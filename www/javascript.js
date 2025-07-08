@@ -114,6 +114,24 @@ window.rssApp = () => {
           }, 0);
         }
         this._attachScrollToTopHandler();
+        // ─── Pull-to-refresh for mobile ────────────────────────────
+        PullToRefresh.init({
+          mainElement: '#app',
+          onRefresh: async () => {
+            // trigger sync and update feed
+            try {
+              const feedTime = await performSync();
+              await pullUserState(await dbPromise);
+              // reload entries from IndexedDB
+              const db = await dbPromise;
+              const rawList = await db.transaction('items', 'readonly').objectStore('items').getAll();
+              this.entries = mapRawItems(rawList, this.formatDate);
+              this.updateCounts();
+            } catch (err) {
+              console.error('Pull-to-refresh sync failed', err);
+            }
+          }
+        });
         // ─── user activity / idle detection ───────────────────────────
         let lastActivity = Date.now();
         const resetActivity = () => { lastActivity = Date.now(); };
