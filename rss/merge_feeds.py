@@ -10,6 +10,7 @@ import requests
 import pprint
 import hashlib
 import redis
+import re
 
 # ─── Redis client for caching raw feed bytes ─────────────────────────────────
 r = redis.Redis(host="localhost", port=6379, db=0)
@@ -127,6 +128,10 @@ def validate_url(url):
     parsed = urlparse(url)
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
+def safe_xml(text):
+    if not isinstance(text, str):
+        return ""
+    return re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', text)
 
 def merge_feeds(feeds_file, output_file):
     """Fetch multiple RSS/Atom feeds, merge entries, and write to an output file."""
@@ -207,9 +212,9 @@ def merge_feeds(feeds_file, output_file):
 
             # Prefer full HTML <content:encoded> if present, otherwise fallback to summary
             if "content" in entry and entry.content:
-                raw_html = entry.content[0].value
+                raw_html = safe_xml(entry.content[0].value)
             else:
-                raw_html = entry.get("summary", "")
+                raw_html = safe_xml(entry.get("summary", ""))
 
             # Emit the HTML inside a CDATA-wrapped <content:encoded> element
             # (so the downstream cleaner can pick up real <p>, <ul>, <li>, etc.)
