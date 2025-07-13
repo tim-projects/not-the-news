@@ -56,7 +56,7 @@ Not The News currently requires:
 
 # Configuration
 Clone the repo:
-```git clone https://github.com/timjefferies/not-the-news.git```
+```git clone https://github.com/tim-projects/not-the-news.git```
 
 For the first run. Edit and rename the config examples in
 www/config/
