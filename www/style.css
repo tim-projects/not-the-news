@@ -839,6 +839,11 @@ span.shuffle-count {
   /* changes color on hover */
 }
 
+.shuffle-btn:hover {
+  background-color: var(--primary);
+  /* changes color on hover */
+}
+
 /* make the label sit left and the switch sit right on one line */
 .modal-content .theme-switch,
 .modal-content .sync-switch,
