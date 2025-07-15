@@ -152,8 +152,8 @@ button.close {
   box-shadow: -1px 1px 0 1px var(--card-shadow-color);
 
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 1px;
+  right: 1px;
   margin: 0;
   padding: 0 1rem 0 1rem;
   border: none;
