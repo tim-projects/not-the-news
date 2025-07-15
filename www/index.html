@@ -84,68 +84,86 @@
     <!-- Settings modal -->
     <div x-show="openSettings" x-cloak class="modal-overlay" @click.self="openSettings = false">
       <div class="modal-content">
+        <button id="back-button" aria-label="Go Back">
+          &#8592; </button>
         <button class="close" @click="openSettings = false">✕</button>
-        <h2>SETTINGS</h2>
+        <div id="main-settings">
+          <h2>SETTINGS</h2>
 
-        <!-- Auto Sync -->
-        <div class="sync-switch">
-          <span class="settings-label">AutoSync Feed? (no to save data)</span>
-          <label class="switch" for="sync-toggle">
-            <span id="sync-text">yes</span>
-            <input type="checkbox" id="sync-toggle">
-            <span class="slider"></span>
-          </label>
+          <div class="settings-group">
+            <label for="sync-toggle">AutoSync Feed? (no to save data)</label>
+            <label class="switch">
+              <input type="checkbox" id="sync-toggle">
+              <span class="slider"></span>
+              <span id="sync-text">yes</span>
+            </label>
+          </div>
+          <div class="settings-group">
+            <label for="theme-toggle">Display theme:</label>
+            <label class="switch">
+              <input type="checkbox" id="theme-toggle">
+              <span class="slider"></span>
+              <span id="theme-text">light</span>
+            </label>
+          </div>
+          <div class="settings-group">
+            <label for="images-toggle">Show images?</label>
+            <label class="switch">
+              <input type="checkbox" id="images-toggle">
+              <span class="slider"></span>
+              <span id="images-text">no</span>
+            </label>
+          </div>
+          <hr>
+          <div class="settings-option">
+            <span>RSS Feeds</span>
+            <button id="configure-rss-feeds-btn" class="configure-button">Configure</button>
+          </div>
+
+          <div class="settings-option">
+            <span>Keyword Blacklist</span>
+            <button id="configure-keyword-blacklist-btn" class="configure-button">Configure</button>
+          </div>
         </div>
         <!-- Theme toggle inside modal -->
-        <div class="theme-switch">
-          <span class="settings-label">Display theme:</span>
-          <label class="switch" for="theme-toggle">
-            <span id="theme-text">light</span>
-            <input type="checkbox" id="theme-toggle">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <!-- Images toggle inside modal -->
-        <div class="images-switch">
-          <span class="settings-label">Show images?</span>
-          <label class="switch" for="images-toggle">
-            <span id="images-text">no</span>
-            <input type="checkbox" id="images-toggle">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <!-- Keywords blacklist -->
-        <div class="settings-group grow">
-          <label for="keywords-blacklist">Keywords Blacklist:</label>
-          <textarea id="keywords-blacklist" class="settings-textarea" placeholder="One keyword per line…"></textarea>
-          <!-- Save button for Keywords -->
-          <button id="save-keywords-btn" class="settings-button">
-            Save
-          </button>
+        <div id="rss-settings-block">
+          <h2>Configure RSS Feeds</h2>
+          <div class="settings-group grow">
+            <textarea id="rss-feeds-textarea" class="settings-textarea"
+              placeholder="Enter RSS feed URLs, one per line"></textarea>
+            <button id="save-rss-btn" class="settings-button">Save RSS Feeds</button>
+            <span id="rss-save-msg" class="save-message"></span>
+          </div>
         </div>
 
-        <!-- RSS feeds list -->
-        <div class="settings-group grow">
-          <label for="rss-feeds">RSS Feeds:</label>
-          <textarea id="rss-feeds" class="settings-textarea" placeholder="One RSS URL per line…"></textarea>
-        </div>
-        <!-- Save button for RSS -->
-        <div class="settings-group">
-          <button id="save-rss-btn" class="settings-button">
-            Save
-          </button>
+        <div id="keywords-settings-block">
+          <h2>Configure Keyword Blacklist</h2>
+          <div class="settings-group grow">
+            <textarea id="keywords-blacklist-textarea" class="settings-textarea"
+              placeholder="Enter keywords, one per line"></textarea>
+
+            <!-- Save button for Keywords -->
+            <button id="save-keywords-btn" class="settings-button">
+              Save
+            </button>
+          </div>
+
+          <!-- RSS feeds list -->
+          <div class="settings-group grow">
+            <span id="keywords-save-msg" class="save-message"></span>
+          </div>
+          <!-- Save button for RSS -->
         </div>
       </div>
+      <!-- New scroll-to-top button -->
+      <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
+        <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24">
+          <path
+            d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z"
+            stroke-width="1.5" />
+        </svg>
+      </button>
     </div>
-    <!-- New scroll-to-top button -->
-    <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
-      <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24">
-        <path
-          d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z"
-          stroke-width="1.5" />
-      </svg>
-    </button>
-  </div>
   </div>
 
 

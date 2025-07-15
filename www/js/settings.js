@@ -149,30 +149,76 @@ export async function initScrollPos(app) {
     if (y) window.scrollTo({ top: y });
   });
 }
+
+// Function to show the RSS Feeds configuration
+function showRssFeeds(app) {
+  app.modalView = 'rss';
+  document.getElementById('main-settings').style.display = 'none';
+  document.getElementById('rss-settings-block').style.display = 'block';
+  document.getElementById('back-button').style.display = 'block'; // Show back button
+  // Load RSS feeds when showing the view
+  fetch(`/load-config?filename=feeds.txt`)
+    .then(r => r.json())
+    .then(data => {
+      app.feeds = data.content || "";
+      const rssArea = document.getElementById("rss-feeds-textarea"); // Updated ID
+      if (rssArea) rssArea.value = app.feeds;
+    })
+    .catch(e => console.error("Error loading feeds:", e));
+}
+
+// Function to show the Keyword Blacklist configuration
+function showKeywordBlacklist(app) {
+  app.modalView = 'keywords';
+  document.getElementById('main-settings').style.display = 'none';
+  document.getElementById('keywords-settings-block').style.display = 'block';
+  document.getElementById('back-button').style.display = 'block'; // Show back button
+  // Load keywords blacklist when showing the view
+  fetch(`/load-config?filename=filter_keywords.txt`)
+    .then(r => r.json())
+    .then(data => (
+      app.keywords = (data.content || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b)).join("\n"),
+      document.getElementById("keywords-blacklist-textarea") && (document.getElementById("keywords-blacklist-textarea").value = app.keywords) // Updated ID
+    ))
+    .catch(e => console.error("Error loading keywords:", e));
+}
+
+// Function to go back to main settings
+function goBackToMainSettings(app) {
+  app.modalView = 'main';
+  document.getElementById('main-settings').style.display = 'block';
+  document.getElementById('rss-settings-block').style.display = 'none';
+  document.getElementById('keywords-settings-block').style.display = 'none';
+  document.getElementById('back-button').style.display = 'none'; // Hide back button
+}
+
 export async function initConfigComponent(app) {
-  // 1) When the modal opens, load the two config files:
+  // Initialize modalView state
+  app.modalView = 'main'; // 'main', 'rss', or 'keywords'
+
+  // 1) When the modal opens, ensure correct view is shown/hidden
   app.$watch("openSettings", value => {
-    if (!value) return;
-
-    // Load keywords blacklist
-    fetch(`/load-config?filename=filter_keywords.txt`)
-      .then(r => r.json())
-      .then(data => (
-        app.keywords = (data.content || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b)).join("\n"),
-        document.getElementById("keywords-blacklist") && (document.getElementById("keywords-blacklist").value = app.keywords)
-      ))
-      .catch(e => console.error("Error loading keywords:", e));
-
-    // Load RSS feeds
-    fetch(`/load-config?filename=feeds.txt`)
-      .then(r => r.json())
-      .then(data => {
-        app.feeds = data.content || "";
-        const rssArea = document.getElementById("rss-feeds");
-        if (rssArea) rssArea.value = app.feeds;
-      })
-      .catch(e => console.error("Error loading feeds:", e));
+    if (value) {
+      // Always show main settings first when opening the modal
+      goBackToMainSettings(app);
+    }
   }); // end app.$watch
+
+  // Wire up the new Configure buttons
+  const rssConfigureBtn = document.getElementById('configure-rss-feeds-btn');
+  if (rssConfigureBtn) {
+    rssConfigureBtn.addEventListener('click', () => showRssFeeds(app));
+  }
+
+  const keywordConfigureBtn = document.getElementById('configure-keyword-blacklist-btn');
+  if (keywordConfigureBtn) {
+    keywordConfigureBtn.addEventListener('click', () => showKeywordBlacklist(app));
+  }
+
+  const backButton = document.getElementById('back-button');
+  if (backButton) {
+    backButton.addEventListener('click', () => goBackToMainSettings(app));
+  }
 
   // Create inline "Saved." message spans if they're not already in the DOM
   const kwBtn = document.getElementById("save-keywords-btn");
@@ -200,7 +246,7 @@ export async function initConfigComponent(app) {
   // 2) Wire up save actions:
   document.getElementById("save-keywords-btn")
     .addEventListener("click", () => {
-      const kwArea = document.getElementById("keywords-blacklist");
+      const kwArea = document.getElementById("keywords-blacklist-textarea"); // Updated ID
       app.keywords = kwArea ? kwArea.value : app.keywords;
       fetch(`/save-config?filename=filter_keywords.txt`, {
         method: "POST",
@@ -221,7 +267,7 @@ export async function initConfigComponent(app) {
 
   document.getElementById("save-rss-btn")
     .addEventListener("click", () => {
-      const rssArea = document.getElementById("rss-feeds");
+      const rssArea = document.getElementById("rss-feeds-textarea"); // Updated ID
       app.feeds = rssArea ? rssArea.value : app.feeds;
       fetch(`/save-config?filename=feeds.txt`, {
         method: "POST",
@@ -239,5 +285,4 @@ export async function initConfigComponent(app) {
         })
         .catch(e => console.error(e));
     });
-}
-
+ }

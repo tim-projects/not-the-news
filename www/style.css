@@ -766,6 +766,99 @@ ul.feed-list,
 /* Textareas for settings */
 
 /* Keywords & RSS boxes: min 5 lines tall, scrollable */
+.modal-content {
+  /* Existing styles */
+  position: relative; /* Ensure this is relative for absolute positioning of back button */
+}
+
+/* Style for the back button */
+#back-button {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: none;
+  border: none;
+  color: var(--fg); /* Or a specific color you prefer */
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: none; /* Hidden by default */
+  padding: 0.5rem;
+  z-index: 10; /* Ensure it's above other content */
+}
+
+#back-button:hover {
+  color: var(--primary); /* Hover effect */
+}
+
+/* Hide the detailed settings blocks by default */
+#rss-settings-block,
+#keywords-settings-block {
+  display: none;
+  flex: 1; /* Allow these blocks to take full height when visible */
+  flex-direction: column; /* Enable column layout for contents */
+  gap: 0.5rem; /* Consistent spacing */
+}
+
+/* Ensure the main settings block is initially visible */
+#main-settings {
+  display: block; /* Or flex, depending on its internal layout */
+  flex: 1; /* Allows main settings to grow */
+  flex-direction: column;
+}
+
+/* Style for the configure buttons */
+.configure-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-left: auto; /* Pushes the button to the right */
+}
+
+.configure-button:hover {
+  background-color: var(--secondary);
+}
+
+/* Style for the container of text and configure button */
+.settings-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--card-border); /* Optional: add a separator */
+}
+
+.settings-option:last-child {
+  border-bottom: none; /* No border for the last item */
+}
+
+.settings-option span {
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+/* Textareas for settings should always fill available space when shown */
+.settings-textarea {
+  flex: 1; /* Make textarea fill available space */
+  min-height: 100px; /* Minimum height for better usability */
+  width: 100%; /* Ensure it spans the full width */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  padding: 0.5rem;
+  border: 1px solid var(--card-border);
+  background-color: var(--card-bg);
+  color: var(--fg);
+  resize: vertical; /* Allow vertical resizing */
+}
+
+/* Ensure save message span is styled correctly */
+.save-message {
+  font-size: 0.9em;
+  color: var(--primary);
+  margin-left: 0.5em;
+  display: none;
+}
 .settings-textarea {
   width: 100%;
   flex: 1;
