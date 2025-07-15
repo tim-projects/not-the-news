@@ -382,7 +382,6 @@ select#filter-selector option:hover {
   font-size: 1rem;
   font-family: inherit;
   flex-shrink: 0;
-  /* Removed margin-left: auto; here as it will be handled by the .settings-group */
 }
 
 .switch input {
@@ -424,17 +423,14 @@ select#filter-selector option:hover {
 }
 
 /* The text for the toggles (e.g., "yes", "dark", "no") */
-/* Positioned relative to its parent (which is now .settings-group with flex) */
 #theme-text,
 #sync-text,
 #images-text {
   font-size: 1rem;
   font-family: inherit;
-  /* Removed absolute positioning and negative margins */
   white-space: nowrap;
   margin-right: 0.5rem; /* Space between the text and the toggle switch */
   text-align: right; /* Align text to the right before the switch */
-  /* These elements should be placed *before* the switch in HTML to use flex effectively */
 }
 
 
@@ -572,7 +568,7 @@ select#filter-selector option:hover {
 }
 
 .modal {
-  display: none;
+  /* Removed display: none; from here */
   position: fixed; /* Changed to fixed for full screen overlay */
   z-index: 9999;
   left: 0;
@@ -581,10 +577,21 @@ select#filter-selector option:hover {
   height: 100%;
   overflow: auto;
   background-color: rgba(0, 0, 0, 0.5);
-  display: flex; /* Use flex to center the modal-content */
+  display: flex; /* This will be the default display when JavaScript sets it visible */
   justify-content: center; /* Center horizontally */
   align-items: center; /* Center vertically */
+  /* Initially hide with opacity and pointer-events, which JavaScript will control */
+  opacity: 0;
+  pointer-events: none; /* Make it unclickable when hidden */
+  transition: opacity 0.3s ease; /* Smooth transition for fade in/out */
 }
+
+/* Add a class that your JavaScript will toggle to show the modal */
+.modal.is-visible {
+  opacity: 1;
+  pointer-events: auto; /* Make it clickable when visible */
+}
+
 
 .modal-content {
   background-color: var(--card-bg);
@@ -598,7 +605,7 @@ select#filter-selector option:hover {
   padding: 2rem;
   padding-top: 3.5rem; /* More padding at the top to clear back/close buttons */
   width: 90%;
-  max-width: 800px; /* **Increased max-width significantly for desktop usability** */
+  max-width: 800px; /* Increased max-width significantly for desktop usability */
   max-height: 90vh; /* Constrain total modal height */
   overflow: hidden; /* Children will scroll internally */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -606,6 +613,16 @@ select#filter-selector option:hover {
   min-height: 300px; /* Ensure a minimum height */
   box-sizing: border-box;
   position: relative; /* Ensure it's relative for absolute positioning of internal buttons */
+  /* Initial state for content (optional, if you want content to fade/scale in) */
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* When the modal is visible, animate the content into place */
+.modal.is-visible .modal-content {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 .modal-content form {
@@ -617,9 +634,6 @@ select#filter-selector option:hover {
   margin-top: 1rem;
   font-size: 1.5em; /* Make modal H2s more prominent and readable */
 }
-
-/* Removed redundant .modal-content textarea rule as .settings-textarea is specific */
-
 
 @keyframes fadeOutUp {
   from {
@@ -698,23 +712,6 @@ ul.feed-list,
   /* clip any child transform that goes beyond the right edge */
 }
 
-/* Modal overlay covers full screen */
-/* This is now handled by the .modal rule above */
-/*
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-*/
-
 /* Grouping & spacing */
 .settings-group {
   margin-top: 0.5rem;
@@ -736,7 +733,6 @@ ul.feed-list,
 /* Make labels within settings-group not shrink */
 .settings-group label {
   flex-shrink: 0;
-  /* This is the label for the setting (e.g., "AutoSync Feed?") */
 }
 
 /* Style for the text near the toggle switches */
@@ -744,7 +740,6 @@ ul.feed-list,
   flex-shrink: 0; /* Prevent it from shrinking */
   margin-right: 0.5rem; /* Space between the text and the toggle switch */
   text-align: right; /* Align text to the right before the switch */
-  /* The order in HTML for these: <label> Text </label> <span id="*-text">yes/no/dark</span> <div class="switch"> */
 }
 
 /* (Optional) Ensure your save-button groups don’t steal extra space */
