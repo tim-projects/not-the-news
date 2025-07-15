@@ -597,7 +597,7 @@ select#filter-selector option:hover {
   padding: 2rem;
   padding-top: 3.5rem;
   width: 90%;
-  max-width: 800px;
+  max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto; /* Allow content to scroll if it overflows */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
