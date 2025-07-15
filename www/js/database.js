@@ -264,7 +264,8 @@ export async function toggleHidden(state, link) {
   // persist hidden list to IDB
   const db = await dbPromise;
   const tx = db.transaction("userState", "readwrite");
-  tx.objectStore("userState").put({ key: "hidden", value: JSON.stringify(app.hidden) });
+  tx.objectStore("userState").put({ key: "hidden", value: JSON.stringify(state.hidden) });
+
   await tx.done;
   if (typeof state.updateCounts === 'function') {
     state.updateCounts();
@@ -297,13 +298,11 @@ export async function loadHidden() {
   const entry = await db.transaction('userState', 'readonly')
     .objectStore('userState').get('hidden');
   let raw = [];
-
   if (entry && entry.value != null) {
     try {
       raw = JSON.parse(entry.value);
     } catch {
       console.warn('loadHidden: invalid JSON in entry.value', entry.value);
-      raw = [];
     }
   }
   if (!Array.isArray(raw)) {
@@ -334,7 +333,6 @@ export async function loadStarred() {
       raw = JSON.parse(entry.value);
     } catch (e) {
       console.warn('loadStarred: invalid JSON in entry.value', entry.value);
-      raw = [];
     }
   }
   if (!Array.isArray(raw)) {
