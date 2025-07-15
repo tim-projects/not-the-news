@@ -9,26 +9,21 @@
   <link rel="icon"
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='white'/%3E%3Ctext x='32' y='50' font-size='36' font-family='Arial, sans-serif' font-weight='bold' fill='black' text-anchor='middle' letter-spacing='-2'%3ENTN%3C/text%3E%3C/svg%3E">
 
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <div id="app" x-data="rssApp()" x-init="init()">
-    <div id="loading-screen" x-show="loading" class="loading-screen">Loading…</div><!-- Loading screen -->
-    <header id="header" x-show="!loading" class="header"><!-- Header -->
-      <div id="ntn-title">
+    <div id="loading-screen" x-show="loading" class="loading-screen">Loading…</div><header id="header" x-show="!loading" class="header"><div id="ntn-title">
         <h2>Not The News</h2>
       </div>
       <div id="header-options">
-        <!-- feed‐filter dropdown -->
         <select id="filter-selector" x-model="filterMode" @change="setFilter(filterMode)" class="filter-select">
           <option value="unread">Unread</option>
           <option value="starred">Starred</option>
           <option value="hidden">Hidden</option>
           <option value="all">All</option>
         </select>
-        <!-- Shuffle button -->
         <button id="shuffle-button" @click="shuffleFeed()" class="shuffle-btn" title="Shuffle">
           <svg class="shuffle-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"
             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,7 +35,6 @@
           </svg>
           <span x-text="shuffleCount" class="shuffle-count"></span>
         </button>
-        <!-- Settings cog opens modal -->
         <button id="settings-button" @click="openSettings = true" class="settings-btn" aria-label="Settings">
           <svg class="gear-icon size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="1.5">
@@ -51,9 +45,7 @@
         </button>
       </div>
     </header>
-    <!-- Feed items -->
     <main id="items" x-show="!loading">
-      <!-- Repeat each entry via template so Alpine’s x-for can clone it properly -->
       <template x-for="entry in filteredEntries" :key="entry.id">
         <div class="item entry" x-bind:data-link="entry.id"
           x-transition:leave="transition ease-in duration-200 transform"
@@ -62,7 +54,6 @@
             <button class="close" @click="toggleHidden(entry.id)" :class="{ 'hidden': isHidden(entry.id) }"
               aria-label="Close">✕</button>
             <div x-html="entry.title"></div>
-            <!-- Star/unstar button -->
             <button class="star" @click="toggleStar(entry.id)" :class="{'starred': isStarred(entry.id)}"
               aria-label="Star">★</button>
           </div>
@@ -81,12 +72,13 @@
       </template>
     </main>
 
-    <!-- Settings modal -->
     <div x-show="openSettings" x-cloak class="modal-overlay" @click.self="openSettings = false">
       <div class="modal-content">
         <button id="back-button" aria-label="Go Back">
-          &#8592; </button>
+          &#8592;
+        </button>
         <button class="close" @click="openSettings = false">✕</button>
+        
         <div id="main-settings">
           <h2>SETTINGS</h2>
 
@@ -125,7 +117,7 @@
             <button id="configure-keyword-blacklist-btn" class="configure-button">Configure</button>
           </div>
         </div>
-        <!-- Theme toggle inside modal -->
+
         <div id="rss-settings-block">
           <h2>Configure RSS Feeds</h2>
           <div class="settings-group grow">
@@ -141,39 +133,27 @@
           <div class="settings-group grow">
             <textarea id="keywords-blacklist-textarea" class="settings-textarea"
               placeholder="Enter keywords, one per line"></textarea>
-
-            <!-- Save button for Keywords -->
             <button id="save-keywords-btn" class="settings-button">
               Save
             </button>
-          </div>
-
-          <!-- RSS feeds list -->
-          <div class="settings-group grow">
             <span id="keywords-save-msg" class="save-message"></span>
           </div>
-          <!-- Save button for RSS -->
         </div>
       </div>
-      <!-- New scroll-to-top button -->
-      <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
-        <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24">
-          <path
-            d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z"
-            stroke-width="1.5" />
-        </svg>
-      </button>
     </div>
+    <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
+      <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24">
+        <path
+          d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z"
+          stroke-width="1.5" />
+      </svg>
+    </button>
   </div>
 
 
-  <!-- RSS Parser v3.13.0 -->
-  <!-- https://cdn.jsdelivr.net/npm/rss-parser@3.13.0/dist/rss-parser.min.js -->
   <script defer src="libs/rss-parser.min.js"></script>
   <script type="module" defer src="javascript.js"></script>
-  <!-- Alpine.js v3.x.x -->
-  <!-- https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" -->
   <script defer src="libs/alpine.3.x.x.js"></script>
 </body>
 
-</html>
+</html> 

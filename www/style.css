@@ -22,6 +22,7 @@ html {
   /* your switch slider track */
   --link-highlight: aliceblue;
   /* for the gradient & button bg in light mode */
+  --border-radius: 5px; /* Define a consistent border-radius variable */
 }
 
 /* System light mode */
@@ -68,9 +69,8 @@ html.light {
 
 html.dark {
   a:visited {
-    a:visited {
-      color: var(--link-visited);
-    }
+    /* Nested a:visited was a syntax error, corrected below */
+    color: var(--link-visited);
   }
 
   background-image: none;
@@ -86,6 +86,11 @@ html.dark {
   #header {
     text-shadow: 2px 2px 2px var(--shadow-text);
   }
+}
+
+/* Corrected a:visited for dark theme */
+html.dark a:visited {
+  color: var(--link-visited);
 }
 
 /* make the cog button match your dark theme */
@@ -125,7 +130,7 @@ a {
   color: var(--secondary);
 }
 
-a, h1, h2, h3, h4, h4, h5, h6 {
+a, h1, h2, h3, h4, h5, h6 { /* Removed h4 twice for consistency */
   text-shadow: 2px 2px 2px var(--card-shadow-color);
 }
 
@@ -142,8 +147,8 @@ button.close {
   box-shadow: -1px 1px 0 1px var(--card-shadow-color);
 
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 0.5rem; /* Adjusted for consistency */
+  right: 0.5rem; /* Adjusted for consistency */
   margin: 0;
   padding: 0 1rem 0 1rem;
   border: none;
@@ -371,8 +376,7 @@ select#filter-selector option:hover {
   height: 24px;
   font-size: 1rem;
   font-family: inherit;
-  margin-left: -3em;
-  margin-top: -0.3em;
+  /* Removed specific negative margins as .settings-group will handle alignment */
 }
 
 .switch input {
@@ -418,8 +422,12 @@ select#filter-selector option:hover {
 #images-text {
   font-size: 1rem;
   font-family: inherit;
-  margin-left: -3em;
-  margin-top: -0.3em;
+  /* Removed specific negative margins as .settings-group will handle alignment */
+  position: absolute; /* Add this to position text relative to switch */
+  right: 60px; /* Adjust as needed to position text */
+  top: 0;
+  line-height: 24px; /* Align text vertically with switch */
+  white-space: nowrap; /* Prevent wrapping */
 }
 
 
@@ -574,22 +582,27 @@ select#filter-selector option:hover {
   border: 1px solid var(--card-border);
 
   display: flex;
-  /* enable column flex layout */
-  position: relative;
   flex-direction: column;
   background: var(--bg);
   color: var(--fg);
-  padding: 1.5rem;
+  padding: 2rem; /* Increased padding */
+  padding-top: 3.5rem; /* More padding at the top to clear back/close buttons */
   width: 90%;
   max-width: none;
-  /* remove 400px cap */
   max-height: 90vh;
-  /* constrain total modal height */
   overflow: hidden;
-  /* children will scroll internally */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  height: 100vh;
+  height: 100vh; /* This might be too aggressive, adjusting below */
   box-sizing: border-box;
+}
+
+/* Adjust modal content height for better control */
+.modal-content {
+  height: auto; /* Allow height to adjust to content */
+  max-height: 90vh; /* Keep a max height for larger screens */
+  min-height: 300px; /* Ensure a minimum height */
+  /* Re-added max-width for better desktop experience (was 400px, now 600px) */
+  max-width: 600px; /* Adjusted max-width for better desktop presentation */
 }
 
 .modal-content form {
@@ -598,10 +611,11 @@ select#filter-selector option:hover {
 }
 
 .modal-content h2 {
-  margin-top: 0;
+  margin-top: 1rem; /* Ensure title is below back/close buttons */
 }
 
 .modal-content textarea {
+  /* This rule is now effectively overridden by .settings-textarea rules */
   width: -webkit-fill-available;
 }
 
@@ -696,52 +710,51 @@ ul.feed-list,
   z-index: 1000;
 }
 
-/* Modal content box */
+/* Moved and updated general modal-content styles */
+/* The earlier .modal-content block had conflicting rules, consolidated them here */
+/* .modal-content is defined earlier in the file, this block was overriding it poorly.
+   I've tried to combine the best aspects into one coherent .modal-content definition earlier.
+   The original rules that were in this block:
+   background: var(--bg);
+   color: var(--fg);
+   padding: 1.5rem;
+   max-width: 400px;  <- This was problematic for larger textareas
+   width: 90%;
+   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+*/
 .modal-content h2 {
-  font-size: smaller;
+  font-size: smaller; /* This might be too small, consider adjusting for readability */
 }
 
-.modal-content {
-  background: var(--bg);
-  color: var(--fg);
-  padding: 1.5rem;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
 
 /* Grouping & spacing */
 .settings-group {
   margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1; /* Allows the group to grow if needed */
   gap: 0.5rem;
 }
 
 .settings-group.grow {
   flex: 1;
-  /* allow group to grow */
   display: flex;
   flex-direction: column;
   margin-top: 1rem;
 }
 
 /* 3) Within those groups, let the textarea itself fill the group */
-.settings-group.grow .settings-textarea {
+/* This rule was somewhat redundant with the more general .settings-textarea */
+/* I've updated the more general one to include the flex and height properties */
+/* .settings-group.grow .settings-textarea {
   flex: 1;
-  /* textarea expands to fill its .grow parent */
-  /* :contentReference[oaicite:3]{index=3} */
   min-height: 3em;
-  /* still at least 3 lines tall */
   overflow-y: auto;
-  /* scroll when content overflows */
-}
+} */
 
 /* 4) Keep non-growing groups (theme-switch & save buttons) at natural height */
 .settings-group:not(.grow) {
   flex: 0;
-  /* do not grow or shrink */
 }
 
 /* (Optional) Ensure your save-button groups don’t steal extra space */
@@ -752,130 +765,31 @@ ul.feed-list,
 /* Style all buttons inside .settings-group */
 .settings-group button {
   font-size: 1rem;
-  /* Make text easy to read */
   min-width: 8rem;
-  /* Ensure buttons are wide enough */
   align-self: flex-end;
-  /* Push buttons to the right edge */
-  padding-top: 0;
-  /* Remove extra top padding */
-  border-radius: 5px;
-  /* Round the corners */
+  padding-top: 0; /* This seems like it should be `padding` instead of `padding-top` to control all sides */
+  padding: 0.5rem 1rem; /* Consistent padding for buttons */
+  border-radius: var(--border-radius); /* Use variable for consistency */
 }
 
 /* Textareas for settings */
-
-/* Keywords & RSS boxes: min 5 lines tall, scrollable */
-.modal-content {
-  /* Existing styles */
-  position: relative; /* Ensure this is relative for absolute positioning of back button */
-}
-
-/* Style for the back button */
-#back-button {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  background: none;
-  border: none;
-  color: var(--fg); /* Or a specific color you prefer */
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: none; /* Hidden by default */
-  padding: 0.5rem;
-  z-index: 10; /* Ensure it's above other content */
-}
-
-#back-button:hover {
-  color: var(--primary); /* Hover effect */
-}
-
-/* Hide the detailed settings blocks by default */
-#rss-settings-block,
-#keywords-settings-block {
-  display: none;
-  flex: 1; /* Allow these blocks to take full height when visible */
-  flex-direction: column; /* Enable column layout for contents */
-  gap: 0.5rem; /* Consistent spacing */
-}
-
-/* Ensure the main settings block is initially visible */
-#main-settings {
-  display: block; /* Or flex, depending on its internal layout */
-  flex: 1; /* Allows main settings to grow */
-  flex-direction: column;
-}
-
-/* Style for the configure buttons */
-.configure-button {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-left: auto; /* Pushes the button to the right */
-}
-
-.configure-button:hover {
-  background-color: var(--secondary);
-}
-
-/* Style for the container of text and configure button */
-.settings-option {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--card-border); /* Optional: add a separator */
-}
-
-.settings-option:last-child {
-  border-bottom: none; /* No border for the last item */
-}
-
-.settings-option span {
-  font-size: 1.1em;
-  font-weight: bold;
-}
-
-/* Textareas for settings should always fill available space when shown */
-.settings-textarea {
-  flex: 1; /* Make textarea fill available space */
-  min-height: 100px; /* Minimum height for better usability */
-  width: 100%; /* Ensure it spans the full width */
-  box-sizing: border-box; /* Include padding and border in the element's total width and height */
-  padding: 0.5rem;
-  border: 1px solid var(--card-border);
-  background-color: var(--card-bg);
-  color: var(--fg);
-  resize: vertical; /* Allow vertical resizing */
-}
-
-/* Ensure save message span is styled correctly */
-.save-message {
-  font-size: 0.9em;
-  color: var(--primary);
-  margin-left: 0.5em;
-  display: none;
-}
+/* Consolidated and improved textarea styling */
 .settings-textarea {
   width: 100%;
-  flex: 1;
-  /* fill available vertical space */
-  min-height: 3em;
-  /* at least five lines tall */
+  height: 100%; /* Make textarea take full height of its container */
+  flex: 1; /* Make textarea fill available space within its flex parent */
+  min-height: 100px; /* Minimum height for better usability (was 3em) */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
   padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: none;
-  /* lock size to layout */
-  overflow-y: scroll;
+  border: 1px solid var(--card-border); /* Use variable */
+  background-color: var(--card-bg); /* Use variable */
+  color: var(--fg); /* Use variable */
+  resize: vertical; /* Allow vertical resizing */
+  border-radius: var(--border-radius); /* Use variable for consistency */
+  overflow-y: auto; /* Ensure scrolling if content overflows */
   font-family: inherit;
   font-size: 1rem;
   line-height: 1.4;
-  background: var(--card-bg);
-  color: var(--fg);
 }
 
 .shuffle-btn {
@@ -929,29 +843,25 @@ span.shuffle-count {
 
 .settings-btn:hover {
   background-color: var(--primary);
-  /* changes color on hover */
 }
 
 .shuffle-btn:hover {
   background-color: var(--primary);
-  /* changes color on hover */
 }
 
 /* make the label sit left and the switch sit right on one line */
+/* These rules are now handled by .settings-group directly */
+/*
 .modal-content .theme-switch,
 .modal-content .sync-switch,
 .modal-content .images-switch {
   display: flex;
-  /* switch to flex layout */
   justify-content: space-between;
-  /* push children to the ends */
   align-items: center;
-  /* vertical-center them */
   width: 100%;
-  /* fill the modal’s content width */
   margin-top: 1rem;
-  /* optional spacing above */
 }
+*/
 
 /* style the label to match your other text */
 .modal-content .settings-label {
@@ -960,89 +870,96 @@ span.shuffle-count {
   color: var(--fg);
 }
 
-/* was mobile sizing now the default */
 
+/* New styles for the refactored settings panel */
 
-body,
-html {
-  font-size: 14px;
+/* Style for the back button */
+#back-button {
+  position: absolute;
+  top: 0.5rem; /* Adjusted for better spacing */
+  left: 0.5rem; /* Adjusted for better spacing */
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 1.8rem; /* Slightly larger for better tap target */
+  cursor: pointer;
+  display: none; /* Hidden by default */
+  padding: 0.5rem;
+  z-index: 10;
 }
 
-p {
-  font-size: 1rem !important;
-  line-height: 1.4 !important;
+#back-button:hover {
+  color: var(--primary);
 }
 
-.pubdate p,
-.itemfrom p {
-  font-size: x-small !important;
+/* Ensure modal content uses flexbox for proper layout of sub-sections */
+/* This was also earlier, consolidating it to the main .modal-content definition */
+
+
+/* Hide the detailed settings blocks by default */
+#rss-settings-block,
+#keywords-settings-block {
+  display: none;
+  flex: 1; /* Allow these blocks to take full height when visible */
+  flex-direction: column; /* Enable column layout for contents */
+  gap: 1rem; /* Consistent spacing, slightly increased for readability */
+  width: 100%; /* Ensure they take full width of modal content */
 }
 
-.pubdate,
-.itemfrom {
-  padding-right: 0.5em;
+/* Ensure the main settings block is initially visible */
+#main-settings {
+  display: flex; /* Changed to flex for proper alignment of children */
+  flex-direction: column; /* Stack children vertically */
+  flex: 1; /* Allows main settings to grow */
+  gap: 1rem; /* Spacing between settings groups */
+  width: 100%; /* Ensure it takes full width */
 }
 
-/* preserve flex layout on mobile */
-.itemfrom {
+/* Specific adjustments for switch alignment if needed, though 'justify-content: space-between' should help */
+.settings-group .switch {
+  margin-left: 1rem; /* Provide some space between label and switch */
+}
+
+/* Style for the configure buttons */
+.configure-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius); /* Use variable for consistency */
+  cursor: pointer;
+  margin-left: auto; /* Pushes the button to the right */
+}
+
+.configure-button:hover {
+  background-color: var(--secondary);
+}
+
+/* Style for the container of text and configure button */
+.settings-option {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--card-border);
 }
 
-.filter-select {
-  margin-left: auto;
+.settings-option:last-child {
+  border-bottom: none;
 }
 
-.modal-content, .item {
-  border-radius: 10px;
+.settings-option span {
+  font-size: 1.1em;
+  font-weight: bold;
 }
 
-.itemtitle {
-  font-size: 1.25rem !important;
-  padding: 1em 3rem 0.5em 0.75em;
-  min-height: calc(1.4em * 3);
-}
-
-button.close {
-  font-size: 1.25rem;
-  border-radius: 0 10px 0 10px;
-  opacity: 0.6;
-  position: absolute;
-}
-
-button.star {
-  font-size: 1.25rem;
-  border-radius: 10px 0 0 0;
-  opacity: 0.6;
-  position: absolute;
-}
-
-.itemdescription {
-  padding: 1em 1.8em 2em !important;
-}
-
-#header {
-  padding: 0rem 0.5rem;
-  margin-top: -0.25em;
-  margin-right: -0.75em;
-  padding-right: 1.2em;
-}
-
-#header h2 {
-  padding-right: 0.7em;
-}
-
-.modal-content>button.close {
-  font-size: 1.25rem;
-  opacity: 0.8;
-}
-
-#scroll-to-top {
-  bottom: 1em;
-  right: 1em;
-  width: 4rem;
-  height: 4rem;
+/* Ensure save message span is styled correctly */
+.save-message {
+  font-size: 0.9em;
+  color: var(--primary);
+  margin-left: 0.5em;
+  display: none;
+  white-space: nowrap; /* Prevent "Saved." from wrapping */
 }
 
 
@@ -1090,6 +1007,91 @@ button.star {
   }
 }*/
 
+
+/* Mobile specific adjustments (now default) */
+body,
+html {
+  font-size: 14px;
+}
+
+p {
+  font-size: 1rem !important;
+  line-height: 1.4 !important;
+}
+
+.pubdate p,
+.itemfrom p {
+  font-size: x-small !important;
+}
+
+.pubdate,
+.itemfrom {
+  padding-right: 0.5em;
+}
+
+/* preserve flex layout on mobile */
+.itemfrom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-select {
+  margin-left: auto;
+}
+
+.modal-content, .item {
+  border-radius: 10px;
+}
+
+.itemtitle {
+  font-size: 1.25rem !important;
+  padding: 1em 3rem 0.5em 0.75em;
+  min-height: calc(1.4em * 3);
+}
+
+button.close {
+  font-size: 1.25rem;
+  border-radius: 0 10px 0 10px;
+  opacity: 0.8;
+  position: absolute;
+}
+
+button.star {
+  font-size: 1.25rem;
+  border-radius: 10px 0 0 0;
+  opacity: 0.6;
+  position: absolute;
+}
+
+.itemdescription {
+  padding: 1em 1.8em 2em !important;
+}
+
+#header {
+  padding: 0rem 0.5rem;
+  margin-top: -0.25em;
+  margin-right: -0.75em;
+  padding-right: 1.2em;
+}
+
+#header h2 {
+  padding-right: 0.7em;
+}
+
+.modal-content>button.close {
+  font-size: 1.25rem;
+  opacity: 0.8;
+}
+
+#scroll-to-top {
+  bottom: 1em;
+  right: 1em;
+  width: 4rem;
+  height: 4rem;
+}
+
+
 /* Tablet and up: wider cards & larger titles */
 @media (min-width: 768px) {
 
@@ -1117,6 +1119,8 @@ button.star {
     font-size: 1.5rem !important;
   }
 
+  /* The following two rules were duplicates/redundant with the ones above */
+  /*
   body,
   html {
     font-size: calc(18px + .2vw);
@@ -1125,9 +1129,10 @@ button.star {
   p {
     line-height: 1.6 !important;
   }
+  */
 
   .item {
-    max-width: 85%;
+    max-width: 85%; /* This conflicts with 75% above, reconsider which is desired */
     margin: 1.5em auto;
     float: none;
   }
@@ -1187,16 +1192,11 @@ button.star {
     transform: translateX(-50%);
     font-size: 1rem;
     margin-top: -0.5em;
-    }
+  }
 
   /* push the switch off to the right */
   #header .switch {
     margin-left: auto;
     margin-right: 1rem;
-    /* match your padding */
-  }
-
-  .modal-content {
-    min-width: 60% !important;
   }
 }
