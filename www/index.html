@@ -72,71 +72,89 @@
       </template>
     </main>
 
-    <div x-show="openSettings" x-cloak class="modal-overlay" @click.self="openSettings = false">
-      <div class="modal-content">
-        <button id="back-button" aria-label="Go Back">
+    <div x-show="openSettings" x-cloak
+         class="modal" @click.self="openSettings = false"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+      <div class="modal-content"
+           x-transition:enter="transition ease-out duration-300 transform"
+           x-transition:enter-start="opacity-0 -translate-y-4"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-200 transform"
+           x-transition:leave-start="opacity-100 translate-y-0"
+           x-transition:leave-end="opacity-0 -translate-y-4">
+        <button id="back-button" @click="goBackInSettings()" aria-label="Go Back">
           &#8592;
         </button>
         <button class="close" @click="openSettings = false">✕</button>
         
-        <div id="main-settings">
+        <div id="main-settings" x-show="currentSettingsPanel === 'main'">
           <h2>SETTINGS</h2>
 
           <div class="settings-group">
             <label for="sync-toggle">AutoSync Feed? (no to save data)</label>
-            <label class="switch">
-              <input type="checkbox" id="sync-toggle">
-              <span class="slider"></span>
-              <span id="sync-text">yes</span>
-            </label>
+            <div class="d-flex align-items-center"> <span id="sync-text" x-text="autoSyncFeed ? 'yes' : 'no'"></span>
+                <label class="switch">
+                    <input type="checkbox" id="sync-toggle" x-model="autoSyncFeed" @change="saveSetting('autoSyncFeed', autoSyncFeed)">
+                    <span class="slider"></span>
+                </label>
+            </div>
           </div>
           <div class="settings-group">
             <label for="theme-toggle">Display theme:</label>
-            <label class="switch">
-              <input type="checkbox" id="theme-toggle">
-              <span class="slider"></span>
-              <span id="theme-text">light</span>
-            </label>
+            <div class="d-flex align-items-center">
+                <span id="theme-text" x-text="theme === 'dark' ? 'dark' : 'light'"></span>
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle" x-model="isDarkTheme" @change="toggleTheme()">
+                    <span class="slider"></span>
+                </label>
+            </div>
           </div>
           <div class="settings-group">
             <label for="images-toggle">Show images?</label>
-            <label class="switch">
-              <input type="checkbox" id="images-toggle">
-              <span class="slider"></span>
-              <span id="images-text">no</span>
-            </label>
+            <div class="d-flex align-items-center">
+                <span id="images-text" x-text="imagesEnabled ? 'yes' : 'no'"></span>
+                <label class="switch">
+                    <input type="checkbox" id="images-toggle" x-model="imagesEnabled" @change="saveSetting('imagesEnabled', imagesEnabled)">
+                    <span class="slider"></span>
+                </label>
+            </div>
           </div>
           <hr>
           <div class="settings-option">
             <span>RSS Feeds</span>
-            <button id="configure-rss-feeds-btn" class="configure-button">Configure</button>
+            <button id="configure-rss-feeds-btn" class="configure-button" @click="showPanel('rss')">Configure</button>
           </div>
 
           <div class="settings-option">
             <span>Keyword Blacklist</span>
-            <button id="configure-keyword-blacklist-btn" class="configure-button">Configure</button>
+            <button id="configure-keyword-blacklist-btn" class="configure-button" @click="showPanel('keywords')">Configure</button>
           </div>
         </div>
 
-        <div id="rss-settings-block">
+        <div id="rss-settings-block" x-show="currentSettingsPanel === 'rss'">
           <h2>Configure RSS Feeds</h2>
           <div class="settings-group grow">
-            <textarea id="rss-feeds-textarea" class="settings-textarea"
+            <textarea id="rss-feeds-textarea" class="settings-textarea" x-model="rssFeedsInput"
               placeholder="Enter RSS feed URLs, one per line"></textarea>
-            <button id="save-rss-btn" class="settings-button">Save RSS Feeds</button>
-            <span id="rss-save-msg" class="save-message"></span>
+            <button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save RSS Feeds</button>
+            <span id="rss-save-msg" class="save-message" x-text="rssSaveMessage" x-show="rssSaveMessage"></span>
           </div>
         </div>
 
-        <div id="keywords-settings-block">
+        <div id="keywords-settings-block" x-show="currentSettingsPanel === 'keywords'">
           <h2>Configure Keyword Blacklist</h2>
           <div class="settings-group grow">
-            <textarea id="keywords-blacklist-textarea" class="settings-textarea"
+            <textarea id="keywords-blacklist-textarea" class="settings-textarea" x-model="keywordBlacklistInput"
               placeholder="Enter keywords, one per line"></textarea>
-            <button id="save-keywords-btn" class="settings-button">
+            <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">
               Save
             </button>
-            <span id="keywords-save-msg" class="save-message"></span>
+            <span id="keywords-save-msg" class="save-message" x-text="keywordsSaveMessage" x-show="keywordsSaveMessage"></span>
           </div>
         </div>
       </div>
@@ -156,4 +174,4 @@
   <script defer src="libs/alpine.3.x.x.js"></script>
 </body>
 
-</html> 
+</html>
