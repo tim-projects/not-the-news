@@ -14,9 +14,8 @@
 
 <body>
   <div id="app" x-data="rssApp()" x-init="init()">
-    <div x-data="{ syncProgress: 0, syncActive: false }"
-      :class="{ 'sync-active': syncActive, 'sync-inactive': !syncActive }" id="sync-progress-bar-container">
-      <div id="sync-progress-bar" :style="`width: ${syncProgress}%`"></div>
+     <div :class="{ 'sync-active': syncActive, 'sync-inactive': !syncActive }" id="sync-progress-bar-container">
+     <div id="sync-progress-bar" :style="`width: ${syncProgress}%`"></div>
     </div>
     <div id="loading-screen" x-show="loading" class="loading-screen">Loading…</div>
     <header id="header" x-show="!loading" class="header">
