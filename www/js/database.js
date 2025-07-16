@@ -206,11 +206,11 @@ export async function toggleStar(state, link) {
   } else {
     state.starred.splice(idx, 1);
   }
-  // persist updated starred list to IDB
-  const db = await dbPromise;
-  const tx = db.transaction("userState", "readwrite");
-  tx.objectStore("userState").put({ key: "starred", value: JSON.stringify(state.starred) });
-  await tx.done;
+  // persist updated starred list to IDB in background
+  dbPromise.then(db => {
+    const tx = db.transaction("userState", "readwrite");
+    tx.objectStore("userState").put({ key: "starred", value: JSON.stringify(state.starred) });
+  });
   // refresh filter counts in header
   if (typeof state.updateCounts === 'function') {
     state.updateCounts();
@@ -221,7 +221,7 @@ export async function toggleStar(state, link) {
     console.log(`Offline: queued star change (${action})`);
   } else {
     try {
-      await fetch("/user-state/starred/delta", {
+      fetch("/user-state/starred/delta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(delta)
@@ -261,12 +261,11 @@ export async function toggleHidden(state, link) {
     // remove it
     state.hidden.splice(idx, 1);
   }
-  // persist hidden list to IDB
-  const db = await dbPromise;
-  const tx = db.transaction("userState", "readwrite");
-  tx.objectStore("userState").put({ key: "hidden", value: JSON.stringify(state.hidden) });
-
-  await tx.done;
+  // persist hidden list to IDB in background
+  dbPromise.then(db => {
+    const tx = db.transaction("userState", "readwrite");
+    tx.objectStore("userState").put({ key: "hidden", value: JSON.stringify(state.hidden) });
+  });
   if (typeof state.updateCounts === 'function') {
     state.updateCounts();
   }
@@ -277,7 +276,7 @@ export async function toggleHidden(state, link) {
     console.log(`Offline: queued hidden change (${action})`);
   } else {
     try {
-      await fetch("/user-state/hidden/delta", {
+      fetch("/user-state/hidden/delta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(delta)
