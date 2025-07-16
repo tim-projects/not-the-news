@@ -497,6 +497,34 @@ select#filter-selector option:hover {
   display: none;
 }
 
+#sync-progress-bar-container {
+    position: fixed; /* Stays at the top even when scrolling */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 1px; /* The desired height */
+    background-color: transparent; /* Initially transparent or a subtle background */
+    z-index: 9999; /* Ensure it's on top of everything */
+    overflow: hidden; /* Important to hide the bar when not in use */
+    transition: opacity 0.3s ease-in-out; /* Smooth fade in/out */
+    opacity: 0; /* Hidden by default */
+}
+
+#sync-progress-bar-container.sync-active {
+    opacity: 1; /* Visible when sync is active */
+}
+
+#sync-progress-bar-container.sync-inactive {
+    opacity: 0; /* Hidden when sync is inactive */
+}
+
+#sync-progress-bar {
+    height: 100%;
+    background-color: #4CAF50; /* Green, or any color you prefer */
+    width: 0%; /* Start at 0% width */
+    transition: width 0.1s linear; /* Smooth progress animation */
+}
+
 #loading-screen {
   font-family: 'Playfair Display', serif;
   position: fixed;
