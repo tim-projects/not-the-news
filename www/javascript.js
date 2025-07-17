@@ -12,14 +12,18 @@ if ('serviceWorker' in navigator) {
 
 import {
   dbPromise, bufferedChanges, pushUserState, performSync, performFullSync, pullUserState, processPendingOperations,
-  isStarred, toggleStar, isHidden, toggleHidden, loadHidden, loadStarred, pruneStaleHidden, saveCurrentDeck, loadCurrentDeck
+  isStarred, toggleStar, isHidden, toggleHidden, loadHidden, loadStarred, pruneStaleHidden, saveCurrentDeck, loadCurrentDeck,
+  saveShuffleState, loadShuffleState // NEW: Added saveShuffleState, loadShuffleState
 } from "./js/database.js";
 import {
   scrollToTop, attachScrollToTopHandler, formatDate,
   setFilter, updateCounts, loadFilterMode,
-  shuffleFeed as handleShuffleFeed, mapRawItems
+  shuffleArray, // CHANGED: Directly import shuffleArray
+  mapRawItems
 } from "./js/functions.js";
-import { initSync, initTheme, initImages, initScrollPos, initConfigComponent, loadSyncEnabled, loadImagesEnabled } from "./js/settings.js";
+import { initSync, initTheme, initImages, initScrollPos, initConfigComponent, loadSyncEnabled, loadImagesEnabled,
+  initShuffleCount // NEW: Added initShuffleCount
+} from "./js/settings.js";
 
 window.rssApp = () => ({
   openSettings: false,
@@ -31,7 +35,7 @@ window.rssApp = () => ({
   imagesEnabled: null,
   syncEnabled: null,
   isShuffled: false,
-  shuffleCount: 2,
+  shuffleCount: 2, // CHANGED: Initial shuffleCount is 2
   currentSettingsPanel: 'main',
   autoSyncFeed: false,
   theme: 'light',
@@ -41,7 +45,7 @@ window.rssApp = () => ({
   keywordBlacklistInput: '',
   keywordsSaveMessage: '',
   loading: true,
-  currentDeckGuids: [], // New state variable for the current deck
+  currentDeckGuids: [],
 
   scrollToTop,
   _attachScrollToTopHandler: attachScrollToTopHandler,
@@ -50,7 +54,7 @@ window.rssApp = () => ({
   isStarred(link) { return isStarred(this, link); },
   toggleStar(link) { toggleStar(this, link); },
   setFilter(mode) { setFilter(this, mode); },
-  shuffleFeed() { handleShuffleFeed(this); },
+  // shuffleFeed() { handleShuffleFeed(this); }, // REMOVED: shuffleFeed is now defined directly below
 
   async init() {
     this.loading = true;
@@ -62,9 +66,12 @@ window.rssApp = () => ({
       initTheme();
       initSync(this);
       initImages(this);
+
+      await initShuffleCount(this); // NEW: Initialize shuffleCount with daily reset logic
+
       this.hidden = await loadHidden();
       this.starred = await loadStarred();
-      this.currentDeckGuids = await loadCurrentDeck(); // Load saved deck
+      this.currentDeckGuids = await loadCurrentDeck();
 
       const db = await dbPromise;
       const count = await db.transaction('items', 'readonly').objectStore('items').count();
@@ -159,7 +166,10 @@ window.rssApp = () => ({
 
         if (unreadInDeck.length === 0) {
             console.log("All items in current deck hidden. Loading next deck...");
-            this.shuffleCount++; // Increment shuffle counter
+            this.shuffleCount++; // Increment shuffle counter (as per request)
+            const today = new Date(); // Get today's date for saving shuffle state
+            today.setHours(0,0,0,0); // Set to midnight for comparison
+            await saveShuffleState(this.shuffleCount, today); // Save the updated shuffle count
             await this.loadNextDeck();
         }
     }
@@ -170,7 +180,7 @@ window.rssApp = () => ({
     const allItems = await db.transaction('items', 'readonly').objectStore('items').getAll();
     const hiddenSet = new Set(this.hidden.map(h => h.id));
 
-    // Get all unread items
+    // Get all unread items, sorted by publication date (most recent first)
     const unreadItems = allItems.filter(item => !hiddenSet.has(item.guid))
                                 .sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
 
@@ -181,6 +191,49 @@ window.rssApp = () => ({
     await saveCurrentDeck(this.currentDeckGuids); // Save the new deck
     this.updateCounts(); // Update counts based on the new deck
     this.scrollToTop(); // Scroll to top for the new deck
+  },
+
+  async shuffleFeed() { // NEW: This is the new shuffle logic directly in rssApp
+    if (this.shuffleCount <= 0) {
+      console.log("No shuffles remaining today.");
+      // You could add UI feedback here, e.g., an alert or a message on the button
+      return;
+    }
+
+    const allUnreadItems = this.entries.filter(entry => !this.hidden.some(h => h.id === entry.id));
+
+    // Filter out items already in the current deck if we want strictly *new* items
+    const currentDeckGuidsSet = new Set(this.currentDeckGuids);
+    const eligibleItemsForShuffle = allUnreadItems.filter(item => !currentDeckGuidsSet.has(item.id));
+
+    if (eligibleItemsForShuffle.length === 0) {
+        console.log("No new unread items available to shuffle into a deck.");
+        // UI feedback if no more distinct unread items are left
+        return;
+    }
+
+    // Shuffle eligible items and pick up to 10
+    const shuffledEligibleItems = shuffleArray(eligibleItemsForShuffle);
+    const newDeckItems = shuffledEligibleItems.slice(0, 10);
+
+    this.currentDeckGuids = newDeckItems.map(item => item.id);
+    await saveCurrentDeck(this.currentDeckGuids); // Save the new shuffled deck
+
+    this.shuffleCount--;
+    const today = new Date();
+    today.setHours(0,0,0,0); // Set to midnight for comparison
+    await saveShuffleState(this.shuffleCount, today); // Save updated shuffle count and reset date
+
+    this.updateCounts(); // Update UI counts
+    this.scrollToTop();  // Scroll to top
+    this.isShuffled = true; // Indicate that it was shuffled for potential UI state
+
+    console.log(`Shuffled. Remaining shuffles: ${this.shuffleCount}`);
+    // Optional: Update a UI element showing shuffle count, if it exists
+    const shuffleCountSpan = document.getElementById('shuffle-count-display');
+    if (shuffleCountSpan) {
+        shuffleCountSpan.textContent = this.shuffleCount;
+    }
   },
 
   _lastFilterHash: "",

@@ -267,3 +267,33 @@ export async function loadCurrentDeck() {
   }
   return Array.isArray(guids) ? guids : [];
 }
+
+// NEW: Save and Load Shuffle State
+export async function saveShuffleState(shuffleCount, lastResetDate) {
+    const db = await dbPromise;
+    const tx = db.transaction('userState', 'readwrite');
+    tx.objectStore('userState').put({ key: 'shuffleCount', value: shuffleCount });
+    tx.objectStore('userState').put({ key: 'lastShuffleResetDate', value: lastResetDate.toISOString() });
+    await tx.done;
+}
+
+export async function loadShuffleState() {
+    const db = await dbPromise;
+    const shuffleCountEntry = await db.transaction('userState', 'readonly').objectStore('userState').get('shuffleCount');
+    const lastResetDateEntry = await db.transaction('userState', 'readonly').objectStore('userState').get('lastShuffleResetDate');
+
+    let count = 2; // Default starting count
+    let lastReset = null;
+
+    if (shuffleCountEntry && typeof shuffleCountEntry.value === 'number') {
+        count = shuffleCountEntry.value;
+    }
+    if (lastResetDateEntry && typeof lastResetDateEntry.value === 'string') {
+        try {
+            lastReset = new Date(lastResetDateEntry.value);
+        } catch (e) {
+            console.warn("Invalid lastShuffleResetDate:", lastResetDateEntry.value, e);
+        }
+    }
+    return { shuffleCount: count, lastShuffleResetDate: lastReset };
+}
