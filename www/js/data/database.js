@@ -1,4 +1,4 @@
-import { openDB } from "../../../libs/idb.js";
+import { openDB } from '../../libs/idb.js';
 
 export const bufferedChanges = [];
 export const pendingOperations = [];

@@ -1,9 +1,9 @@
-import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './js/data/database.js';
-import { appState } from './js/data/appState.js';
-import { formatDate, shuffleArray, mapRawItems } from './js/helpers/dataUtils.js';
-import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './js/helpers/userStateUtils.js';
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './js/ui/uiInitializers.js';
-import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './js/ui/uiUpdaters.js';
+import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js';
+import { appState } from './data/appState.js';
+import { formatDate, shuffleArray, mapRawItems } from './helpers/dataUtils.js';
+import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
+import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -24,7 +24,8 @@ if ('serviceWorker' in navigator) {
         .catch(error => console.warn('Service Worker registration failed:', error));
 }
 
-window.rssApp = () => {
+// Function to initialize the Alpine.js application state and methods
+function initializeRssApp() {
     const app = appState(); // Initialize the core app state
 
     // Assign methods from imported modules to the app state
@@ -40,7 +41,7 @@ window.rssApp = () => {
     });
 
     // Main initialization function for the Alpine.js app
-    app.initApp = async function() {
+    app.initApp = async function() { // Renamed from init to initApp
         this.loading = true;
         let syncCompletionTime = 0;
         const db = await dbPromise;
@@ -205,7 +206,10 @@ window.rssApp = () => {
     };
 
     return app;
-};
+}
+
+// Expose initializeRssApp globally so Alpine can find it
+window.rssApp = initializeRssApp;
 
 // Global event listener for image loading (outside Alpine.js app)
 document.addEventListener("load", e => {
