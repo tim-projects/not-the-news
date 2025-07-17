@@ -54,7 +54,6 @@ window.rssApp = () => ({
   isStarred(link) { return isStarred(this, link); },
   toggleStar(link) { toggleStar(this, link); },
   setFilter(mode) { setFilter(this, mode); },
-  // shuffleFeed() { handleShuffleFeed(this); }, // REMOVED: shuffleFeed is now defined directly below
 
   async init() {
     this.loading = true;
@@ -193,7 +192,7 @@ window.rssApp = () => ({
     this.scrollToTop(); // Scroll to top for the new deck
   },
 
-  async shuffleFeed() { // NEW: This is the new shuffle logic directly in rssApp
+  async shuffleFeed() { // This method is now directly in rssApp
     if (this.shuffleCount <= 0) {
       console.log("No shuffles remaining today.");
       // You could add UI feedback here, e.g., an alert or a message on the button
@@ -226,7 +225,9 @@ window.rssApp = () => ({
 
     this.updateCounts(); // Update UI counts
     this.scrollToTop();  // Scroll to top
-    this.isShuffled = true; // Indicate that it was shuffled for potential UI state
+
+    this._cachedFilteredEntries = null; // Clear cache to force re-render of the deck
+    this.isShuffled = false; // Reset shuffle state, important for UI button feedback
 
     console.log(`Shuffled. Remaining shuffles: ${this.shuffleCount}`);
     // Optional: Update a UI element showing shuffle count, if it exists
