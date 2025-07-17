@@ -1,12 +1,16 @@
+// app.js
+
 // Import necessary modules
 import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js';
 import { appState as initialAppState } from './data/appState.js'; // Renamed import to avoid confusion
-import { formatDate, shuffleArray, mapRawItems } from './helpers/dataUtils.js';
+// Updated import: deck functions are now part of dataUtils.js
+import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
-import { getShuffleCountDisplay } from './ui/uiElements.js';
+import { getShuffleCountDisplay } from './ui/uiElements.js'; // This import is not used here but kept for completeness
 import { createAndShowSaveMessage } from './ui/uiUpdaters.js';
+
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -40,7 +44,6 @@ document.addEventListener("load", e => {
 document.addEventListener('alpine:init', () => {
     Alpine.data('rssApp', () => ({
         // Reactive properties for Alpine to observe.
-        // **FIX:** Call initialAppState() to get the initial state object
         loading: initialAppState().loading, // Initialize with the default from appState
         filterMode: initialAppState().filterMode,
         openSettings: initialAppState().openSettings,
@@ -59,7 +62,6 @@ document.addEventListener('alpine:init', () => {
         // Ensure memoization properties are initialized too, as they are part of appState.js
         _lastFilterHash: initialAppState()._lastFilterHash,
         _cachedFilteredEntries: initialAppState()._cachedFilteredEntries,
-
 
         // Computed property for filtered entries (copied directly from your appState.js logic)
         get filteredEntries() {
@@ -93,17 +95,6 @@ document.addEventListener('alpine:init', () => {
                     break;
             }
 
-            // Apply keyword blacklist (this was in your original app.js version, but missing from the appState.js getter you provided)
-            // Ensure this logic is consistent between appState.js and app.js if filteredEntries is also in appState.js
-            const keywordBlacklist = this.keywordBlacklistInput.split('\n').filter(Boolean).map(kw => kw.trim().toLowerCase());
-            if (keywordBlacklist.length > 0) {
-                filtered = filtered.filter(entry => {
-                    const title = (entry.title || '').toLowerCase();
-                    const description = (entry.description || '').toLowerCase();
-                    return !keywordBlacklist.some(keyword => title.includes(keyword) || description.includes(keyword));
-                });
-            }
-
             this._cachedFilteredEntries = filtered;
             this._lastFilterHash = currentHash;
             return this._cachedFilteredEntries;
@@ -116,13 +107,38 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 // Load initial settings and user state from DB/localStorage
-                // These loadStateValue calls are fine, as you expect them to update the initial state
                 this.syncEnabled = await loadStateValue(db, 'syncEnabled', true);
                 this.imagesEnabled = await loadStateValue(db, 'imagesEnabled', true);
                 this.filterMode = await loadFilterMode(db);
+
+                // --- IMPORTANT ORDER: Load entries, then hidden/starred, then currentDeckGuids ---
+                // Load feed items first, as hidden pruning and deck validation depend on them.
+                await this.loadFeedItemsFromDB(); // Populates this.entries
+
+                // Load hidden and starred after entries, as pruneStaleHidden depends on this.entries
                 this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
                 this.starred = await this.loadArrayStateFromDB(db, 'starred');
+
+                // Prune stale hidden entries immediately after loading all entries and hidden state
+                // This ensures an accurate `hidden` array before deck validation.
+                const itemsCount = await db.transaction('items', 'readonly').objectStore('items').count();
+                let syncCompletionTime = Date.now(); // Default if no sync occurs
+                if (itemsCount === 0 && isOnline()) {
+                     const { feedTime } = await performFullSync(db);
+                     syncCompletionTime = feedTime;
+                     // Re-load hidden/starred if a full sync just happened to ensure consistency
+                     this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
+                     this.starred = await this.loadArrayStateFromDB(db, 'starred');
+                     await this.loadFeedItemsFromDB(); // Reload entries again if full sync added new ones
+                }
+                this.hidden = await pruneStaleHidden(db, this.entries, syncCompletionTime); // Use this.entries
+
+                // Now load currentDeckGuids
                 this.currentDeckGuids = await loadCurrentDeck(db);
+
+                // *** NEW LOGIC: Validate and potentially regenerate currentDeckGuids ***
+                await validateAndRegenerateCurrentDeck(this); // Pass 'this' (Alpine scope)
+                // *******************************************************************
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
                 const today = new Date();
@@ -131,7 +147,7 @@ document.addEventListener('alpine:init', () => {
                     this.shuffleCount = shuffleCount;
                 } else {
                     this.shuffleCount = 2; // Reset daily limit
-                    await saveShuffleState(db, 3, today);
+                    await saveShuffleState(db, 2, today); // Initialize with 2 shuffles for the day
                 }
 
                 // Initialize UI components and their listeners, passing `this` (Alpine scope)
@@ -162,20 +178,6 @@ document.addEventListener('alpine:init', () => {
                 this.$watch('keywordBlacklistInput', value => saveStateValue(db, 'keywordBlacklist', value));
                 this.$watch('filterMode', value => setFilterMode(this, db, value)); // Save filter mode on change
 
-                // Initial feed sync if no items or needed
-                const itemsCount = await db.transaction('items', 'readonly').objectStore('items').count();
-                let syncCompletionTime = Date.now(); // Default to now if no sync occurs
-                if (itemsCount === 0 && isOnline()) {
-                    const { feedTime } = await performFullSync(db);
-                    syncCompletionTime = feedTime;
-                    // Reload state after initial full sync
-                    this.hidden = await this.loadArrayStateFromDB(db, 'hidden'); // Use this.loadArrayStateFromDB
-                    this.starred = await this.loadArrayStateFromDB(db, 'starred'); // Use this.loadArrayStateFromDB
-                }
-
-                // Load feed items from DB
-                await this.loadFeedItemsFromDB(); // New helper method
-                this.hidden = await pruneStaleHidden(db, this.entries, syncCompletionTime); // Use this.entries
                 this.updateCounts();
                 await initScrollPosition(this); // Restore scroll position after initial render
 
@@ -190,9 +192,11 @@ document.addEventListener('alpine:init', () => {
                             // Re-load data after background sync to ensure UI updates
                             this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
                             this.starred = await this.loadArrayStateFromDB(db, 'starred');
-                            await this.loadFeedItemsFromDB();
+                            await this.loadFeedItemsFromDB(); // Reload entries after sync
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
+                            // After background sync, re-validate current deck as items might have changed
+                            await validateAndRegenerateCurrentDeck(this); // Pass 'this' (Alpine scope)
                         } catch (error) {
                             console.error('Background partial sync failed', error);
                         }
@@ -229,15 +233,12 @@ document.addEventListener('alpine:init', () => {
                         await this.loadFeedItemsFromDB(); // Reload items after sync
                         this.hidden = await pruneStaleHidden(db, this.entries, now); // Prune hidden based on current time
                         this.updateCounts();
+                        // After periodic sync, re-validate current deck
+                        await validateAndRegenerateCurrentDeck(this); // Pass 'this' (Alpine scope)
                     } catch (error) {
                         console.error("Partial sync failed", error);
                     }
                 }, SYNC_INTERVAL_MS);
-
-                // Load next deck if current deck is empty after initial load
-                if (this.currentDeckGuids.length === 0 && this.entries.length > 0) {
-                    await this.loadNextDeck();
-                }
 
             } catch (error) {
                 console.error("Initialization failed:", error);
@@ -249,19 +250,18 @@ document.addEventListener('alpine:init', () => {
         // --- Alpine.js methods (now part of the data object) ---
 
         // Helper to load array states from DB
+        // This method can stay here as it's a general app utility for loading arrays
         async loadArrayStateFromDB(db, key) {
-            // **FIX**: loadStateValue is used here instead of loadArrayState from database.js
-            // If loadStateValue can correctly return an array, this is fine.
-            // If loadArrayState is specifically for arrays, consider using that.
-            const stored = await loadStateValue(db, key, []); // loadStateValue provides a default []
-            return Array.isArray(stored) ? stored : []; // Ensure it's an array
+            const stored = await loadStateValue(db, key, []);
+            return Array.isArray(stored) ? stored : [];
         },
 
         // Helper to load feed items from DB and update entries
+        // This method should stay in app.js as it directly updates the app.entries state
         async loadFeedItemsFromDB() {
             const db = await dbPromise;
             const rawItemsFromDb = await db.transaction('items', 'readonly').objectStore('items').getAll();
-            this.entries = mapRawItems(rawItemsFromDb, formatDate); // Use mapRawItems, formatDate from helpers
+            this.entries = mapRawItems(rawItemsFromDb, formatDate);
         },
 
         updateCounts() {
@@ -288,70 +288,14 @@ document.addEventListener('alpine:init', () => {
             this.filterMode = mode; // Update Alpine's reactive property
             // The $watch for filterMode will handle saving to DB
         },
+        // Original loadNextDeck and shuffleFeed methods now call the imported functions.
         async loadNextDeck() {
-            const db = await dbPromise;
-            // Ensure entries is up-to-date and correctly mapped before filtering
-            await this.loadFeedItemsFromDB(); // Call helper to populate this.entries
-
-            const hiddenSet = new Set(this.hidden.map(h => h.id));
-
-            // Filter from this.entries (which uses 'id'), not raw 'allItems' from DB
-            const unreadItems = this.entries.filter(item => !hiddenSet.has(item.id)) // Filter using item.id
-                                            .sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
-
-            const nextDeck = unreadItems.slice(0, 10);
-
-            if (nextDeck.length > 0) {
-                this.currentDeckGuids = nextDeck.map(item => item.id); // Map using item.id
-                await saveCurrentDeck(db, this.currentDeckGuids); // Pass db argument
-            } else {
-                this.currentDeckGuids = []; // Clear the deck if no more unread items
-                await saveCurrentDeck(db, []); // Persist empty deck
-                createAndShowSaveMessage('No more unread items to load!', 'info');
-            }
-
-            this.updateCounts();
-            this.scrollToTop();
+            await loadNextDeck(this); // Call the imported function from dataUtils
         },
 
-            async shuffleFeed() {
-            if (this.shuffleCount <= 0) {
-                createAndShowSaveMessage('No shuffles left for today!', 'error'); // Use UI feedback
-                return;
-            }
-
-            const db = await dbPromise;
-            await this.loadFeedItemsFromDB(); // Ensure entries is up-to-date
-
-            const allUnhidden = this.entries.filter(entry => !this.hidden.some(h => h.id === entry.id));
-
-            // CRITICAL FIX: Shuffle from ALL unhidden items, not just those *not* in the current deck.
-            // A shuffle should give you a fresh, random set.
-            const eligibleItemsForShuffle = allUnhidden;
-
-            if (eligibleItemsForShuffle.length === 0) {
-                createAndShowSaveMessage('No unread items to shuffle.', 'info'); // Use UI feedback
-                return;
-            }
-
-            const shuffledEligibleItems = shuffleArray(eligibleItemsForShuffle);
-            const newDeckItems = shuffledEligibleItems.slice(0, 10);
-
-            this.currentDeckGuids = newDeckItems.map(item => item.id);
-            await saveCurrentDeck(db, this.currentDeckGuids); // Pass db argument
-
-            this.shuffleCount--;
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            await saveShuffleState(db, this.shuffleCount, today); // Pass db argument
-
-            this.updateCounts();
-            this.scrollToTop();
-            this.isShuffled = true; // Keep this if you need it for UI state
-
-            // Remove direct DOM manipulation; Alpine will handle this if bound correctly in HTML
-            // console.log(`Shuffled. Remaining shuffles: ${this.shuffleCount}`); // Remove if not needed for debugging
-        },    
+        async shuffleFeed() {
+            await shuffleFeed(this); // Call the imported function from dataUtils
+        },
         // The save settings logic for textareas is now simpler as x-model binds directly
         // and $watch saves to DB. The buttons simply trigger the $watch.
         async saveRssFeeds() {

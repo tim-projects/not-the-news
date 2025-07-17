@@ -1,3 +1,10 @@
+// www/js/helpers/dataUtils.js
+
+// Import necessary modules for deck functions
+import { dbPromise, saveStateValue } from '../data/database.js';
+import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
+import { createAndShowSaveMessage } from '../ui/uiUpdaters.js'; // Assuming this utility is available
+
 export function formatDate(dateStr) {
     const now = new Date();
     const date = new Date(dateStr);
@@ -61,4 +68,100 @@ export function mapRawItems(rawList, fmtFn) {
             timestamp: ts
         };
     }).sort((a, b) => b.timestamp - a.timestamp);
+}
+
+/**
+ * Validates the current deck and regenerates it if all items are hidden or no longer exist.
+ * This method is intended to be called during app initialization and after data syncs.
+ * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
+ */
+export async function validateAndRegenerateCurrentDeck(app) {
+    const db = await dbPromise;
+    const hiddenSet = new Set(app.hidden.map(h => h.id));
+
+    // Filter out items from the current deck that are now hidden or no longer exist in entries
+    const validGuidsInDeck = app.currentDeckGuids.filter(guid => {
+        const entry = app.entries.find(e => e.id === guid);
+        return entry && !hiddenSet.has(guid);
+    });
+
+    // If the deck is empty or all items are invalid, generate a new deck
+    if (validGuidsInDeck.length === 0 && app.entries.length > 0) {
+        console.log("Current deck is empty or invalid. Generating a new deck...");
+        await loadNextDeck(app); // Call the shared loadNextDeck, passing app scope
+    } else if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
+        // If some items were removed from the deck, update and save it
+        console.log("Current deck contained hidden/non-existent items. Updating the deck.");
+        app.currentDeckGuids = validGuidsInDeck;
+        await saveCurrentDeck(db, app.currentDeckGuids);
+    }
+}
+
+/**
+ * Loads the next set of unread items into the current deck.
+ * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
+ */
+export async function loadNextDeck(app) {
+    const db = await dbPromise;
+    // Ensure entries is up-to-date and correctly mapped before filtering
+    await app.loadFeedItemsFromDB(); // Call helper to populate app.entries
+
+    const hiddenSet = new Set(app.hidden.map(h => h.id));
+
+    // Filter from app.entries (which uses 'id'), not raw 'allItems' from DB
+    const unreadItems = app.entries.filter(item => !hiddenSet.has(item.id)) // Filter using item.id
+                                    .sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
+
+    const nextDeck = unreadItems.slice(0, 10); // Take the next 10 items
+
+    if (nextDeck.length > 0) {
+        app.currentDeckGuids = nextDeck.map(item => item.id); // Map using item.id
+        await saveCurrentDeck(db, app.currentDeckGuids); // Save the new deck
+    } else {
+        app.currentDeckGuids = []; // Clear the deck if no more unread items
+        await saveCurrentDeck(db, []); // Persist empty deck
+        createAndShowSaveMessage('No more unread items to load!', 'info');
+    }
+
+    app.updateCounts();
+    app.scrollToTop();
+}
+
+/**
+ * Shuffles all unhidden items and loads a new deck from them.
+ * Decrements the daily shuffle count.
+ * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
+ */
+export async function shuffleFeed(app) {
+    if (app.shuffleCount <= 0) {
+        createAndShowSaveMessage('No shuffles left for today!', 'error'); // Use UI feedback
+        return;
+    }
+
+    const db = await dbPromise;
+    await app.loadFeedItemsFromDB(); // Ensure entries is up-to-date
+
+    const allUnhidden = app.entries.filter(entry => !app.hidden.some(h => h.id === entry.id));
+
+    const eligibleItemsForShuffle = allUnhidden;
+
+    if (eligibleItemsForShuffle.length === 0) {
+        createAndShowSaveMessage('No unread items to shuffle.', 'info'); // Use UI feedback
+        return;
+    }
+
+    const shuffledEligibleItems = shuffleArray(eligibleItemsForShuffle);
+    const newDeckItems = shuffledEligibleItems.slice(0, 10); // Get the first 10 shuffled items
+
+    app.currentDeckGuids = newDeckItems.map(item => item.id);
+    await saveCurrentDeck(db, app.currentDeckGuids); // Save the new shuffled deck
+
+    app.shuffleCount--;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    await saveShuffleState(db, app.shuffleCount, today); // Save updated shuffle state
+
+    app.updateCounts();
+    app.scrollToTop();
+    app.isShuffled = true;
 }
