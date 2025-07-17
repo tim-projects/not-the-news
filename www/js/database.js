@@ -11,13 +11,13 @@ export function isOnline() {
   }
 
 // Alpine.js setters for progress bar
-export function setSyncProgress(progress) {
+function setSyncProgress(progress) {
     const appRoot = document.getElementById('app');
     if (appRoot && appRoot.__x) {
         appRoot.__x.$data.syncProgress = progress;
     }
 }
-export function setSyncActive(active) {
+function setSyncActive(active) {
     const appRoot = document.getElementById('app');
     if (appRoot && appRoot.__x) {
         appRoot.__x.$data.syncActive = active;
@@ -62,6 +62,7 @@ export async function performSync() {
     return Date.now();
   }
   const db = await dbPromise;
+  setSyncActive(true); // Start progress bar
 
   // 1) fetch serverTime and compute cutoff
   const { time: serverTimeStr } = await fetchWithRetry('/time').then(r => r.json());
@@ -86,9 +87,9 @@ export async function performSync() {
     await Promise.all(toDelete.map(g => txDel.objectStore('items').delete(g)));
     await txDel.done;
   }
-  // Combine total items for calculation: new items + existing items to update lastSync
-  const totalItemsToProcess = missing.length + survivors.length;
-  let processedItemsCount = 0;
+  let processedItems = 0;
+  const totalItems = serverGuids.length; // Total items to process
+  setSyncProgress(0); // Initialize progress
 
   // 5) fetch missing items in batches (break up TXs to avoid locks)
   const missing = serverGuids.filter(g => !localGuids.has(g));
@@ -108,8 +109,8 @@ export async function performSync() {
       txUp.objectStore('items').put(item);
     });
     await txUp.done;
-    processedItemsCount += batch.length;
-    setSyncProgress(processedItemsCount / totalItemsToProcess * 100);
+    processedItems += batch.length;
+    setSyncProgress(processedItems / totalItems * 100);
   }
   // 6) update lastSync on survivors in separate TXs
   const survivors = serverGuids.filter(g => localGuids.has(g));
@@ -125,6 +126,8 @@ export async function performSync() {
       }
     }
     await txUp2.done;
+    setSyncActive(false); // Hide progress bar
+    setSyncProgress(0); // Reset progress
   }
   return serverTime;
 }
@@ -194,18 +197,11 @@ export async function pushUserState(db, buffered = bufferedChanges) {
 
 // Integrate into your sync driver
 export async function performFullSync() {
-    setSyncActive(true); // Activate progress bar for the full sync duration
-    setSyncProgress(0); // Ensure it starts from 0
-    try {
-        const db = await dbPromise;
-        const feedTime = await performSync(); // This updates its own progress
-        const stateTime = await pullUserState(db); // User state changes don't add to this progress bar, but happen within the active time
-        await pushUserState(db);
-        return { feedTime, stateTime };
-    } finally {
-        setSyncActive(false); // Deactivate no matter what (success or failure)
-        setSyncProgress(0); // Reset progress
-    }
+  const db = await dbPromise;
+  const feedTime = await performSync();
+  const stateTime = await pullUserState(db);
+  await pushUserState(db);
+  return { feedTime, stateTime };
 }
 
 
