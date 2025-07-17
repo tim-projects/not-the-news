@@ -718,6 +718,26 @@ a:hover {
   border: 1px solid var(--card-border);
   opacity: 0.8;
   box-shadow: 1px 1px 5px var(--card-shadow-color);
+  /* Add these new properties: */
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Add these new hover, focus, and active states: */
+.filter-select:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+.filter-select:focus {
+  box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
+  background-color: var(--primary);
+  color: white;
+}
+
+.filter-select:active {
+  background-color: var(--primary);
+  color: white;
 }
 
 .filter-select:focus-visible {
