@@ -1,4 +1,4 @@
-import { dbPromise, saveStateValue, loadArrayState, saveArrayState, pendingOperations, isOnline } from '../data/database.js';
+import { dbPromise, saveStateValue, loadArrayState, saveArrayState, pendingOperations, isOnline, loadStateValue } from '../data/database.js';
 
 export async function toggleStar(app, guid) {
     const db = await dbPromise;
