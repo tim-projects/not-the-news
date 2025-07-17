@@ -1,18 +1,21 @@
-import { openDB } from "../../libs/idb.js";window.openDB = openDB;
+import { openDB } from "../../libs/idb.js";
+window.openDB = openDB;
 export const bufferedChanges = [];
 export const pendingOperations = [];
 
-export function isOnline() { return navigator.onLine; }
+export const isOnline = () => navigator.onLine;
 
 export const dbPromise = openDB('not-the-news-db', 2, {
   upgrade(db, oldVersion) {
-    if (oldVersion < 1) { const store = db.createObjectStore('items', { keyPath: 'guid' });store.createIndex('by-lastSync', 'lastSync'); }
+    if (oldVersion < 1) { const store = db.createObjectStore('items', { keyPath: 'guid' }); store.createIndex('by-lastSync', 'lastSync'); }
     if (oldVersion < 2) { db.createObjectStore('userState', { keyPath: 'key' }); }
   }
 });
+
 async function fetchWithRetry(url, options = {}, retries = 3, backoff = 500) {
-  if (!isOnline()) { throw new Error('Currently offline'); }
-  try { return await fetch(url, options); } catch (err) {
+  if (!isOnline()) throw new Error('Currently offline');
+  try { return await fetch(url, options); }
+  catch (err) {
     if (retries === 0) throw err;
     await new Promise(r => setTimeout(r, backoff));
     return fetchWithRetry(url, options, retries - 1, backoff * 2);
@@ -22,24 +25,19 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoff = 500) {
 export async function performSync() {
   if (!isOnline()) { console.log('Skipping sync while offline'); return Date.now(); }
   const db = await dbPromise;
-
   const { time: serverTimeStr } = await fetchWithRetry('/time').then(r => r.json());
   const serverTime = Date.parse(serverTimeStr);
   const staleCutoff = serverTime - 30 * 86400 * 1000;
-
   const serverGuids = await fetchWithRetry('/guids').then(r => r.json());
-
   const txRead = db.transaction('items', 'readonly');
   const localItems = await txRead.objectStore('items').getAll();
   const localGuids = new Set(localItems.map(it => it.guid));
-
   const toDelete = localItems.filter(it => !serverGuids.includes(it.guid) && it.lastSync < staleCutoff).map(it => it.guid);
   if (toDelete.length) {
     const txDel = db.transaction('items', 'readwrite');
     await Promise.all(toDelete.map(g => txDel.objectStore('items').delete(g)));
     await txDel.done;
   }
-
   const missing = serverGuids.filter(g => !localGuids.has(g));
   const BATCH = 50;
   for (let i = 0; i < missing.length; i += BATCH) {
@@ -115,7 +113,7 @@ export async function performFullSync() {
   return { feedTime, stateTime };
 }
 
-export function isStarred(state, link) { return state.starred.some(entry => entry.id === link); }
+export const isStarred = (state, link) => state.starred.some(entry => entry.id === link);
 
 export async function toggleStar(state, link) {
   const idx = state.starred.findIndex(entry => entry.id === link);
@@ -133,11 +131,7 @@ export async function toggleStar(state, link) {
     console.log(`Offline: queued star change (${action})`);
   } else {
     try {
-      fetch("/user-state/starred/delta", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(delta)
-      });
+      fetch("/user-state/starred/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(delta) });
     } catch (err) {
       console.error("Failed to sync star change:", err);
       pendingOperations.push({ type: 'starDelta', data: delta });
@@ -145,7 +139,7 @@ export async function toggleStar(state, link) {
   }
 }
 
-export function isHidden(app, link) { return app.hidden.some(entry => entry.id === link); }
+export const isHidden = (app, link) => app.hidden.some(entry => entry.id === link);
 
 export async function toggleHidden(state, link) {
   const idx = state.hidden.findIndex(entry => entry.id === link);
@@ -163,11 +157,7 @@ export async function toggleHidden(state, link) {
     console.log(`Offline: queued hidden change (${action})`);
   } else {
     try {
-      fetch("/user-state/hidden/delta", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(delta)
-      });
+      fetch("/user-state/hidden/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(delta) });
     } catch (err) {
       console.error("Failed to sync hidden change:", err);
       pendingOperations.push({ type: 'hiddenDelta', data: delta });
@@ -208,11 +198,9 @@ export async function pruneStaleHidden(entries, serverTime) {
   }
   if (!Array.isArray(storedHidden)) storedHidden = [];
   if (!Array.isArray(entries) || entries.length === 0 || !entries.every(e => e && typeof e.id === 'string')) { return storedHidden; }
-
   const validIds = new Set(entries.map(e => e.id.trim().toLowerCase()));
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
   const now = serverTime;
-
   const pruned = storedHidden.filter(item => {
     const idNorm = String(item.id).trim().toLowerCase();
     const keepBecauseInFeed = validIds.has(idNorm);
@@ -236,12 +224,8 @@ export async function processPendingOperations() {
     try {
       switch (op.type) {
         case 'pushUserState': await pushUserState(await dbPromise, op.data); break;
-        case 'starDelta':
-          await fetch("/user-state/starred/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
-          break;
-        case 'hiddenDelta':
-          await fetch("/user-state/hidden/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
-          break;
+        case 'starDelta': await fetch("/user-state/starred/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) }); break;
+        case 'hiddenDelta': await fetch("/user-state/hidden/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) }); break;
         default: console.warn(`Unknown op: ${op.type}`);
       }
     } catch (e) {
@@ -268,7 +252,6 @@ export async function loadCurrentDeck() {
   return Array.isArray(guids) ? guids : [];
 }
 
-// NEW: Save and Load Shuffle State
 export async function saveShuffleState(shuffleCount, lastResetDate) {
     const db = await dbPromise;
     const tx = db.transaction('userState', 'readwrite');
@@ -281,10 +264,8 @@ export async function loadShuffleState() {
     const db = await dbPromise;
     const shuffleCountEntry = await db.transaction('userState', 'readonly').objectStore('userState').get('shuffleCount');
     const lastResetDateEntry = await db.transaction('userState', 'readonly').objectStore('userState').get('lastShuffleResetDate');
-
-    let count = 2; // Default starting count
+    let count = 2;
     let lastReset = null;
-
     if (shuffleCountEntry && typeof shuffleCountEntry.value === 'number') {
         count = shuffleCountEntry.value;
     }
