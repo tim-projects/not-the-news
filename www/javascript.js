@@ -38,8 +38,6 @@ window.rssApp = () => {
     syncEnabled: null,
     isShuffled: false,              // Track whether we're in shuffled mode
     shuffleCount: 10,               // How many shuffles remain
-    syncProgress: 0, // Current sync progress (0-100)
-    syncActive: false, // Is a sync currently active?
 
     loading: true,
 

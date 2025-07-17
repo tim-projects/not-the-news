@@ -8,20 +8,6 @@ export const pendingOperations = [];
 // helper to detect network state
 export function isOnline() {
   return navigator.onLine;
-  }
-
-// Alpine.js setters for progress bar
-function setSyncProgress(progress) {
-    const appRoot = document.getElementById('app');
-    if (appRoot && appRoot.__x) {
-        appRoot.__x.$data.syncProgress = progress;
-    }
-}
-function setSyncActive(active) {
-    const appRoot = document.getElementById('app');
-    if (appRoot && appRoot.__x) {
-        appRoot.__x.$data.syncActive = active;
-    }
 }
 
 // Initialize IndexedDB with 'items' and 'meta' stores
@@ -62,7 +48,7 @@ export async function performSync() {
     return Date.now();
   }
   const db = await dbPromise;
-  setSyncActive(true); // Start progress bar
+
 
   // 1) fetch serverTime and compute cutoff
   const { time: serverTimeStr } = await fetchWithRetry('/time').then(r => r.json());
@@ -87,9 +73,6 @@ export async function performSync() {
     await Promise.all(toDelete.map(g => txDel.objectStore('items').delete(g)));
     await txDel.done;
   }
-  let processedItems = 0;
-  const totalItems = serverGuids.length; // Total items to process
-  setSyncProgress(0); // Initialize progress
 
   // 5) fetch missing items in batches (break up TXs to avoid locks)
   const missing = serverGuids.filter(g => !localGuids.has(g));
@@ -109,8 +92,6 @@ export async function performSync() {
       txUp.objectStore('items').put(item);
     });
     await txUp.done;
-    processedItems += batch.length;
-    setSyncProgress(processedItems / totalItems * 100);
   }
   // 6) update lastSync on survivors in separate TXs
   const survivors = serverGuids.filter(g => localGuids.has(g));
@@ -126,8 +107,6 @@ export async function performSync() {
       }
     }
     await txUp2.done;
-    setSyncActive(false); // Hide progress bar
-    setSyncProgress(0); // Reset progress
   }
   return serverTime;
 }
