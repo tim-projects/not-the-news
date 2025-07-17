@@ -198,7 +198,7 @@ button:active {
 
 /* Close button - keeping existing positioning and shape */
 button.close {
-  font-size: 2rem;
+  font-size: 1.75rem;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
@@ -230,7 +230,7 @@ button.close:active {
 
 /* Star button - keeping existing positioning and shape */
 button.star {
-  font-size: 2rem;
+  font-size: 1.75rem;
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
