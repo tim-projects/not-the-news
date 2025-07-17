@@ -1,4 +1,4 @@
-i@import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
 
 /* Tell browser we support both light & dark */
 html {
@@ -24,13 +24,6 @@ html {
   /* for the gradient & button bg in light mode */
   --border-radius: 5px;
   /* Define a consistent border-radius variable */
-
-  /* New: Define a darker primary for active states */
-  --primary-darker: rgb(85, 128, 204); /* A slightly darker cornflowerblue */
-  --secondary-darker: rgb(180, 200, 220); /* A slightly darker aliceblue, for hover */
-  --button-text-light: white; /* Text color for dark buttons */
-  --button-text-dark: black; /* Text color for light buttons */
-  --link-visited: darkgray; /* Default visited link color for dark theme */
 }
 
 /* System light mode */
@@ -39,41 +32,31 @@ html {
     --bg: #f5f5f5 !important;
     --fg: darkslategrey !important;
     --primary: cornflowerblue !important;
-    --secondary: slategrey !important; /* Note: slategrey is darker than aliceblue */
+    --secondary: slategrey !important;
     --card-bg: #ffffff !important;
     --card-border: #EEE !important;
     --card-shadow-color: lightgrey !important;
-    --primary-darker: rgb(85, 128, 204) !important; /* A slightly darker cornflowerblue */
-    --secondary-darker: rgb(90, 100, 110) !important; /* A slightly darker slategrey */
-    --link-highlight: cornflowerblue !important; /* Ensure highlight is appropriate for light */
-    --link-visited: #6A5ACD !important; /* A common visited link color for light themes */
   }
 }
 
 /* Manual theme overrides */
 html.light {
-  /* IMPORTANT FIX: Explicitly set all light theme variables here */
-  --bg: #f5f5f5 !important;
-  --fg: darkslategrey !important;
-  --primary: cornflowerblue !important;
-  --secondary: slategrey !important;
-  --card-bg: #ffffff !important;
-  --card-border: #EEE !important;
-  --card-shadow-color: lightgrey !important;
-  --primary-darker: rgb(85, 128, 204) !important;
-  --secondary-darker: rgb(90, 100, 110) !important;
-  --link-highlight: cornflowerblue !important;
-  --link-visited: #6A5ACD !important;
-
   /* show noise background */
-  /* Assuming --bg-light was intended to be --bg here. Adjusted to --bg. */
-  background-color: var(--bg) !important;
+  background-color: var(--bg) !important; /* Corrected from var(--bg-light) */
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><defs><filter id='tileableNoise' x='0%' y='0%' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch' result='noise'/><feColorMatrix in='noise' type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.05'/></feComponentTransfer></filter></defs><rect width='100%' height='100%' /><rect width='100%' height='100%' filter='url(%23tileableNoise)'/></svg>") !important;
   background-repeat: repeat;
 
   button.close,
   button.star {
-    background: var(--link-highlight); /* This will now be cornflowerblue in light mode */
+    background: var(--link-highlight);
+  }
+
+  button.close:hover {
+    color: aliceblue;
+  }
+
+  button.star:hover {
+    color: aliceblue;
   }
 
   .itemtitle {
@@ -86,15 +69,27 @@ html.light {
 }
 
 html.dark {
+  a:visited {
+    color: var(--link-visited);
+  }
+
   background-image: none;
 
+  button.close {
+    box-shadow: -1px 1px 0 0px var(--card-border);
+  }
+
+  button.star {
+    box-shadow: -1px -1px 0 0px var(--card-border);
+  }
+
   #header {
-    text-shadow: 2px 2px 2px var(--card-shadow-color);
+    text-shadow: 2px 2px 2px var(--shadow-text);
   }
 }
 
-/* General a:visited rule for both themes, using the defined variable */
-a:visited {
+/* Corrected a:visited for dark theme */
+html.dark a:visited {
   color: var(--link-visited);
 }
 
@@ -111,7 +106,7 @@ html.dark .cog-wheel-button:hover {
 }
 
 html.dark .switch input:checked+.slider {
-  background-color: var(--toggle-checked-dark, var(--primary));
+  background-color: var(--toggle-checked-dark);
 }
 
 
@@ -135,12 +130,10 @@ a {
   color: var(--secondary);
 }
 
-/* Corrected and expanded header list for text-shadow */
 a,
 h1,
 h2,
 h3,
-h4,
 h5,
 h6 {
   text-shadow: 2px 2px 2px var(--card-shadow-color);
@@ -150,67 +143,27 @@ title {
   display: none;
 }
 
----
-
-### Button Styles
-
-/* Base button styles - apply to all relevant buttons */
-button {
-  cursor: pointer;
-  border: none; /* Default for most buttons */
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-}
-
-/* General button hover state */
-button:hover {
-  opacity: 1 !important; /* Ensure full opacity on hover for all buttons */
-}
-
-/* General button focus state for accessibility */
-button:focus {
-  outline: none; /* Remove default browser outline */
-  box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary); /* Custom outline using primary color */
-}
-
-/* General button active state for visual feedback when pressed */
-button:active {
-  transform: translateY(1px);
-  box-shadow: inset 1px 1px 5px rgba(0,0,0,0.2);
-}
-
-/* Specific button styles */
-
 button.close {
   font-size: xx-large;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 40px 0 20px;
   opacity: 0.8;
-  box-shadow: -1px 1px 0 1px var(--card-border);
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
 
   position: absolute;
   top: 1px;
   right: 1px;
   margin: 0;
   padding: 0 1rem 0 1rem;
+  border: none;
+  cursor: pointer;
 }
 
 button.close:hover {
   color: var(--secondary);
   background: var(--primary);
 }
-
-button.close:focus {
-  box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary); /* Combine with base focus */
-  color: var(--secondary); /* Match hover color on focus */
-  background: var(--primary); /* Match hover background on focus */
-}
-
-button.close:active {
-    background-color: var(--primary-darker);
-    color: var(--secondary);
-}
-
 
 /* Star button, same shape as close */
 button.star {
@@ -219,7 +172,7 @@ button.star {
   color: var(--fg);
   border-radius: 20px 0 0 0;
   opacity: 0.6;
-  box-shadow: -2px -2px 0 1px var(--card-shadow-color); /* Kept specific shadow */
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color);
 
   float: right;
   position: absolute;
@@ -227,6 +180,8 @@ button.star {
   right: 0;
   margin: 0;
   padding: 0 1rem 0 1rem;
+  border: none;
+  cursor: pointer;
 }
 
 button.star:hover {
@@ -234,42 +189,13 @@ button.star:hover {
   background: var(--primary);
 }
 
-button.star:focus {
-  box-shadow: -2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary); /* Combine with base focus */
-  color: var(--secondary); /* Match hover color on focus */
-  background: var(--primary); /* Match hover background on focus */
-}
-
-button.star:active {
-  background-color: var(--primary-darker);
-  color: var(--secondary);
-}
-
 /* Turn the star gold when starred */
 button.star.starred,
 button.close.hidden {
   color: gold;
   opacity: 1;
-  background: transparent; /* Assuming you want transparent for starred/hidden */
+  background: transparent;
 }
-/* Re-apply hover for starred/hidden states if you want a different effect */
-button.star.starred:hover,
-button.close.hidden:hover {
-  background-color: rgba(255, 215, 0, 0.1); /* Slight highlight on hover for gold items */
-  color: gold;
-}
-button.star.starred:focus,
-button.close.hidden:focus {
-  box-shadow: 0 0 0 3px gold, inset 0 0 0 1px gold; /* Gold outline for focused gold items */
-  color: gold;
-  background-color: rgba(255, 215, 0, 0.1);
-}
-button.star.starred:active,
-button.close.hidden:active {
-  background-color: rgba(255, 215, 0, 0.2);
-  color: gold;
-}
-
 
 .itemfrom {
   /* shared padding, font & background */
@@ -387,77 +313,44 @@ a {
   transition: color .3s linear;
 }
 
+a:visited {
+  color: grey;
+}
+
 a:hover {
   color: var(--primary);
 }
-
----
-
-### Header Styles
 
 /* Updated header: sticky and flex */
 #header {
   position: static;
   z-index: 1000;
   display: flex;
-  align-items: center; /* Ensures vertical centering for direct children */
-  justify-content: space-between; /* This pushes left-aligned and right-aligned groups to ends */
+  align-items: center;
+  justify-content: space-between;
   padding: 1rem 1rem;
   background-color: transparent;
   font-family: 'Playfair Display', serif;
   font-weight: 400;
   text-transform: uppercase;
+  text-align: center;
   color: var(--fg-muted);
   font-size: small;
   font-variant: all-small-caps;
 }
 
-/* New style for the title in the header */
-#header .ntn-title {
-  /* Use margin auto to push it as far left as possible from the next flex item (header-options) */
-  margin-right: auto;
-  /* Add flex to center the h2 vertically within ntn-title if it's not the only content */
-  display: flex;
-  align-items: center;
-  /* Reset previous desktop absolute positioning */
-  position: static;
-  left: unset;
-  transform: unset;
+#header .switch {
+  margin-left: auto;
+  margin-right: 1rem;
 }
 
-/* Ensure h2 within ntn-title is vertically centered */
-#header .ntn-title h2 {
-    margin: 0; /* Remove default margin that might affect centering */
-    line-height: 1; /* Adjust line-height for precise vertical centering */
-}
-
-/* Grouping for shuffle button and settings button */
-#left-aligned-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem; /* Space between items */
-  /* This margin-right will push itself and ntn-title to the left,
-     and push header-options to the far right. */
-  margin-right: auto;
-}
-
-/* Ensure header-options is always aligned to the far right */
 #header-options {
   display: flex;
-  align-items: center; /* Vertically center items within header-options */
-  margin-left: auto; /* This will push header-options to the far right */
-  gap: 1rem; /* Space between the switch and the filter */
-}
-
-/* Remove margin-left from header .switch as it's handled by #header-options */
-#header .switch {
-  margin-left: 0;
-  margin-right: 0; /* No longer need margin-right if gap is on parent */
 }
 
 /* simple styling for our filter dropdown */
 .filter-select {
-  margin: 0; /* Reset margins as it's now part of the flex group */
+  margin: 0 1rem;
   padding: 0.5em 0.5em;
   font-size: inherit;
   border-radius: 4px;
@@ -469,12 +362,15 @@ a:hover {
 
 .filter-select:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--primary); /* Focus for selects */
 }
 
 select#filter-selector {
   background: var(--card-bg);
   color: var(--fg);
+}
+
+select#filter-selector option:hover {
+  background: var(--primary);
 }
 
 /* Toggle switch styling */
@@ -617,10 +513,6 @@ select#filter-selector {
   font-size: xx-large;
 }
 
----
-
-### Scroll to Top Button & Cog Wheel Button
-
 /* hide by default */
 #scroll-to-top {
   bottom: 2rem;
@@ -628,18 +520,20 @@ select#filter-selector {
   width: 4rem;
   height: 4rem;
   opacity: 0;
-  transition: opacity 0.3s ease-in-out, background-color 0.3s, color 0.3s, box-shadow 0.3s, transform 0.2s;
+  transition: opacity 0.3s ease-in-out;
   font-size: xx-large;
   color: var(--primary);
   background: var(--secondary);
-  border-radius: 50%; /* Changed to 50% for perfect circle */
+  border-radius: 100px;
 
   position: fixed;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
   z-index: 1000;
 }
 
@@ -648,87 +542,33 @@ select#filter-selector {
   opacity: 1;
 }
 
-#scroll-to-top:hover {
-  background-color: var(--primary); /* Hover becomes primary */
-  color: var(--button-text-light); /* Text becomes light for primary */
+#scroll-to-top,
+.cog-wheel-button {
+  position: fixed;
+  bottom: 20px;
+  z-index: 9999;
+  background-color: var(--bg-alt);
+  color: var(--fg-muted);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  border-color: whitesmoke;
 }
 
-#scroll-to-top:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary), 0 2px 4px rgba(0, 0, 0, 0.3); /* Custom outline */
-  background-color: var(--primary);
-  color: var(--button-text-light);
-}
-
-#scroll-to-top:active {
-  background-color: var(--primary-darker);
-  transform: translateY(1px);
+#scroll-to-top:hover,
+.cog-wheel-button:hover {
+  background-color: var(--hover-alt-bg);
+  color: var(--hover-alt-color);
 }
 
 .cog-wheel-button {
-  /* Removed fixed positioning as it will be part of the header flex layout */
-  font-size: 55px; /* Size for the cog icon */
+  left: 20px;
+  font-size: 55px;
   line-height: 0.94;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-
-  /* Resetting styles that were for fixed positioning */
-  position: static;
-  bottom: unset;
-  left: unset;
-
-  /* Adjustments for being in a flex container and making it round */
-  margin: 0; /* Remove any default margins */
-  background-color: var(--card-bg); /* Use card-bg as default, as per dark theme definition */
-  color: var(--fg-muted); /* Original base color, often gray */
-  border-radius: 50%; /* Make it perfectly round */
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  border: 1px solid var(--card-border); /* Added border for consistency */
-  height: 3.5rem; /* Standardized height to match shuffle-btn for roundness */
-  width: 3.5rem; /* Standardized width for a circle to match shuffle-btn */
-  display: flex; /* Make it a flex container for centering content */
-  justify-content: center; /* Center icon horizontally */
-  align-items: center; /* Center icon vertically */
-  padding: 0; /* Remove padding if any */
 }
-
-.cog-wheel-button:hover {
-  background-color: var(--primary); /* Changed to primary on hover */
-  color: var(--button-text-light); /* Changed to light text on hover */
-}
-
-.cog-wheel-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary), 0 2px 5px rgba(0, 0, 0, 0.2);
-  background-color: var(--primary);
-  color: var(--button-text-light);
-}
-
-.cog-wheel-button:active {
-  background-color: var(--primary-darker);
-  transform: translateY(1px);
-  color: var(--button-text-light); /* Ensure text color remains light on active */
-}
-
-/* Dark theme specific override for cog-wheel-button */
-html.dark .cog-wheel-button {
-  background: var(--card-bg); /* Default dark theme background for consistency */
-  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
-  color: var(--fg); /* Default dark theme foreground for consistency */
-}
-
-html.dark .cog-wheel-button:hover {
-  background: var(--fg); /* Dark theme hover background */
-  color: var(--bg); /* Dark theme hover text color */
-}
-
-
----
-
-### Modal Styles
 
 .modal {
-  position: fixed; /* Changed to fixed for full overlay */
+  position: fixed;
   z-index: 9999;
   left: 0;
   top: 0;
@@ -748,7 +588,7 @@ html.dark .cog-wheel-button:hover {
 
 .modal-content {
   background-color: var(--card-bg);
-  margin: 0; /* Reset margin to allow flex centering */
+  margin: 5% auto;
   border: 1px solid var(--card-border);
   display: flex;
   flex-direction: column;
@@ -762,7 +602,7 @@ html.dark .cog-wheel-button:hover {
   overflow-y: auto; /* Allow content to scroll if it overflows */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   height: auto;
-  min-height: 50vw; /* Keep a minimum height for better appearance */
+  min-height: 50vw;
   box-sizing: border-box;
   position: relative;
 }
@@ -776,6 +616,9 @@ html.dark .cog-wheel-button:hover {
   margin-top: 1rem;
   font-size: 1.5em;
 }
+
+/* Removed @keyframes and related classes as Alpine x-transition handles this */
+
 
 /* Alpine x-transition classes for item leave animation */
 .transition {
@@ -871,27 +714,7 @@ ul.feed-list,
   align-self: flex-end;
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
-  /* Default settings group buttons to primary/white text */
-  background-color: var(--primary);
-  color: var(--button-text-light);
 }
-
-.settings-group button:hover {
-  background-color: var(--secondary);
-  color: var(--fg); /* Assuming fg contrasts with secondary */
-}
-
-.settings-group button:focus {
-  box-shadow: 0 0 0 3px var(--secondary), inset 0 0 0 1px var(--secondary); /* Outline in secondary */
-  background-color: var(--secondary);
-  color: var(--fg);
-}
-
-.settings-group button:active {
-  background-color: var(--secondary-darker);
-  color: var(--fg);
-}
-
 
 /* Consolidated and improved textarea styling */
 .settings-textarea {
@@ -913,48 +736,23 @@ ul.feed-list,
 }
 
 .shuffle-btn {
-  width: 3.5em; /* Use em for consistent sizing relative to font */
-  height: 3.5em; /* Make height equal to width for circle */
-  background-color: var(--card-bg); /* Kept original base background */
-  color: var(--fg); /* Kept original base color */
-  border: none; /* Base styles */
-  border-radius: 50%; /* Make it perfectly round */
+  width: 3.5em;
+  height: 3.5em;
+  background-color: var(--card-bg);
+  color: var(--fg);
+  margin-left: auto;
+  border: none;
+  border-radius: 100px;
   opacity: 0.8;
+  padding-top: 0.4em;
   box-shadow: 1px 1px 5px var(--card-shadow-color);
-  border: 1px solid var(--card-border); /* Specific border */
-  transition: background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-
-  /* Align content for button */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0; /* Remove padding to avoid impacting size with flex centering */
-}
-
-.shuffle-btn:hover {
-  background-color: var(--primary);
-  opacity: 1; /* Make it fully opaque on hover */
-  color: var(--button-text-light); /* Text becomes light on hover */
-}
-
-.shuffle-btn:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary), 1px 1px 5px var(--card-shadow-color);
-  background-color: var(--primary);
-  opacity: 1;
-  color: var(--button-text-light);
-}
-
-.shuffle-btn:active {
-  background-color: var(--primary-darker);
-  box-shadow: inset 1px 1px 5px rgba(0,0,0,0.2);
-  transform: translateY(1px);
+  border: 1px solid var(--card-border);
 }
 
 svg.shuffle-icon {
-  width: 3em; /* Adjusted slightly smaller to fit within 3.5em button */
-  height: 3em; /* Ensure it's square */
-  margin: 0; /* Center the icon within the button */
+  width: 3em;
+  margin-left: -0.15em;
+  margin-top: -0.15em;
 }
 
 span.shuffle-count {
@@ -965,50 +763,60 @@ span.shuffle-count {
   line-height: 2em;
 }
 
-.gear-icon {
-  width: 3em; /* Adjusted to fit the new button size */
-  height: 3em; /* Ensure it's square */
-  margin: 0; /* Center the icon within the button */
+/* Settings button style */
+.settings-btn {
+  width: 3.5em;
+  height: 3.5em;
+  background-color: var(--card-bg);
+  color: var(--fg);
+  margin-left: auto;
+  border: none;
+  border-radius: 100px;
+  opacity: 0.8;
+  padding-top: 0.4em;
+  box-shadow: 1px 1px 5px var(--card-shadow-color);
+  border: 1px solid var(--card-border);
 }
 
----
+.gear-icon {
+  width: 3em;
+  margin-left: -0.15em;
+  margin-top: -0.15em;
+}
 
-### Settings Panel Styles
+.settings-btn:hover {
+  background-color: var(--primary);
+}
+
+.shuffle-btn:hover {
+  background-color: var(--primary);
+}
+
+/* New styles for the refactored settings panel */
 
 /* Style for the back button */
 #back-button {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
-  background: none; /* Already transparent */
+  background: none;
   border: none;
-  color: var(--fg); /* Base color for the icon */
+  color: var(--fg);
   font-size: 1.8rem;
   cursor: pointer;
+  /* Removed display: none; as Alpine's x-show controls it */
   padding: 0.5rem;
   z-index: 10;
-  transition: color 0.2s ease, transform 0.2s ease; /* Add transitions */
 }
 
 #back-button:hover {
-  color: var(--primary); /* Hover color */
+  color: var(--primary);
 }
-
-#back-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary); /* Outline for focus */
-  color: var(--primary); /* Match hover color on focus */
-}
-
-#back-button:active {
-  transform: scale(0.95); /* Slightly shrink on active */
-  color: var(--primary-darker); /* Darker primary on active */
-}
-
 
 /* Hide the detailed settings blocks by default */
 #rss-settings-block,
 #keywords-settings-block {
+  /* Removed display: none; as Alpine's x-show controls it */
   flex: 1;
   flex-direction: column;
   gap: 1rem;
@@ -1017,6 +825,7 @@ span.shuffle-count {
 
 /* Ensure the main settings block is initially visible */
 #main-settings {
+  /* Removed display: flex; as Alpine's x-show controls it, but ensure it's flex when shown */
   flex: 1;
   flex-direction: column;
   gap: 1rem;
@@ -1027,30 +836,16 @@ span.shuffle-count {
 /* Style for the configure buttons */
 .configure-button {
   background-color: var(--primary);
-  color: var(--button-text-light); /* Use variable for text color */
+  color: white;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
   cursor: pointer;
   margin-left: auto;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .configure-button:hover {
   background-color: var(--secondary);
-  color: var(--fg); /* Text color for light background (secondary) */
-}
-
-.configure-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--secondary);
-  background-color: var(--secondary);
-  color: var(--fg);
-}
-
-.configure-button:active {
-  background-color: var(--secondary-darker);
-  color: var(--fg);
 }
 
 /* Style for the container of text and configure button */
@@ -1076,12 +871,10 @@ span.shuffle-count {
   font-size: 0.9em;
   color: var(--primary);
   margin-left: 0.5em;
+  /* Removed display: none; as Alpine's x-show controls it */
   white-space: nowrap;
 }
 
----
-
-### Responsive Adjustments
 
 /* Mobile specific adjustments (now default) */
 body,
@@ -1112,7 +905,7 @@ p {
 }
 
 .filter-select {
-  margin-left: 0; /* Reset this to work with #left-aligned-controls */
+  margin-left: auto;
 }
 
 .modal-content,
@@ -1151,23 +944,11 @@ button.star {
   padding-right: 1.2em;
 }
 
-/* Remove absolute positioning and previous centering attempts on mobile */
 #header h2 {
-  padding-right: 0;
-  position: static; /* Reset to static for mobile */
-  left: unset;
-  transform: unset;
-  margin-top: 0; /* Reset margin */
-  text-align: left; /* Explicitly left-align on mobile */
+  padding-right: 0.7em;
 }
 
-/* Ensure the header options are pushed to the right on mobile */
-#header-options {
-  margin-left: auto;
-}
-
-
-.modal-content > button.close {
+.modal-content>button.close {
   font-size: 1.25rem;
   opacity: 0.8;
 }
@@ -1222,91 +1003,57 @@ button.star {
   button.star {
     font-size: 2rem;
   }
+}
 
-  /* Desktop and up: half-width, centered, big headings */
-  @media (min-width: 1024px) {
-    body,
-    html {
-      font-size: calc(20px + .3vw);
-    }
+/* Desktop and up: half-width, centered, big headings */
+@media (min-width: 1024px) {
+  body,
+  html {
+    font-size: calc(20px + .3vw);
+  }
 
-    .item {
-      max-width: 50%;
-      /* cards take half the screen */
-      margin: 2.5em auto;
-    }
+  .item {
+    max-width: 50%;
+    /* cards take half the screen */
+    margin: 2.5em auto;
+  }
 
-    .itemtitle h1 {
-      font-size: 2.5rem !important;
-    }
+  .itemtitle h1 {
+    font-size: 2.5rem !important;
+  }
 
-    .itemtitle h2 {
-      font-size: 2rem !important;
-    }
+  .itemtitle h2 {
+    font-size: 2rem !important;
+  }
 
-    .pubdate p,
-    .itemfrom p {
-      font-size: smaller !important;
-    }
+  .pubdate p,
+  .itemfrom p {
+    font-size: smaller !important;
+  }
 
-    .item {
-      float: unset;
-      margin-left: 20%;
-      margin-right: 20%;
-      box-shadow: 1px 1px 100px 1px var(--card-shadow-color) !important;
-      margin: 1.4em auto;
-    }
+  .item {
+    float: unset;
+    margin-left: 20%;
+    margin-right: 20%;
+    box-shadow: 1px 1px 100px 1px var(--card-shadow-color) !important;
+    margin: 1.4em auto;
+  }
 
-    .filter-select {
-      font-size: large;
-    }
+  .filter-select {
+    font-size: large;
+  }
+  #header h2 {
+    padding-right: 0;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1rem;
+    margin-top: -0.5em;
+  }
 
-    /* Desktop header centering */
-    #header {
-      /* Revert `justify-content` to allow individual centering */
-      justify-content: flex-start; /* Reset to default flex-start */
-      position: relative; /* Make it a positioning context for absolute children */
-    }
-
-    #header .ntn-title {
-        /* Keep `margin-right: auto` to push it away from #left-aligned-controls */
-        /* But also ensure it acts as a flex item within the header */
-        flex-grow: 1; /* Allow it to grow and take available space */
-        text-align: center; /* Center the text horizontally within its flex space */
-        margin: 0 auto; /* Center it horizontally as much as possible if other elements don't fill space */
-    }
-
-    #header h2 { /* Assuming this is your "ntn-title" */
-      /* Remove absolute positioning. Flexbox handles centering now. */
-      position: static;
-      left: unset;
-      transform: unset;
-      margin-top: 0; /* Keep your original margin-top */
-      text-align: center; /* Ensure the text itself is centered */
-    }
-
-    /* Push header options to the right on desktop */
-    #header-options {
-      margin-left: auto; /* This already correctly pushes it to the right */
-      position: relative; /* Ensure it stays within the header */
-      z-index: 2; /* Ensure it's above the centered title if needed */
-    }
-
-    /* Grouping for shuffle button, settings button, and options dropdown */
-    #left-aligned-controls {
-      /* Re-evaluate margin-right here, as ntn-title also has margin:auto */
-      /* If you want the shuffle/settings buttons to be truly on the far left,
-         and the title centered, and options far right, the header structure
-         might need careful consideration with flexbox order or multiple flex containers.
-         For now, keeping margin-right: auto on #left-aligned-controls
-         will keep it next to the centered title and push header-options right. */
-      margin-right: 1rem; /* Adjust as needed or remove if title takes precedence */
-    }
-
-    /* push the switch off to the right (already correct but ensure no conflicts) */
-    #header .switch {
-      margin-left: 0; /* Ensure no auto margin here */
-      margin-right: 0;
-    }
+  /* push the switch off to the right */
+  #header .switch {
+    margin-left: auto;
+    margin-right: 1rem;
   }
 }
