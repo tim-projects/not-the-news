@@ -201,7 +201,7 @@ button.close {
   font-size: xx-large;
   background: var(--bg);
   color: var(--fg);
-  border-radius: 0 40px 0 20px;
+  border-radius: 0 10px 0 20px;
   opacity: 0.8;
   box-shadow: -1px 1px 0 1px var(--card-shadow-color);
   position: absolute;
