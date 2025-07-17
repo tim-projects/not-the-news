@@ -826,7 +826,6 @@ select#filter-selector option:hover {
   font-weight: 400;
   text-transform: capitalize;
   min-height: calc(1.4em * 2);
-  background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
   margin-top: 0;
   position: relative;
 }
