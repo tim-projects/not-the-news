@@ -31,7 +31,7 @@ window.rssApp = () => ({
   imagesEnabled: null,
   syncEnabled: null,
   isShuffled: false,
-  shuffleCount: 10,
+  shuffleCount: 2,
   currentSettingsPanel: 'main',
   autoSyncFeed: false,
   theme: 'light',
