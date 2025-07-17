@@ -747,6 +747,28 @@ ul.feed-list,
   padding-top: 0.4em;
   box-shadow: 1px 1px 5px var(--card-shadow-color);
   border: 1px solid var(--card-border);
+  transition: background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease; /* Add transition for smoother effects */
+}
+
+.shuffle-btn:hover {
+  background-color: var(--primary);
+  opacity: 1; /* Make it fully opaque on hover */
+}
+
+.shuffle-btn:focus {
+  /* This ensures a visible focus indicator for keyboard users */
+  outline: none; /* Remove default browser outline */
+  box-shadow: 0 0 0 3px var(--primary), /* A subtle outline around the button */
+              1px 1px 5px var(--card-shadow-color); /* Keep existing shadow */
+  background-color: var(--primary); /* You can make focus similar to hover */
+  opacity: 1;
+}
+
+.shuffle-btn:active {
+  /* Styles for when the button is actively being pressed down */
+  background-color: var(--primary-darker); /* A slightly darker primary color */
+  box-shadow: inset 1px 1px 5px rgba(0,0,0,0.2); /* Inset shadow to make it look "pressed" */
+  transform: translateY(1px); /* A slight push down effect */
 }
 
 svg.shuffle-icon {
@@ -785,10 +807,6 @@ span.shuffle-count {
 }
 
 .settings-btn:hover {
-  background-color: var(--primary);
-}
-
-.shuffle-btn:hover {
   background-color: var(--primary);
 }
 
