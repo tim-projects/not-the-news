@@ -1,5 +1,3 @@
-// js/app.js - UPDATED CONTENT
-
 // Import necessary modules
 import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js';
 import { appState as initialAppState } from './data/appState.js'; // Renamed import to avoid confusion
@@ -108,8 +106,8 @@ document.addEventListener('alpine:init', () => {
                 this.syncEnabled = await loadStateValue(db, 'syncEnabled', true);
                 this.imagesEnabled = await loadStateValue(db, 'imagesEnabled', true);
                 this.filterMode = await loadFilterMode(db);
-                this.hidden = await loadArrayStateFromDB(db, 'hidden'); // Use a helper to load arrays
-                this.starred = await loadArrayStateFromDB(db, 'starred'); // Use a helper to load arrays
+                this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
+                this.starred = await this.loadArrayStateFromDB(db, 'starred');
                 this.currentDeckGuids = await loadCurrentDeck(db);
 
                 const { shuffleCount, date } = await loadShuffleState(db);
