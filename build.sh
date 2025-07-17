@@ -63,7 +63,7 @@ fi
 echo "Starting build process..."
 (
     set -x  # Show git/docker commands
-    git pull && \
+    #git pull && \
     sudo docker rm -f ntn && \
     sudo docker container prune -f && \
     sudo docker buildx build "${BUILD_ARGS[@]}" -t not-the-news . && \

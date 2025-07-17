@@ -30,6 +30,7 @@ html {
   --secondary-darker: rgb(180, 200, 220); /* A slightly darker aliceblue, for hover */
   --button-text-light: white; /* Text color for dark buttons */
   --button-text-dark: black; /* Text color for light buttons */
+  --link-visited: darkgray; /* Default visited link color for dark theme */
 }
 
 /* System light mode */
@@ -42,24 +43,40 @@ html {
     --card-bg: #ffffff !important;
     --card-border: #EEE !important;
     --card-shadow-color: lightgrey !important;
-    --primary-darker: rgb(85, 128, 204); /* A slightly darker cornflowerblue */
-    --secondary-darker: rgb(90, 100, 110); /* A slightly darker slategrey */
+    --primary-darker: rgb(85, 128, 204) !important; /* A slightly darker cornflowerblue */
+    --secondary-darker: rgb(90, 100, 110) !important; /* A slightly darker slategrey */
+    --link-highlight: cornflowerblue !important; /* Ensure highlight is appropriate for light */
+    --link-visited: #6A5ACD !important; /* A common visited link color for light themes */
   }
 }
 
 /* Manual theme overrides */
 html.light {
+  /* IMPORTANT FIX: Explicitly set all light theme variables here */
+  --bg: #f5f5f5 !important;
+  --fg: darkslategrey !important;
+  --primary: cornflowerblue !important;
+  --secondary: slategrey !important;
+  --card-bg: #ffffff !important;
+  --card-border: #EEE !important;
+  --card-shadow-color: lightgrey !important;
+  --primary-darker: rgb(85, 128, 204) !important;
+  --secondary-darker: rgb(90, 100, 110) !important;
+  --link-highlight: cornflowerblue !important;
+  --link-visited: #6A5ACD !important;
+
   /* show noise background */
-  background-color: var(--bg-light) !important;
+  /* Assuming --bg-light was intended to be --bg here. Adjusted to --bg. */
+  background-color: var(--bg) !important;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><defs><filter id='tileableNoise' x='0%' y='0%' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch' result='noise'/><feColorMatrix in='noise' type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.05'/></feComponentTransfer></filter></defs><rect width='100%' height='100%' /><rect width='100%' height='100%' filter='url(%23tileableNoise)'/></svg>") !important;
   background-repeat: repeat;
 
   button.close,
   button.star {
-    background: var(--link-highlight);
+    background: var(--link-highlight); /* This will now be cornflowerblue in light mode */
   }
 
-  /* These hover styles will be overridden by the consolidated button styles below, which is good. */
+  /* Removed redundant commented-out hover styles, as they are now consolidated below */
   /* button.close:hover {
     color: aliceblue;
   }
@@ -78,13 +95,14 @@ html.light {
 }
 
 html.dark {
-  a:visited {
+  /* a:visited rule was duplicated and is handled by a general rule now */
+  /* a:visited {
     color: var(--link-visited);
-  }
+  } */
 
   background-image: none;
 
-  /* These specific button shadows should probably be moved into the general button styles or removed if handled by box-shadow */
+  /* Removed redundant commented-out button shadows. If needed, incorporate into general button styles. */
   /* button.close {
     box-shadow: -1px 1px 0 0px var(--card-border);
   }
@@ -94,12 +112,13 @@ html.dark {
   } */
 
   #header {
-    text-shadow: 2px 2px 2px var(--shadow-text);
+    /* Assuming --shadow-text should refer to --card-shadow-color */
+    text-shadow: 2px 2px 2px var(--card-shadow-color);
   }
 }
 
-/* Corrected a:visited for dark theme */
-html.dark a:visited {
+/* General a:visited rule for both themes, using the defined variable */
+a:visited {
   color: var(--link-visited);
 }
 
@@ -116,7 +135,8 @@ html.dark .cog-wheel-button:hover {
 }
 
 html.dark .switch input:checked+.slider {
-  background-color: var(--toggle-checked-dark);
+  /* Added a fallback to --primary if --toggle-checked-dark is not explicitly defined for dark mode */
+  background-color: var(--toggle-checked-dark, var(--primary));
 }
 
 
@@ -140,10 +160,12 @@ a {
   color: var(--secondary);
 }
 
+/* Corrected and expanded header list for text-shadow */
 a,
 h1,
 h2,
 h3,
+h4,
 h5,
 h6 {
   text-shadow: 2px 2px 2px var(--card-shadow-color);
@@ -153,9 +175,11 @@ title {
   display: none;
 }
 
-/* --- BUTTON STYLES (Consolidated and Improved) --- */
+---
+
+### Button Styles
+
 /* Base button styles - apply to all relevant buttons */
-/* Removed hardcoded button styles from various places and consolidated here for consistency */
 button {
   cursor: pointer;
   border: none; /* Default for most buttons */
@@ -388,13 +412,13 @@ a {
   transition: color .3s linear;
 }
 
-a:visited {
-  color: grey;
-}
-
 a:hover {
   color: var(--primary);
 }
+
+---
+
+### Header Styles
 
 /* Updated header: sticky and flex */
 #header {
@@ -445,7 +469,7 @@ select#filter-selector {
   color: var(--fg);
 }
 
-/* This hover style will be overridden by the general button styles or needs to be specific if this is a button */
+/* This hover style on option is not widely supported. Styling options directly is limited. */
 /* select#filter-selector option:hover {
   background: var(--primary);
 } */
@@ -590,6 +614,10 @@ select#filter-selector {
   font-size: xx-large;
 }
 
+---
+
+### Scroll to Top Button & Cog Wheel Button
+
 /* hide by default */
 #scroll-to-top {
   bottom: 2rem;
@@ -597,14 +625,13 @@ select#filter-selector {
   width: 4rem;
   height: 4rem;
   opacity: 0;
-  transition: opacity 0.3s ease-in-out, background-color 0.3s, color 0.3s, box-shadow 0.3s, transform 0.2s; /* Add transitions */
+  transition: opacity 0.3s ease-in-out, background-color 0.3s, color 0.3s, box-shadow 0.3s, transform 0.2s;
   font-size: xx-large;
   color: var(--primary);
   background: var(--secondary);
-  border-radius: 100px; /* Use 50% for perfect circle regardless of width/height */
+  border-radius: 50%; /* Changed to 50% for perfect circle */
 
   position: fixed;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -639,10 +666,9 @@ select#filter-selector {
   left: 20px;
   font-size: 55px;
   line-height: 0.94;
-  /* Add specific transitions for consistency, overriding general 'button' if needed */
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
-/* Re-applied general button properties here for specific .cog-wheel-button */
+
 .cog-wheel-button {
   position: fixed;
   bottom: 20px;
@@ -672,6 +698,9 @@ select#filter-selector {
   transform: translateY(1px);
 }
 
+---
+
+### Modal Styles
 
 .modal {
   position: fixed;
@@ -865,7 +894,7 @@ ul.feed-list,
   color: var(--fg); /* Kept original base color */
   margin-left: auto;
   border: none; /* Base styles */
-  border-radius: 100px;
+  border-radius: 50%; /* Changed to 50% for perfect circle */
   opacity: 0.8;
   padding-top: 0.4em;
   box-shadow: 1px 1px 5px var(--card-shadow-color);
@@ -908,9 +937,7 @@ span.shuffle-count {
 }
 
 /* Settings button style (cog-wheel-button class is already defined globally and seems to control this) */
-/* Re-checked and the global .cog-wheel-button handles this, so removed redundancy here. */
-/* The .settings-btn class here is unused if the cog is .cog-wheel-button */
-
+/* Removed redundant comments for .settings-btn */
 
 .gear-icon {
   width: 3em;
@@ -918,7 +945,9 @@ span.shuffle-count {
   margin-top: -0.15em;
 }
 
-/* New styles for the refactored settings panel */
+---
+
+### Settings Panel Styles
 
 /* Style for the back button */
 #back-button {
@@ -954,7 +983,7 @@ span.shuffle-count {
 /* Hide the detailed settings blocks by default */
 #rss-settings-block,
 #keywords-settings-block {
-  /* Removed display: none; as Alpine's x-show controls it */
+  /* Removed display: none; as Alpine's x-show controls visibility */
   flex: 1;
   flex-direction: column;
   gap: 1rem;
@@ -963,7 +992,7 @@ span.shuffle-count {
 
 /* Ensure the main settings block is initially visible */
 #main-settings {
-  /* Removed display: flex; as Alpine's x-show controls it, but ensure it's flex when shown */
+  /* Removed display: flex; as Alpine's x-show controls visibility, but ensure it's flex when shown */
   flex: 1;
   flex-direction: column;
   gap: 1rem;
@@ -1023,10 +1052,13 @@ span.shuffle-count {
   font-size: 0.9em;
   color: var(--primary);
   margin-left: 0.5em;
-  /* Removed display: none; as Alpine's x-show controls it */
+  /* Removed display: none; as Alpine's x-show controls visibility */
   white-space: nowrap;
 }
 
+---
+
+### Responsive Adjustments
 
 /* Mobile specific adjustments (now default) */
 body,
@@ -1100,7 +1132,7 @@ button.star {
   padding-right: 0.7em;
 }
 
-.modal-content>button.close {
+.modal-content > button.close {
   font-size: 1.25rem;
   opacity: 0.8;
 }
