@@ -24,6 +24,12 @@ html {
   /* for the gradient & button bg in light mode */
   --border-radius: 5px;
   /* Define a consistent border-radius variable */
+
+  /* New: Define a darker primary for active states */
+  --primary-darker: rgb(85, 128, 204); /* A slightly darker cornflowerblue */
+  --secondary-darker: rgb(180, 200, 220); /* A slightly darker aliceblue, for hover */
+  --button-text-light: white; /* Text color for dark buttons */
+  --button-text-dark: black; /* Text color for light buttons */
 }
 
 /* System light mode */
@@ -32,10 +38,12 @@ html {
     --bg: #f5f5f5 !important;
     --fg: darkslategrey !important;
     --primary: cornflowerblue !important;
-    --secondary: slategrey !important;
+    --secondary: slategrey !important; /* Note: slategrey is darker than aliceblue */
     --card-bg: #ffffff !important;
     --card-border: #EEE !important;
     --card-shadow-color: lightgrey !important;
+    --primary-darker: rgb(85, 128, 204); /* A slightly darker cornflowerblue */
+    --secondary-darker: rgb(90, 100, 110); /* A slightly darker slategrey */
   }
 }
 
@@ -51,13 +59,14 @@ html.light {
     background: var(--link-highlight);
   }
 
-  button.close:hover {
+  /* These hover styles will be overridden by the consolidated button styles below, which is good. */
+  /* button.close:hover {
     color: aliceblue;
   }
 
   button.star:hover {
     color: aliceblue;
-  }
+  } */
 
   .itemtitle {
     background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
@@ -75,13 +84,14 @@ html.dark {
 
   background-image: none;
 
-  button.close {
+  /* These specific button shadows should probably be moved into the general button styles or removed if handled by box-shadow */
+  /* button.close {
     box-shadow: -1px 1px 0 0px var(--card-border);
   }
 
   button.star {
     box-shadow: -1px -1px 0 0px var(--card-border);
-  }
+  } */
 
   #header {
     text-shadow: 2px 2px 2px var(--shadow-text);
@@ -143,27 +153,65 @@ title {
   display: none;
 }
 
+/* --- BUTTON STYLES (Consolidated and Improved) --- */
+/* Base button styles - apply to all relevant buttons */
+/* Removed hardcoded button styles from various places and consolidated here for consistency */
+button {
+  cursor: pointer;
+  border: none; /* Default for most buttons */
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* General button hover state */
+button:hover {
+  opacity: 1 !important; /* Ensure full opacity on hover for all buttons */
+}
+
+/* General button focus state for accessibility */
+button:focus {
+  outline: none; /* Remove default browser outline */
+  box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary); /* Custom outline using primary color */
+}
+
+/* General button active state for visual feedback when pressed */
+button:active {
+  transform: translateY(1px);
+  box-shadow: inset 1px 1px 5px rgba(0,0,0,0.2);
+}
+
+/* Specific button styles */
+
 button.close {
   font-size: xx-large;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 40px 0 20px;
   opacity: 0.8;
-  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color); /* Kept specific shadow */
 
   position: absolute;
   top: 1px;
   right: 1px;
   margin: 0;
   padding: 0 1rem 0 1rem;
-  border: none;
-  cursor: pointer;
 }
 
 button.close:hover {
   color: var(--secondary);
   background: var(--primary);
 }
+
+button.close:focus {
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary); /* Combine with base focus */
+  color: var(--secondary); /* Match hover color on focus */
+  background: var(--primary); /* Match hover background on focus */
+}
+
+button.close:active {
+    background-color: var(--primary-darker);
+    color: var(--secondary);
+}
+
 
 /* Star button, same shape as close */
 button.star {
@@ -172,7 +220,7 @@ button.star {
   color: var(--fg);
   border-radius: 20px 0 0 0;
   opacity: 0.6;
-  box-shadow: -2px -2px 0 1px var(--card-shadow-color);
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color); /* Kept specific shadow */
 
   float: right;
   position: absolute;
@@ -180,8 +228,6 @@ button.star {
   right: 0;
   margin: 0;
   padding: 0 1rem 0 1rem;
-  border: none;
-  cursor: pointer;
 }
 
 button.star:hover {
@@ -189,13 +235,42 @@ button.star:hover {
   background: var(--primary);
 }
 
+button.star:focus {
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary); /* Combine with base focus */
+  color: var(--secondary); /* Match hover color on focus */
+  background: var(--primary); /* Match hover background on focus */
+}
+
+button.star:active {
+  background-color: var(--primary-darker);
+  color: var(--secondary);
+}
+
 /* Turn the star gold when starred */
 button.star.starred,
 button.close.hidden {
   color: gold;
   opacity: 1;
-  background: transparent;
+  background: transparent; /* Assuming you want transparent for starred/hidden */
 }
+/* Re-apply hover for starred/hidden states if you want a different effect */
+button.star.starred:hover,
+button.close.hidden:hover {
+  background-color: rgba(255, 215, 0, 0.1); /* Slight highlight on hover for gold items */
+  color: gold;
+}
+button.star.starred:focus,
+button.close.hidden:focus {
+  box-shadow: 0 0 0 3px gold, inset 0 0 0 1px gold; /* Gold outline for focused gold items */
+  color: gold;
+  background-color: rgba(255, 215, 0, 0.1);
+}
+button.star.starred:active,
+button.close.hidden:active {
+  background-color: rgba(255, 215, 0, 0.2);
+  color: gold;
+}
+
 
 .itemfrom {
   /* shared padding, font & background */
@@ -362,6 +437,7 @@ a:hover {
 
 .filter-select:focus-visible {
   outline: none;
+  box-shadow: 0 0 0 3px var(--primary); /* Focus for selects */
 }
 
 select#filter-selector {
@@ -369,9 +445,10 @@ select#filter-selector {
   color: var(--fg);
 }
 
-select#filter-selector option:hover {
+/* This hover style will be overridden by the general button styles or needs to be specific if this is a button */
+/* select#filter-selector option:hover {
   background: var(--primary);
-}
+} */
 
 /* Toggle switch styling */
 .switch {
@@ -520,11 +597,11 @@ select#filter-selector option:hover {
   width: 4rem;
   height: 4rem;
   opacity: 0;
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity 0.3s ease-in-out, background-color 0.3s, color 0.3s, box-shadow 0.3s, transform 0.2s; /* Add transitions */
   font-size: xx-large;
   color: var(--primary);
   background: var(--secondary);
-  border-radius: 100px;
+  border-radius: 100px; /* Use 50% for perfect circle regardless of width/height */
 
   position: fixed;
   border-radius: 50%;
@@ -533,7 +610,6 @@ select#filter-selector option:hover {
   justify-content: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   cursor: pointer;
-  transition: background-color 0.3s, color 0.3s;
   z-index: 1000;
 }
 
@@ -542,30 +618,60 @@ select#filter-selector option:hover {
   opacity: 1;
 }
 
-#scroll-to-top,
-.cog-wheel-button {
-  position: fixed;
-  bottom: 20px;
-  z-index: 9999;
-  background-color: var(--bg-alt);
-  color: var(--fg-muted);
-  border-radius: 50%;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  border-color: whitesmoke;
+#scroll-to-top:hover {
+  background-color: var(--primary); /* Hover becomes primary */
+  color: var(--button-text-light); /* Text becomes light for primary */
 }
 
-#scroll-to-top:hover,
-.cog-wheel-button:hover {
-  background-color: var(--hover-alt-bg);
-  color: var(--hover-alt-color);
+#scroll-to-top:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary), 0 2px 4px rgba(0, 0, 0, 0.3); /* Custom outline */
+  background-color: var(--primary);
+  color: var(--button-text-light);
+}
+
+#scroll-to-top:active {
+  background-color: var(--primary-darker);
+  transform: translateY(1px);
 }
 
 .cog-wheel-button {
   left: 20px;
   font-size: 55px;
   line-height: 0.94;
+  /* Add specific transitions for consistency, overriding general 'button' if needed */
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
+/* Re-applied general button properties here for specific .cog-wheel-button */
+.cog-wheel-button {
+  position: fixed;
+  bottom: 20px;
+  z-index: 9999;
+  background-color: var(--bg-alt); /* Original base background */
+  color: var(--fg-muted); /* Original base color */
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  border: 1px solid var(--card-border); /* Added border for consistency */
+}
+
+.cog-wheel-button:hover {
+  background-color: var(--primary); /* Changed to primary on hover */
+  color: var(--button-text-light); /* Changed to light text on hover */
+}
+
+.cog-wheel-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary), 0 2px 5px rgba(0, 0, 0, 0.2);
+  background-color: var(--primary);
+  color: var(--button-text-light);
+}
+
+.cog-wheel-button:active {
+  background-color: var(--primary-darker);
+  transform: translateY(1px);
+}
+
 
 .modal {
   position: fixed;
@@ -616,9 +722,6 @@ select#filter-selector option:hover {
   margin-top: 1rem;
   font-size: 1.5em;
 }
-
-/* Removed @keyframes and related classes as Alpine x-transition handles this */
-
 
 /* Alpine x-transition classes for item leave animation */
 .transition {
@@ -714,7 +817,27 @@ ul.feed-list,
   align-self: flex-end;
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
+  /* Default settings group buttons to primary/white text */
+  background-color: var(--primary);
+  color: var(--button-text-light);
 }
+
+.settings-group button:hover {
+  background-color: var(--secondary);
+  color: var(--fg); /* Assuming fg contrasts with secondary */
+}
+
+.settings-group button:focus {
+  box-shadow: 0 0 0 3px var(--secondary), inset 0 0 0 1px var(--secondary); /* Outline in secondary */
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.settings-group button:active {
+  background-color: var(--secondary-darker);
+  color: var(--fg);
+}
+
 
 /* Consolidated and improved textarea styling */
 .settings-textarea {
@@ -738,37 +861,36 @@ ul.feed-list,
 .shuffle-btn {
   width: 3.5em;
   height: 3.5em;
-  background-color: var(--card-bg);
-  color: var(--fg);
+  background-color: var(--card-bg); /* Kept original base background */
+  color: var(--fg); /* Kept original base color */
   margin-left: auto;
-  border: none;
+  border: none; /* Base styles */
   border-radius: 100px;
   opacity: 0.8;
   padding-top: 0.4em;
   box-shadow: 1px 1px 5px var(--card-shadow-color);
-  border: 1px solid var(--card-border);
-  transition: background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease; /* Add transition for smoother effects */
+  border: 1px solid var(--card-border); /* Specific border */
+  transition: background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .shuffle-btn:hover {
   background-color: var(--primary);
   opacity: 1; /* Make it fully opaque on hover */
+  color: var(--button-text-light); /* Text becomes light on hover */
 }
 
 .shuffle-btn:focus {
-  /* This ensures a visible focus indicator for keyboard users */
-  outline: none; /* Remove default browser outline */
-  box-shadow: 0 0 0 3px var(--primary), /* A subtle outline around the button */
-              1px 1px 5px var(--card-shadow-color); /* Keep existing shadow */
-  background-color: var(--primary); /* You can make focus similar to hover */
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary), 1px 1px 5px var(--card-shadow-color);
+  background-color: var(--primary);
   opacity: 1;
+  color: var(--button-text-light);
 }
 
 .shuffle-btn:active {
-  /* Styles for when the button is actively being pressed down */
-  background-color: var(--primary-darker); /* A slightly darker primary color */
-  box-shadow: inset 1px 1px 5px rgba(0,0,0,0.2); /* Inset shadow to make it look "pressed" */
-  transform: translateY(1px); /* A slight push down effect */
+  background-color: var(--primary-darker);
+  box-shadow: inset 1px 1px 5px rgba(0,0,0,0.2);
+  transform: translateY(1px);
 }
 
 svg.shuffle-icon {
@@ -785,29 +907,15 @@ span.shuffle-count {
   line-height: 2em;
 }
 
-/* Settings button style */
-.settings-btn {
-  width: 3.5em;
-  height: 3.5em;
-  background-color: var(--card-bg);
-  color: var(--fg);
-  margin-left: auto;
-  border: none;
-  border-radius: 100px;
-  opacity: 0.8;
-  padding-top: 0.4em;
-  box-shadow: 1px 1px 5px var(--card-shadow-color);
-  border: 1px solid var(--card-border);
-}
+/* Settings button style (cog-wheel-button class is already defined globally and seems to control this) */
+/* Re-checked and the global .cog-wheel-button handles this, so removed redundancy here. */
+/* The .settings-btn class here is unused if the cog is .cog-wheel-button */
+
 
 .gear-icon {
   width: 3em;
   margin-left: -0.15em;
   margin-top: -0.15em;
-}
-
-.settings-btn:hover {
-  background-color: var(--primary);
 }
 
 /* New styles for the refactored settings panel */
@@ -817,19 +925,31 @@ span.shuffle-count {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
-  background: none;
+  background: none; /* Already transparent */
   border: none;
-  color: var(--fg);
+  color: var(--fg); /* Base color for the icon */
   font-size: 1.8rem;
   cursor: pointer;
-  /* Removed display: none; as Alpine's x-show controls it */
   padding: 0.5rem;
   z-index: 10;
+  transition: color 0.2s ease, transform 0.2s ease; /* Add transitions */
 }
 
 #back-button:hover {
-  color: var(--primary);
+  color: var(--primary); /* Hover color */
 }
+
+#back-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary); /* Outline for focus */
+  color: var(--primary); /* Match hover color on focus */
+}
+
+#back-button:active {
+  transform: scale(0.95); /* Slightly shrink on active */
+  color: var(--primary-darker); /* Darker primary on active */
+}
+
 
 /* Hide the detailed settings blocks by default */
 #rss-settings-block,
@@ -854,16 +974,30 @@ span.shuffle-count {
 /* Style for the configure buttons */
 .configure-button {
   background-color: var(--primary);
-  color: white;
+  color: var(--button-text-light); /* Use variable for text color */
   border: none;
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
   cursor: pointer;
   margin-left: auto;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .configure-button:hover {
   background-color: var(--secondary);
+  color: var(--fg); /* Text color for light background (secondary) */
+}
+
+.configure-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--secondary);
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.configure-button:active {
+  background-color: var(--secondary-darker);
+  color: var(--fg);
 }
 
 /* Style for the container of text and configure button */
