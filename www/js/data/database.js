@@ -97,6 +97,7 @@ export async function pullUserState(db) {
     const { changes, serverTime } = await res.json();
     const tx = db.transaction('userState', 'readwrite');
     for (let [k, v] of Object.entries(changes)) {
+        // pullUserState already stringifies `v` before putting it. This is correct if all userState values are strings.
         tx.objectStore('userState').put({ key: k, value: JSON.stringify(v) });
     }
     tx.objectStore('userState').put({ key: 'lastStateSync', value: serverTime });
@@ -114,7 +115,8 @@ export async function pushUserState(db, changes = bufferedChanges) {
 
     const compiledChanges = {};
     for (const { key, value } of changes) {
-        compiledChanges[key] = value;
+        // Ensure values are consistently stringified for sending
+        compiledChanges[key] = typeof value === 'string' ? value : JSON.stringify(value);
     }
     const payload = JSON.stringify({ changes: compiledChanges });
 
@@ -131,6 +133,7 @@ export async function pushUserState(db, changes = bufferedChanges) {
 
     const { serverTime } = await res.json();
     const tx = db.transaction('userState', 'readwrite');
+    // The serverTime itself should not be stringified here if it's a raw value
     tx.objectStore('userState').put({ key: 'lastStateSync', value: serverTime });
     await tx.done;
     changes.length = 0;
@@ -143,15 +146,51 @@ export async function performFullSync(db) {
     return { feedTime: feedT, stateTime: stateT };
 }
 
+// *** CRITICAL FIX: Make loadStateValue always parse the JSON string ***
 export async function loadStateValue(db, key, defaultValue) {
     const entry = await db.transaction('userState', 'readonly').objectStore('userState').get(key);
-    return entry?.value ?? defaultValue;
+    let value = entry?.value;
+
+    if (value === undefined || value === null) {
+        return defaultValue;
+    }
+
+    // Attempt to parse if it's a string.
+    // This handles values like 'true', '"some string"', '123', or '[...]'
+    if (typeof value === 'string') {
+        try {
+            return JSON.parse(value);
+        } catch (e) {
+            // If it's a plain string that can't be parsed (e.g., just "hello"), return it as is.
+            // This case needs careful handling: if server sends "hello" (no quotes) and it's not JSON,
+            // JSON.parse fails. But if server sends "hello" (with quotes), it parses to "hello".
+            // The expectation from pullUserState is that everything is JSON.stringify'd on the server side too.
+            // If the server sends raw string values for some keys, and JSON.stringify'd for others,
+            // this strategy needs refinement.
+            // For now, assume everything from server is JSON.stringify'd if it's not a primitive.
+            // A safer approach might involve explicit type mapping or just returning the string if parsing fails.
+            // However, given `pullUserState` stringifies ALL values from server changes, this should be consistent.
+            console.warn(`Could not parse value for key "${key}":`, value, e);
+            return value; // Fallback to returning the raw string if parsing fails
+        }
+    }
+    return value; // Return as is if it's not a string (e.g., lastStateSync might be stored directly)
 }
 
 export async function saveStateValue(db, key, value) {
     const tx = db.transaction('userState', 'readwrite');
-    tx.objectStore('userState').put({ key: key, value: value });
+    // *** FIX: Stringify all values before saving to userState store, except 'lastStateSync' if it's a raw timestamp/nonce ***
+    // Assuming 'lastStateSync' is a raw string/number that shouldn't be stringified twice.
+    // All other values (booleans, numbers, strings, objects, arrays) should be stringified.
+    const valToSave = (key === 'lastStateSync') ? value : JSON.stringify(value);
+    tx.objectStore('userState').put({ key: key, value: valToSave });
     await tx.done;
+    // Add to bufferedChanges only if it's NOT lastStateSync and it's a user setting that needs syncing
+    if (key !== 'lastStateSync' && ['filterMode', 'syncEnabled', 'imagesEnabled', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
+        bufferedChanges.push({ key, value: value }); // Push the original value, not the stringified one
+        // Optionally, debounce or schedule pushUserState here instead of buffering.
+        // For now, assume pushUserState is called periodically or on certain events.
+    }
 }
 
 export async function loadArrayState(db, key) {
@@ -167,6 +206,10 @@ export async function saveArrayState(db, key, arr) {
     const tx = db.transaction('userState', 'readwrite');
     tx.objectStore('userState').put({ key: key, value: JSON.stringify(arr) });
     await tx.done;
+    // Add to bufferedChanges only if it's a user setting that needs syncing
+    if (['starred', 'hidden', 'currentDeck'].includes(key)) {
+        bufferedChanges.push({ key, value: arr }); // Push the original array
+    }
 }
 
 export async function processPendingOperations(db) {
@@ -176,7 +219,11 @@ export async function processPendingOperations(db) {
     for (const op of opsToProcess) {
         try {
             switch (op.type) {
-                case 'pushUserState': await pushUserState(db, op.data); break;
+                case 'pushUserState':
+                    // op.data for 'pushUserState' is already an array of {key, value} objects
+                    // pushUserState expects an array of changes, where value might not be stringified yet
+                    await pushUserState(db, op.data);
+                    break;
                 case 'starDelta':
                     await fetchWithRetry("/user-state/starred/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
                     break;
@@ -187,7 +234,7 @@ export async function processPendingOperations(db) {
             }
         } catch (err) {
             console.error(`Failed to process ${op.type}`, err);
-            pendingOperations.push(op);
+            pendingOperations.push(op); // Push back failed operations
         }
     }
 }
