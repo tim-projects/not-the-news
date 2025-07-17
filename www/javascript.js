@@ -38,6 +38,14 @@ window.rssApp = () => {
     syncEnabled: null,
     isShuffled: false,              // Track whether we're in shuffled mode
     shuffleCount: 10,               // How many shuffles remain
+    currentSettingsPanel: 'main',
+    autoSyncFeed: false,
+    theme: 'light',
+    isDarkTheme: false,
+    rssFeedsInput: '',
+    rssSaveMessage: '',
+    keywordBlacklistInput: '',
+    keywordsSaveMessage: '',
 
     loading: true,
 
@@ -57,6 +65,14 @@ window.rssApp = () => {
       try {
         this.syncEnabled = await loadSyncEnabled();
         this.imagesEnabled = await loadImagesEnabled();
+        console.log('currentSettingsPanel:', this.currentSettingsPanel);
+        console.log('autoSyncFeed:', this.autoSyncFeed);
+        console.log('theme:', this.theme);
+        console.log('isDarkTheme:', this.isDarkTheme);
+        console.log('rssFeedsInput:', this.rssFeedsInput);
+        console.log('rssSaveMessage:', this.rssSaveMessage);
+        console.log('keywordBlacklistInput:', this.keywordBlacklistInput);
+        console.log('keywordsSaveMessage:', this.keywordsSaveMessage);
         initTheme();
         initSync(this);
         initImages(this);
