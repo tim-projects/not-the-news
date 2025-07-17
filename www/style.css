@@ -42,21 +42,26 @@ html {
 /* Manual theme overrides */
 html.light {
   /* show noise background */
-  background-color: var(--bg) !important; /* Corrected from var(--bg-light) */
+  background-color: var(--bg) !important;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><defs><filter id='tileableNoise' x='0%' y='0%' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch' result='noise'/><feColorMatrix in='noise' type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.05'/></feComponentTransfer></filter></defs><rect width='100%' height='100%' /><rect width='100%' height='100%' filter='url(%23tileableNoise)'/></svg>") !important;
   background-repeat: repeat;
+  color: var(--fg) !important; /* Ensure text color is set for light mode */
 
   button.close,
   button.star {
-    background: var(--link-highlight);
+    background: var(--card-bg); /* Use card-bg for light mode buttons */
+    color: var(--fg); /* Use foreground color for light mode buttons */
+    box-shadow: -1px 1px 0 1px var(--card-shadow-color); /* Light mode shadow */
   }
 
   button.close:hover {
-    color: aliceblue;
+    color: var(--secondary);
+    background: var(--primary);
   }
 
   button.star:hover {
-    color: aliceblue;
+    color: var(--secondary);
+    background: var(--primary);
   }
 
   .itemtitle {
@@ -65,6 +70,36 @@ html.light {
 
   .itemtitle a {
     color: var(--primary);
+  }
+
+  .item {
+    background-color: var(--card-bg); /* Ensure item background is light */
+    box-shadow: 0px 4px 15px -5px var(--card-shadow-color); /* Light mode shadow */
+  }
+
+  .modal-content {
+    background-color: var(--bg); /* Ensure modal background is light */
+    color: var(--fg);
+  }
+
+  #header {
+    background-color: var(--bg); /* Ensure header background is light */
+    color: var(--fg-muted); /* Keep muted color for header text */
+  }
+
+  select#filter-selector {
+    background: var(--card-bg); /* Ensure filter select background is light */
+    color: var(--fg);
+  }
+
+  .shuffle-btn,
+  .settings-btn {
+    background-color: var(--card-bg); /* Ensure button backgrounds are light */
+    color: var(--fg);
+    box-shadow: 1px 1px 5px var(--card-shadow-color); /* Light mode shadow */
+  }
+  .switch .slider {
+    background-color: var(--toggle-track); /* Ensure toggle track is light */
   }
 }
 
