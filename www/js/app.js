@@ -5,8 +5,8 @@ import { formatDate, shuffleArray, mapRawItems } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
-import { getShuffleCountDisplay } from './ui/uiElements.js'; // Assuming you have this helper or will add it
-import { createAndShowSaveMessage } from './ui/uiElements.js'; // Assuming createAndShowSaveMessage is in ui/uiElements.js or similar
+import { getShuffleCountDisplay } from './ui/uiElements.js';
+import { createAndShowSaveMessage } from './ui/uiUpdaters.js';
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
