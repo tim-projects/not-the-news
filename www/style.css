@@ -230,7 +230,7 @@ button.close:active {
 
 /* Star button - keeping existing positioning and shape */
 button.star {
-  font-size: xx-large;
+  font-size: 2rem;
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
@@ -1246,7 +1246,7 @@ p {
 
   .itemtitle {
     font-size: 1.75rem !important;
-    padding: 0.75em 3rem 0.2em 1.2em;
+    padding: 0.75em 3.5rem 0.2em 1.2em;
   }
 
   .item {
