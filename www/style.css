@@ -904,6 +904,7 @@ span.shuffle-count {
   display: flex; /* This ensures modal-content can be centered */
   justify-content: center;
   align-items: center;
+  backdrop-filter: blur(8px);
 }
 
 /* Alpine x-cloak directive for initial hiding */
