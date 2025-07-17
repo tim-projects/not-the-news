@@ -1303,6 +1303,8 @@ p {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
+    font-size: 1.2rem;
+    margin-top: -0.8em;
   }
 
   .pubdate p,
