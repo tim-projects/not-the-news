@@ -24,28 +24,55 @@ html {
   /* for the gradient & button bg in light mode */
   --border-radius: 5px;
   /* Define a consistent border-radius variable */
+
+  /* Light mode specific variables, initially set for manual override */
+  --light-bg: #f5f5f5;
+  --light-fg: darkslategrey;
+  --light-primary: cornflowerblue;
+  --light-secondary: slategrey;
+  --light-card-bg: #ffffff;
+  --light-card-border: #EEE;
+  --light-card-shadow-color: lightgrey;
+  --light-toggle-track: #ccc;
+  --light-link-highlight: rgba(173, 216, 230, 0.5); /* Lighter blue highlight */
 }
 
-/* System light mode */
+
+/* System light mode - these are now the *system preferred* defaults,
+   but html.light will override them if applied manually.
+   Removed !important to allow html.light to take precedence. */
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f5f5f5 !important;
-    --fg: darkslategrey !important;
-    --primary: cornflowerblue !important;
-    --secondary: slategrey !important;
-    --card-bg: #ffffff !important;
-    --card-border: #EEE !important;
-    --card-shadow-color: lightgrey !important;
+    --bg: var(--light-bg);
+    --fg: var(--light-fg);
+    --primary: var(--light-primary);
+    --secondary: var(--light-secondary);
+    --card-bg: var(--light-card-bg);
+    --card-border: var(--light-card-border);
+    --card-shadow-color: var(--light-card-shadow-color);
+    --toggle-track: var(--light-toggle-track);
+    --link-highlight: var(--light-link-highlight);
   }
 }
 
 /* Manual theme overrides */
 html.light {
+  /* Set all variables explicitly for light mode */
+  --bg: var(--light-bg);
+  --fg: var(--light-fg);
+  --primary: var(--light-primary);
+  --secondary: var(--light-secondary);
+  --card-bg: var(--light-card-bg);
+  --card-border: var(--light-card-border);
+  --card-shadow-color: var(--light-card-shadow-color);
+  --toggle-track: var(--light-toggle-track);
+  --link-highlight: var(--light-link-highlight);
+
   /* show noise background */
-  background-color: var(--bg) !important;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><defs><filter id='tileableNoise' x='0%' y='0%' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch' result='noise'/><feColorMatrix in='noise' type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.05'/></feComponentTransfer></filter></defs><rect width='100%' height='100%' /><rect width='100%' height='100%' filter='url(%23tileableNoise)'/></svg>") !important;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><defs><filter id='tileableNoise' x='0%' y='0%' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch' result='noise'/><feColorMatrix in='noise' type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.05'/></feComponentTransfer></filter></defs><rect width='100%' height='100%' /><rect width='100%' height='100%' filter='url(%23tileableNoise)'/></svg>");
   background-repeat: repeat;
-  color: var(--fg) !important; /* Ensure text color is set for light mode */
+  color: var(--fg); /* Ensure text color is set for light mode */
 
   button.close,
   button.star {
@@ -78,7 +105,7 @@ html.light {
   }
 
   .modal-content {
-    background-color: var(--bg); /* Ensure modal background is light */
+    background-color: var(--card-bg); /* Ensure modal background is light */
     color: var(--fg);
   }
 
@@ -119,13 +146,13 @@ html.dark {
   }
 
   #header {
-    text-shadow: 2px 2px 2px var(--shadow-text);
+    text-shadow: 2px 2px 2px var(--card-shadow-color); /* Corrected from --shadow-text which was undefined */
   }
 }
 
 /* Corrected a:visited for dark theme */
 html.dark a:visited {
-  color: var(--link-visited);
+  color: grey; /* Using a direct color as --link-visited was not defined */
 }
 
 /* make the cog button match your dark theme */
@@ -141,7 +168,7 @@ html.dark .cog-wheel-button:hover {
 }
 
 html.dark .switch input:checked+.slider {
-  background-color: var(--toggle-checked-dark);
+  background-color: var(--primary); /* Using primary for checked state in dark mode */
 }
 
 
@@ -450,7 +477,7 @@ select#filter-selector option:hover {
 }
 
 .switch input:checked+.slider {
-  background: var(--primary) !important;
+  background: var(--primary);
 }
 
 .switch input:checked+.slider::before {
@@ -501,7 +528,7 @@ select#filter-selector option:hover {
   font-weight: 400;
   text-transform: capitalize;
   min-height: calc(1.4em * 2);
-  background: linear-gradient(360deg, var(--bg) 0%, transparent);
+  background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
   margin-top: 0;
   position: relative;
 }
@@ -592,8 +619,8 @@ select#filter-selector option:hover {
 
 #scroll-to-top:hover,
 .cog-wheel-button:hover {
-  background-color: var(--hover-alt-bg);
-  color: var(--hover-alt-color);
+  background-color: var(--primary); /* Changed to primary for consistency on hover */
+  color: white; /* Changed to white for consistency on hover */
 }
 
 .cog-wheel-button {
@@ -980,7 +1007,12 @@ button.star {
 }
 
 #header h2 {
-  padding-right: 0.7em;
+  padding-right: 0;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1rem;
+  margin-top: -0.5em;
 }
 
 .modal-content>button.close {
