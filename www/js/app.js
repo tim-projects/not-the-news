@@ -6,6 +6,7 @@ import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurren
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
 import { getShuffleCountDisplay } from './ui/uiElements.js'; // Assuming you have this helper or will add it
+import { createAndShowSaveMessage } from './ui/uiElements.js'; // Assuming createAndShowSaveMessage is in ui/uiElements.js or similar
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -39,52 +40,62 @@ document.addEventListener("load", e => {
 document.addEventListener('alpine:init', () => {
     Alpine.data('rssApp', () => ({
         // Reactive properties for Alpine to observe.
-        // Initialize them with default values or values from appState
-        loading: true, // Default to true while app is initializing
-        filterMode: initialAppState.filterMode,
-        openSettings: initialAppState.openSettings,
-        modalView: initialAppState.modalView,
-        shuffleCount: initialAppState.shuffleCount,
-        syncEnabled: initialAppState.syncEnabled,
-        imagesEnabled: initialAppState.imagesEnabled,
-        rssFeedsInput: initialAppState.rssFeedsInput,
-        keywordBlacklistInput: initialAppState.keywordBlacklistInput,
-        entries: initialAppState.allEntries, // 'entries' will be the source of truth for rendered items
-        hidden: initialAppState.hidden,
-        starred: initialAppState.starred,
-        currentDeckGuids: initialAppState.currentDeckGuids,
-        errorMessage: '',
-        isOnline: isOnline(), // Initial online status
+        // **FIX:** Call initialAppState() to get the initial state object
+        loading: initialAppState().loading, // Initialize with the default from appState
+        filterMode: initialAppState().filterMode,
+        openSettings: initialAppState().openSettings,
+        modalView: initialAppState().modalView,
+        shuffleCount: initialAppState().shuffleCount,
+        syncEnabled: initialAppState().syncEnabled,
+        imagesEnabled: initialAppState().imagesEnabled,
+        rssFeedsInput: initialAppState().rssFeedsInput,
+        keywordBlacklistInput: initialAppState().keywordBlacklistInput,
+        entries: initialAppState().entries, // Correctly references 'entries' from appState.js
+        hidden: initialAppState().hidden,
+        starred: initialAppState().starred,
+        currentDeckGuids: initialAppState().currentDeckGuids,
+        errorMessage: initialAppState().errorMessage,
+        isOnline: initialAppState().isOnline,
+        // Ensure memoization properties are initialized too, as they are part of appState.js
+        _lastFilterHash: initialAppState()._lastFilterHash,
+        _cachedFilteredEntries: initialAppState()._cachedFilteredEntries,
 
-        // Computed property for filtered entries
+
+        // Computed property for filtered entries (copied directly from your appState.js logic)
         get filteredEntries() {
-            // Ensure appState.allEntries is used as the base
-            const allItems = this.entries;
-            const hiddenSet = new Set(this.hidden.map(h => h.id));
-            const starredSet = new Set(this.starred.map(s => s.id));
-            const keywordBlacklist = this.keywordBlacklistInput.split('\n').filter(Boolean).map(kw => kw.trim().toLowerCase());
+            // Create a hash to memoize based on relevant properties
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}`;
 
+            if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
+                return this._cachedFilteredEntries;
+            }
+
+            const hiddenMap = new Map(this.hidden.map(h => [h.id, h.hiddenAt]));
+            const starredMap = new Map(this.starred.map(s => [s.id, s.starredAt]));
             let filtered = [];
 
-            // If a deck is loaded, only show items in the current deck
-            if (this.currentDeckGuids && this.currentDeckGuids.length > 0) {
-                const deckSet = new Set(this.currentDeckGuids);
-                filtered = allItems.filter(entry => deckSet.has(entry.id));
-            } else {
-                filtered = allItems;
+            switch (this.filterMode) {
+                case "all":
+                    filtered = this.entries;
+                    break;
+                case "unread":
+                    const deckSet = new Set(this.currentDeckGuids);
+                    filtered = this.entries.filter(e => deckSet.has(e.id) && !hiddenMap.has(e.id));
+                    break;
+                case "hidden":
+                    filtered = this.entries.filter(e => hiddenMap.has(e.id)).sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+                    break;
+                case "starred":
+                    filtered = this.entries.filter(e => starredMap.has(e.id)).sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
+                    break;
+                default:
+                    filtered = this.entries;
+                    break;
             }
 
-            // Apply filter mode
-            if (this.filterMode === 'unread') {
-                filtered = filtered.filter(entry => !hiddenSet.has(entry.id));
-            } else if (this.filterMode === 'starred') {
-                filtered = filtered.filter(entry => starredSet.has(entry.id));
-            } else if (this.filterMode === 'hidden') {
-                filtered = filtered.filter(entry => hiddenSet.has(entry.id));
-            }
-            // 'all' mode doesn't need further filtering based on hidden/starred
-
-            // Apply keyword blacklist
+            // Apply keyword blacklist (this was in your original app.js version, but missing from the appState.js getter you provided)
+            // Ensure this logic is consistent between appState.js and app.js if filteredEntries is also in appState.js
+            const keywordBlacklist = this.keywordBlacklistInput.split('\n').filter(Boolean).map(kw => kw.trim().toLowerCase());
             if (keywordBlacklist.length > 0) {
                 filtered = filtered.filter(entry => {
                     const title = (entry.title || '').toLowerCase();
@@ -93,9 +104,11 @@ document.addEventListener('alpine:init', () => {
                 });
             }
 
-            // Sort by pubDate descending for all modes except shuffle
-            return filtered.sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
+            this._cachedFilteredEntries = filtered;
+            this._lastFilterHash = currentHash;
+            return this._cachedFilteredEntries;
         },
+
 
         // --- Alpine.js init method ---
         async initApp() {
@@ -103,6 +116,7 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 // Load initial settings and user state from DB/localStorage
+                // These loadStateValue calls are fine, as you expect them to update the initial state
                 this.syncEnabled = await loadStateValue(db, 'syncEnabled', true);
                 this.imagesEnabled = await loadStateValue(db, 'imagesEnabled', true);
                 this.filterMode = await loadFilterMode(db);
@@ -110,10 +124,10 @@ document.addEventListener('alpine:init', () => {
                 this.starred = await this.loadArrayStateFromDB(db, 'starred');
                 this.currentDeckGuids = await loadCurrentDeck(db);
 
-                const { shuffleCount, date } = await loadShuffleState(db);
+                const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
                 const today = new Date();
                 today.setHours(0,0,0,0);
-                if (date && new Date(date).toDateString() === today.toDateString()) {
+                if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
                     this.shuffleCount = 3; // Reset daily limit
@@ -155,8 +169,8 @@ document.addEventListener('alpine:init', () => {
                     const { feedTime } = await performFullSync(db);
                     syncCompletionTime = feedTime;
                     // Reload state after initial full sync
-                    this.hidden = await loadArrayStateFromDB(db, 'hidden');
-                    this.starred = await loadArrayStateFromDB(db, 'starred');
+                    this.hidden = await this.loadArrayStateFromDB(db, 'hidden'); // Use this.loadArrayStateFromDB
+                    this.starred = await this.loadArrayStateFromDB(db, 'starred'); // Use this.loadArrayStateFromDB
                 }
 
                 // Load feed items from DB
@@ -174,8 +188,8 @@ document.addEventListener('alpine:init', () => {
                             await performFeedSync(db);
                             await pullUserState(db);
                             // Re-load data after background sync to ensure UI updates
-                            this.hidden = await loadArrayStateFromDB(db, 'hidden');
-                            this.starred = await loadArrayStateFromDB(db, 'starred');
+                            this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
+                            this.starred = await this.loadArrayStateFromDB(db, 'starred');
                             await this.loadFeedItemsFromDB();
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
@@ -236,8 +250,11 @@ document.addEventListener('alpine:init', () => {
 
         // Helper to load array states from DB
         async loadArrayStateFromDB(db, key) {
-            const stored = await loadStateValue(db, key, []);
-            return Array.isArray(stored) ? stored : [];
+            // **FIX**: loadStateValue is used here instead of loadArrayState from database.js
+            // If loadStateValue can correctly return an array, this is fine.
+            // If loadArrayState is specifically for arrays, consider using that.
+            const stored = await loadStateValue(db, key, []); // loadStateValue provides a default []
+            return Array.isArray(stored) ? stored : []; // Ensure it's an array
         },
 
         // Helper to load feed items from DB and update entries
@@ -259,13 +276,13 @@ document.addEventListener('alpine:init', () => {
             return this.starred.some(e => e.id === guid);
         },
         toggleStar(guid) {
-            toggleStar(this, dbPromise, guid); // Pass 'this' and dbPromise
+            toggleStar(this, guid); // Pass 'this' and guid (dbPromise is within toggleStar now)
         },
         isHidden(guid) {
             return this.hidden.some(e => e.id === guid);
         },
         toggleHidden(guid) {
-            toggleHidden(this, dbPromise, guid); // Pass 'this' and dbPromise
+            toggleHidden(this, guid); // Pass 'this' and guid (dbPromise is within toggleHidden now)
         },
         setFilter(mode) {
             this.filterMode = mode; // Update Alpine's reactive property
