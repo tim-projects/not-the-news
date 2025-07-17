@@ -288,58 +288,70 @@ document.addEventListener('alpine:init', () => {
             this.filterMode = mode; // Update Alpine's reactive property
             // The $watch for filterMode will handle saving to DB
         },
-
         async loadNextDeck() {
             const db = await dbPromise;
-            // Ensure entries is up-to-date
-            await this.loadFeedItemsFromDB();
+            // Ensure entries is up-to-date and correctly mapped before filtering
+            await this.loadFeedItemsFromDB(); // Call helper to populate this.entries
 
             const hiddenSet = new Set(this.hidden.map(h => h.id));
-            const unhiddenItems = this.entries.filter(i => !hiddenSet.has(i.id))
-                                              .sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
 
-            const nextDeck = unhiddenItems.slice(0, 10);
-            this.currentDeckGuids = nextDeck.map(i => i.id);
-            await saveCurrentDeck(db, this.currentDeckGuids);
+            // Filter from this.entries (which uses 'id'), not raw 'allItems' from DB
+            const unreadItems = this.entries.filter(item => !hiddenSet.has(item.id)) // Filter using item.id
+                                            .sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
+
+            const nextDeck = unreadItems.slice(0, 10);
+
+            if (nextDeck.length > 0) {
+                this.currentDeckGuids = nextDeck.map(item => item.id); // Map using item.id
+                await saveCurrentDeck(db, this.currentDeckGuids); // Pass db argument
+            } else {
+                this.currentDeckGuids = []; // Clear the deck if no more unread items
+                await saveCurrentDeck(db, []); // Persist empty deck
+                createAndShowSaveMessage('No more unread items to load!', 'info');
+            }
+
             this.updateCounts();
             this.scrollToTop();
         },
 
-        async shuffleFeed() {
+            async shuffleFeed() {
             if (this.shuffleCount <= 0) {
-                createAndShowSaveMessage('No shuffles left for today!', 'error');
+                createAndShowSaveMessage('No shuffles left for today!', 'error'); // Use UI feedback
                 return;
             }
 
             const db = await dbPromise;
-            // Ensure entries is up-to-date
-            await this.loadFeedItemsFromDB();
+            await this.loadFeedItemsFromDB(); // Ensure entries is up-to-date
 
-            const allUnhidden = this.entries.filter(e => !this.hidden.some(h => h.id === e.id));
-            const deckGuidsSet = new Set(this.currentDeckGuids);
-            const eligibleItems = allUnhidden.filter(i => !deckGuidsSet.has(i.id));
+            const allUnhidden = this.entries.filter(entry => !this.hidden.some(h => h.id === entry.id));
 
-            if (eligibleItems.length === 0) {
-                createAndShowSaveMessage('No new items to shuffle in.', 'info');
+            // CRITICAL FIX: Shuffle from ALL unhidden items, not just those *not* in the current deck.
+            // A shuffle should give you a fresh, random set.
+            const eligibleItemsForShuffle = allUnhidden;
+
+            if (eligibleItemsForShuffle.length === 0) {
+                createAndShowSaveMessage('No unread items to shuffle.', 'info'); // Use UI feedback
                 return;
             }
 
-            const shuffledEligible = shuffleArray(eligibleItems);
-            const newDeck = shuffledEligible.slice(0, 10);
-            this.currentDeckGuids = newDeck.map(i => i.id);
-            await saveCurrentDeck(db, this.currentDeckGuids);
+            const shuffledEligibleItems = shuffleArray(eligibleItemsForShuffle);
+            const newDeckItems = shuffledEligibleItems.slice(0, 10);
+
+            this.currentDeckGuids = newDeckItems.map(item => item.id);
+            await saveCurrentDeck(db, this.currentDeckGuids); // Pass db argument
 
             this.shuffleCount--;
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            await saveShuffleState(db, this.shuffleCount, today);
+            today.setHours(0,0,0,0);
+            await saveShuffleState(db, this.shuffleCount, today); // Pass db argument
 
             this.updateCounts();
             this.scrollToTop();
-            // No need for _cachedFilteredEntries or isShuffled if filteredEntries is a computed prop
-            // The update to currentDeckGuids will naturally trigger filteredEntries re-computation
-        },
+            this.isShuffled = true; // Keep this if you need it for UI state
 
+            // Remove direct DOM manipulation; Alpine will handle this if bound correctly in HTML
+            // console.log(`Shuffled. Remaining shuffles: ${this.shuffleCount}`); // Remove if not needed for debugging
+        },    
         // The save settings logic for textareas is now simpler as x-model binds directly
         // and $watch saves to DB. The buttons simply trigger the $watch.
         async saveRssFeeds() {
