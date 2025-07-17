@@ -182,7 +182,7 @@ title {
 /* Base button styles - apply to all relevant buttons */
 button {
   cursor: pointer;
-  border: var(--card-border); /* Default for most buttons */
+  border: none; /* Default for most buttons */
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -211,7 +211,8 @@ button.close {
   color: var(--fg);
   border-radius: 0 40px 0 20px;
   opacity: 0.8;
-  box-shadow: -1px 1px 0 1px var(--card-shadow-color); /* Kept specific shadow */
+  /* UPDATED: Border of close button to use --card-border */
+  box-shadow: -1px 1px 0 1px var(--card-border);
 
   position: absolute;
   top: 1px;
@@ -226,7 +227,8 @@ button.close:hover {
 }
 
 button.close:focus {
-  box-shadow: -1px 1px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary); /* Combine with base focus */
+  /* UPDATED: Border of close button focus to use --card-border */
+  box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary); /* Combine with base focus */
   color: var(--secondary); /* Match hover color on focus */
   background: var(--primary); /* Match hover background on focus */
 }
@@ -445,20 +447,29 @@ a:hover {
   margin-right: auto; /* Push header-options to the right */
 }
 
+/* Grouping for shuffle button, settings button, and options dropdown */
+#left-aligned-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem; /* Space between items */
+  margin-right: auto; /* Pushes the group to the left and pushes header-options to the right */
+}
+
 /* Ensure header-options is always aligned to the right */
 #header-options {
   display: flex;
   margin-left: auto; /* This will push header-options to the right */
 }
 
+/* Remove margin-left from header .switch as it's handled by #header-options */
 #header .switch {
-  margin-left: 0; /* Reset margin from previous rule */
+  margin-left: 0;
   margin-right: 1rem;
 }
 
 /* simple styling for our filter dropdown */
 .filter-select {
-  margin: 0 1rem;
+  margin: 0; /* Reset margins as it's now part of the flex group */
   padding: 0.5em 0.5em;
   font-size: inherit;
   border-radius: 4px;
@@ -672,22 +683,31 @@ select#filter-selector {
 }
 
 .cog-wheel-button {
-  left: 20px;
-  font-size: 55px;
+  /* Removed fixed positioning as it will be part of the header flex layout */
+  /* left: 20px; */
+  font-size: 55px; /* Size for the cog icon */
   line-height: 0.94;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-}
 
-.cog-wheel-button {
-  position: fixed;
-  bottom: 20px;
-  z-index: 9999;
-  background-color: var(--bg-alt); /* Original base background */
-  color: var(--fg-muted); /* Original base color */
-  border-radius: 50%;
+  /* Resetting styles that were for fixed positioning */
+  position: static;
+  bottom: unset;
+  left: unset;
+
+  /* Adjustments for being in a flex container and making it round */
+  margin: 0; /* Remove any default margins */
+  background-color: var(--card-bg); /* Use card-bg as default, as per dark theme definition */
+  color: var(--fg-muted); /* Original base color, often gray */
+  border-radius: 50%; /* Make it perfectly round */
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   border: 1px solid var(--card-border); /* Added border for consistency */
+  height: 4rem; /* Standardized height */
+  width: 4rem; /* Standardized width for a circle */
+  display: flex; /* Make it a flex container for centering content */
+  justify-content: center; /* Center icon horizontally */
+  align-items: center; /* Center icon vertically */
+  padding: 0; /* Remove padding if any */
 }
 
 .cog-wheel-button:hover {
@@ -705,7 +725,21 @@ select#filter-selector {
 .cog-wheel-button:active {
   background-color: var(--primary-darker);
   transform: translateY(1px);
+  color: var(--button-text-light); /* Ensure text color remains light on active */
 }
+
+/* Dark theme specific override for cog-wheel-button */
+html.dark .cog-wheel-button {
+  background: var(--card-bg); /* Default dark theme background for consistency */
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
+  color: var(--fg); /* Default dark theme foreground for consistency */
+}
+
+html.dark .cog-wheel-button:hover {
+  background: var(--fg); /* Dark theme hover background */
+  color: var(--bg); /* Dark theme hover text color */
+}
+
 
 ---
 
@@ -897,18 +931,27 @@ ul.feed-list,
 }
 
 .shuffle-btn {
-  width: 3.5em;
-  height: 3.5em;
+  /* Removed absolute positioning */
+  /* margin-left: auto; */
+
+  /* General button styles for flex container */
+  width: 3.5em; /* Use em for consistent sizing relative to font */
+  height: 3.5em; /* Make height equal to width for circle */
   background-color: var(--card-bg); /* Kept original base background */
   color: var(--fg); /* Kept original base color */
-  margin-left: auto;
   border: none; /* Base styles */
-  border-radius: 50%; /* Changed to 50% for perfect circle */
+  border-radius: 50%; /* Make it perfectly round */
   opacity: 0.8;
-  padding-top: 0.4em;
+  /* padding-top: 0.4em; removed, as content is centered by flex */
   box-shadow: 1px 1px 5px var(--card-shadow-color);
   border: 1px solid var(--card-border); /* Specific border */
   transition: background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+
+  /* Align content for button */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0; /* Remove padding to avoid impacting size with flex centering */
 }
 
 .shuffle-btn:hover {
@@ -932,9 +975,11 @@ ul.feed-list,
 }
 
 svg.shuffle-icon {
-  width: 3em;
-  margin-left: -0.15em;
-  margin-top: -0.15em;
+  width: 3em; /* Adjusted slightly smaller to fit within 3.5em button */
+  height: 3em; /* Ensure it's square */
+  margin: 0; /* Center the icon within the button */
+  /* margin-left: -0.15em; removed */
+  /* margin-top: -0.15em; removed */
 }
 
 span.shuffle-count {
@@ -949,9 +994,11 @@ span.shuffle-count {
 /* Removed redundant comments for .settings-btn */
 
 .gear-icon {
-  width: 3em;
-  margin-left: -0.15em;
-  margin-top: -0.15em;
+  width: 3em; /* Adjusted to fit the new button size */
+  height: 3em; /* Ensure it's square */
+  margin: 0; /* Center the icon within the button */
+  /* margin-left: -0.15em; removed */
+  /* margin-top: -0.15em; removed */
 }
 
 ---
@@ -1098,7 +1145,7 @@ p {
 }
 
 .filter-select {
-  margin-left: auto;
+  margin-left: 0; /* Reset this to work with #left-aligned-controls */
 }
 
 .modal-content,
@@ -1145,7 +1192,7 @@ button.star {
   transform: unset;
   margin-top: 0; /* Reset margin */
   text-align: left; /* Explicitly left-align on mobile */
-  margin-right: auto; /* Push header-options to the right */
+  /* margin-right: auto; // This is now handled by #left-aligned-controls positioning */
 }
 
 /* Ensure the header options are pushed to the right on mobile */
@@ -1270,6 +1317,11 @@ button.star {
       margin-left: auto; /* This already correctly pushes it to the right */
       position: relative; /* Ensure it stays within the header */
       z-index: 2; /* Ensure it's above the centered title if needed */
+    }
+
+    /* Grouping for shuffle button, settings button, and options dropdown */
+    #left-aligned-controls {
+      margin-right: auto; /* Pushes the group to the left */
     }
 
     /* push the switch off to the right (already correct but ensure no conflicts) */
