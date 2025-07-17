@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
+i@import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
 
 /* Tell browser we support both light & dark */
 html {
@@ -76,15 +76,6 @@ html.light {
     background: var(--link-highlight); /* This will now be cornflowerblue in light mode */
   }
 
-  /* Removed redundant commented-out hover styles, as they are now consolidated below */
-  /* button.close:hover {
-    color: aliceblue;
-  }
-
-  button.star:hover {
-    color: aliceblue;
-  } */
-
   .itemtitle {
     background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
   }
@@ -95,24 +86,9 @@ html.light {
 }
 
 html.dark {
-  /* a:visited rule was duplicated and is handled by a general rule now */
-  /* a:visited {
-    color: var(--link-visited);
-  } */
-
   background-image: none;
 
-  /* Removed redundant commented-out button shadows. If needed, incorporate into general button styles. */
-  /* button.close {
-    box-shadow: -1px 1px 0 0px var(--card-border);
-  }
-
-  button.star {
-    box-shadow: -1px -1px 0 0px var(--card-border);
-  } */
-
   #header {
-    /* Assuming --shadow-text should refer to --card-shadow-color */
     text-shadow: 2px 2px 2px var(--card-shadow-color);
   }
 }
@@ -135,7 +111,6 @@ html.dark .cog-wheel-button:hover {
 }
 
 html.dark .switch input:checked+.slider {
-  /* Added a fallback to --primary if --toggle-checked-dark is not explicitly defined for dark mode */
   background-color: var(--toggle-checked-dark, var(--primary));
 }
 
@@ -211,7 +186,6 @@ button.close {
   color: var(--fg);
   border-radius: 0 40px 0 20px;
   opacity: 0.8;
-  /* UPDATED: Border of close button to use --card-border */
   box-shadow: -1px 1px 0 1px var(--card-border);
 
   position: absolute;
@@ -227,7 +201,6 @@ button.close:hover {
 }
 
 button.close:focus {
-  /* UPDATED: Border of close button focus to use --card-border */
   box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary); /* Combine with base focus */
   color: var(--secondary); /* Match hover color on focus */
   background: var(--primary); /* Match hover background on focus */
@@ -427,14 +400,13 @@ a:hover {
   position: static;
   z-index: 1000;
   display: flex;
-  align-items: center;
-  justify-content: space-between; /* This will push elements to ends */
+  align-items: center; /* Ensures vertical centering for direct children */
+  justify-content: space-between; /* This pushes left-aligned and right-aligned groups to ends */
   padding: 1rem 1rem;
   background-color: transparent;
   font-family: 'Playfair Display', serif;
   font-weight: 400;
   text-transform: uppercase;
-  text-align: center; /* This might be overridden by flex item alignment */
   color: var(--fg-muted);
   font-size: small;
   font-variant: all-small-caps;
@@ -442,29 +414,45 @@ a:hover {
 
 /* New style for the title in the header */
 #header .ntn-title {
-  /* On mobile, this will be left-aligned by default due to flex-start */
-  text-align: left; /* Ensure it's left-aligned explicitly */
-  margin-right: auto; /* Push header-options to the right */
+  /* Use margin auto to push it as far left as possible from the next flex item (header-options) */
+  margin-right: auto;
+  /* Add flex to center the h2 vertically within ntn-title if it's not the only content */
+  display: flex;
+  align-items: center;
+  /* Reset previous desktop absolute positioning */
+  position: static;
+  left: unset;
+  transform: unset;
 }
 
-/* Grouping for shuffle button, settings button, and options dropdown */
+/* Ensure h2 within ntn-title is vertically centered */
+#header .ntn-title h2 {
+    margin: 0; /* Remove default margin that might affect centering */
+    line-height: 1; /* Adjust line-height for precise vertical centering */
+}
+
+/* Grouping for shuffle button and settings button */
 #left-aligned-controls {
   display: flex;
   align-items: center;
   gap: 1rem; /* Space between items */
-  margin-right: auto; /* Pushes the group to the left and pushes header-options to the right */
+  /* This margin-right will push itself and ntn-title to the left,
+     and push header-options to the far right. */
+  margin-right: auto;
 }
 
-/* Ensure header-options is always aligned to the right */
+/* Ensure header-options is always aligned to the far right */
 #header-options {
   display: flex;
-  margin-left: auto; /* This will push header-options to the right */
+  align-items: center; /* Vertically center items within header-options */
+  margin-left: auto; /* This will push header-options to the far right */
+  gap: 1rem; /* Space between the switch and the filter */
 }
 
 /* Remove margin-left from header .switch as it's handled by #header-options */
 #header .switch {
   margin-left: 0;
-  margin-right: 1rem;
+  margin-right: 0; /* No longer need margin-right if gap is on parent */
 }
 
 /* simple styling for our filter dropdown */
@@ -488,11 +476,6 @@ select#filter-selector {
   background: var(--card-bg);
   color: var(--fg);
 }
-
-/* This hover style on option is not widely supported. Styling options directly is limited. */
-/* select#filter-selector option:hover {
-  background: var(--primary);
-} */
 
 /* Toggle switch styling */
 .switch {
@@ -684,7 +667,6 @@ select#filter-selector {
 
 .cog-wheel-button {
   /* Removed fixed positioning as it will be part of the header flex layout */
-  /* left: 20px; */
   font-size: 55px; /* Size for the cog icon */
   line-height: 0.94;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
@@ -702,8 +684,8 @@ select#filter-selector {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   border: 1px solid var(--card-border); /* Added border for consistency */
-  height: 4rem; /* Standardized height */
-  width: 4rem; /* Standardized width for a circle */
+  height: 3.5rem; /* Standardized height to match shuffle-btn for roundness */
+  width: 3.5rem; /* Standardized width for a circle to match shuffle-btn */
   display: flex; /* Make it a flex container for centering content */
   justify-content: center; /* Center icon horizontally */
   align-items: center; /* Center icon vertically */
@@ -746,7 +728,7 @@ html.dark .cog-wheel-button:hover {
 ### Modal Styles
 
 .modal {
-  position: fixed;
+  position: fixed; /* Changed to fixed for full overlay */
   z-index: 9999;
   left: 0;
   top: 0;
@@ -766,7 +748,7 @@ html.dark .cog-wheel-button:hover {
 
 .modal-content {
   background-color: var(--card-bg);
-  margin: 5% auto;
+  margin: 0; /* Reset margin to allow flex centering */
   border: 1px solid var(--card-border);
   display: flex;
   flex-direction: column;
@@ -780,7 +762,7 @@ html.dark .cog-wheel-button:hover {
   overflow-y: auto; /* Allow content to scroll if it overflows */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   height: auto;
-  min-height: 50vw;
+  min-height: 50vw; /* Keep a minimum height for better appearance */
   box-sizing: border-box;
   position: relative;
 }
@@ -931,10 +913,6 @@ ul.feed-list,
 }
 
 .shuffle-btn {
-  /* Removed absolute positioning */
-  /* margin-left: auto; */
-
-  /* General button styles for flex container */
   width: 3.5em; /* Use em for consistent sizing relative to font */
   height: 3.5em; /* Make height equal to width for circle */
   background-color: var(--card-bg); /* Kept original base background */
@@ -942,7 +920,6 @@ ul.feed-list,
   border: none; /* Base styles */
   border-radius: 50%; /* Make it perfectly round */
   opacity: 0.8;
-  /* padding-top: 0.4em; removed, as content is centered by flex */
   box-shadow: 1px 1px 5px var(--card-shadow-color);
   border: 1px solid var(--card-border); /* Specific border */
   transition: background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
@@ -978,8 +955,6 @@ svg.shuffle-icon {
   width: 3em; /* Adjusted slightly smaller to fit within 3.5em button */
   height: 3em; /* Ensure it's square */
   margin: 0; /* Center the icon within the button */
-  /* margin-left: -0.15em; removed */
-  /* margin-top: -0.15em; removed */
 }
 
 span.shuffle-count {
@@ -990,15 +965,10 @@ span.shuffle-count {
   line-height: 2em;
 }
 
-/* Settings button style (cog-wheel-button class is already defined globally and seems to control this) */
-/* Removed redundant comments for .settings-btn */
-
 .gear-icon {
   width: 3em; /* Adjusted to fit the new button size */
   height: 3em; /* Ensure it's square */
   margin: 0; /* Center the icon within the button */
-  /* margin-left: -0.15em; removed */
-  /* margin-top: -0.15em; removed */
 }
 
 ---
@@ -1039,7 +1009,6 @@ span.shuffle-count {
 /* Hide the detailed settings blocks by default */
 #rss-settings-block,
 #keywords-settings-block {
-  /* Removed display: none; as Alpine's x-show controls visibility */
   flex: 1;
   flex-direction: column;
   gap: 1rem;
@@ -1048,7 +1017,6 @@ span.shuffle-count {
 
 /* Ensure the main settings block is initially visible */
 #main-settings {
-  /* Removed display: flex; as Alpine's x-show controls visibility, but ensure it's flex when shown */
   flex: 1;
   flex-direction: column;
   gap: 1rem;
@@ -1108,7 +1076,6 @@ span.shuffle-count {
   font-size: 0.9em;
   color: var(--primary);
   margin-left: 0.5em;
-  /* Removed display: none; as Alpine's x-show controls visibility */
   white-space: nowrap;
 }
 
@@ -1192,7 +1159,6 @@ button.star {
   transform: unset;
   margin-top: 0; /* Reset margin */
   text-align: left; /* Explicitly left-align on mobile */
-  /* margin-right: auto; // This is now handled by #left-aligned-controls positioning */
 }
 
 /* Ensure the header options are pushed to the right on mobile */
@@ -1302,14 +1268,21 @@ button.star {
       position: relative; /* Make it a positioning context for absolute children */
     }
 
+    #header .ntn-title {
+        /* Keep `margin-right: auto` to push it away from #left-aligned-controls */
+        /* But also ensure it acts as a flex item within the header */
+        flex-grow: 1; /* Allow it to grow and take available space */
+        text-align: center; /* Center the text horizontally within its flex space */
+        margin: 0 auto; /* Center it horizontally as much as possible if other elements don't fill space */
+    }
+
     #header h2 { /* Assuming this is your "ntn-title" */
-      position: absolute; /* Take it out of normal flow */
-      left: 50%; /* Move left edge to center */
-      transform: translateX(-50%); /* Shift it back by half its width to truly center */
-      padding-right: 0; /* Reset any mobile padding */
-      margin-top: -0.5em; /* Keep your original margin-top */
-      /* Ensure z-index if anything overlaps */
-      z-index: 1;
+      /* Remove absolute positioning. Flexbox handles centering now. */
+      position: static;
+      left: unset;
+      transform: unset;
+      margin-top: 0; /* Keep your original margin-top */
+      text-align: center; /* Ensure the text itself is centered */
     }
 
     /* Push header options to the right on desktop */
@@ -1321,13 +1294,19 @@ button.star {
 
     /* Grouping for shuffle button, settings button, and options dropdown */
     #left-aligned-controls {
-      margin-right: auto; /* Pushes the group to the left */
+      /* Re-evaluate margin-right here, as ntn-title also has margin:auto */
+      /* If you want the shuffle/settings buttons to be truly on the far left,
+         and the title centered, and options far right, the header structure
+         might need careful consideration with flexbox order or multiple flex containers.
+         For now, keeping margin-right: auto on #left-aligned-controls
+         will keep it next to the centered title and push header-options right. */
+      margin-right: 1rem; /* Adjust as needed or remove if title takes precedence */
     }
 
     /* push the switch off to the right (already correct but ensure no conflicts) */
     #header .switch {
       margin-left: 0; /* Ensure no auto margin here */
-      margin-right: 1rem;
+      margin-right: 0;
     }
   }
 }
