@@ -1,258 +1,258 @@
-import { dbPromise, bufferedChanges, saveShuffleState, loadShuffleState } from "./database.js";
-
-export function scrollToTop() { window.scrollTo({ top: 0, behavior: "smooth" }); }
-
-export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
-  const btn = document.getElementById(buttonId);
-  if (!btn) return;
-  let idleTimeout = null;
-  window.addEventListener("scroll", () => {
-    btn.classList.add("visible");
-    clearTimeout(idleTimeout);
-    idleTimeout = setTimeout(() => { btn.classList.remove("visible"); }, 1200);
-  });
+if ('serviceWorker' in navigator) {
+	navigator.serviceWorker.register('/sw.js').then(reg => {
+		console.log('SW registered:', reg.scope);
+		reg.addEventListener('updatefound', () => {
+			const newSW = reg.installing;
+			newSW.addEventListener('statechange', () => {
+				if (newSW.state === 'activated') {
+					window.location.reload();
+				}
+			});
+		});
+	}).catch(err => console.warn('SW registration failed:', err));
 }
 
-export async function loadSyncEnabled() {
-  const db = await dbPromise;
-  const entry = await db.transaction('userState', 'readonly').objectStore('userState').get('syncEnabled');
-  return entry?.value ?? true;
-}
+import { dbPromise, bufferedChanges, pushUserState, performSync, performFullSync, pullUserState, processPendingOperations, isStarred, toggleStar, isHidden, toggleHidden, loadHidden, loadStarred, pruneStaleHidden, saveCurrentDeck, loadCurrentDeck, saveShuffleState, loadShuffleState } from "./js/database.js";
+import { scrollToTop, attachScrollToTopHandler, formatDate, setFilter, updateCounts, loadFilterMode, shuffleArray, mapRawItems } from "./js/functions.js";
+import { initSync, initTheme, initImages, initScrollPos, initConfigComponent, loadSyncEnabled, loadImagesEnabled, initShuffleCount } from "./js/settings.js";
 
-export async function loadImagesEnabled() {
-  const db = await dbPromise;
-  const entry = await db.transaction('userState', 'readonly').objectStore('userState').get('imagesEnabled');
-  return entry?.value ?? true;
-}
+window.rssApp = () => ({
+	openSettings: false,
+	entries: [],
+	isOnline: navigator.onLine,
+	hidden: [],
+	starred: [],
+	filterMode: "unread",
+	imagesEnabled: null,
+	syncEnabled: null,
+	isShuffled: false,
+	shuffleCount: 2,
+	currentSettingsPanel: 'main',
+	autoSyncFeed: false,
+	theme: 'light',
+	isDarkTheme: false,
+	rssFeedsInput: '',
+	rssSaveMessage: '',
+	keywordBlacklistInput: '',
+	keywordsSaveMessage: '',
+	loading: true,
+	currentDeckGuids: [],
 
-export function initSync(app) {
-  const toggle = document.getElementById('sync-toggle');
-  const syncText = document.getElementById('sync-text');
-  if (!toggle || !syncText) return;
-  toggle.checked = app.syncEnabled;
-  bufferedChanges.push({ key: 'settings', value: { syncEnabled: app.syncEnabled } });
-  toggle.addEventListener('change', async () => {
-    app.syncEnabled = toggle.checked;
-    const db = await dbPromise;
-    const tx = db.transaction('userState', 'readwrite');
-    tx.objectStore('userState').put({ key: 'syncEnabled', value: app.syncEnabled });
-    await tx.done;
-    syncText.textContent = app.syncEnabled ? 'yes' : 'no';
-    if (app.syncEnabled) {
-      console.log("AutoSync enabled – kicking off full feed sync");
-      app.init();
-    }
-  });
-}
+	scrollToTop,
+	_attachScrollToTopHandler: attachScrollToTopHandler,
+	formatDate,
+	updateCounts,
+	isStarred(link) {
+		return isStarred(this, link);
+	},
+	toggleStar(link) {
+		toggleStar(this, link);
+	},
+	setFilter(mode) {
+		setFilter(this, mode);
+	},
 
-export function initImages(app) {
-  const toggle = document.getElementById('images-toggle');
-  const imagesText = document.getElementById('images-text');
-  if (!toggle || !imagesText) return;
-  toggle.checked = app.imagesEnabled;
-  bufferedChanges.push({ key: 'settings', value: { imagesEnabled: app.imagesEnabled } });
-  toggle.addEventListener('change', async () => {
-    app.imagesEnabled = toggle.checked;
-    const db = await dbPromise;
-    const tx = db.transaction('userState', 'readwrite');
-    tx.objectStore('userState').put({ key: 'imagesEnabled', value: app.imagesEnabled });
-    await tx.done;
-    imagesText.textContent = app.imagesEnabled ? 'yes' : 'no';
-  });
-}
+	async init() {
+		this.loading = true;
+		let serverTime = 0;
+		try {
+			this.syncEnabled = await loadSyncEnabled();
+			this.imagesEnabled = await loadImagesEnabled();
 
-export async function initTheme() {
-  const html = document.documentElement;
-  const toggle = document.getElementById('theme-toggle');
-  const themeText = document.getElementById('theme-text');
-  if (!toggle || !themeText) return;
-  let saved;
-  try {
-    const db = await dbPromise;
-    const e = await db.transaction('userState', 'readonly').objectStore('userState').get('theme');
-    saved = e?.value;
-  } catch {
-    saved = null;
-  }
-  const useDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  html.classList.add(useDark ? 'dark' : 'light');
-  toggle.checked = useDark;
-  themeText.textContent = useDark ? 'dark' : 'light';
-  toggle.addEventListener('change', async () => {
-    const newTheme = toggle.checked ? 'dark' : 'light';
-    html.classList.toggle('dark', toggle.checked);
-    html.classList.toggle('light', !toggle.checked);
-    const db = await dbPromise;
-    const tx = db.transaction('userState', 'readwrite');
-    tx.objectStore('userState').put({ key: 'theme', value: newTheme });
-    await tx.done;
-    themeText.textContent = newTheme;
-    bufferedChanges.push({ key: 'settings', value: { theme: newTheme } });
-  });
-}
+			initTheme();
+			initSync(this);
+			initImages(this);
 
-export async function initScrollPos(app) {
-  const scrollY = window.scrollY;
-  const entries = document.querySelectorAll('.entry');
-  const db = await dbPromise;
-  const tx = db.transaction('userState', 'readwrite');
-  tx.objectStore('userState').put({ key: 'feedScrollY', value: String(scrollY) });
-  for (const el of entries) {
-    if (el.getBoundingClientRect().top >= 0) {
-      tx.objectStore('userState').put({ key: 'feedVisibleLink', value: el.dataset.link || '' });
-      break;
-    }
-  }
-  await tx.done;
-  const db2 = await dbPromise;
-  const savedY = (await db2.transaction('userState', 'readonly').objectStore('userState').get('feedScrollY'))?.value;
-  if (!savedY || savedY === '0') return;
-  window.requestAnimationFrame(async () => {
-    const link = (await db2.transaction('userState', 'readonly').objectStore('userState').get('feedVisibleLink'))?.value;
-    if (link) {
-      const target = document.querySelector(`.entry[data-link="${link}"]`);
-      if (target) {
-        target.scrollIntoView({ block: 'start' });
-        return;
-      }
-    }
-    const y = Number(savedY) || 0;
-    if (y) window.scrollTo({ top: y });
-  });
-}
+			await initShuffleCount(this);
 
-export async function initShuffleCount(app) {
-  const { shuffleCount, lastShuffleResetDate } = await loadShuffleState();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let shouldReset = false;
-  if (!lastShuffleResetDate || lastShuffleResetDate.toDateString() !== today.toDateString()) {
-    shouldReset = true;
-  }
-  if (shouldReset) {
-    app.shuffleCount = 2;
-    await saveShuffleState(app.shuffleCount, today);
-  } else {
-    app.shuffleCount = shuffleCount;
-  }
-  const shuffleCountSpan = document.getElementById('shuffle-count-display');
-  if (shuffleCountSpan) {
-    shuffleCountSpan.textContent = app.shuffleCount;
-  }
-}
+			this.hidden = await loadHidden();
+			this.starred = await loadStarred();
+			this.currentDeckGuids = await loadCurrentDeck();
 
-function showRssFeeds(app) {
-  app.modalView = 'rss';
-  document.getElementById('main-settings').style.display = 'none';
-  document.getElementById('rss-settings-block').style.display = 'block';
-  document.getElementById('back-button').style.display = 'block';
-  fetch(`/load-config?filename=feeds.txt`)
-    .then(r => r.json())
-    .then(data => {
-      app.rssFeedsInput = data.content || "";
-      const rssArea = document.getElementById("rss-feeds-textarea");
-      if (rssArea) rssArea.value = app.rssFeedsInput;
-    })
-    .catch(e => console.error("Error loading feeds:", e));
-}
+			const db = await dbPromise;
+			const count = await db.transaction('items', 'readonly').objectStore('items').count();
+			if (count === 0 && this.isOnline) {
+				const { feedTime } = await performFullSync();
+				serverTime = feedTime;
+				this.hidden = await loadHidden();
+				this.starred = await loadStarred();
+			} else {
+				serverTime = Date.now();
+			}
+			initConfigComponent(this);
+			window.addEventListener('online', () => {
+				this.isOnline = true;
+				if (this.syncEnabled && typeof this.syncPendingChanges === 'function') {
+					this.syncPendingChanges();
+				}
+			});
+			window.addEventListener('offline', () => {
+				this.isOnline = false;
+			});
+			const rawList = await db.transaction('items', 'readonly').objectStore('items').getAll();
+			this.entries = mapRawItems(rawList, this.formatDate);
+			this.hidden = await pruneStaleHidden(this.entries, serverTime);
+			this.updateCounts();
+			initScrollPos(this);
+			this.loading = false;
+			if (this.syncEnabled) {
+				setTimeout(async () => {
+					try {
+						await performSync();
+						await pullUserState(await dbPromise);
+						this.hidden = await loadHidden();
+						this.starred = await loadStarred();
+						const freshRaw = await db.transaction('items', 'readonly').objectStore('items').getAll();
+						this.entries = mapRawItems(freshRaw, this.formatDate);
+						this.hidden = await pruneStaleHidden(this.entries, Date.now());
+						this.updateCounts();
+					} catch (err) {
+						console.error('Background partial sync failed', err);
+					}
+				}, 0);
+			}
+			this._attachScrollToTopHandler();
+			let lastActivity = Date.now();
+			const resetActivity = () => {
+				lastActivity = Date.now();
+			};
+			["mousemove", "mousedown", "keydown", "scroll", "click"].forEach(evt => document.addEventListener(evt, resetActivity, true));
+			document.addEventListener("visibilitychange", resetActivity, true);
+			window.addEventListener("focus", resetActivity, true);
 
-function showKeywordBlacklist(app) {
-  app.modalView = 'keywords';
-  document.getElementById('main-settings').style.display = 'none';
-  document.getElementById('keywords-settings-block').style.display = 'block';
-  document.getElementById('back-button').style.display = 'block';
-  fetch(`/load-config?filename=filter_keywords.txt`)
-    .then(r => r.json())
-    .then(data => (
-      app.keywordBlacklistInput = (data.content || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b)).join("\n"),
-      document.getElementById("keywords-blacklist-textarea") && (document.getElementById("keywords-blacklist-textarea").value = app.keywordBlacklistInput)
-    ))
-    .catch(e => console.error("Error loading keywords:", e));
-}
+			const SYNC_INTERVAL = 5 * 60 * 1000;
+			const IDLE_THRESHOLD = 60 * 1000;
 
-function goBackToMainSettings(app) {
-  app.modalView = 'main';
-  document.getElementById('main-settings').style.display = 'block';
-  document.getElementById('rss-settings-block').style.display = 'none';
-  document.getElementById('keywords-settings-block').style.display = 'none';
-  document.getElementById('back-button').style.display = 'none';
-}
+			setInterval(async () => {
+				const now = Date.now();
+				if (this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivity) > IDLE_THRESHOLD) {
+					return;
+				}
+				try {
+					await performSync();
+					await pullUserState(await dbPromise);
+					this.hidden = await pruneStaleHidden(this.entries, now);
+				} catch (err) {
+					console.error("Partial sync failed", err);
+				}
+			}, SYNC_INTERVAL);
 
-export async function initConfigComponent(app) {
-  app.modalView = 'main';
-  app.$watch("openSettings", value => {
-    if (value) {
-      goBackToMainSettings(app);
-    }
-  });
-  const rssConfigureBtn = document.getElementById('configure-rss-feeds-btn');
-  if (rssConfigureBtn) {
-    rssConfigureBtn.addEventListener('click', () => showRssFeeds(app));
-  }
-  const keywordConfigureBtn = document.getElementById('configure-keyword-blacklist-btn');
-  if (keywordConfigureBtn) {
-    keywordConfigureBtn.addEventListener('click', () => showKeywordBlacklist(app));
-  }
-  const backButton = document.getElementById('back-button');
-  if (backButton) {
-    backButton.addEventListener('click', () => goBackToMainSettings(app));
-  }
-  const kwBtn = document.getElementById("save-keywords-btn");
-  let kwMsg = document.getElementById("keywords-save-msg");
-  if (kwBtn && !kwMsg) {
-    kwMsg = document.createElement("span");
-    kwMsg.id = "keywords-save-msg";
-    kwMsg.className = "save-message";
-    kwMsg.style.marginLeft = "0.5em";
-    kwMsg.style.display = "none";
-    kwBtn.parentNode.insertBefore(kwMsg, kwBtn);
-  }
-  const rssBtn = document.getElementById("save-rss-btn");
-  let rssMsg = document.getElementById("rss-save-msg");
-  if (rssBtn && !rssMsg) {
-    rssMsg = document.createElement("span");
-    rssMsg.id = "rss-save-msg";
-    rssMsg.className = "save-message";
-    rssMsg.style.marginLeft = "0.5em";
-    rssMsg.style.display = "none";
-    rssBtn.parentNode.insertBefore(rssMsg, rssBtn);
-  }
-  document.getElementById("save-keywords-btn").addEventListener("click", () => {
-    const kwArea = document.getElementById("keywords-blacklist-textarea");
-    app.keywordBlacklistInput = kwArea ? kwArea.value : app.keywordBlacklistInput;
-    fetch(`/save-config?filename=filter_keywords.txt`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: app.keywordBlacklistInput }),
-      })
-      .then(r => {
-        if (!r.ok) throw new Error("Failed to save keywords");
-        console.log("Keywords saved");
-        if (kwMsg) {
-          kwMsg.textContent = "Saved.";
-          kwMsg.style.display = "inline";
-          setTimeout(() => kwMsg.style.display = "none", 2000);
-        }
-      })
-      .catch(e => console.error(e));
-  });
-  document.getElementById("save-rss-btn").addEventListener("click", () => {
-    const rssArea = document.getElementById("rss-feeds-textarea");
-    app.rssFeedsInput = rssArea ? rssArea.value : app.rssFeedsInput;
-    fetch(`/save-config?filename=feeds.txt`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: app.rssFeedsInput }),
-      })
-      .then(r => {
-        if (!r.ok) throw new Error("Failed to save feeds");
-        console.log("Feeds saved");
-        if (rssMsg) {
-          rssMsg.textContent = "Saved.";
-          rssMsg.style.display = "inline";
-          setTimeout(() => rssMsg.style.display = "none", 2000);
-        }
-      })
-      .catch(e => console.error(e));
-  });
-}
+			if (this.currentDeckGuids.length === 0) {
+				await this.loadNextDeck();
+			}
+		} catch (err) {
+			console.error("loadFeed failed", err);
+			this.errorMessage = "Could not load feed: " + err.message;
+		} finally {
+			this.loading = false;
+		}
+	},
+	async syncPendingChanges() {
+		if (!this.isOnline) return;
+		try {
+			await processPendingOperations();
+		} catch (err) {
+			console.error('syncPendingChanges failed', err);
+		}
+	},
+	isHidden(link) {
+		return isHidden(this, link);
+	},
+	async toggleHidden(link) {
+		await toggleHidden(this, link);
+		if (this.currentDeckGuids.includes(link)) {
+			this.currentDeckGuids = this.currentDeckGuids.filter(guid => guid !== link);
+			await saveCurrentDeck(this.currentDeckGuids);
+			const unreadInDeck = this.currentDeckGuids.filter(guid => !this.hidden.some(h => h.id === guid));
+			if (unreadInDeck.length === 0) {
+				console.log("All items in current deck hidden. Loading next deck...");
+				this.shuffleCount++;
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+				await saveShuffleState(this.shuffleCount, today);
+				await this.loadNextDeck();
+			}
+		}
+	},
+
+	async loadNextDeck() {
+		const db = await dbPromise;
+		const allItems = await db.transaction('items', 'readonly').objectStore('items').getAll();
+		const hiddenSet = new Set(this.hidden.map(h => h.id));
+		const unreadItems = allItems.filter(item => !hiddenSet.has(item.guid))
+			.sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
+		const nextDeck = unreadItems.slice(0, 10);
+		this.currentDeckGuids = nextDeck.map(item => item.guid);
+		await saveCurrentDeck(this.currentDeckGuids);
+		this.updateCounts();
+		this.scrollToTop();
+	},
+
+	async shuffleFeed() {
+		if (this.shuffleCount <= 0) {
+			console.log("No shuffles remaining today.");
+			return;
+		}
+		const allUnreadItems = this.entries.filter(entry => !this.hidden.some(h => h.id === entry.id));
+		const currentDeckGuidsSet = new Set(this.currentDeckGuids);
+		const eligibleItemsForShuffle = allUnreadItems.filter(item => !currentDeckGuidsSet.has(item.id));
+		if (eligibleItemsForShuffle.length === 0) {
+			console.log("No new unread items available to shuffle into a deck.");
+			return;
+		}
+		const shuffledEligibleItems = shuffleArray(eligibleItemsForShuffle);
+		const newDeckItems = shuffledEligibleItems.slice(0, 10);
+		this.currentDeckGuids = newDeckItems.map(item => item.id);
+		await saveCurrentDeck(this.currentDeckGuids);
+		this.shuffleCount--;
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		await saveShuffleState(this.shuffleCount, today);
+		this.updateCounts();
+		this.scrollToTop();
+		this._cachedFilteredEntries = null;
+		this.isShuffled = false;
+		console.log(`Shuffled. Remaining shuffles: ${this.shuffleCount}`);
+		const shuffleCountSpan = document.getElementById('shuffle-count-display');
+		if (shuffleCountSpan) {
+			shuffleCountSpan.textContent = this.shuffleCount;
+		}
+	},
+
+	_lastFilterHash: "",
+	_cachedFilteredEntries: null,
+
+	get filteredEntries() {
+		const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}`;
+		if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
+			return this._cachedFilteredEntries;
+		}
+		const hiddenMap = new Map(this.hidden.map(h => [h.id, h.hiddenAt]));
+		const starredMap = new Map(this.starred.map(s => [s.id, s.starredAt]));
+		let filtered = [];
+		switch (this.filterMode) {
+			case "all": filtered = this.entries; break;
+			case "unread":
+				const deckGuidsSet = new Set(this.currentDeckGuids);
+				filtered = this.entries.filter(entry => deckGuidsSet.has(entry.id) && !hiddenMap.has(entry.id));
+				break;
+			case "hidden":
+				filtered = this.entries.filter(entry => hiddenMap.has(entry.id))
+					.sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+				break;
+			case "starred":
+				filtered = this.entries.filter(entry => starredMap.has(entry.id))
+					.sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
+				break;
+			default: filtered = this.entries; break;
+		}
+		this._cachedFilteredEntries = filtered;
+		this._lastFilterHash = currentHash;
+		return this._cachedFilteredEntries;
+	}
+});
+document.addEventListener("load", e => {
+	if (e.target.tagName.toLowerCase() === "img") {
+		e.target.classList.add("loaded");
+	}
+}, true);
