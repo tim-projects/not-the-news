@@ -130,7 +130,7 @@ document.addEventListener('alpine:init', () => {
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
-                    this.shuffleCount = 3; // Reset daily limit
+                    this.shuffleCount = 2; // Reset daily limit
                     await saveShuffleState(db, 3, today);
                 }
 
