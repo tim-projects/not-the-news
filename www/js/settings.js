@@ -16,8 +16,10 @@ export function initSync(app) {
   const toggle = document.getElementById('sync-toggle');
   const syncText = document.getElementById('sync-text');
   if (!toggle || !syncText) return;
+
   toggle.checked = app.syncEnabled;
   bufferedChanges.push({ key: 'settings', value: { syncEnabled: app.syncEnabled } });
+
   toggle.addEventListener('change', async () => {
     app.syncEnabled = toggle.checked;
     const db = await dbPromise;
@@ -36,8 +38,10 @@ export function initImages(app) {
   const toggle = document.getElementById('images-toggle');
   const imagesText = document.getElementById('images-text');
   if (!toggle || !imagesText) return;
+
   toggle.checked = app.imagesEnabled;
   bufferedChanges.push({ key: 'settings', value: { imagesEnabled: app.imagesEnabled } });
+
   toggle.addEventListener('change', async () => {
     app.imagesEnabled = toggle.checked;
     const db = await dbPromise;
@@ -53,6 +57,7 @@ export async function initTheme() {
   const toggle = document.getElementById('theme-toggle');
   const themeText = document.getElementById('theme-text');
   if (!toggle || !themeText) return;
+
   let saved;
   try {
     const db = await dbPromise;
@@ -61,10 +66,12 @@ export async function initTheme() {
   } catch {
     saved = null;
   }
+
   const useDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
   html.classList.add(useDark ? 'dark' : 'light');
   toggle.checked = useDark;
   themeText.textContent = useDark ? 'dark' : 'light';
+
   toggle.addEventListener('change', async () => {
     const newTheme = toggle.checked ? 'dark' : 'light';
     html.classList.toggle('dark', toggle.checked);
@@ -91,9 +98,11 @@ export async function initScrollPos(app) {
     }
   }
   await tx.done;
+
   const db2 = await dbPromise;
   const savedY = (await db2.transaction('userState', 'readonly').objectStore('userState').get('feedScrollY'))?.value;
   if (!savedY || savedY === '0') return;
+
   window.requestAnimationFrame(async () => {
     const link = (await db2.transaction('userState', 'readonly').objectStore('userState').get('feedVisibleLink'))?.value;
     if (link) {
