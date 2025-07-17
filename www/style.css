@@ -198,7 +198,7 @@ button:active {
 
 /* Close button - keeping existing positioning and shape */
 button.close {
-  font-size: xx-large;
+  font-size: 2rem;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
@@ -520,7 +520,7 @@ button.close.hidden:active {
 
 /* Modal close button - inherits from button.close but adjust for modal context */
 .modal-content > button.close {
-  font-size: 1.25rem;
+  font-size: 2rem;
   opacity: 0.8;
 }
 
@@ -1274,6 +1274,10 @@ p {
     margin-left: auto;
     margin-right: 1rem;
   }
+
+  .button-close, .button-star {
+    font-size: xx-large;
+  }
 }
 
 /* Desktop and up: half-width, centered, big headings */
@@ -1304,5 +1308,9 @@ p {
   .pubdate p,
   .itemfrom p {
     font-size: smaller !important;
+  }
+  
+  .button-close, .button-star {
+    font-size: xx-large;
   }
 }
