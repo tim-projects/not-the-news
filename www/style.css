@@ -1193,9 +1193,9 @@ p {
 #header h2 {
   padding-right: 0;
   position: absolute;
-  left: 50%;
+  left: 16%;
   transform: translateX(-50%);
-  font-size: 1rem;
+  font-size: 1.75rem;
   margin-top: -0.5em;
 }
 
@@ -1265,8 +1265,8 @@ p {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 1rem;
-    margin-top: -0.5em;
+    font-size: 1.2rem;
+    margin-top: -0.8em;
   }
 
   /* push the switch off to the right */
