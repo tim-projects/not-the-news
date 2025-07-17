@@ -73,10 +73,10 @@ window.rssApp = () => {
         console.log('rssSaveMessage:', this.rssSaveMessage);
         console.log('keywordBlacklistInput:', this.keywordBlacklistInput);
         console.log('keywordsSaveMessage:', this.keywordsSaveMessage);
+        
         initTheme();
         initSync(this);
         initImages(this);
-        initConfigComponent(this);
         // Load user‑state from IndexedDB
         this.hidden = await loadHidden();
         this.starred = await loadStarred();
@@ -94,6 +94,7 @@ window.rssApp = () => {
           // offline or not first run → use local data
           serverTime = Date.now();
         }
+        initConfigComponent(this);
         // ─── network detection & offline queue sync ─────────────────
         window.addEventListener('online', () => {
           this.isOnline = true;
