@@ -182,7 +182,7 @@ title {
 /* Base button styles - apply to all relevant buttons */
 button {
   cursor: pointer;
-  border: none; /* Default for most buttons */
+  border: var(--card-border); /* Default for most buttons */
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -426,25 +426,34 @@ a:hover {
   z-index: 1000;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; /* This will push elements to ends */
   padding: 1rem 1rem;
   background-color: transparent;
   font-family: 'Playfair Display', serif;
   font-weight: 400;
   text-transform: uppercase;
-  text-align: center;
+  text-align: center; /* This might be overridden by flex item alignment */
   color: var(--fg-muted);
   font-size: small;
   font-variant: all-small-caps;
 }
 
-#header .switch {
-  margin-left: auto;
-  margin-right: 1rem;
+/* New style for the title in the header */
+#header .ntn-title {
+  /* On mobile, this will be left-aligned by default due to flex-start */
+  text-align: left; /* Ensure it's left-aligned explicitly */
+  margin-right: auto; /* Push header-options to the right */
 }
 
+/* Ensure header-options is always aligned to the right */
 #header-options {
   display: flex;
+  margin-left: auto; /* This will push header-options to the right */
+}
+
+#header .switch {
+  margin-left: 0; /* Reset margin from previous rule */
+  margin-right: 1rem;
 }
 
 /* simple styling for our filter dropdown */
@@ -1128,9 +1137,22 @@ button.star {
   padding-right: 1.2em;
 }
 
+/* Remove absolute positioning and previous centering attempts on mobile */
 #header h2 {
-  padding-right: 0.7em;
+  padding-right: 0;
+  position: static; /* Reset to static for mobile */
+  left: unset;
+  transform: unset;
+  margin-top: 0; /* Reset margin */
+  text-align: left; /* Explicitly left-align on mobile */
+  margin-right: auto; /* Push header-options to the right */
 }
+
+/* Ensure the header options are pushed to the right on mobile */
+#header-options {
+  margin-left: auto;
+}
+
 
 .modal-content > button.close {
   font-size: 1.25rem;
@@ -1187,57 +1209,73 @@ button.star {
   button.star {
     font-size: 2rem;
   }
-}
 
-/* Desktop and up: half-width, centered, big headings */
-@media (min-width: 1024px) {
-  body,
-  html {
-    font-size: calc(20px + .3vw);
-  }
+  /* Desktop and up: half-width, centered, big headings */
+  @media (min-width: 1024px) {
+    body,
+    html {
+      font-size: calc(20px + .3vw);
+    }
 
-  .item {
-    max-width: 50%;
-    /* cards take half the screen */
-    margin: 2.5em auto;
-  }
+    .item {
+      max-width: 50%;
+      /* cards take half the screen */
+      margin: 2.5em auto;
+    }
 
-  .itemtitle h1 {
-    font-size: 2.5rem !important;
-  }
+    .itemtitle h1 {
+      font-size: 2.5rem !important;
+    }
 
-  .itemtitle h2 {
-    font-size: 2rem !important;
-  }
+    .itemtitle h2 {
+      font-size: 2rem !important;
+    }
 
-  .pubdate p,
-  .itemfrom p {
-    font-size: smaller !important;
-  }
+    .pubdate p,
+    .itemfrom p {
+      font-size: smaller !important;
+    }
 
-  .item {
-    float: unset;
-    margin-left: 20%;
-    margin-right: 20%;
-    box-shadow: 1px 1px 100px 1px var(--card-shadow-color) !important;
-    margin: 1.4em auto;
-  }
+    .item {
+      float: unset;
+      margin-left: 20%;
+      margin-right: 20%;
+      box-shadow: 1px 1px 100px 1px var(--card-shadow-color) !important;
+      margin: 1.4em auto;
+    }
 
-  .filter-select {
-    font-size: large;
-  }
-  #header h2 {
-    padding-right: 0;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1rem;
-    margin-top: -0.5em;
-  }
+    .filter-select {
+      font-size: large;
+    }
 
-  /* push the switch off to the right */
-  #header .switch {
-    margin-left: auto;
-    margin-right: 1rem;
+    /* Desktop header centering */
+    #header {
+      /* Revert `justify-content` to allow individual centering */
+      justify-content: flex-start; /* Reset to default flex-start */
+      position: relative; /* Make it a positioning context for absolute children */
+    }
+
+    #header h2 { /* Assuming this is your "ntn-title" */
+      position: absolute; /* Take it out of normal flow */
+      left: 50%; /* Move left edge to center */
+      transform: translateX(-50%); /* Shift it back by half its width to truly center */
+      padding-right: 0; /* Reset any mobile padding */
+      margin-top: -0.5em; /* Keep your original margin-top */
+      /* Ensure z-index if anything overlaps */
+      z-index: 1;
+    }
+
+    /* Push header options to the right on desktop */
+    #header-options {
+      margin-left: auto; /* This already correctly pushes it to the right */
+      position: relative; /* Ensure it stays within the header */
+      z-index: 2; /* Ensure it's above the centered title if needed */
+    }
+
+    /* push the switch off to the right (already correct but ensure no conflicts) */
+    #header .switch {
+      margin-left: 0; /* Ensure no auto margin here */
+      margin-right: 1rem;
+    }
   }
 }
