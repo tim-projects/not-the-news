@@ -141,11 +141,14 @@ document.addEventListener('alpine:init', () => {
                 // *******************************************************************
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
+                console.log('DEBUG: Loaded shuffle state:', { shuffleCount, lastShuffleResetDate });
                 const today = new Date();
                 today.setHours(0,0,0,0);
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
+                    console.log('DEBUG: Restored shuffleCount from saved state:', shuffleCount);
                 } else {
+                    console.log('DEBUG: Resetting shuffleCount to 2 (daily reset)');
                     this.shuffleCount = 2; // Reset daily limit
                     await saveShuffleState(db, 2, today); // Initialize with 2 shuffles for the day
                 }
