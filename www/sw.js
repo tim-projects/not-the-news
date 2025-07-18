@@ -17,7 +17,8 @@ const PRECACHE_URLS = [
   '/style.css',       // if you have a CSS file
   '/libs/alpine.3.x.x.js',
   '/libs/idb.js',
-  '/libs/rss-parser.min.js'
+  '/libs/rss-parser.min.js',
+  '/images/placeholder.svg'
 ];
 
 self.addEventListener('install', event => {
@@ -89,9 +90,16 @@ self.addEventListener('fetch', event => {
   }
 
   // 3. other requests → cache-first for static
+  // Exclude requests to external image domains
+  if (url.hostname.includes('redd.it')) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(request).then(cached => 
-      cached || fetch(request)
-    )
+    caches.match(request).then(cached => {
+      return cached || fetch(request).catch(() => {
+        return caches.match('/images/placeholder.svg');
+      });
+    })
   );
 });
