@@ -5,10 +5,15 @@ const API_CACHE    = 'api-v1';
 // List the files you want precached:
 const PRECACHE_URLS = [
   '/',                     // your index.html
-  '/javascript.js',        // your main bundle
-  '/js/database.js',
-  '/js/functions.js',
-  '/js/settings.js',
+  '/js/app.js',        // your main bundle
+  '/js/data/appState.js',
+  '/js/data/database.js',
+  '/js/helpers/apiUtils.js',
+  '/js/helpers/dataUtils.js',
+  '/js/helpers/userStateUtils.js',
+  '/js/ui/uiElements.js',
+  '/js/ui/uiInitializers.js',
+  '/js/ui/uiUpdaters.js',
   '/style.css',       // if you have a CSS file
   '/libs/alpine.3.x.x.js',
   '/libs/idb.js',
