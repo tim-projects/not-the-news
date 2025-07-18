@@ -18,7 +18,24 @@ const PRECACHE_URLS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(cache => {
+        return cache.addAll(PRECACHE_URLS)
+          .catch(error => {
+            console.error('Failed to cache:', error);
+            PRECACHE_URLS.forEach(url => {
+              fetch(url)
+                .then(response => {
+                  if (!response.ok) {
+                    console.error('Failed to fetch ' + url + ': ' + response.status);
+                  }
+                })
+                .catch(fetchError => {
+                  console.error('Failed to fetch ' + url + ': ' + fetchError);
+                });
+            });
+            throw error; // Re-throw the error to prevent installation
+          });
+      })
       .then(() => self.skipWaiting())
   );
 });
