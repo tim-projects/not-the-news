@@ -170,6 +170,7 @@ export async function shuffleFeed(app) {
 
     app.currentDeckGuids = newDeckItems.map(item => item.id);
     await saveCurrentDeck(db, app.currentDeckGuids); // Save the new shuffled deck
+    console.log('DEBUG: shuffleFeed() - new deck saved:', app.currentDeckGuids);
 
     app.shuffleCount--;
     const today = new Date();
