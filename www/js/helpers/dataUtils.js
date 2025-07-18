@@ -150,7 +150,13 @@ export async function shuffleFeed(app) {
 
     if (!navigator.onLine) {
         console.log("App is offline. Filtering for long-form text posts.");
-        eligibleItemsForShuffle = allUnhidden.filter(item => item.description.length >= 500);
+        const longFormItems = allUnhidden.filter(item => item.description.length >= 750 && !item.description.substring(item.description.length - 100).includes('?'));
+        if (longFormItems.length < 10) {
+            eligibleItemsForShuffle = allUnhidden; // Relax the filter
+            console.log("Relaxing filter because less than 10 long-form items are available.");
+        } else {
+            eligibleItemsForShuffle = longFormItems;
+        }
         console.log(`Number of long-form items: ${eligibleItemsForShuffle.length}`);
     }
 
