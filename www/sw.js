@@ -18,7 +18,8 @@ const PRECACHE_URLS = [
   '/libs/alpine.3.x.x.js',
   '/libs/idb.js',
   '/libs/rss-parser.min.js',
-  '/images/placeholder.svg'
+  '/images/placeholder.svg',
+  'https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap'
 ];
 
 self.addEventListener('install', event => {
@@ -99,11 +100,6 @@ self.addEventListener('fetch', event => {
     caches.match(request).then(cached => {
       return cached || fetch(request).catch(() => {
         if (request.url === 'https://news.loveopenly.net/time') {
-          // Return a placeholder response for /time
-          return new Response(JSON.stringify({ time: 'offline' }), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        } else if (request.headers.get('Accept').includes('application/json')) {
           return new Response(JSON.stringify({ time: 'offline' }), {
             headers: { 'Content-Type': 'application/json' }
           });
