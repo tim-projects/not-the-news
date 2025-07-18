@@ -104,10 +104,13 @@ self.addEventListener('fetch', event => {
           return new Response(JSON.stringify({ time: 'offline' }), {
             headers: { 'Content-Type': 'application/json' }
           });
-        } else {
-          return caches.match('/images/placeholder.svg');
         }
       });
+    }).catch(() => {
+      if (request.destination === 'image') {
+        return caches.match('/images/placeholder.svg');
+      }
+      throw error;
     })
   );
 });
