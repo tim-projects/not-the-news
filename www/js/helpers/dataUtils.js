@@ -125,6 +125,7 @@ export async function loadNextDeck(app) {
 
     app.updateCounts();
     app.scrollToTop();
+    app.isShuffled = true;
 }
 
 /**
@@ -143,7 +144,15 @@ export async function shuffleFeed(app) {
 
     const allUnhidden = app.entries.filter(entry => !app.hidden.some(h => h.id === entry.id));
 
-    const eligibleItemsForShuffle = allUnhidden;
+    console.log(`Total unhidden items: ${allUnhidden.length}`);
+
+    let eligibleItemsForShuffle = allUnhidden;
+
+    if (!navigator.onLine) {
+        console.log("App is offline. Filtering for long-form text posts.");
+        eligibleItemsForShuffle = allUnhidden.filter(item => item.description.length >= 500);
+        console.log(`Number of long-form items: ${eligibleItemsForShuffle.length}`);
+    }
 
     if (eligibleItemsForShuffle.length === 0) {
         createAndShowSaveMessage('No unread items to shuffle.', 'info'); // Use UI feedback
