@@ -98,7 +98,14 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(request).then(cached => {
       return cached || fetch(request).catch(() => {
-        return caches.match('/images/placeholder.svg');
+        if (request.url === 'https://news.loveopenly.net/time') {
+          // Return a placeholder response for /time
+          return new Response(JSON.stringify({ time: 'offline' }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          return caches.match('/images/placeholder.svg');
+        }
       });
     })
   );
