@@ -1,3 +1,9 @@
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('fonts/Playfair_Display.ttf') format('truetype');
+  font-display: swap; /* Important for fallback */
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
 
 /* Tell browser we support both light & dark */

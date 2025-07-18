@@ -19,7 +19,8 @@ const PRECACHE_URLS = [
   '/libs/idb.js',
   '/libs/rss-parser.min.js',
   '/images/placeholder.svg',
-  'https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap'
+  'https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap',
+  '/fonts/Playfair_Display.ttf'
 ];
 
 self.addEventListener('install', event => {
