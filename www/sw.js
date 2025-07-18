@@ -103,8 +103,12 @@ self.addEventListener('fetch', event => {
           return new Response(JSON.stringify({ time: 'offline' }), {
             headers: { 'Content-Type': 'application/json' }
           });
-        } else {
+        } else if (request.headers.get('Accept').includes('image')) {
           return caches.match('/images/placeholder.svg');
+        } else {
+          return new Response(JSON.stringify({ time: 'offline' }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
       });
     })
