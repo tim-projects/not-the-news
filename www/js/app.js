@@ -293,11 +293,15 @@ document.addEventListener('alpine:init', () => {
         },
         // Original loadNextDeck and shuffleFeed methods now call the imported functions.
         async loadNextDeck() {
+            console.log('DEBUG: loadNextDeck() called'); // Add log
             await loadNextDeck(this); // Call the imported function from dataUtils
+            console.log('DEBUG: loadNextDeck() completed'); // Add log
         },
 
         async shuffleFeed() {
+            console.log('DEBUG: shuffleFeed() called'); // Add log
             await shuffleFeed(this); // Call the imported function from dataUtils
+            console.log('DEBUG: shuffleFeed() completed'); // Add log
         },
         // The save settings logic for textareas is now simpler as x-model binds directly
         // and $watch saves to DB. The buttons simply trigger the $watch.
