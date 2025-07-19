@@ -16,3 +16,236 @@ for example. Adding a keyword set of 'breaking, war' will promote to the top any
 - AI based feed tastemaking
 Ambitious idea to build an algo that auto finds new rss feeds based on the users app interactions
 
+```
+Here’s the **fully updated design prompt** with all the enhancements we’ve discussed:
+
+---
+
+# ✅ Personalized Feed Ranking & News Control
+
+*(for app: **Not The News**)*
+
+---
+
+## **Core Concept**
+
+A vertical feed app serving **10-card decks**.
+Each item = an enriched RSS entry with:
+
+* **Category** (Tier 1)
+* **Subcategory** (Tier 2)
+* **Timeliness Tag** (Tier 3: `breaking`, `recent`, `evergreen`)
+* **Hash** (for fast relevance scoring)
+
+User interactions:
+
+* Scroll, Star, Hide, Click, Shuffle, Clear Deck.
+
+Goal:
+
+* Personalize feed for **long-term interests**, **balanced variety**, **controlled timeliness**.
+* Avoid addiction loops & doomscrolling.
+* Allow news for engagement but prevent full takeover.
+
+---
+
+## ✅ **Event Logging**
+
+Minimal but rich logs:
+
+```json
+{
+  "event": "enter" | "exit" | "star" | "hide" | "click" | "shuffle" | "clear_deck",
+  "cardId": "uuid",
+  "deckId": "uuid",
+  "timestamp": 1721209824,
+  "meta": {
+    "direction": "up" | "down",  
+    "gesture": "drag" | "flick"  
+  }
+}
+```
+
+---
+
+## ✅ **Content Enrichment (Server-Side)**
+
+Each RSS item → enriched with:
+
+```json
+{
+  "id": "uuid",
+  "title": "...",
+  "url": "...",
+  "category": "Technology",
+  "subcategory": "AI",
+  "timeliness": "breaking", // breaking, recent, evergreen
+  "hash": "hash_of_keywords",
+  "media": {"images": 1, "videos": 0, "audio": 0}
+}
+```
+
+### Category & Subcategory Extraction
+
+* Use **keyword siloing** + **LLM API** (Gemini Flash or similar) for classification.
+* Hash generated from normalized keyword set.
+
+---
+
+## ✅ **User Profile**
+
+```json
+{
+  "keywords": [
+    {"term": "AI", "long_term": 12.0, "short_term": 3.0},
+    {"term": "blockchain", "long_term": -7.0, "short_term": -1.5}
+  ],
+  "media_prefs": {
+    "images": 5.3,
+    "videos": 8.2,
+    "audio": -2.1,
+    "text_only": 1.0
+  },
+  "meta": {
+    "shuffles_today": 3,
+    "decks_cleared_today": 2,
+    "timeliness_factor": 1.0,
+    "engagement_score": 0.82
+  }
+}
+```
+
+---
+
+## ✅ **Three-Tier Interest Model**
+
+* **Tier 1:** Category (stable identity)
+* **Tier 2:** Subcategory (granular context)
+* **Tier 3:** Timeliness Tag
+
+  * `breaking` (+15), `recent` (+5), `evergreen` (0)
+  * Aggressive decay:
+    Breaking → half-life = 30 min
+    Recent → half-life = 6–12h
+
+Combined weight:
+
+```
+final_weight(term) = (long_term * 0.7) + (short_term * 1.3)
+```
+
+---
+
+## ✅ **Signals & Behavior Scoring**
+
+```
+Star: +20
+Click: +10
+Dwell >5s: +5
+Dwell 1–5s: +1
+<1s: -5
+Hide fast (<1s): -15
+Flick away: -10
+Clear after reading: +10
+Shuffle spam: penalty (anti-addiction)
+```
+
+---
+
+## ✅ **News Saturation Penalty**
+
+* Track news ratio:
+
+```
+news_ratio = news_engagements / total_engagements
+```
+
+* If `news_ratio > 0.3`:
+
+```
+penalty = (news_ratio - 0.3) * β
+adjusted_score = score - penalty
+```
+
+---
+
+## ✅ **Deck Diversity Rules**
+
+* Max **3 news items** per 10-card deck (normal mode).
+* Always mix evergreen or interest-based cards.
+
+---
+
+## ✅ **Re-engagement Mode**
+
+If engagement drops below 70% of baseline:
+
+* Activate:
+
+  * `timeliness_boost_factor = 1.5–2.0`
+  * Max news per deck = 5
+  * Halve saturation penalty.
+* Deactivate gradually over 3–5 decks.
+
+---
+
+## ✅ **Trigger Category Control**
+
+* Track "trigger\_score" for rage-bait categories.
+* If too high:
+
+```
+adjusted_category_score = category_score * (1 - trigger_penalty)
+```
+
+---
+
+## ✅ **Ranking Formula**
+
+```
+final_score =
+    behavior_score
+  + (keyword_score * 1.0)
+  + media_score
+  + (timeliness_score * user_timeliness_factor * timeliness_boost_factor)
+  - saturation_penalty
+```
+
+---
+
+## ✅ **Retention Rules**
+
+* Long-term decay: 0.99 per cycle (never zero).
+* Short-term decay: 0.9 per cycle.
+* Maintain baseline profile for stability.
+
+---
+
+## ✅ **Pipeline Summary**
+
+1. Aggregate & clean RSS feeds.
+2. Enrich items:
+
+   * Category, subcategory, timeliness, hash.
+3. Rank on **server** using profile + rules.
+4. Push **pre-ranked pool** to client.
+5. Client picks 10-card decks (light shuffle allowed).
+
+---
+
+### ✅ **Optional Hash Optimization**
+
+* Hash = minhash or simhash of keywords → enables fast similarity checks.
+* Profile still keeps **\~150 keywords** for fine-grain personalization.
+
+---
+
+🔥 This design ensures:
+
+* Personalized content.
+* Controlled timeliness influence.
+* Anti-addiction + diversity bias.
+* Engagement recovery without spam.
+* Server does heavy lifting → client lightweight.
+
+```
