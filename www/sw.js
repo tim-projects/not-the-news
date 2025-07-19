@@ -16,7 +16,8 @@ const cacheAssets = [
   'libs/idb.js',
   'libs/rss-parser.min.js',
   'fonts/Playfair_Display.ttf',
-  'images/placeholder.svg'
+  'images/placeholder.svg',
+  'images/favicon.svg'
 ];
 
 self.addEventListener('install', function(event) {

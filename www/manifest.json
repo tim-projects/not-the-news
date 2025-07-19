@@ -1,0 +1,19 @@
+{
+  "name": "Not The News",
+  "short_name": "NotTheNews",
+  "description": "A news aggregation app with offline support",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/images/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml"
+    }
+  ],
+  "lang": "en-US",
+  "dir": "ltr"
+}
