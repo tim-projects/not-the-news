@@ -1214,13 +1214,15 @@ p {
 }
 
 @media (max-width: 767px) {
+  #header {
+    display: flex;
+    align-items: center;
+  }
   #header h2 {
     text-align: left;
     left: 0.25em; /* Same as itemtitle left padding */
     transform: none;
-    display: flex;
-    align-items: center;
-    height: 100%;
+    height: auto;
   }
 }
 
