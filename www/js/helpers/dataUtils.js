@@ -135,7 +135,8 @@ export async function loadNextDeck(app) {
  */
 export async function shuffleFeed(app) {
     if (app.shuffleCount <= 0) {
-        createAndShowSaveMessage('No shuffles left for today!', 'error'); // Use UI feedback
+        const shuffleButton = document.getElementById('shuffle-button');
+        createAndShowSaveMessage(shuffleButton, 'shuffle-error-msg', 'No shuffles left for today!'); // Use UI feedback
         return;
     }
 
