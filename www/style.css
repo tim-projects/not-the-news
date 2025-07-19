@@ -703,6 +703,7 @@ a:hover {
   color: var(--fg-muted);
   font-size: small;
   font-variant: all-small-caps;
+  max-height: 3em;
 }
 
 #header .switch {
@@ -1204,7 +1205,6 @@ p {
 #header h2 {
   padding-right: 0;
   font-size: 1.75rem;
-  margin-top: -0.5em; /* Restore margin-top */
   position: relative;
   left: 0;
   transform: translateX(-50%);
@@ -1224,32 +1224,11 @@ p {
     transform: none;
     height: auto;
   }
-}
-
-#header-options {
-  display: flex;
-  align-items: center;
-}
-
-#header-options > * {
-  margin-left: 8px;
-}
-
-#header-options > *:first-child {
-  margin-left: 0;
-}
-
-@media (max-width: 767px) {
-  #header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between; /* Add space between header items */
+  #header-options > * {
+    margin-left: 8px;
   }
-  #header h2 {
-    text-align: left;
-    left: 0.25em; /* Same as itemtitle left padding */
-    transform: none;
-    height: auto;
+  #header-options > *:first-child {
+    margin-left: 0;
   }
 }
 
