@@ -1224,11 +1224,32 @@ p {
     transform: none;
     height: auto;
   }
-  #header-options > * {
-    margin-left: 8px;
+}
+
+#header-options {
+  display: flex;
+  align-items: center;
+}
+
+#header-options > * {
+  margin-left: 8px;
+}
+
+#header-options > *:first-child {
+  margin-left: 0;
+}
+
+@media (max-width: 767px) {
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Add space between header items */
   }
-  #header-options > *:first-child {
-    margin-left: 0;
+  #header h2 {
+    text-align: left;
+    left: 0.25em; /* Same as itemtitle left padding */
+    transform: none;
+    height: auto;
   }
 }
 
