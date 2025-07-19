@@ -5,7 +5,6 @@
 
 
 # LATER
-- turn app into a PWA app
 - Add a custom theme styling box in the settings.
 
 - Keyword whitelist. 
@@ -13,4 +12,7 @@ This is a list of keywords that override your blacklist. This feature can be use
 
 for example. Adding a keyword set of 'breaking, war' will promote to the top any items that contain both these keywords.
 - if reddit description contains [link], if it's an i.reddit.it image, rewrite the link as an img tag, if it's v.reddit.it rewrite the link as a video tag, otherwise set the <link> tag to it. Hide the [link]
+
+- AI based feed tastemaking
+Ambitious idea to build an algo that auto finds new rss feeds based on the users app interactions
 
