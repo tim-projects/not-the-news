@@ -36,16 +36,19 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
+  console.log('[Service Worker] Fetching:', event.request.url);
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
         // Cache hit - return response
         if (response) {
+          console.log('[Service Worker] Cache hit for:', event.request.url);
           return response;
         }
+        console.log('[Service Worker] Cache miss for:', event.request.url);
         return fetch(event.request)
           .catch(function(err) {
-            console.log('[Service Worker] Fetching failed', err);
+            console.log('[Service Worker] Fetching failed:', event.request.url, err);
             // You could return a custom offline page here
             return new Response('<h1>Offline</h1>', {
               headers: { 'Content-Type': 'text/html' }
