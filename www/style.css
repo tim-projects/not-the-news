@@ -1196,13 +1196,24 @@ p {
   padding-right: 1.2em;
 }
 
+#header {
+  display: grid;
+  place-items: center;
+}
+
 #header h2 {
   padding-right: 0;
-  position: absolute;
-  left: 16%;
-  transform: translateX(-50%);
   font-size: 1.75rem;
-  margin-top: -0.5em;
+  margin-top: 0;
+}
+
+@media (max-width: 767px) {
+  #header h2 {
+    text-align: left;
+    position: relative;
+    left: 1.2em; /* Same as itemtitle left padding */
+    transform: none;
+  }
 }
 
 #scroll-to-top {

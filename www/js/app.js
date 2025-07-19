@@ -1,3 +1,17 @@
+// Add logging to validate CSS rules
+function logHeaderStyles() {
+  const headerTitle = document.querySelector('#header h2');
+  if (headerTitle) {
+    const screenWidth = window.innerWidth;
+    const textAlign = window.getComputedStyle(headerTitle).textAlign;
+    const left = window.getComputedStyle(headerTitle).left;
+    console.log("Screen width: " + screenWidth + "px, text-align: " + textAlign + ", left: " + left);
+  }
+}
+
+// Call the logging function on page load and resize
+window.addEventListener('load', logHeaderStyles);
+window.addEventListener('resize', logHeaderStyles);
 // app.js
 
 // Import necessary modules
