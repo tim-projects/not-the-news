@@ -178,7 +178,6 @@ export async function loadStateValue(db, key, defaultValue) {
 }
 
 export async function saveStateValue(db, key, value) {
-    console.log('DEBUG: saveStateValue saving:', { key, value });
     const tx = db.transaction('userState', 'readwrite');
     // *** FIX: Stringify all values before saving to userState store, except 'lastStateSync' if it's a raw timestamp/nonce ***
     // Assuming 'lastStateSync' is a raw string/number that shouldn't be stringified twice.
@@ -186,7 +185,6 @@ export async function saveStateValue(db, key, value) {
     const valToSave = (key === 'lastStateSync') ? value : JSON.stringify(value);
     tx.objectStore('userState').put({ key: key, value: valToSave });
     await tx.done;
-    console.log('DEBUG: saveStateValue saved successfully:', { key, value });
     // Add to bufferedChanges only if it's NOT lastStateSync and it's a user setting that needs syncing
     if (key !== 'lastStateSync' && ['filterMode', 'syncEnabled', 'imagesEnabled', 'rssFeeds', 'keywordBlacklist', 'currentDeck'].includes(key)) {
         bufferedChanges.push({ key, value: value }); // Push the original value, not the stringified one

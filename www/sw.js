@@ -43,7 +43,14 @@ self.addEventListener('fetch', function(event) {
         if (response) {
           return response;
         }
-        return fetch(event.request);
+        return fetch(event.request)
+          .catch(function(err) {
+            console.log('[Service Worker] Fetching failed', err);
+            // You could return a custom offline page here
+            return new Response('<h1>Offline</h1>', {
+              headers: { 'Content-Type': 'text/html' }
+            });
+          });
       }
     )
   );

@@ -87,7 +87,6 @@ export async function validateAndRegenerateCurrentDeck(app) {
 
     // If the deck is empty or all items are invalid, generate a new deck
     if (validGuidsInDeck.length === 0 && app.entries.length > 0) {
-        console.log("Current deck is empty or invalid. Generating a new deck...");
         await loadNextDeck(app); // Call the shared loadNextDeck, passing app scope
     } else if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
         // If some items were removed from the deck, update and save it
