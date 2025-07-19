@@ -48,6 +48,24 @@ self.addEventListener('fetch', function(event) {
         }
         console.log('[Service Worker] Cache miss for:', event.request.url);
         return fetch(event.request)
+          .then(function(response) {
+            // Check if we received a valid response
+            if(!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // IMPORTANT: Clone the response. A response is a stream
+            // and because we want the response to both be used by the cache
+            // and consumed by the browser, we need to clone it.
+            var responseToCache = response.clone();
+
+            caches.open(cacheName)
+              .then(function(cache) {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
           .catch(function(err) {
             console.log('[Service Worker] Fetching failed:', event.request.url, err);
             // You could return a custom offline page here
