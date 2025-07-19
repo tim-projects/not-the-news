@@ -716,7 +716,6 @@ a:hover {
 
 /* simple styling for our filter dropdown */
 .filter-select {
-  margin: 0 1rem;
   padding: 0.5em 0.5em;
   font-size: inherit;
   border-radius: 4px;
@@ -1217,12 +1216,19 @@ p {
   #header {
     display: flex;
     align-items: center;
+    justify-content: space-between; /* Add space between header items */
   }
   #header h2 {
     text-align: left;
     left: 0.25em; /* Same as itemtitle left padding */
     transform: none;
     height: auto;
+  }
+  #header-options > * {
+    margin-left: 8px;
+  }
+  #header-options > *:first-child {
+    margin-left: 0;
   }
 }
 
