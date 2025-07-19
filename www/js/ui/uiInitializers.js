@@ -156,3 +156,20 @@ export async function initConfigPanelListeners(app) {
         }
     });
 }
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); // Prevent default prompt
+  deferredPrompt = e; // Save the event
+  // Show a custom install button (e.g., in your UI)
+  const installButton = document.getElementById('install-button');
+  installButton.style.display = 'block';
+  installButton.addEventListener('click', () => {
+    deferredPrompt.prompt(); // Show the install prompt
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('PWA installed');
+      }
+      deferredPrompt = null;
+    });
+  });
+});
