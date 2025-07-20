@@ -10,3 +10,4 @@ backup
 __pycache__
 *.pyc
 
+.aider*
