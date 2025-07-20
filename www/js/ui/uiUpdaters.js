@@ -1,3 +1,5 @@
+// www/js/ui/uiUpdaters.js
+
 import { getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getFilterSelector } from './uiElements.js';
 import { dbPromise, saveStateValue } from '../data/database.js';
 
@@ -96,12 +98,27 @@ export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
     if (!button) return;
 
     let inactivityTimeout = null;
+    let previousScrollPosition = window.scrollY; // Track previous scroll position
+
     window.addEventListener("scroll", () => {
-        button.classList.add("visible");
+        const currentScrollPosition = window.scrollY;
+        // Show button only if scrolling up
+        if (currentScrollPosition < previousScrollPosition) {
+            button.classList.add("visible");
+        } else {
+            button.classList.remove("visible");
+        }
+        previousScrollPosition = currentScrollPosition; // Update previous scroll position
+
         clearTimeout(inactivityTimeout);
         inactivityTimeout = setTimeout(() => {
             button.classList.remove("visible");
-        }, 1200);
+        }, 2000); // Hide after 2 seconds of inactivity
+    });
+
+    button.addEventListener("click", (e) => {
+        e.preventDefault();
+        scrollToTop();
     });
 }
 
