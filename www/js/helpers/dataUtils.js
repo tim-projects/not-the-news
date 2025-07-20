@@ -143,8 +143,77 @@ export async function loadNextDeck(app) {
             }
         }
     } else {
-        // Offline fallback: 10 random posts sorted chronologically
-        nextDeck = unreadItems.slice(0, 10).sort((a, b) => b.timestamp - a.timestamp);
+        // Offline fallback:
+
+        let filteredItems = [...unreadItems];
+
+        // Initial filters
+        const hasQuestionMarkInTitle = (item) => item.title.includes('?');
+        const hasQuestionMarkInDescriptionFirst100 = (item) => item.description.substring(0, 100).includes('?');
+        const hasQuestionMarkAtEndOfDescription = (item) => item.description.endsWith('?');
+        const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
+        const hasImage = (item) => item.image !== "";
+
+        // Apply initial filters
+        filteredItems = filteredItems.filter(item => !hasQuestionMarkInTitle(item));
+        filteredItems = filteredItems.filter(item => !hasQuestionMarkInDescriptionFirst100(item));
+        filteredItems = filteredItems.filter(item => !hasQuestionMarkAtEndOfDescription(item));
+        filteredItems = filteredItems.filter(item => !(item.description.length >= 750 && hasHyperlink(item)));
+        filteredItems = filteredItems.filter(item => !(item.description.length >= 750 && hasImage(item)));
+
+        // Undo filters in reverse priority until we have 10 items
+        if (filteredItems.length < 10) {
+            let itemsToRestore = [...unreadItems];
+
+            const restoreHasImage = (item) => (item.description.length >= 750 && hasImage(item));
+            const restoreHasHyperlink = (item) => (item.description.length >= 750 && hasHyperlink(item));
+            const restoreHasQuestionMarkAtEndOfDescription = (item) => hasQuestionMarkAtEndOfDescription(item);
+            const restoreHasQuestionMarkInDescriptionFirst100 = (item) => hasQuestionMarkInDescriptionFirst100(item);
+            const restoreHasQuestionMarkInTitle = (item) => hasQuestionMarkInTitle(item);
+
+            itemsToRestore = itemsToRestore.filter(item => filteredItems.indexOf(item) === -1);
+
+            // Restore items until we have 10
+            while (filteredItems.length < 10 && itemsToRestore.length > 0) {
+                if (itemsToRestore.some(restoreHasImage)) {
+                    const item = itemsToRestore.find(restoreHasImage);
+                    filteredItems.push(item);
+                    itemsToRestore = itemsToRestore.filter(i => i !== item);
+                } else if (itemsToRestore.some(restoreHasHyperlink)) {
+                    const item = itemsToRestore.find(restoreHasHyperlink);
+                    filteredItems.push(item);
+                    itemsToRestore = itemsToRestore.filter(i => i !== item);
+                } else if (itemsToRestore.some(restoreHasQuestionMarkAtEndOfDescription)) {
+                    const item = itemsToRestore.find(restoreHasQuestionMarkAtEndOfDescription);
+                    filteredItems.push(item);
+                    itemsToRestore = itemsToRestore.filter(i => i !== item);
+                } else if (itemsToRestore.some(restoreHasQuestionMarkInDescriptionFirst100)) {
+                    const item = itemsToRestore.find(restoreHasQuestionMarkInDescriptionFirst100);
+                    filteredItems.push(item);
+                    itemsToRestore = itemsToRestore.filter(i => i !== item);
+                } else if (itemsToRestore.some(restoreHasQuestionMarkInTitle)) {
+                    const item = itemsToRestore.find(restoreHasQuestionMarkInTitle);
+                    filteredItems.push(item);
+                    itemsToRestore = itemsToRestore.filter(i => i !== item);
+                } else {
+                    // If none of the specific criteria are met, just add the first item
+                    filteredItems.push(itemsToRestore[0]);
+                    itemsToRestore = itemsToRestore.slice(1);
+                }
+            }
+        }
+
+        // Prioritize 2 items from the last 24 hours
+        const now = Date.now();
+        const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+        nextDeck = recentItems.slice(0, 2);
+
+        // Fill the rest of the deck with remaining items
+        const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
+        nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
+
+        // Sort the resulting deck chronologically
+        nextDeck.sort((a, b) => b.timestamp - a.timestamp);
     }
 
     if (nextDeck.length > 0) {
