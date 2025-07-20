@@ -119,12 +119,19 @@ export async function loadNextDeck(app) {
     } else {
         app.currentDeckGuids = []; // Clear the deck if no more unread items
         await saveCurrentDeck(db, []); // Persist empty deck
-        createAndShowSaveMessage('No more unread items to load!', 'info');
+        const shuffleButton = document.getElementById('shuffle-button');
+        createAndShowSaveMessage(shuffleButton, 'load-more-msg', 'No more unread items to load!');
+        // After clearing, try to load next available deck
+        await loadNextDeck(app); 
     }
 
+    // Force UI refresh by reloading entries and updating counts
+    await app.loadFeedItemsFromDB();
     app.updateCounts();
     app.scrollToTop();
     app.isShuffled = true;
+    // Trigger Alpine reactivity update
+    app.currentDeckGuids = [...app.currentDeckGuids];
 }
 
 /**
