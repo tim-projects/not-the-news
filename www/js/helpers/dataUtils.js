@@ -107,11 +107,45 @@ export async function loadNextDeck(app) {
 
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
-    // Filter from app.entries (which uses 'id'), not raw 'allItems' from DB
-    const unreadItems = app.entries.filter(item => !hiddenSet.has(item.id)) // Filter using item.id
-                                    .sort((a, b) => Date.parse(b.pubDate) - Date.parse(a.pubDate));
+    // Filter out hidden items
+    const unreadItems = app.entries.filter(item => !hiddenSet.has(item.id));
 
-    const nextDeck = unreadItems.slice(0, 10); // Take the next 10 items
+    let nextDeck = [];
+
+    if (navigator.onLine) {
+        // Online deck creation logic
+        const longItems = unreadItems.filter(item => item.description.length >= 750);
+        const shortItems = unreadItems.filter(item => item.description.length < 750);
+
+        const now = Date.now();
+        const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+
+        // Get 2 long items, 2 short items, and 2 recent items
+        const numLong = Math.min(2, longItems.length);
+        const numShort = Math.min(2, shortItems.length);
+        const numRecent = Math.min(2, recentItems.length);
+
+        for (let i = 0; i < numLong; i++) nextDeck.push(longItems[i]);
+        for (let i = 0; i < numShort; i++) nextDeck.push(shortItems[i]);
+        for (let i = 0; i < numRecent; i++) nextDeck.push(recentItems[i]);
+
+        // Fill the rest with random items
+        const remainingCount = 10 - nextDeck.length;
+        const remainingItems = unreadItems.filter(item => !nextDeck.includes(item));
+        const shuffledRemaining = shuffleArray(remainingItems).slice(0, remainingCount);
+        nextDeck = nextDeck.concat(shuffledRemaining);
+
+        // If the deck is still not full, fill it with any remaining unread items
+        while (nextDeck.length < 10 && unreadItems.length > nextDeck.length) {
+            const item = unreadItems[nextDeck.length];
+            if (!nextDeck.includes(item)) {
+                nextDeck.push(item);
+            }
+        }
+    } else {
+        // Offline fallback: 10 random posts sorted chronologically
+        nextDeck = unreadItems.slice(0, 10).sort((a, b) => b.timestamp - a.timestamp);
+    }
 
     if (nextDeck.length > 0) {
         app.currentDeckGuids = nextDeck.map(item => item.id); // Map using item.id
@@ -122,7 +156,7 @@ export async function loadNextDeck(app) {
         const shuffleButton = document.getElementById('shuffle-button');
         createAndShowSaveMessage(shuffleButton, 'load-more-msg', 'No more unread items to load!');
         // After clearing, try to load next available deck
-        await loadNextDeck(app); 
+        await loadNextDeck(app);
     }
 
     // Force UI refresh by reloading entries and updating counts
