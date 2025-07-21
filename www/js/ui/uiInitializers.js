@@ -1,8 +1,12 @@
+// www/js/ui/uiInitializers.js
+
 import { dbPromise, loadStateValue, saveStateValue, bufferedChanges } from '../data/database.js';
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
 import { loadShuffleState, saveShuffleState } from '../helpers/userStateUtils.js';
 import { loadConfigFile, saveConfigFile } from '../helpers/apiUtils.js';
-import { createAndShowSaveMessage, attachScrollToTopHandler } from './uiUpdaters.js';
+// --- UPDATED IMPORT: Use createStatusBarMessage instead of createAndShowSaveMessage ---
+import { createStatusBarMessage, attachScrollToTopHandler } from './uiUpdaters.js'; // Assuming attachScrollToTopHandler is also available
+// --- END UPDATED IMPORT ---
 
 /**
  * Generic function to set up a boolean toggle UI element and sync its state with IndexedDB.
@@ -147,10 +151,14 @@ export async function initConfigPanelListeners(app) {
         try {
             await saveConfigFile('filter_keywords.txt', content);
             app.keywordBlacklistInput = content;
-            createAndShowSaveMessage(saveKeywordsBtn, "keywords-save-msg", "Saved.");
+            // --- UPDATED CALL: Use createStatusBarMessage ---
+            createStatusBarMessage("Keywords saved.", 'success'); // Pass message and type
+            // --- END UPDATED CALL ---
         } catch (err) {
             console.error(err);
-            createAndShowSaveMessage(saveKeywordsBtn, "keywords-save-msg", "Error!");
+            // --- UPDATED CALL: Use createStatusBarMessage for error ---
+            createStatusBarMessage("Error saving keywords!", 'error'); // Pass message and type
+            // --- END UPDATED CALL ---
         }
     });
 
@@ -161,10 +169,14 @@ export async function initConfigPanelListeners(app) {
         try {
             await saveConfigFile('feeds.txt', content);
             app.rssFeedsInput = content;
-            createAndShowSaveMessage(saveRssBtn, "rss-save-msg", "Saved.");
+            // --- UPDATED CALL: Use createStatusBarMessage ---
+            createStatusBarMessage("RSS feeds saved.", 'success'); // Pass message and type
+            // --- END UPDATED CALL ---
         } catch (err) {
             console.error(err);
-            createAndShowSaveMessage(saveRssBtn, "rss-save-msg", "Error!");
+            // --- UPDATED CALL: Use createStatusBarMessage for error ---
+            createStatusBarMessage("Error saving RSS feeds!", 'error'); // Pass message and type
+            // --- END UPDATED CALL ---
         }
     });
 }
@@ -174,14 +186,18 @@ window.addEventListener('beforeinstallprompt', (e) => {
   deferredPrompt = e; // Save the event
   // Show a custom install button (e.g., in your UI)
   const installButton = document.getElementById('install-button');
-  installButton.style.display = 'block';
-  installButton.addEventListener('click', () => {
-    deferredPrompt.prompt(); // Show the install prompt
-    deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('PWA installed');
-      }
-      deferredPrompt = null;
+  if (installButton) { // Check if the button exists before trying to display/add listener
+    installButton.style.display = 'block';
+    installButton.addEventListener('click', () => {
+      deferredPrompt.prompt(); // Show the install prompt
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('PWA installed');
+        } else {
+          console.log('PWA installation dismissed');
+        }
+        deferredPrompt = null;
+      });
     });
-  });
+  }
 });
