@@ -15,7 +15,7 @@ const cacheAssets = [
   'libs/alpine.3.x.x.js',
   'libs/idb.js',
   'libs/rss-parser.min.js',
-  'fonts/Playfair_Display.ttf',
+  'css/fonts/Playfair_Display.ttf',
   'images/placeholder.svg',
   'images/favicon.svg'
 ];
