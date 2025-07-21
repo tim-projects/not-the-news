@@ -11,6 +11,12 @@ import { dbPromise, saveStateValue } from '../data/database.js';
  * @param {string} msgTxt - The text content of the message.
  */
 export function createAndShowSaveMessage(btn, msgId, msgTxt) {
+    // Add a check to ensure btn and its parent node exist
+    if (!btn || !btn.parentNode) {
+        console.warn("createAndShowSaveMessage: Target button or its parent not found, cannot display message.", { btn, msgId, msgTxt });
+        return; // Exit the function if we can't place the message
+    }
+
     let msgEl = document.getElementById(msgId);
     if (!msgEl) {
         msgEl = document.createElement("span");
@@ -18,6 +24,7 @@ export function createAndShowSaveMessage(btn, msgId, msgTxt) {
         msgEl.className = "save-message";
         msgEl.style.marginLeft = "0.5em";
         msgEl.style.display = "none";
+        // Line 21: This line is now safe because btn.parentNode is checked
         btn.parentNode.insertBefore(msgEl, btn.nextSibling);
     }
     msgEl.textContent = msgTxt;
