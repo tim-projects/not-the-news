@@ -87,6 +87,12 @@ p {
   line-height: 1.6 !important;
 }
 
+a {
+  text-decoration: none;
+  transition: color .3s linear;
+  -webkit-tap-highlight-color: transparent;
+}
+
 h1 {
   line-height: 1.4;
   font-size: 1.3em;
