@@ -88,7 +88,8 @@ function mergeHiddenStates(local, remote) {
     const mergedMap = new Map();
     local.forEach(item => mergedMap.set(item.id, item));
     remote.forEach(item => {
-        if (!mergedMap.has(item.id) || new Date(item.hiddenAt) > new Date(mergedMap.get(item.id).hiddenAt)) {
+        // Assuming 'hiddenAt' is a timestamp string, latest timestamp wins
+        if (!mergedMap.has(item.id) || (item.hiddenAt && new Date(item.hiddenAt) > new Date(mergedMap.get(item.id).hiddenAt))) {
             mergedMap.set(item.id, item);
         }
     });
@@ -99,7 +100,8 @@ function mergeStarredStates(local, remote) {
     const mergedMap = new Map();
     local.forEach(item => mergedMap.set(item.id, item));
     remote.forEach(item => {
-        if (!mergedMap.has(item.id) || new Date(item.starredAt) > new Date(mergedMap.get(item.id).starredAt)) {
+        // Assuming 'starredAt' is a timestamp string, latest timestamp wins
+        if (!mergedMap.has(item.id) || (item.starredAt && new Date(item.starredAt) > new Date(mergedMap.get(item.id).starredAt))) {
             mergedMap.set(item.id, item);
         }
     });
@@ -121,22 +123,35 @@ export async function pullUserState(db) {
 
         // If server indicates no new changes
         if (res.status === 304) {
-            console.log('User state: No changes from server (304 Not Modified).');
+            console.log('[pullUserState] User state: No changes from server (304 Not Modified).');
             return lastSyncEntry.value; // Return the current nonce
         }
 
         if (!res.ok) {
-            throw new Error(`Server error pulling user state: ${res.statusText}`);
+            const errorText = await response.text();
+            console.error(`[pullUserState] Server returned an error: ${res.status} ${res.statusText}`);
+            console.error('[pullUserState] Server error response body:', errorText);
+            throw new Error(`Failed to fetch user state: ${res.status} ${res.statusText}`);
         }
 
-        const text = await res.text();
+        // --- CRITICAL DEBUGGING AREA ---
+        const responseText = await res.text();
+        console.log('[pullUserState] Raw response text length:', responseText.length);
+        console.log('[pullUserState] Raw response text START (first 200 chars):', responseText.substring(0, 200));
+        console.log('[pullUserState] Raw response text END (last 200 chars):', responseText.substring(responseText.length - 200));
+        console.log('[pullUserState] Raw response text FULL:', responseText); // Log the full raw text for direct inspection
+
         let data;
         try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.error("Failed to parse JSON:", text, e);
-            throw e;
+            data = JSON.parse(responseText);
+            console.log('[pullUserState] Successfully parsed JSON data.');
+        } catch (parseError) {
+            console.error('[pullUserState] JSON parsing failed! Raw text was:', responseText); // Log the full raw text on parse error
+            console.error('[pullUserState] JSON parsing error:', parseError);
+            throw parseError; // Re-throw to propagate
         }
+        // END CRITICAL DEBUGGING AREA
+
         const { userState, serverTime } = data; // Assuming server returns { userState: { hidden: [...], starred: [...], currentDeckGuids: [...] }, serverTime: "nonce" }
 
         const tx = db.transaction('userState', 'readwrite');
@@ -145,13 +160,15 @@ export async function pullUserState(db) {
         // --- MERGE/UPDATE LOGIC FOR EACH USER STATE ---
 
         // Hidden state
-        const localHidden = await store.get('hidden') || { value: [] };
-        const newHidden = mergeHiddenStates(JSON.parse(localHidden.value || '[]'), userState.hidden || []);
+        // Use loadArrayState to ensure correct parsing of stored JSON array
+        const localHidden = await loadArrayState(db, 'hidden');
+        const newHidden = mergeHiddenStates(localHidden, userState.hidden || []);
         await store.put({ key: 'hidden', value: JSON.stringify(newHidden) });
 
         // Starred state
-        const localStarred = await store.get('starred') || { value: [] };
-        const newStarred = mergeStarredStates(JSON.parse(localStarred.value || '[]'), userState.starred || []);
+        // Use loadArrayState to ensure correct parsing of stored JSON array
+        const localStarred = await loadArrayState(db, 'starred');
+        const newStarred = mergeStarredStates(localStarred, userState.starred || []);
         await store.put({ key: 'starred', value: JSON.stringify(newStarred) });
 
         // Current Deck GUIDs: Simple "server wins" strategy for now.
@@ -165,8 +182,8 @@ export async function pullUserState(db) {
         const simpleStateKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'];
         for (const key of simpleStateKeys) {
             if (userState.hasOwnProperty(key)) {
-                // Values coming from the server might not be stringified yet,
-                // so ensure they are stringified before storing.
+                // Values coming from the server are already the correct type (string, boolean, number, array, object)
+                // as jsonify handles the conversion. We need to JSON.stringify them for IndexedDB storage.
                 await store.put({ key: key, value: JSON.stringify(userState[key]) });
             }
         }
@@ -175,10 +192,10 @@ export async function pullUserState(db) {
         await store.put({ key: 'lastStateSync', value: serverTime });
 
         await tx.done;
-        console.log('User state pulled and merged successfully.');
+        console.log('[pullUserState] User state pulled and merged successfully.');
         return serverTime;
     } catch (error) {
-        console.error('Failed to pull user state:', error);
+        console.error('[pullUserState] Failed to pull user state:', error);
         throw error; // Re-throw to propagate error
     }
 }
@@ -186,38 +203,25 @@ export async function pullUserState(db) {
 export async function pushUserState(db, changes = bufferedChanges) {
     if (changes.length === 0) return;
 
-    // Use a unique ID for this batch of operations, if you want server to handle idempotency
-    // const batchId = Date.now().toString();
-
     if (!isOnline()) {
-        pendingOperations.push({ type: 'pushUserState', data: JSON.parse(JSON.stringify(changes)) });
+        pendingOperations.push({ type: 'pushUserState', data: JSON.parse(JSON.stringify(changes)) }); // Deep clone
         console.warn("Offline: Queued user state changes for later push.");
         return;
     }
 
     const compiledChanges = {};
     for (const { key, value } of changes) {
-        // Ensure values are consistently stringified for sending
-        // If value is already a string (e.g., a simple text input), send as is.
-        // Otherwise, JSON.stringify complex types (arrays, objects, booleans, numbers).
-        compiledChanges[key] = (typeof value === 'string' && !['rssFeeds', 'keywordBlacklist'].includes(key)) ? value : JSON.stringify(value);
-        // Special handling for rssFeeds/keywordBlacklist if they are always string values on client.
-        // The original line `typeof value === 'string' ? value : JSON.stringify(value)` works for most cases
-        // but can stringify `"true"` to `""true""`. Better to parse, then stringify.
-        // Or simpler: always JSON.stringify everything except the nonce.
-        // Let's stick to the current logic: if it's a string, send as is (assuming it's a primitive string),
-        // otherwise stringify.
-        // For 'rssFeeds' and 'keywordBlacklist', their `value` in `bufferedChanges` will be the raw string from input.
-        // So, `typeof value === 'string'` will be true, and they'll be sent as is.
-        // For arrays/objects, it will be JSON.stringify(value).
-        // This line as it was is fine, assuming `value` is the raw form (not stringified already).
+        // The `value` here is the *original* (non-stringified) value from `bufferedChanges`.
+        // We always JSON.stringify it for sending to the server, except for the serverTime nonce
+        // which isn't part of userState for POST.
+        compiledChanges[key] = JSON.stringify(value);
     }
 
     try {
         const res = await fetchWithRetry('/user-state', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ userState: compiledChanges /*, batchId: batchId */ }) // Send the compiled changes
+            body: JSON.stringify({ userState: compiledChanges }) // Send the compiled changes
         });
 
         if (!res.ok) {
@@ -267,12 +271,16 @@ export async function loadStateValue(db, key, defaultValue) {
             // This correctly parses "true" to true, "123" to 123, "[...]" to array, "{...}" to object.
             // If it's a simple string like "hello" (which was intentionally not stringified), it will throw,
             // so we return the string itself in the catch block.
-            return JSON.parse(value);
+            const parsedValue = JSON.parse(value);
+            // After parsing, check if the parsed value is a primitive that might have been
+            // stringified (like "true", "123", "null"). If so, return the parsed value.
+            // If it was a string that couldn't be parsed, it will fall to the catch.
+            return parsedValue;
         } catch (e) {
             // This catch block handles cases where the stored string value is NOT valid JSON.
             // E.g., if 'lastStateSync' stores a raw nonce string like "some-random-guid", JSON.parse would fail.
             // In such cases, we return the raw string.
-            // console.warn(`loadStateValue: Could not parse JSON for key "${key}", returning raw string. Value:`, value);
+            // console.warn(`[loadStateValue] Could not parse JSON for key "${key}", returning raw string. Value:`, value, e);
             return value; // Return the raw string if it's not valid JSON
         }
     }
@@ -292,7 +300,7 @@ export async function saveStateValue(db, key, value) {
     // Ensure we push the ORIGINAL value, not the stringified one, to bufferedChanges.
     // 'currentDeckGuids' should be handled by saveArrayState for consistency with other arrays.
     if (['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'].includes(key)) {
-        bufferedChanges.push({ key, value: value });
+        bufferedChanges.push({ key, value: value }); // Push the original value
     }
 }
 
@@ -300,7 +308,9 @@ export async function loadArrayState(db, key) {
     const entry = await db.transaction('userState', 'readonly').objectStore('userState').get(key);
     let items = [];
     if (entry?.value != null) {
-        try { items = JSON.parse(entry.value); } catch {}
+        try { items = JSON.parse(entry.value); } catch (e) {
+            console.warn(`[loadArrayState] Could not parse JSON for array key "${key}", returning empty array. Value:`, entry.value, e);
+        }
     }
     return Array.isArray(items) ? items : [];
 }
@@ -309,8 +319,8 @@ export async function saveArrayState(db, key, arr) {
     const tx = db.transaction('userState', 'readwrite');
     tx.objectStore('userState').put({ key: key, value: JSON.stringify(arr) });
     await tx.done;
-    // Add to bufferedChanges for syncing. Ensure the key here is 'currentDeckGuids', not just 'currentDeck'.
-    if (['starred', 'hidden', 'currentDeckGuids'].includes(key)) { // Changed 'currentDeck' to 'currentDeckGuids'
+    // Add to bufferedChanges for syncing.
+    if (['starred', 'hidden', 'currentDeckGuids'].includes(key)) {
         bufferedChanges.push({ key, value: arr }); // Push the original array
     }
 }
