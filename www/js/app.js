@@ -1,8 +1,8 @@
 // app.js
 
 // Import necessary modules
-// Remove the problematic 'appState' import as it no longer exists as a named export from data/database.js
-import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js'; // This is actually data/appState.js based on your provided file
+// Ensure loadArrayState is imported here
+import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, loadArrayState, isOnline } from './data/database.js'; // Added loadArrayState
 import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
@@ -93,7 +93,7 @@ document.addEventListener('alpine:init', () => {
                     filtered = this.entries;
                     break;
             }
-            
+
             const keywordBlacklist = this.keywordBlacklistInput.split(',').map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
             if (keywordBlacklist.length > 0) {
                 filtered = filtered.filter(item => {
@@ -280,7 +280,7 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
             }
         },
-        
+
         // --- Convert URLs to links based on setting ---
         async convertUrlsInEntries() {
             const entriesContainer = document.getElementById('items');
@@ -290,12 +290,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         // --- Alpine.js methods ---
-
-        // loadArrayStateFromDB is no longer needed as we import loadArrayState directly
-        // async loadArrayStateFromDB(db, key) {
-        //     const stored = await loadStateValue(db, key, []);
-        //     return Array.isArray(stored) ? stored : [];
-        // },
 
         async loadFeedItemsFromDB() {
             const db = await dbPromise;
