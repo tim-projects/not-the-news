@@ -2,7 +2,17 @@ const cacheName = 'not-the-news-v1';
 const cacheAssets = [
   'index.html',
   'login.html',
-  'style.css',
+  'css/content.css',
+  'css/buttons.css',
+  'css/forms.css',
+  'css/layout.css',
+  'css/modal.css',
+  'css/variables.css',
+  'css/fonts/Playfair_Display.ttf',
+  'images/placeholder.svg',
+  'images/favicon.svg',
+  'images/icon-192.png',
+  'images/icon-512.png',
   'js/app.js',
   'js/data/appState.js',
   'js/data/database.js',
@@ -14,10 +24,7 @@ const cacheAssets = [
   'js/ui/uiUpdaters.js',
   'libs/alpine.3.x.x.js',
   'libs/idb.js',
-  'libs/rss-parser.min.js',
-  'css/fonts/Playfair_Display.ttf',
-  'images/placeholder.svg',
-  'images/favicon.svg'
+  'libs/rss-parser.min.js'
 ];
 
 self.addEventListener('install', function(event) {
