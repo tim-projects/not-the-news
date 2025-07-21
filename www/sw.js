@@ -1,4 +1,4 @@
-const cacheName = 'not-the-news-v2';
+const cacheName = 'not-the-news-v3'; // IMPORTANT: Increment this cacheName for new SW versions!
 const cacheAssets = [
   '/', // Include the root path
   'index.html',
@@ -53,7 +53,21 @@ self.addEventListener('activate', function(event) {
         }
       }));
     }).then(function() {
-      return self.clients.claim(); // Ensures the new SW controls pages immediately
+      // Ensure the new SW controls clients immediately
+      return self.clients.claim();
+    }).then(function() {
+        // Force all open clients to reload to ensure they are controlled by the new SW.
+        // This is the mechanism that replaces the removed app.js 'controllerchange' listener.
+        self.clients.matchAll({ type: 'window' }).then(function (clients) {
+            clients.forEach(function (client) {
+                // Only reload if the client is still visible and the URL matches
+                // and it's not already controlled by *this* SW instance's scriptURL (avoid self-reloads)
+                if (client.url && client.visibilityState === 'visible' && client.url.startsWith(self.location.origin) && !client.url.includes(self.location.origin + '/sw.js')) {
+                    console.log('[Service Worker] Forcing client reload for:', client.url);
+                    client.navigate(client.url); // Reloads the current page
+                }
+            });
+        });
     })
   );
 });
@@ -100,7 +114,11 @@ self.addEventListener('fetch', function(event) {
                               networkResponse.status === 200 &&
                               networkResponse.type === 'basic' && // 'basic' for same-origin, 'opaque' for cross-origin.
                               !requestUrl.pathname.includes('/user-state') && // Exclude user-state from generic caching
-                              !requestUrl.pathname.includes('/time'); // Exclude time endpoint from generic caching
+                              !requestUrl.pathname.includes('/time') && // Exclude time endpoint from generic caching
+                              !requestUrl.pathname.includes('/items'); // Exclude /items from generic GET caching if it's dynamic
+                                                                      // and fetched frequently by the app to ensure freshness.
+                                                                      // If /items is only read from IndexedDB, this might not be needed.
+                                                                      // Consider whether /items should be cached here based on its usage.
 
           if (shouldCache) {
             // IMPORTANT: Clone the response because a response can only be consumed once.
@@ -116,9 +134,8 @@ self.addEventListener('fetch', function(event) {
         }).catch(function(err) {
           // This catch handles network errors (e.g., user is offline, DNS lookup failed), not HTTP errors (like 404).
           console.error('[Service Worker] Network fetch failed for GET:', requestUrl.href, err);
-          // For GET requests that fail, you might want to serve an offline fallback.
-          // For critical API data, re-throwing is often better if your app handles errors.
-          // For now, re-throwing to let your app's initApp catch it.
+          // For GET requests that fail, you might want to serve an an offline page or specific fallback.
+          // For now, re-throwing to let your app's initApp catch it if it's a critical API call.
           throw err;
         });
       })

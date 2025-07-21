@@ -17,31 +17,23 @@ if ('serviceWorker' in navigator) {
             .then(reg => {
                 console.log('app.js: Service Worker registered:', reg.scope);
 
-                // This listener ensures that if a new SW is installed/activated
-                // while the page is open, the page reloads to be controlled by it.
-                // This is crucial for cache invalidation and immediate SW control.
+                // This listener watches for a new Service Worker being found and installing.
+                // It will trigger a reload if the new SW activates and isn't yet controlling the page.
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     if (newWorker) {
                         newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-                                // Only reload if the current page is NOT controlled by the new SW yet.
-                                // If the new SW has just activated and taken control (via clients.claim()),
-                                // we need to reload the page to ensure it's using the new SW's fetches.
-                                if (!reg.active || !navigator.serviceWorker.controller.scriptURL.includes(reg.active.scriptURL)) {
-                                     console.log('app.js: New Service Worker activated and took control. Reloading page...');
-                                     window.location.reload();
-                                }
+                            if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
+                                console.log('app.js: New Service Worker activated, but not yet controlling. Reloading...');
+                                window.location.reload();
                             }
                         });
                     }
                 });
 
-                // Listen for controller changes. This happens when a new SW takes over.
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    console.log('app.js: Service Worker controller changed! Reloading page to ensure new SW control.');
-                    window.location.reload();
-                });
+                // REMOVED: The aggressive 'controllerchange' listener that caused the infinite loop.
+                // The Service Worker (sw.js) will now be responsible for triggering a reload
+                // when it needs to take control of existing clients.
 
             })
             .catch(error => console.warn('app.js: Service Worker registration failed:', error));
@@ -150,16 +142,11 @@ document.addEventListener('alpine:init', () => {
                         console.log("app.js: Early user state pull completed.");
                     } catch (error) {
                         console.warn("app.js: Early pullUserState failed, proceeding with local state. Error:", error);
-                        // Don't block initialization if sync fails here. User gets local state.
-                        // IMPORTANT: Add the log here that shows the *text* that failed JSON parse
                         if (error instanceof SyntaxError && error.message.includes('Unexpected end of JSON input')) {
-                            // If the pullUserState function in database.js could pass the response text
-                            // through the error, we could log it here. For now, rely on database.js's own logging.
                             console.error("app.js: Failed to parse user state JSON. The server likely sent incomplete or malformed data.");
                         }
                     }
                 }
-                // --- END NEW LOGIC ---
 
                 // Load feed items from DB (populates this.entries).
                 // This must happen before hidden pruning or deck validation, as they depend on `entries`.
@@ -333,7 +320,6 @@ document.addEventListener('alpine:init', () => {
         async convertUrlsInEntries() {
             const entriesContainer = document.getElementById('items');
             if (entriesContainer) {
-                // console.log(`convertUrlsInEntries: openUrlsInNewTabEnabled: ${this.openUrlsInNewTabEnabled}`); // Log the value of openUrlsInNewTabEnabled
                 convertUrlsToLinks(entriesContainer, this.openUrlsInNewTabEnabled);
             }
         },
@@ -420,7 +406,6 @@ function convertUrlsToLinks(element, openInNewTab) {
     if (node.nodeType === Node.TEXT_NODE && node.parentNode.tagName.toLowerCase() !== 'a') {
       const text = node.textContent;
       const newHtml = text.replace(urlRegex, (url) => {
-        // console.log(`Found URL: ${url}, openInNewTab: ${openInNewTab}`); // Log the URL and the value of openInNewTab
         // Ensure openInNewTab is explicitly true for _blank, otherwise _self
         const target = openInNewTab === true ? '_blank' : '_self';
         return `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
