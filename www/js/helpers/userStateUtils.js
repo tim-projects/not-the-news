@@ -1,3 +1,5 @@
+// userStateUtils.js
+
 import { dbPromise, saveStateValue, loadArrayState, saveArrayState, pendingOperations, isOnline, loadStateValue } from '../data/database.js';
 
 export async function toggleStar(app, guid) {
@@ -91,12 +93,14 @@ export async function pruneStaleHidden(db, feedItems, currentTS) {
 }
 
 export async function loadCurrentDeck(db) {
-    let guids = await loadArrayState(db, 'currentDeck');
+    // FIX: Change key from 'currentDeck' to 'currentDeckGuids'
+    let guids = await loadArrayState(db, 'currentDeckGuids');
     return Array.isArray(guids) ? guids : [];
 }
 
 export async function saveCurrentDeck(db, guids) {
-    await saveArrayState(db, 'currentDeck', guids);
+    // FIX: Change key from 'currentDeck' to 'currentDeckGuids'
+    await saveArrayState(db, 'currentDeckGuids', guids);
 }
 
 export async function loadShuffleState(db) {
