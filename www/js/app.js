@@ -1,18 +1,3 @@
-// Add logging to validate CSS rules (KEEP THIS FOR DEBUGGING)
-function logHeaderStyles() {
-  const headerTitle = document.querySelector('#header h2');
-  if (headerTitle) {
-    const screenWidth = window.innerWidth;
-    const textAlign = window.getComputedStyle(headerTitle).textAlign;
-    const left = window.getComputedStyle(headerTitle).left;
-    console.log("Screen width: " + screenWidth + "px, text-align: " + textAlign + ", left: " + left);
-  }
-}
-
-// Call the logging function on page load and resize (KEEP THIS FOR DEBUGGING)
-window.addEventListener('load', logHeaderStyles);
-window.addEventListener('resize', logHeaderStyles);
-
 // app.js
 
 // Import necessary modules
@@ -22,7 +7,6 @@ import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
-// import { getShuffleCountDisplay } from './ui/uiElements.js'; // This import is not used here, consider removing if truly unused.
 import { createAndShowSaveMessage } from './ui/uiUpdaters.js';
 
 
@@ -31,19 +15,36 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then(reg => {
-                console.log('Service Worker registered:', reg.scope);
+                console.log('app.js: Service Worker registered:', reg.scope);
+
+                // This listener ensures that if a new SW is installed/activated
+                // while the page is open, the page reloads to be controlled by it.
+                // This is crucial for cache invalidation and immediate SW control.
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     if (newWorker) {
                         newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'activated') {
-                                window.location.reload(); // Reload the page to pick up new service worker
+                            if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                                // Only reload if the current page is NOT controlled by the new SW yet.
+                                // If the new SW has just activated and taken control (via clients.claim()),
+                                // we need to reload the page to ensure it's using the new SW's fetches.
+                                if (!reg.active || !navigator.serviceWorker.controller.scriptURL.includes(reg.active.scriptURL)) {
+                                     console.log('app.js: New Service Worker activated and took control. Reloading page...');
+                                     window.location.reload();
+                                }
                             }
                         });
                     }
                 });
+
+                // Listen for controller changes. This happens when a new SW takes over.
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('app.js: Service Worker controller changed! Reloading page to ensure new SW control.');
+                    window.location.reload();
+                });
+
             })
-            .catch(error => console.warn('Service Worker registration failed:', error));
+            .catch(error => console.warn('app.js: Service Worker registration failed:', error));
     });
 }
 
@@ -139,16 +140,23 @@ document.addEventListener('alpine:init', () => {
                 this.filterMode = await loadFilterMode(db);
                 this.isOnline = isOnline(); // Set initial online status
 
-                // --- NEW LOGIC: Attempt to pull user state (including current deck) from server early ---
+                // --- Attempt to pull user state (including current deck) from server early ---
                 // This happens first if online, ensuring the most recent shared deck is fetched.
+                // The page reload from SW update will ensure this fetch happens *after* new SW is active.
                 if (this.syncEnabled && this.isOnline) {
                     try {
-                        console.log("Attempting early pull of user state (including current deck) from server...");
+                        console.log("app.js: Attempting early pull of user state (including current deck) from server...");
                         await pullUserState(db); // This function (in database.js) needs to handle currentDeckGuids sync
-                        console.log("Early user state pull completed.");
+                        console.log("app.js: Early user state pull completed.");
                     } catch (error) {
-                        console.warn("Early pullUserState failed, proceeding with local state. Error:", error);
+                        console.warn("app.js: Early pullUserState failed, proceeding with local state. Error:", error);
                         // Don't block initialization if sync fails here. User gets local state.
+                        // IMPORTANT: Add the log here that shows the *text* that failed JSON parse
+                        if (error instanceof SyntaxError && error.message.includes('Unexpected end of JSON input')) {
+                            // If the pullUserState function in database.js could pass the response text
+                            // through the error, we could log it here. For now, rely on database.js's own logging.
+                            console.error("app.js: Failed to parse user state JSON. The server likely sent incomplete or malformed data.");
+                        }
                     }
                 }
                 // --- END NEW LOGIC ---
@@ -189,9 +197,6 @@ document.addEventListener('alpine:init', () => {
                 // validateAndRegenerateCurrentDeck *also calls* displayCurrentDeck internally.
                 await validateAndRegenerateCurrentDeck(this);
 
-                // No need for a separate displayCurrentDeck(this) here, as validateAndRegenerateCurrentDeck
-                // will ensure the display is updated after its processing.
-
                 // Load and set shuffle count based on last reset date
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
                 const today = new Date();
@@ -231,11 +236,11 @@ document.addEventListener('alpine:init', () => {
                 this.$watch('rssFeedsInput', value => saveStateValue(db, 'rssFeeds', value));
                 this.$watch('keywordBlacklistInput', value => saveStateValue(db, 'keywordBlacklist', value));
                 this.$watch('filterMode', value => setFilterMode(this, db, value));
-this.updateCounts();
-await initScrollPosition(this); // Restore scroll position after initial render
+                this.updateCounts();
+                await initScrollPosition(this); // Restore scroll position after initial render
 
-// Convert URLs to links after initial render
-await this.convertUrlsInEntries();
+                // Convert URLs to links after initial render
+                await this.convertUrlsInEntries();
 
                 this.loading = false; // Important: Set loading to false here after all initial loading
 
@@ -243,7 +248,7 @@ await this.convertUrlsInEntries();
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
-                            console.log("Initiating background partial sync...");
+                            console.log("app.js: Initiating background partial sync...");
                             await performFeedSync(db); // Fetches new articles
                             await pullUserState(db); // Syncs user states (hidden, starred, currentDeckGuids)
                             // Re-load data after background sync to ensure UI updates
@@ -254,10 +259,10 @@ await this.convertUrlsInEntries();
                             this.updateCounts();
                             // After background sync, re-validate current deck as items might have changed
                             await validateAndRegenerateCurrentDeck(this);
-                            console.log("Background partial sync completed.");
+                            console.log("app.js: Background partial sync completed.");
                             await this.convertUrlsInEntries();
                         } catch (error) {
-                            console.error('Background partial sync failed', error);
+                            console.error('app.js: Background partial sync failed', error);
                         }
                     }, 0); // Non-blocking immediate execution
                 }
@@ -268,7 +273,7 @@ await this.convertUrlsInEntries();
                 window.addEventListener('online', async () => {
                     this.isOnline = true;
                     if (this.syncEnabled) {
-                        console.log("Online detected. Processing pending operations and resyncing.");
+                        console.log("app.js: Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations(db);
                         // If returning online and operations were processed, data might have changed.
                         // Refresh all relevant data.
@@ -278,12 +283,12 @@ await this.convertUrlsInEntries();
                         this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this); // Validate and update display
-                        console.log("Online resync completed.");
+                        console.log("app.js: Online resync completed.");
                     }
                 });
                 window.addEventListener('offline', () => {
                     this.isOnline = false;
-                    console.warn("Offline detected. Syncing disabled.");
+                    console.warn("app.js: Offline detected. Syncing disabled.");
                 });
 
                 // Setup activity listeners for auto-sync
@@ -303,32 +308,32 @@ await this.convertUrlsInEntries();
                         return;
                     }
                     try {
-                        console.log("Performing periodic background sync...");
+                        console.log("app.js: Performing periodic background sync...");
                         await performFeedSync(db);
                         await pullUserState(db);
                         await this.loadFeedItemsFromDB();
                         this.hidden = await pruneStaleHidden(db, this.entries, now);
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this);
-                        console.log("Periodic background sync completed.");
+                        console.log("app.js: Periodic background sync completed.");
                         await this.convertUrlsInEntries();
                     } catch (error) {
-                        console.error("Periodic sync failed", error);
+                        console.error("app.js: Periodic sync failed", error);
                     }
                 }, SYNC_INTERVAL_MS);
 
             } catch (error) {
-                console.error("Initialization failed:", error);
+                console.error("app.js: Initialization failed:", error);
                 this.errorMessage = "Could not load feed: " + error.message;
                 this.loading = false;
             }
         },
         
-        // --- NEW LOGIC: Convert URLs to links based on setting ---
+        // --- Convert URLs to links based on setting ---
         async convertUrlsInEntries() {
             const entriesContainer = document.getElementById('items');
             if (entriesContainer) {
-                console.log(`openUrlsInNewTabEnabled: ${this.openUrlsInNewTabEnabled}`); // Log the value of openUrlsInNewTabEnabled
+                // console.log(`convertUrlsInEntries: openUrlsInNewTabEnabled: ${this.openUrlsInNewTabEnabled}`); // Log the value of openUrlsInNewTabEnabled
                 convertUrlsToLinks(entriesContainer, this.openUrlsInNewTabEnabled);
             }
         },
@@ -411,11 +416,14 @@ function convertUrlsToLinks(element, openInNewTab) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
 
   element.querySelectorAll('*').forEach(node => {
-    if (node.nodeType === Node.TEXT_NODE) {
+    // Only process text nodes that are not inside <a> tags already
+    if (node.nodeType === Node.TEXT_NODE && node.parentNode.tagName.toLowerCase() !== 'a') {
       const text = node.textContent;
       const newHtml = text.replace(urlRegex, (url) => {
-        console.log(`Found URL: ${url}, openInNewTab: ${openInNewTab}`); // Log the URL and the value of openInNewTab
-        return `<a href="${url}" target="${openInNewTab === true ? '_blank' : '_self'}" rel="noopener noreferrer">${url}</a>`;
+        // console.log(`Found URL: ${url}, openInNewTab: ${openInNewTab}`); // Log the URL and the value of openInNewTab
+        // Ensure openInNewTab is explicitly true for _blank, otherwise _self
+        const target = openInNewTab === true ? '_blank' : '_self';
+        return `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
       });
 
       if (newHtml !== text) {
