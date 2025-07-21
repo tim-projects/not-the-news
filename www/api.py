@@ -170,7 +170,7 @@ def get_user_state():
                 out_user_state[key] = []
             elif key in ["filterMode", "rssFeeds", "keywordBlacklist"]:
                 out_user_state[key] = "" # Default to empty string for text fields
-            elif key in ["syncEnabled", "imagesEnabled"]:
+            elif key in ["syncEnabled", "imagesEnabled", "openUrlsInNewTabEnabled"]: # Added openUrlsInNewTabEnabled
                 out_user_state[key] = True # Default to True for booleans if not found
             elif key == "shuffleCount":
                 out_user_state[key] = 2 # Default shuffle count
@@ -183,21 +183,22 @@ def get_user_state():
 
     # Log what's being returned for 304 (Not Modified)
     if if_none_match == etag:
-        print(f"API: Returning 304 Not Modified for /user-state. ETag: {etag}", file=sys.stderr) # <--- LOGGING
+        print(f"API: Returning 304 Not Modified for /user-state. ETag: {etag}", file=sys.stderr)
         return make_response("", 304) # Not Modified
 
-    resp = jsonify({"userState": out_user_state, "serverTime": etag}) # Changed 'changes' to 'userState'
+    resp_payload = {"userState": out_user_state, "serverTime": etag}
+    resp = jsonify(resp_payload)
     resp.headers["ETag"] = etag
 
     # --- IMPORTANT DEBUGGING STEP ---
     # Log the size and a snippet of the JSON string being sent.
     try:
-        json_str_payload = json.dumps({"userState": out_user_state, "serverTime": etag})
-        print(f"API: Sending /user-state. Payload size: {len(json_str_payload)} bytes.", file=sys.stderr) # <--- LOGGING
-        print(f"API: Payload START (first 100 chars): {json_str_payload[:100]}", file=sys.stderr) # <--- LOGGING
-        print(f"API: Payload END (last 100 chars): {json_str_payload[-100:]}", file=sys.stderr) # <--- LOGGING
+        json_str_payload = json.dumps(resp_payload) # Use resp_payload dictionary directly
+        print(f"API: Sending /user-state. Payload size: {len(json_str_payload)} bytes.", file=sys.stderr)
+        print(f"API: Payload START (first 200 chars): {json_str_payload[:200]}", file=sys.stderr)
+        print(f"API: Payload END (last 200 chars): {json_str_payload[-200:]}", file=sys.stderr)
     except Exception as e:
-        print(f"API ERROR: Could not log /user-state payload: {e}", file=sys.stderr) # <--- LOGGING
+        print(f"API ERROR: Could not log /user-state payload for inspection: {e}", file=sys.stderr)
         # If dumping for logging fails, it means `out_user_state` itself might be problematic.
         # This is unlikely if jsonify succeeded, but good to catch.
 
@@ -223,8 +224,13 @@ def post_user_state():
         # if client-side deltas aren't used for these specific types.
         # However, you already have /hidden/delta and /starred/delta for that.
         # So for /user-state POST, we assume client sends the full, desired state for each key.
-        server_time = _save_state(key, val) # `val` is already the decoded Python object (list, str, bool, int)
-        
+        try:
+            server_time = _save_state(key, val) # `val` is already the decoded Python object (list, str, bool, int)
+        except Exception as e:
+            # Log the specific key and value that failed to save
+            app.logger.error(f"Error saving user state key '{key}' with value '{val}': {e}")
+            return jsonify({"error": f"Failed to save state for {key}", "details": str(e)}), 500 # Return specific error
+
     return jsonify({"serverTime": server_time}), 200
 
 # Delta endpoints remain largely the same, but ensure they also update lastModified
