@@ -1,4 +1,4 @@
-const cacheName = 'not-the-news-v1'; // Keep this name, increment if you make significant changes to `cacheAssets`
+const cacheName = 'not-the-news-v2';
 const cacheAssets = [
   '/', // Include the root path
   'index.html',
