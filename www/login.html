@@ -89,13 +89,12 @@
     // Get theme from local storage
     let t = localStorage.getItem('theme');
 
-    // Default to dark if no theme is explicitly set in local storage or if system prefers dark.
-    // Otherwise, use the saved preference or default to light if system prefers light and no preference is saved.
+    // If a theme is explicitly saved as 'light', apply the 'light' class.
+    // Otherwise (t is null or 'dark'), no class is added, and the CSS :root (dark) takes effect.
     if (t === 'light') {
       document.documentElement.classList.add('light');
-    } else {
-      document.documentElement.classList.add('dark');
     }
+    // No 'else' needed here, as the :root in CSS is now the default dark.
   </script>
 </head>
 
