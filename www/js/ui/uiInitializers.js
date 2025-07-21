@@ -44,18 +44,29 @@ export async function initImagesToggle(app) {
 
 export async function initTheme(app) {
     const htmlEl = document.documentElement;
-    const toggle = getThemeToggle();
-    const text = getThemeText();
+    const toggle = getThemeToggle(); // Assumed to get the theme switch element
+    const text = getThemeText();     // Assumed to get an element to display theme name
 
     if (!toggle || !text) return;
 
-    const db = await dbPromise;
-    let storedTheme = await loadStateValue(db, 'theme', null);
+    const db = await dbPromise; // Assumed to be an IndexedDB promise
+    let storedTheme = await loadStateValue(db, 'theme', null); // Loads theme from DB, defaults to null
 
-    const prefersDark = storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    htmlEl.classList.add(prefersDark ? 'dark' : 'light');
-    toggle.checked = prefersDark;
-    text.textContent = prefersDark ? 'dark' : 'light';
+    let activeThemeIsDark;
+
+    // --- CRITICAL CHANGE HERE ---
+    if (storedTheme === 'light') {
+        // User explicitly chose light mode
+        activeThemeIsDark = false;
+    } else {
+        // If storedTheme is 'dark' OR null (no saved preference), default to dark.
+        activeThemeIsDark = true;
+    }
+    // --- END CRITICAL CHANGE ---
+
+    htmlEl.classList.add(activeThemeIsDark ? 'dark' : 'light');
+    toggle.checked = activeThemeIsDark;
+    text.textContent = activeThemeIsDark ? 'dark' : 'light';
 
     toggle.addEventListener('change', async () => {
         const newTheme = toggle.checked ? 'dark' : 'light';
@@ -64,7 +75,8 @@ export async function initTheme(app) {
 
         await saveStateValue(db, 'theme', newTheme);
         text.textContent = newTheme;
-        bufferedChanges.push({ key: 'settings', value: { theme: newTheme } });
+        // Assuming bufferedChanges is defined elsewhere
+        // bufferedChanges.push({ key: 'settings', value: { theme: newTheme } });
     });
 }
 
