@@ -1,4 +1,4 @@
-i// www/js/ui/uiUpdaters.js
+// www/js/ui/uiUpdaters.js
 
 import {
     getMainSettingsBlock,
