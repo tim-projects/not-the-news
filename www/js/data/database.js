@@ -154,7 +154,7 @@ export async function pullUserState(db) {
 
         // Other simple states (filterMode, syncEnabled, imagesEnabled, rssFeeds, keywordBlacklist, shuffleCount, lastShuffleResetDate)
         // Iterate over potential keys and apply server value if present
-        const simpleStateKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'];
+        const simpleStateKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'];
         for (const key of simpleStateKeys) {
             if (userState.hasOwnProperty(key)) {
                 // Values coming from the server might not be stringified yet,
@@ -283,7 +283,7 @@ export async function saveStateValue(db, key, value) {
     // Add to bufferedChanges if it's a user setting that needs syncing.
     // Ensure we push the ORIGINAL value, not the stringified one, to bufferedChanges.
     // 'currentDeckGuids' should be handled by saveArrayState for consistency with other arrays.
-    if (['filterMode', 'syncEnabled', 'imagesEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'].includes(key)) {
+    if (['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'].includes(key)) {
         bufferedChanges.push({ key, value: value });
     }
 }

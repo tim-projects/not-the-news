@@ -57,6 +57,7 @@ document.addEventListener("load", e => {
 // Alpine.js Initialization
 document.addEventListener('alpine:init', () => {
     Alpine.data('rssApp', () => ({
+        openUrlsInNewTabEnabled: initialAppState().openUrlsInNewTabEnabled,
         // Reactive properties for Alpine to observe.
         loading: initialAppState().loading,
         filterMode: initialAppState().filterMode,
@@ -134,6 +135,7 @@ document.addEventListener('alpine:init', () => {
                 // Load initial settings and user state from DB/localStorage
                 this.syncEnabled = await loadStateValue(db, 'syncEnabled', true);
                 this.imagesEnabled = await loadStateValue(db, 'imagesEnabled', true);
+                this.openUrlsInNewTabEnabled = await loadStateValue(db, 'openUrlsInNewTabEnabled', true);
                 this.filterMode = await loadFilterMode(db);
                 this.isOnline = isOnline(); // Set initial online status
 
@@ -225,12 +227,15 @@ document.addEventListener('alpine:init', () => {
                 // Watchers for settings changes (direct model binding saves values)
                 this.$watch('syncEnabled', value => saveStateValue(db, 'syncEnabled', value));
                 this.$watch('imagesEnabled', value => saveStateValue(db, 'imagesEnabled', value));
+                this.$watch('openUrlsInNewTabEnabled', value => saveStateValue(db, 'openUrlsInNewTabEnabled', value));
                 this.$watch('rssFeedsInput', value => saveStateValue(db, 'rssFeeds', value));
                 this.$watch('keywordBlacklistInput', value => saveStateValue(db, 'keywordBlacklist', value));
                 this.$watch('filterMode', value => setFilterMode(this, db, value));
+this.updateCounts();
+await initScrollPosition(this); // Restore scroll position after initial render
 
-                this.updateCounts();
-                await initScrollPosition(this); // Restore scroll position after initial render
+// Convert URLs to links after initial render
+await this.convertUrlsInEntries();
 
                 this.loading = false; // Important: Set loading to false here after all initial loading
 
@@ -250,6 +255,7 @@ document.addEventListener('alpine:init', () => {
                             // After background sync, re-validate current deck as items might have changed
                             await validateAndRegenerateCurrentDeck(this);
                             console.log("Background partial sync completed.");
+                            await this.convertUrlsInEntries();
                         } catch (error) {
                             console.error('Background partial sync failed', error);
                         }
@@ -305,6 +311,7 @@ document.addEventListener('alpine:init', () => {
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this);
                         console.log("Periodic background sync completed.");
+                        await this.convertUrlsInEntries();
                     } catch (error) {
                         console.error("Periodic sync failed", error);
                     }
@@ -314,6 +321,14 @@ document.addEventListener('alpine:init', () => {
                 console.error("Initialization failed:", error);
                 this.errorMessage = "Could not load feed: " + error.message;
                 this.loading = false;
+            }
+        },
+        
+        // --- NEW LOGIC: Convert URLs to links based on setting ---
+        async convertUrlsInEntries() {
+            const entriesContainer = document.getElementById('items');
+            if (entriesContainer) {
+                convertUrlsToLinks(entriesContainer, this.openUrlsInNewTabEnabled);
             }
         },
 
@@ -387,3 +402,26 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 });
+
+// Function to convert external URLs to links that open in a new tab
+function convertUrlsToLinks(element, openInNewTab) {
+  if (!element) return;
+
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+  element.querySelectorAll('*').forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      const newHtml = text.replace(urlRegex, (url) => {
+        console.log(`Found URL: ${url}`); // Log the URL
+        return `<a href="${url}" target="${openInNewTab ? '_blank' : '_self'}" rel="noopener noreferrer">${url}</a>`;
+      });
+
+      if (newHtml !== text) {
+        const span = document.createElement('span');
+        span.innerHTML = newHtml;
+        node.replaceWith(span);
+      }
+    }
+  });
+}

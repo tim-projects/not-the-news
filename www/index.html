@@ -105,6 +105,16 @@
 </label>
 </div>
 </div>
+<div class="settings-group">
+<label for="open-urls-in-new-tab-toggle">Open urls in a new tab?</label>
+<div class="d-flex align-items-center">
+<span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'yes' : 'no'"></span>
+<label class="switch">
+<input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled">
+<span class="slider"></span>
+</label>
+</div>
+</div>
 <hr>
 <div class="settings-option">
 <span>RSS Feeds</span>

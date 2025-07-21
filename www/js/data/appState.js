@@ -7,6 +7,7 @@ export const appState = () => ({
     filterMode: "unread",
     imagesEnabled: null,
     syncEnabled: null,
+    openUrlsInNewTabEnabled: null,
     isShuffled: false,
     shuffleCount: 2,
     modalView: 'main', // Controls which settings panel is visible
