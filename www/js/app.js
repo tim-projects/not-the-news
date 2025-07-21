@@ -6,8 +6,10 @@ import { appState as initialAppState } from './data/appState.js'; // Renamed imp
 import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
-import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
-import { createAndShowSaveMessage } from './ui/uiUpdaters.js';
+// --- UPDATED IMPORT: createStatusBarMessage instead of createAndShowSaveMessage ---
+import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
+// --- REMOVED: No longer importing createAndShowSaveMessage separately if it's replaced ---
+// import { createAndShowSaveMessage } from './ui/uiUpdaters.js';
 
 
 // Service Worker Registration
@@ -376,7 +378,9 @@ document.addEventListener('alpine:init', () => {
         async saveRssFeeds() {
             const db = await dbPromise;
             await saveStateValue(db, 'rssFeeds', this.rssFeedsInput);
-            createAndShowSaveMessage('RSS Feeds saved!', 'success', 'rss-save-msg');
+            // --- UPDATED CALL: Use createStatusBarMessage ---
+            createStatusBarMessage('RSS Feeds saved!', 'success'); // Removed target element and ID arguments
+            // --- END UPDATED CALL ---
             this.loading = true;
             await performFullSync(db);
             await this.loadFeedItemsFromDB();
@@ -387,7 +391,9 @@ document.addEventListener('alpine:init', () => {
         async saveKeywordBlacklist() {
             const db = await dbPromise;
             await saveStateValue(db, 'keywordBlacklist', this.keywordBlacklistInput);
-            createAndShowSaveMessage('Keyword Blacklist saved!', 'success', 'keywords-save-msg');
+            // --- UPDATED CALL: Use createStatusBarMessage ---
+            createStatusBarMessage('Keyword Blacklist saved!', 'success'); // Removed target element and ID arguments
+            // --- END UPDATED CALL ---
             // Keyword blacklist updates affect the `filteredEntries` computed property,
             // so Alpine will react automatically if your UI uses it.
             this.updateCounts(); // Update counts if blacklist affects what's considered "unread"
