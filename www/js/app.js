@@ -1,15 +1,12 @@
 // app.js
 
 // Import necessary modules
-import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js';
-import { appState as initialAppState } from './data/appState.js'; // Renamed import to avoid confusion
+// Remove the problematic 'appState' import as it no longer exists as a named export from data/database.js
+import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js'; // This is actually data/appState.js based on your provided file
 import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
-// --- UPDATED IMPORT: createStatusBarMessage instead of createAndShowSaveMessage ---
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
-// --- REMOVED: No longer importing createAndShowSaveMessage separately if it's replaced ---
-// import { createAndShowSaveMessage } from './ui/uiUpdaters.js';
 
 
 // Service Worker Registration
@@ -19,8 +16,6 @@ if ('serviceWorker' in navigator) {
             .then(reg => {
                 console.log('app.js: Service Worker registered:', reg.scope);
 
-                // This listener watches for a new Service Worker being found and installing.
-                // It will trigger a reload if the new SW activates and isn't yet controlling the page.
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     if (newWorker) {
@@ -32,11 +27,6 @@ if ('serviceWorker' in navigator) {
                         });
                     }
                 });
-
-                // REMOVED: The aggressive 'controllerchange' listener that caused the infinite loop.
-                // The Service Worker (sw.js) will now be responsible for triggering a reload
-                // when it needs to take control of existing clients.
-
             })
             .catch(error => console.warn('app.js: Service Worker registration failed:', error));
     });
@@ -52,30 +42,29 @@ document.addEventListener("load", e => {
 // Alpine.js Initialization
 document.addEventListener('alpine:init', () => {
     Alpine.data('rssApp', () => ({
-        openUrlsInNewTabEnabled: initialAppState().openUrlsInNewTabEnabled,
-        // Reactive properties for Alpine to observe.
-        loading: initialAppState().loading,
-        filterMode: initialAppState().filterMode,
-        openSettings: initialAppState().openSettings,
-        modalView: initialAppState().modalView,
-        shuffleCount: initialAppState().shuffleCount,
-        syncEnabled: initialAppState().syncEnabled,
-        imagesEnabled: initialAppState().imagesEnabled,
-        rssFeedsInput: initialAppState().rssFeedsInput,
-        keywordBlacklistInput: initialAppState().keywordBlacklistInput,
-        entries: initialAppState().entries,
-        hidden: initialAppState().hidden,
-        starred: initialAppState().starred,
-        currentDeckGuids: initialAppState().currentDeckGuids,
-        errorMessage: initialAppState().errorMessage,
-        isOnline: initialAppState().isOnline,
-        deckItems: initialAppState().deckItems,
-        _lastFilterHash: initialAppState()._lastFilterHash,
-        _cachedFilteredEntries: initialAppState()._cachedFilteredEntries,
+        // --- Alpine.js Reactive properties with initial defaults ---
+        loading: true, // Start as true, set to false after initApp completes
+        filterMode: 'unread',
+        openSettings: false,
+        modalView: 'main',
+        shuffleCount: 0, // Will be loaded from DB
+        syncEnabled: true, // Will be loaded from DB
+        imagesEnabled: true, // Will be loaded from DB
+        openUrlsInNewTabEnabled: true, // Will be loaded from DB
+        rssFeedsInput: '', // Will be loaded from DB
+        keywordBlacklistInput: '', // Will be loaded from DB
+        entries: [],
+        hidden: [],
+        starred: [],
+        currentDeckGuids: [],
+        errorMessage: '',
+        isOnline: isOnline(), // Initialize with current online status
+        deckItems: [], // This will be populated by displayCurrentDeck
+        _lastFilterHash: '', // For memoization
+        _cachedFilteredEntries: null, // For memoization
 
-        // Computed property for filtered entries (copied directly from your appState.js logic)
+        // Computed property for filtered entries
         get filteredEntries() {
-            // Create a hash to memoize based on relevant properties
             const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}`;
 
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
@@ -92,7 +81,6 @@ document.addEventListener('alpine:init', () => {
                     break;
                 case "unread":
                     const deckSet = new Set(this.currentDeckGuids);
-                    // Filtered unread items are those in the current deck AND not hidden
                     filtered = this.entries.filter(e => deckSet.has(e.id) && !hiddenMap.has(e.id));
                     break;
                 case "hidden":
@@ -106,7 +94,6 @@ document.addEventListener('alpine:init', () => {
                     break;
             }
             
-            // Apply keyword blacklist if it exists
             const keywordBlacklist = this.keywordBlacklistInput.split(',').map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
             if (keywordBlacklist.length > 0) {
                 filtered = filtered.filter(item => {
@@ -128,6 +115,7 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 // Load initial settings and user state from DB/localStorage
+                // These directly update the Alpine data properties
                 this.syncEnabled = await loadStateValue(db, 'syncEnabled', true);
                 this.imagesEnabled = await loadStateValue(db, 'imagesEnabled', true);
                 this.openUrlsInNewTabEnabled = await loadStateValue(db, 'openUrlsInNewTabEnabled', true);
@@ -135,12 +123,10 @@ document.addEventListener('alpine:init', () => {
                 this.isOnline = isOnline(); // Set initial online status
 
                 // --- Attempt to pull user state (including current deck) from server early ---
-                // This happens first if online, ensuring the most recent shared deck is fetched.
-                // The page reload from SW update will ensure this fetch happens *after* new SW is active.
                 if (this.syncEnabled && this.isOnline) {
                     try {
                         console.log("app.js: Attempting early pull of user state (including current deck) from server...");
-                        await pullUserState(db); // This function (in database.js) needs to handle currentDeckGuids sync
+                        await pullUserState(db);
                         console.log("app.js: Early user state pull completed.");
                     } catch (error) {
                         console.warn("app.js: Early pullUserState failed, proceeding with local state. Error:", error);
@@ -151,50 +137,39 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 // Load feed items from DB (populates this.entries).
-                // This must happen before hidden pruning or deck validation, as they depend on `entries`.
                 await this.loadFeedItemsFromDB();
 
                 // Load hidden and starred states from local DB. These might have been updated by early pullUserState.
-                this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
-                this.starred = await this.loadArrayStateFromDB(db, 'starred');
+                this.hidden = await loadArrayState(db, 'hidden'); // Use the exported loadArrayState
+                this.starred = await loadArrayState(db, 'starred'); // Use the exported loadArrayState
 
                 // Determine sync completion time for pruning stale hidden entries.
-                // If no items are present locally and online, perform a full sync.
                 const itemsCount = await db.transaction('items', 'readonly').objectStore('items').count();
-                let syncCompletionTime = Date.now(); // Default, if no full sync occurs
+                let syncCompletionTime = Date.now();
                 if (itemsCount === 0 && this.isOnline) {
                      const { feedTime } = await performFullSync(db);
                      syncCompletionTime = feedTime;
-                     // After a full sync (which might add new feeds/items), re-pull user state to ensure consistency,
-                     // and reload entries/hidden/starred to reflect any changes.
                      if (this.syncEnabled && this.isOnline) {
-                         await pullUserState(db); // Re-pull user state (could update deck, hidden, starred)
-                         this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
-                         this.starred = await this.loadArrayStateFromDB(db, 'starred');
+                         await pullUserState(db);
+                         this.hidden = await loadArrayState(db, 'hidden');
+                         this.starred = await loadArrayState(db, 'starred');
                      }
-                     await this.loadFeedItemsFromDB(); // Reload entries again if full sync added new ones
+                     await this.loadFeedItemsFromDB();
                 }
-                // Prune stale hidden entries based on the current set of `entries`.
                 this.hidden = await pruneStaleHidden(db, this.entries, syncCompletionTime);
 
-                // Now load currentDeckGuids. This will reflect the deck from the early pullUserState,
-                // or the last locally saved one if no sync occurred or it failed.
                 this.currentDeckGuids = await loadCurrentDeck(db);
 
-                // Validate and potentially regenerate currentDeckGuids.
-                // This also ensures the deck is valid based on currently available entries and hidden states.
-                // validateAndRegenerateCurrentDeck *also calls* displayCurrentDeck internally.
                 await validateAndRegenerateCurrentDeck(this);
 
-                // Load and set shuffle count based on last reset date
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
                 const today = new Date();
                 today.setHours(0,0,0,0);
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
-                    this.shuffleCount = 2; // Reset daily limit
-                    await saveShuffleState(db, 2, today); // Initialize with 2 shuffles for the day
+                    this.shuffleCount = 2;
+                    await saveShuffleState(db, 2, today);
                 }
 
                 // Initialize UI components and their listeners
@@ -203,22 +178,19 @@ document.addEventListener('alpine:init', () => {
                 initImagesToggle(this);
                 initConfigPanelListeners(this);
 
-                // Watchers for settings panel visibility
                 this.$watch("openSettings", async (isOpen) => {
                     if (isOpen) {
-                        this.modalView = 'main'; // Ensure starting at main view when settings modal opens
+                        this.modalView = 'main';
                         await manageSettingsPanelVisibility(this);
-                        // Reload text area content when opening settings
                         this.rssFeedsInput = await loadStateValue(db, 'rssFeeds', '');
                         this.keywordBlacklistInput = await loadStateValue(db, 'keywordBlacklist', '');
                     } else {
-                        await saveCurrentScrollPosition(); // Save scroll position when closing settings
+                        await saveCurrentScrollPosition();
                     }
                 });
                 this.$watch("modalView", async () => {
                     await manageSettingsPanelVisibility(this);
                 });
-                // Watchers for settings changes (direct model binding saves values)
                 this.$watch('syncEnabled', value => saveStateValue(db, 'syncEnabled', value));
                 this.$watch('imagesEnabled', value => saveStateValue(db, 'imagesEnabled', value));
                 this.$watch('openUrlsInNewTabEnabled', value => saveStateValue(db, 'openUrlsInNewTabEnabled', value));
@@ -226,52 +198,45 @@ document.addEventListener('alpine:init', () => {
                 this.$watch('keywordBlacklistInput', value => saveStateValue(db, 'keywordBlacklist', value));
                 this.$watch('filterMode', value => setFilterMode(this, db, value));
                 this.updateCounts();
-                await initScrollPosition(this); // Restore scroll position after initial render
+                await initScrollPosition(this);
 
-                // Convert URLs to links after initial render
                 await this.convertUrlsInEntries();
 
-                this.loading = false; // Important: Set loading to false here after all initial loading
+                this.loading = false;
 
-                // Background partial sync if enabled (short delay to not block main thread)
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
                             console.log("app.js: Initiating background partial sync...");
-                            await performFeedSync(db); // Fetches new articles
-                            await pullUserState(db); // Syncs user states (hidden, starred, currentDeckGuids)
-                            // Re-load data after background sync to ensure UI updates
-                            this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
-                            this.starred = await this.loadArrayStateFromDB(db, 'starred');
-                            await this.loadFeedItemsFromDB(); // Reload entries after sync
+                            await performFeedSync(db);
+                            await pullUserState(db);
+                            this.hidden = await loadArrayState(db, 'hidden');
+                            this.starred = await loadArrayState(db, 'starred');
+                            await this.loadFeedItemsFromDB();
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
-                            // After background sync, re-validate current deck as items might have changed
                             await validateAndRegenerateCurrentDeck(this);
                             console.log("app.js: Background partial sync completed.");
                             await this.convertUrlsInEntries();
                         } catch (error) {
                             console.error('app.js: Background partial sync failed', error);
                         }
-                    }, 0); // Non-blocking immediate execution
+                    }, 0);
                 }
 
                 attachScrollToTopHandler();
 
-                // Setup online/offline listeners
                 window.addEventListener('online', async () => {
                     this.isOnline = true;
                     if (this.syncEnabled) {
                         console.log("app.js: Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations(db);
-                        // If returning online and operations were processed, data might have changed.
-                        // Refresh all relevant data.
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
-                        this.starred = await this.loadArrayStateFromDB(db, 'starred');
+                        this.hidden = await loadArrayState(db, 'hidden');
+                        this.starred = await loadArrayState(db, 'starred');
                         this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                         this.updateCounts();
-                        await validateAndRegenerateCurrentDeck(this); // Validate and update display
+                        await validateAndRegenerateCurrentDeck(this);
                         console.log("app.js: Online resync completed.");
                     }
                 });
@@ -280,19 +245,17 @@ document.addEventListener('alpine:init', () => {
                     console.warn("app.js: Offline detected. Syncing disabled.");
                 });
 
-                // Setup activity listeners for auto-sync
                 let lastActivityTimestamp = Date.now();
                 const recordActivity = () => { lastActivityTimestamp = Date.now(); };
                 ["mousemove", "mousedown", "keydown", "scroll", "click"].forEach(event => document.addEventListener(event, recordActivity, true));
                 document.addEventListener("visibilitychange", recordActivity, true);
                 window.addEventListener("focus", recordActivity, true);
 
-                const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-                const INACTIVITY_TIMEOUT_MS = 60 * 1000; // 1 minute of inactivity
+                const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+                const INACTIVITY_TIMEOUT_MS = 60 * 1000;
 
                 setInterval(async () => {
                     const now = Date.now();
-                    // Sync only if online, not in settings, sync is enabled, document is visible, and recently active
                     if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
                         return;
                     }
@@ -328,10 +291,11 @@ document.addEventListener('alpine:init', () => {
 
         // --- Alpine.js methods ---
 
-        async loadArrayStateFromDB(db, key) {
-            const stored = await loadStateValue(db, key, []);
-            return Array.isArray(stored) ? stored : [];
-        },
+        // loadArrayStateFromDB is no longer needed as we import loadArrayState directly
+        // async loadArrayStateFromDB(db, key) {
+        //     const stored = await loadStateValue(db, key, []);
+        //     return Array.isArray(stored) ? stored : [];
+        // },
 
         async loadFeedItemsFromDB() {
             const db = await dbPromise;
@@ -352,20 +316,16 @@ document.addEventListener('alpine:init', () => {
         },
         async toggleStar(guid) {
             await toggleStar(this, guid);
-            // No need to call displayCurrentDeck as starring doesn't change the deck content.
         },
         isHidden(guid) {
             return this.hidden.some(e => e.id === guid);
         },
         async toggleHidden(guid) {
             await toggleHidden(this, guid);
-            await validateAndRegenerateCurrentDeck(this); // Re-evaluates and redraws if deck changes
+            await validateAndRegenerateCurrentDeck(this);
         },
         setFilter(mode) {
             this.filterMode = mode;
-            // Alpine's computed property `filteredEntries` will react to `filterMode` change.
-            // If your UI relies on `deckItems` for all display modes, you might call `displayCurrentDeck(this)`
-            // here, but if it uses `filteredEntries` when not in "unread" mode, it's automatic.
         },
         async loadNextDeck() {
             await loadNextDeck(this);
@@ -378,9 +338,7 @@ document.addEventListener('alpine:init', () => {
         async saveRssFeeds() {
             const db = await dbPromise;
             await saveStateValue(db, 'rssFeeds', this.rssFeedsInput);
-            // --- UPDATED CALL: Use createStatusBarMessage ---
-            createStatusBarMessage('RSS Feeds saved!', 'success'); // Removed target element and ID arguments
-            // --- END UPDATED CALL ---
+            createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
             await performFullSync(db);
             await this.loadFeedItemsFromDB();
@@ -391,12 +349,8 @@ document.addEventListener('alpine:init', () => {
         async saveKeywordBlacklist() {
             const db = await dbPromise;
             await saveStateValue(db, 'keywordBlacklist', this.keywordBlacklistInput);
-            // --- UPDATED CALL: Use createStatusBarMessage ---
-            createStatusBarMessage('Keyword Blacklist saved!', 'success'); // Removed target element and ID arguments
-            // --- END UPDATED CALL ---
-            // Keyword blacklist updates affect the `filteredEntries` computed property,
-            // so Alpine will react automatically if your UI uses it.
-            this.updateCounts(); // Update counts if blacklist affects what's considered "unread"
+            createStatusBarMessage('Keyword Blacklist saved!', 'success');
+            this.updateCounts();
         }
     }));
 });
@@ -408,11 +362,9 @@ function convertUrlsToLinks(element, openInNewTab) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
 
   element.querySelectorAll('*').forEach(node => {
-    // Only process text nodes that are not inside <a> tags already
     if (node.nodeType === Node.TEXT_NODE && node.parentNode.tagName.toLowerCase() !== 'a') {
       const text = node.textContent;
       const newHtml = text.replace(urlRegex, (url) => {
-        // Ensure openInNewTab is explicitly true for _blank, otherwise _self
         const target = openInNewTab === true ? '_blank' : '_self';
         return `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
       });
