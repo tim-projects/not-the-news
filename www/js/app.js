@@ -328,6 +328,7 @@ await this.convertUrlsInEntries();
         async convertUrlsInEntries() {
             const entriesContainer = document.getElementById('items');
             if (entriesContainer) {
+                console.log(`openUrlsInNewTabEnabled: ${this.openUrlsInNewTabEnabled}`); // Log the value of openUrlsInNewTabEnabled
                 convertUrlsToLinks(entriesContainer, this.openUrlsInNewTabEnabled);
             }
         },
