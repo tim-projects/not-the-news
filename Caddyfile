@@ -15,8 +15,16 @@
     not path /*.css
     not path /*.js
     not path /*.svg
+    # --- NEW ADDITIONS TO ALLOW UNATHENTICATED ACCESS ---
+    not path /*.ttf       # Allow TrueType Font files
+    not path /*.woff      # Allow Web Open Font Format files
+    not path /*.woff2     # Allow Web Open Font Format 2 files
+    not path /manifest.json # Allow the PWA manifest file
+    not path /images/* # Allow all images (crucial for PWA icons)
+    # --- END NEW ADDITIONS ---
   }
   redir @unauth /login.html 302
+
   # Proxy your login API _first_
   handle /api/login* {
     reverse_proxy 127.0.0.1:3000 {
@@ -63,8 +71,11 @@
       header_up Host {host}
     }
   }
+
+  # Ensure this root is correct for your static files (e.g., /app/www)
   root * /app/www
   file_server
+
   # — Compression & caching for HTML/JS/XML/JSON assets —
   encode {
     br 11
@@ -79,6 +90,10 @@
       header Content-Type application/xml
       header Content-Type text/xml
       header Content-Type application/json
+      # Add font MIME types for compression if desired
+      # header Content-Type font/ttf
+      # header Content-Type font/woff
+      # header Content-Type font/woff2
     }
 
     # skip tiny responses
@@ -113,4 +128,3 @@
     file_server
   }
 }
-
