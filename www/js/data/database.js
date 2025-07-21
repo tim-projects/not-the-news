@@ -112,30 +112,27 @@ function mergeStarredStates(local, remote) {
 export async function pullUserState(db) {
     if (!isOnline()) return null;
 
-    // The 'lastStateSync' key stores a nonce/timestamp from the server
     const lastSyncEntry = await db.get('userState', 'lastStateSync') || { value: null };
     const lastSyncNonce = lastSyncEntry.value;
     const headers = lastSyncNonce ? { 'If-None-Match': lastSyncNonce } : {};
 
+    let responseText; // Declare outside try block for wider scope
     try {
-        // Assuming your server has an endpoint to pull user state changes or full state
-        const res = await fetchWithRetry('/user-state', { headers }); // Assuming /user-state returns full state or changes since nonce
+        const res = await fetchWithRetry('/user-state', { headers });
 
-        // If server indicates no new changes
         if (res.status === 304) {
             console.log('[pullUserState] User state: No changes from server (304 Not Modified).');
-            return lastSyncEntry.value; // Return the current nonce
+            return lastSyncEntry.value;
         }
 
         if (!res.ok) {
-            const errorText = await response.text();
+            const errorText = await res.text();
             console.error(`[pullUserState] Server returned an error: ${res.status} ${res.statusText}`);
             console.error('[pullUserState] Server error response body:', errorText);
             throw new Error(`Failed to fetch user state: ${res.status} ${res.statusText}`);
         }
 
-        // --- CRITICAL DEBUGGING AREA ---
-        const responseText = await res.text();
+        responseText = await res.text(); // Assign to wider scope variable
         console.log('[pullUserState] Raw response text length:', responseText.length);
         console.log('[pullUserState] Raw response text START (first 200 chars):', responseText.substring(0, 200));
         console.log('[pullUserState] Raw response text END (last 200 chars):', responseText.substring(responseText.length - 200));
@@ -146,44 +143,39 @@ export async function pullUserState(db) {
             data = JSON.parse(responseText);
             console.log('[pullUserState] Successfully parsed JSON data.');
         } catch (parseError) {
-            console.error('[pullUserState] JSON parsing failed! Raw text was:', responseText); // Log the full raw text on parse error
+            console.error('[pullUserState] JSON parsing failed! Raw text was:', responseText);
             console.error('[pullUserState] JSON parsing error:', parseError);
-            throw parseError; // Re-throw to propagate
+            throw parseError;
         }
-        // END CRITICAL DEBUGGING AREA
 
-        const { userState, serverTime } = data; // Assuming server returns { userState: { hidden: [...], starred: [...], currentDeckGuids: [...] }, serverTime: "nonce" }
+        const { userState, serverTime } = data;
 
+        // --- Fetch all local state needed for merging BEFORE starting the readwrite transaction ---
+        const localHidden = await loadArrayState(db, 'hidden');
+        const localStarred = await loadArrayState(db, 'starred');
+        // No need to load other simple states if we're just overwriting them with server values or stringifying immediately
+
+
+        // --- Start the readwrite transaction and perform all puts within it ---
         const tx = db.transaction('userState', 'readwrite');
         const store = tx.objectStore('userState');
 
-        // --- MERGE/UPDATE LOGIC FOR EACH USER STATE ---
-
         // Hidden state
-        // Use loadArrayState to ensure correct parsing of stored JSON array
-        const localHidden = await loadArrayState(db, 'hidden');
         const newHidden = mergeHiddenStates(localHidden, userState.hidden || []);
         await store.put({ key: 'hidden', value: JSON.stringify(newHidden) });
 
         // Starred state
-        // Use loadArrayState to ensure correct parsing of stored JSON array
-        const localStarred = await loadArrayState(db, 'starred');
         const newStarred = mergeStarredStates(localStarred, userState.starred || []);
         await store.put({ key: 'starred', value: JSON.stringify(newStarred) });
 
         // Current Deck GUIDs: Simple "server wins" strategy for now.
-        // If serverState.currentDeckGuids is null/undefined, keep local.
         const serverDeck = userState.currentDeckGuids || [];
         await store.put({ key: 'currentDeckGuids', value: JSON.stringify(serverDeck) });
 
-
         // Other simple states (filterMode, syncEnabled, imagesEnabled, rssFeeds, keywordBlacklist, shuffleCount, lastShuffleResetDate)
-        // Iterate over potential keys and apply server value if present
         const simpleStateKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'];
         for (const key of simpleStateKeys) {
             if (userState.hasOwnProperty(key)) {
-                // Values coming from the server are already the correct type (string, boolean, number, array, object)
-                // as jsonify handles the conversion. We need to JSON.stringify them for IndexedDB storage.
                 await store.put({ key: key, value: JSON.stringify(userState[key]) });
             }
         }
@@ -191,12 +183,12 @@ export async function pullUserState(db) {
         // Save the new serverTime nonce
         await store.put({ key: 'lastStateSync', value: serverTime });
 
-        await tx.done;
+        await tx.done; // Ensure the transaction completes
         console.log('[pullUserState] User state pulled and merged successfully.');
         return serverTime;
     } catch (error) {
         console.error('[pullUserState] Failed to pull user state:', error);
-        throw error; // Re-throw to propagate error
+        throw error;
     }
 }
 
@@ -211,9 +203,6 @@ export async function pushUserState(db, changes = bufferedChanges) {
 
     const compiledChanges = {};
     for (const { key, value } of changes) {
-        // The `value` here is the *original* (non-stringified) value from `bufferedChanges`.
-        // We always JSON.stringify it for sending to the server, except for the serverTime nonce
-        // which isn't part of userState for POST.
         compiledChanges[key] = JSON.stringify(value);
     }
 
@@ -221,7 +210,7 @@ export async function pushUserState(db, changes = bufferedChanges) {
         const res = await fetchWithRetry('/user-state', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ userState: compiledChanges }) // Send the compiled changes
+            body: JSON.stringify({ userState: compiledChanges })
         });
 
         if (!res.ok) {
@@ -229,33 +218,27 @@ export async function pushUserState(db, changes = bufferedChanges) {
             throw new Error(`pushUserState failed ${res.status}: ${errorText}`);
         }
 
-        const { serverTime } = await res.json(); // Assuming server returns { serverTime: "nonce" }
+        const { serverTime } = await res.json();
         const tx = db.transaction('userState', 'readwrite');
         tx.objectStore('userState').put({ key: 'lastStateSync', value: serverTime });
         await tx.done;
-        changes.length = 0; // Clear buffered changes after successful push
+        changes.length = 0;
         console.log('User state changes pushed successfully.');
     } catch (error) {
         console.error('Failed to push user state changes:', error);
-        // Do not clear changes if push fails, they remain buffered for next attempt.
-        throw error; // Re-throw to propagate error
+        throw error;
     }
 }
 
 export async function performFullSync(db) {
     console.log("Performing full sync...");
     const feedT = await performFeedSync(db);
-    // After performing feed sync (which fetches items), pull user state to ensure consistency,
-    // as the deck might contain new items.
     const stateT = await pullUserState(db);
-    // Push any pending local changes after pulling server's latest state.
-    await pushUserState(db); // pushUserState uses bufferedChanges by default
+    await pushUserState(db);
     console.log("Full sync completed.");
     return { feedTime: feedT, stateTime: stateT };
 }
 
-// *** CRITICAL FIX: Make loadStateValue always parse the JSON string ***
-// This function needs to be robust for all types of values stored in userState.
 export async function loadStateValue(db, key, defaultValue) {
     const entry = await db.transaction('userState', 'readonly').objectStore('userState').get(key);
     let value = entry?.value;
@@ -264,43 +247,25 @@ export async function loadStateValue(db, key, defaultValue) {
         return defaultValue;
     }
 
-    // Attempt to parse if it's a string. Values saved by saveStateValue and pullUserState
-    // should generally be JSON stringified for complex types and primitives.
     if (typeof value === 'string') {
         try {
-            // This correctly parses "true" to true, "123" to 123, "[...]" to array, "{...}" to object.
-            // If it's a simple string like "hello" (which was intentionally not stringified), it will throw,
-            // so we return the string itself in the catch block.
             const parsedValue = JSON.parse(value);
-            // After parsing, check if the parsed value is a primitive that might have been
-            // stringified (like "true", "123", "null"). If so, return the parsed value.
-            // If it was a string that couldn't be parsed, it will fall to the catch.
             return parsedValue;
         } catch (e) {
-            // This catch block handles cases where the stored string value is NOT valid JSON.
-            // E.g., if 'lastStateSync' stores a raw nonce string like "some-random-guid", JSON.parse would fail.
-            // In such cases, we return the raw string.
-            // console.warn(`[loadStateValue] Could not parse JSON for key "${key}", returning raw string. Value:`, value, e);
-            return value; // Return the raw string if it's not valid JSON
+            return value;
         }
     }
-    return value; // If it's not a string (e.g., it was stored as a number/boolean directly, though current saveStateValue stringifies), return as is.
+    return value;
 }
-
 
 export async function saveStateValue(db, key, value) {
     const tx = db.transaction('userState', 'readwrite');
-    // All values (booleans, numbers, strings, objects, arrays) should be stringified
-    // when stored in IndexedDB's userState store, except 'lastStateSync' which is a nonce/timestamp.
     const valToSave = (key === 'lastStateSync') ? value : JSON.stringify(value);
     tx.objectStore('userState').put({ key: key, value: valToSave });
     await tx.done;
 
-    // Add to bufferedChanges if it's a user setting that needs syncing.
-    // Ensure we push the ORIGINAL value, not the stringified one, to bufferedChanges.
-    // 'currentDeckGuids' should be handled by saveArrayState for consistency with other arrays.
     if (['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'].includes(key)) {
-        bufferedChanges.push({ key, value: value }); // Push the original value
+        bufferedChanges.push({ key, value: value });
     }
 }
 
@@ -319,37 +284,32 @@ export async function saveArrayState(db, key, arr) {
     const tx = db.transaction('userState', 'readwrite');
     tx.objectStore('userState').put({ key: key, value: JSON.stringify(arr) });
     await tx.done;
-    // Add to bufferedChanges for syncing.
     if (['starred', 'hidden', 'currentDeckGuids'].includes(key)) {
-        bufferedChanges.push({ key, value: arr }); // Push the original array
+        bufferedChanges.push({ key, value: arr });
     }
 }
 
 export async function processPendingOperations(db) {
     if (!isOnline() || pendingOperations.length === 0) return;
 
-    const opsToProcess = pendingOperations.splice(0); // Take all pending operations
-    console.log(`Processing ${opsToProcess.length} pending operations...`);
+    const opsToProcess = pendingOperations.splice(0);
 
     for (const op of opsToProcess) {
         try {
             switch (op.type) {
                 case 'pushUserState':
-                    // op.data for 'pushUserState' is already an array of {key, value} objects (the bufferedChanges that were queued)
-                    // pushUserState expects an array of changes.
                     await pushUserState(db, op.data);
                     break;
-                case 'starDelta': // If you use delta endpoints for hidden/starred
+                case 'starDelta':
                     await fetchWithRetry("/user-state/starred/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
                     break;
-                case 'hiddenDelta': // If you use delta endpoints for hidden/starred
+                case 'hiddenDelta':
                     await fetchWithRetry("/user-state/hidden/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
                     break;
                 default: console.warn(`Unknown pending operation type: ${op.type}`);
             }
         } catch (err) {
             console.error(`Failed to process pending operation of type "${op.type}":`, err);
-            // Re-queue the failed operation for a future attempt
             pendingOperations.push(op);
         }
     }
