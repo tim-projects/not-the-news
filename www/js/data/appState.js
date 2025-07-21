@@ -15,8 +15,8 @@ export const appState = () => ({
     loading: true,
     currentDeckGuids: [],
     errorMessage: '',
-    // --- ADD THIS NEW PROPERTY ---
-    deckItems: [], // This will hold the actual item objects to be displayed in the current deck
+    // This will hold the actual item objects to be displayed in the current deck
+    deckItems: [],
 
     // Placeholders for functions that will be mixed in or called from main app logic
     initApp: null, // Will be assigned the main init function
@@ -53,7 +53,7 @@ export const appState = () => ({
                 filtered = this.entries.filter(e => deckSet.has(e.id) && !hiddenMap.has(e.id));
                 break;
             case "hidden":
-                filtered = this.entries.filter(e => hiddenMap.has(e.id)).sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+                filtered = this.entries.filter(e => hiddenMap.has(e.id)).sort((a, b) => new new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
                 break;
             case "starred":
                 filtered = this.entries.filter(e => starredMap.has(e.id)).sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
