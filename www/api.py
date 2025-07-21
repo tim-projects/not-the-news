@@ -4,7 +4,9 @@ from xml.etree import ElementTree as ET
 from email.utils import parsedate_to_datetime
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
-import json, secrets
+import json
+import secrets
+import sys # <--- ADD THIS IMPORT
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -179,11 +181,26 @@ def get_user_state():
     etag = newest_timestamp if newest_timestamp else "" # Use newest timestamp as ETag
     if_none_match = request.headers.get("If-None-Match")
 
+    # Log what's being returned for 304 (Not Modified)
     if if_none_match == etag:
+        print(f"API: Returning 304 Not Modified for /user-state. ETag: {etag}", file=sys.stderr) # <--- LOGGING
         return make_response("", 304) # Not Modified
 
     resp = jsonify({"userState": out_user_state, "serverTime": etag}) # Changed 'changes' to 'userState'
     resp.headers["ETag"] = etag
+
+    # --- IMPORTANT DEBUGGING STEP ---
+    # Log the size and a snippet of the JSON string being sent.
+    try:
+        json_str_payload = json.dumps({"userState": out_user_state, "serverTime": etag})
+        print(f"API: Sending /user-state. Payload size: {len(json_str_payload)} bytes.", file=sys.stderr) # <--- LOGGING
+        print(f"API: Payload START (first 100 chars): {json_str_payload[:100]}", file=sys.stderr) # <--- LOGGING
+        print(f"API: Payload END (last 100 chars): {json_str_payload[-100:]}", file=sys.stderr) # <--- LOGGING
+    except Exception as e:
+        print(f"API ERROR: Could not log /user-state payload: {e}", file=sys.stderr) # <--- LOGGING
+        # If dumping for logging fails, it means `out_user_state` itself might be problematic.
+        # This is unlikely if jsonify succeeded, but good to catch.
+
     return resp, 200
 
 @app.route("/user-state", methods=["POST"])
