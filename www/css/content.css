@@ -1,0 +1,162 @@
+/* content.css */
+.itemfrom {
+  padding-right: 1em;
+  opacity: 0.6;
+  padding-bottom: 0.5em;
+  font-style: italic;
+  font-size: 1rem;
+  background-color: var(--card-bg);
+}
+
+.pubdate {
+  text-align: right;
+}
+
+.itemfrom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.pubdate p,
+.itemfrom p {
+  margin: 0;
+  line-height: 0;
+}
+
+.spacer {
+  margin: 1.4vh;
+}
+
+.itemdate h3 {
+  margin-top: 0;
+  margin-bottom: -30px;
+  padding-top: 3em;
+  padding-right: 8em;
+  float: right;
+}
+
+img {
+  box-shadow: 0 4px 12px var(--card-shadow-color);
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  width: 100%;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity .3s ease-in-out;
+}
+
+img.loaded {
+  opacity: 1;
+}
+
+img.entry-image {
+  margin-bottom: 1em;
+}
+
+.itemdescription {
+  font-family: auto;
+  padding: 0.25em 1.8em 2em;
+  width: auto;
+}
+
+table {
+  min-width: -webkit-fill-available;
+}
+
+td {
+  width: 60%;
+}
+
+td p a,
+td a,
+span {
+  display: grid;
+}
+
+td p a {
+  padding-left: 3em;
+}
+
+td a {
+  line-height: 1.6;
+}
+
+p {
+  line-height: 1.6 !important;
+}
+
+h1 {
+  line-height: 1.4;
+  font-size: 1.3em;
+  font-weight: lighter;
+}
+
+h2,
+h3 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 100;
+  color: var(--fg);
+  line-height: 1.4;
+}
+
+h3 {
+  margin-top: 2em;
+  font-size: large;
+}
+
+p {
+  font-size: 1rem !important;
+  line-height: 1.4 !important;
+}
+
+.pubdate p,
+.itemfrom p {
+  font-size: x-small !important;
+}
+
+.pubdate,
+.itemfrom {
+  padding-right: 0.5em;
+}
+
+.itemfrom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-select {
+  margin-left: auto;
+}
+
+.itemtitle {
+  font-size: 1.25rem !important;
+  padding: 1em 3rem 0.5em 0.75em;
+  min-height: calc(1.4em * 3);
+}
+
+.itemdescription {
+  padding: 1em 1.8em 2em !important;
+}
+
+svg.shuffle-icon {
+  width: 3em;
+  margin-left: -0.15em;
+  margin-top: -0.15em;
+}
+
+span.shuffle-count {
+  margin-top: -1em;
+  font-size: smaller;
+  margin-right: 0em;
+  font-weight: 900;
+  line-height: 2em;
+}
+
+.gear-icon {
+  width: 3em;
+  margin-left: -0.15em;
+  margin-top: -0.15em;
+}

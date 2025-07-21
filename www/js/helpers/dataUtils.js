@@ -222,14 +222,9 @@ export async function loadNextDeck(app) {
     } else {
         app.currentDeckGuids = []; // Clear the deck if no more unread items
         await saveCurrentDeck(db, []); // Persist empty deck
-<<<<<<< HEAD
-        const shuffleButton = document.getElementById('shuffle-button');
-        createAndShowSaveMessage(shuffleButton, 'load-more-msg', 'No more unread items to load!');
-        // After clearing, try to load next available deck
-        await loadNextDeck(app);
-=======
         createAndShowSaveMessage('No more unread items to load!', 'info');
->>>>>>> parent of c9b70c0 (fix: Ensure deck clearing loads next set and shuffle refreshes display)
+
+        createAndShowSaveMessage('No more unread items to load!', 'info');
     }
 
     app.updateCounts();

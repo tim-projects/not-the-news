@@ -1,0 +1,345 @@
+/* buttons.css */
+button {
+  cursor: pointer;
+  border: none;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+}
+
+button:hover {
+  opacity: 1 !important;
+}
+
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary);
+}
+
+button:active {
+  transform: translateY(1px);
+  box-shadow: inset 1px 1px 5px rgba(0, 0, 0, 0.2);
+}
+
+button.close {
+  font-size: 1.75rem;
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 0 10px 0 20px;
+  opacity: 0.8;
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  margin: 0;
+  padding: 0 1rem 0 1rem;
+  cursor: pointer;
+}
+
+button.close:hover {
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+button.close:focus {
+  box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+button.close:active {
+  background-color: var(--primary);
+  color: var(--secondary);
+}
+
+button.star {
+  font-size: 1.75rem;
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 20px 0 0 0;
+  opacity: 0.6;
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color);
+  float: right;
+  position: absolute;
+  bottom: 2px;
+  right: 0;
+  margin: 0;
+  padding: 0 1rem 0 1rem;
+  cursor: pointer;
+}
+
+button.star:hover {
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+button.star:focus {
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary);
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+button.star:active {
+  background-color: var(--primary);
+  color: var(--secondary);
+}
+
+button.star.starred,
+button.close.hidden {
+  color: gold;
+  opacity: 1;
+  background: transparent;
+}
+
+button.star.starred:hover,
+button.close.hidden:hover {
+  background-color: rgba(255, 215, 0, 0.1);
+  color: gold;
+}
+
+button.star.starred:focus,
+button.close.hidden:focus {
+  box-shadow: 0 0 0 3px gold, inset 0 0 0 1px gold;
+  color: gold;
+  background-color: rgba(255, 215, 0, 0.1);
+}
+
+button.star.starred:active,
+button.close.hidden:active {
+  background-color: rgba(255, 215, 0, 0.2);
+  color: gold;
+}
+
+#scroll-to-top {
+  bottom: 2rem;
+  right: 2rem;
+  width: 4rem;
+  height: 4rem;
+  opacity: 0;
+  transition: opacity .3s ease-in-out, background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+  font-size: xx-large;
+  color: var(--primary);
+  background: var(--secondary);
+  border-radius: 100px;
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  z-index: 1000;
+  border: none;
+}
+
+#scroll-to-top.visible {
+  opacity: 1;
+}
+
+#scroll-to-top:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+#scroll-to-top:focus {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--primary);
+  background-color: var(--primary);
+  color: white;
+}
+
+#scroll-to-top:active {
+  background-color: var(--primary);
+  color: white;
+}
+
+.cog-wheel-button {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 9999;
+  background-color: var(--bg-alt);
+  color: var(--fg-muted);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  border: none;
+  font-size: 55px;
+  line-height: 0.94;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.cog-wheel-button:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+.cog-wheel-button:focus {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), 0 0 0 3px var(--primary);
+  background-color: var(--primary);
+  color: white;
+}
+
+.cog-wheel-button:active {
+  background-color: var(--primary);
+  color: white;
+}
+
+.shuffle-btn,
+.settings-btn {
+  width: 3.5em;
+  height: 3.5em;
+  background-color: var(--card-bg);
+  color: var(--fg);
+  margin-left: auto;
+  border-radius: 100px;
+  opacity: 0.8;
+  padding-top: 0.4em;
+  box-shadow: 1px 1px 5px var(--card-shadow-color);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+}
+
+.shuffle-btn:hover,
+.settings-btn:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+.shuffle-btn:focus,
+.settings-btn:focus {
+  box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
+  background-color: var(--primary);
+  color: white;
+}
+
+.shuffle-btn:active,
+.settings-btn:active {
+  background-color: var(--primary);
+  color: white;
+}
+
+#back-button {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  background: none;
+  color: var(--fg);
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  z-index: 10;
+  border: none;
+  border-radius: 4px;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+#back-button:hover {
+  color: var(--primary);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+#back-button:focus {
+  box-shadow: 0 0 0 3px var(--primary);
+  color: var(--primary);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+#back-button:active {
+  color: var(--primary);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.configure-button {
+  background-color: var(--primary);
+  color: white;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  margin-left: auto;
+  padding: 0.5rem 1rem;
+  border: none;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.configure-button:hover {
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.configure-button:focus {
+  box-shadow: 0 0 0 3px var(--secondary);
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.configure-button:active {
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.settings-group button {
+  font-size: 1rem;
+  min-width: 8rem;
+  align-self: flex-end;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.settings-group button:hover {
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.settings-group button:focus {
+  box-shadow: 0 0 0 3px var(--secondary);
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.settings-group button:active {
+  background-color: var(--secondary);
+  color: var(--fg);
+}
+
+.modal-content>button.close {
+  font-size: 2rem;
+  opacity: 0.8;
+}
+
+html.light button.close,
+html.light button.star {
+  background: var(--card-bg);
+  color: var(--fg);
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
+}
+
+html.light button.close:hover {
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+html.light button.star:hover {
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+html.dark button.close {
+  box-shadow: -1px 1px 0 0px var(--card-border);
+}
+
+html.dark button.star {
+  box-shadow: -1px -1px 0 0px var(--card-border);
+}
+
+html.dark .cog-wheel-button {
+  background: var(--card-bg);
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
+  color: var(--fg);
+}
+
+html.dark .cog-wheel-button:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
