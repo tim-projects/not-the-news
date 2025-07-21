@@ -18,7 +18,8 @@ window.addEventListener('resize', logHeaderStyles);
 import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline } from './data/database.js';
 import { appState as initialAppState } from './data/appState.js'; // Renamed import to avoid confusion
 // Updated import: deck functions are now part of dataUtils.js
-import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
+// IMPORT displayCurrentDeck HERE
+import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition } from './ui/uiUpdaters.js';
@@ -73,6 +74,8 @@ document.addEventListener('alpine:init', () => {
         currentDeckGuids: initialAppState().currentDeckGuids,
         errorMessage: initialAppState().errorMessage,
         isOnline: initialAppState().isOnline,
+        // *** NEW: Add deckItems to appState for display ***
+        deckItems: initialAppState().deckItems,
         // Ensure memoization properties are initialized too, as they are part of appState.js
         _lastFilterHash: initialAppState()._lastFilterHash,
         _cachedFilteredEntries: initialAppState()._cachedFilteredEntries,
@@ -96,6 +99,7 @@ document.addEventListener('alpine:init', () => {
                     break;
                 case "unread":
                     const deckSet = new Set(this.currentDeckGuids);
+                    // Filtered unread items are those in the current deck AND not hidden
                     filtered = this.entries.filter(e => deckSet.has(e.id) && !hiddenMap.has(e.id));
                     break;
                 case "hidden":
@@ -150,8 +154,14 @@ document.addEventListener('alpine:init', () => {
                 // Now load currentDeckGuids
                 this.currentDeckGuids = await loadCurrentDeck(db);
 
-                // *** NEW LOGIC: Validate and potentially regenerate currentDeckGuids ***
-                await validateAndRegenerateCurrentDeck(this); // Pass 'this' (Alpine scope)
+                // *** Validate and potentially regenerate currentDeckGuids ***
+                // This function now internally calls displayCurrentDeck(this) if the deck changes.
+                await validateAndRegenerateCurrentDeck(this);
+
+                // Initial display of the deck if not already done by validateAndRegenerateCurrentDeck
+                // This ensures that the deck is displayed even if no validation/regeneration was needed
+                // (e.g., first load and existing valid deck).
+                displayCurrentDeck(this);
                 // *******************************************************************
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
@@ -160,7 +170,6 @@ document.addEventListener('alpine:init', () => {
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
-                    this.shuffleCount = 2; // Reset daily limit
                     this.shuffleCount = 2; // Reset daily limit
                     await saveShuffleState(db, 2, today); // Initialize with 2 shuffles for the day
                 }
@@ -211,7 +220,8 @@ document.addEventListener('alpine:init', () => {
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
                             // After background sync, re-validate current deck as items might have changed
-                            await validateAndRegenerateCurrentDeck(this); // Pass 'this' (Alpine scope)
+                            // This function now internally calls displayCurrentDeck(this) if the deck changes.
+                            await validateAndRegenerateCurrentDeck(this);
                         } catch (error) {
                             console.error('Background partial sync failed', error);
                         }
@@ -223,7 +233,19 @@ document.addEventListener('alpine:init', () => {
                 // Setup online/offline listeners
                 window.addEventListener('online', async () => {
                     this.isOnline = true;
-                    if (this.syncEnabled) await processPendingOperations(db);
+                    if (this.syncEnabled) {
+                        await processPendingOperations(db);
+                        // If returning online and operations were processed, data might have changed.
+                        // Refresh data and deck.
+                        await this.loadFeedItemsFromDB();
+                        this.hidden = await this.loadArrayStateFromDB(db, 'hidden');
+                        this.starred = await this.loadArrayStateFromDB(db, 'starred');
+                        this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
+                        this.updateCounts();
+                        // Call displayCurrentDeck directly here, or ensure validateAndRegenerateCurrentDeck is robust enough.
+                        // validateAndRegenerateCurrentDeck will handle updating display.
+                        await validateAndRegenerateCurrentDeck(this);
+                    }
                 });
                 window.addEventListener('offline', () => { this.isOnline = false; });
 
@@ -239,17 +261,21 @@ document.addEventListener('alpine:init', () => {
 
                 setInterval(async () => {
                     const now = Date.now();
-                    if (this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
-                        return; // Skip sync if settings are open, sync is disabled, document is hidden, or inactive
+                    // Sync only if online, not in settings, sync is enabled, document is visible, and recently active
+                    if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
+                        return;
                     }
                     try {
+                        console.log("Performing periodic background sync...");
                         await performFeedSync(db);
                         await pullUserState(db);
                         await this.loadFeedItemsFromDB(); // Reload items after sync
                         this.hidden = await pruneStaleHidden(db, this.entries, now); // Prune hidden based on current time
                         this.updateCounts();
                         // After periodic sync, re-validate current deck
-                        await validateAndRegenerateCurrentDeck(this); // Pass 'this' (Alpine scope)
+                        // This function now internally calls displayCurrentDeck(this) if the deck changes.
+                        await validateAndRegenerateCurrentDeck(this);
+                        console.log("Periodic background sync completed.");
                     } catch (error) {
                         console.error("Partial sync failed", error);
                     }
@@ -290,26 +316,45 @@ document.addEventListener('alpine:init', () => {
         isStarred(guid) {
             return this.starred.some(e => e.id === guid);
         },
-        toggleStar(guid) {
-            toggleStar(this, guid); // Pass 'this' and guid (dbPromise is within toggleStar now)
+        async toggleStar(guid) { // Make async because saveStateValue might be in toggleStar
+            await toggleStar(this, guid); // Pass 'this' and guid (dbPromise is within toggleStar now)
+            // No need to call displayCurrentDeck here, as starring/unstarring doesn't change the deck content,
+            // only its visual state if you apply classes based on this.starred.
+            // If you filter your *displayed* items based on starred state, then you'd re-call displayCurrentDeck.
         },
         isHidden(guid) {
             return this.hidden.some(e => e.id === guid);
         },
-        toggleHidden(guid) {
-            toggleHidden(this, guid); // Pass 'this' and guid (dbPromise is within toggleHidden now)
+        async toggleHidden(guid) { // Make async because saveStateValue might be in toggleHidden
+            await toggleHidden(this, guid); // Pass 'this' and guid (dbPromise is within toggleHidden now)
+            // After hiding an item, the deck might need to be re-evaluated and displayed
+            // validateAndRegenerateCurrentDeck will handle this.
+            await validateAndRegenerateCurrentDeck(this);
         },
         setFilter(mode) {
             this.filterMode = mode; // Update Alpine's reactive property
-            // The $watch for filterMode will handle saving to DB
+            // The $watch for filterMode will handle saving to DB.
+            // IMPORTANT: When filterMode changes, you likely want to re-render what's shown.
+            // If your HTML template uses `filteredEntries` directly for display (e.g., x-for="item in filteredEntries"),
+            // Alpine will automatically react to `this.filterMode` changing due to the getter.
+            // If your main display still relies on `deckItems`, you might need to adjust or call `displayCurrentDeck(this)`
+            // after setting the filter, but generally, computed properties handle this elegantly.
+            // Given your `filteredEntries` computed property, a direct call to `displayCurrentDeck` might be redundant
+            // for filter changes if your x-for is `filteredEntries`. However, if the main deck view only shows
+            // `currentDeckGuids`, then setting a filter mode *might* not immediately change what's shown
+            // unless your UI switches to showing `filteredEntries` for specific modes.
+            // For now, let's assume `filteredEntries` directly drives your main display when filterMode is not 'unread'.
+            // If the filter mode is 'unread', then `currentDeckGuids` still dictates the primary view.
         },
         // Original loadNextDeck and shuffleFeed methods now call the imported functions.
         async loadNextDeck() {
-            await loadNextDeck(this); // Call the imported function from dataUtils
+            // The imported loadNextDeck already calls displayCurrentDeck(this)
+            await loadNextDeck(this);
         },
 
         async shuffleFeed() {
-            await shuffleFeed(this); // Call the imported function from dataUtils
+            // The imported shuffleFeed already calls displayCurrentDeck(this)
+            await shuffleFeed(this);
         },
         // The save settings logic for textareas is now simpler as x-model binds directly
         // and $watch saves to DB. The buttons simply trigger the $watch.
@@ -321,6 +366,8 @@ document.addEventListener('alpine:init', () => {
             this.loading = true; // Show loading while refetching
             await performFullSync(db); // Full sync to get new feeds
             await this.loadFeedItemsFromDB();
+            // After re-fetching and full sync, the deck might need re-validation/generation
+            await validateAndRegenerateCurrentDeck(this);
             this.loading = false;
         },
 
@@ -329,7 +376,12 @@ document.addEventListener('alpine:init', () => {
             await saveStateValue(db, 'keywordBlacklist', this.keywordBlacklistInput);
             createAndShowSaveMessage('Keyword Blacklist saved!', 'success', 'keywords-save-msg');
             // Re-apply filter to update displayed items
-            this.updateCounts(); // updateCounts implicitly calls applyFilter via filteredEntries
+            // If keywords affect `filteredEntries`, Alpine's reactivity will handle it.
+            // If it needs to update the primary deck, you might need to re-validate/generate or display.
+            // For keyword blacklist, it typically affects the *pool* from which new decks are drawn,
+            // or how `filteredEntries` behaves. No direct `displayCurrentDeck` call needed here
+            // unless your current deck actively changes based on a keyword blacklist, which is less common.
+            this.updateCounts();
         }
     }));
 });

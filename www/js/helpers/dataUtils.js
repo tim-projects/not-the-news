@@ -71,6 +71,29 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 /**
+ * Updates the UI to display the items in the current deck.
+ * This function should be called whenever app.currentDeckGuids is updated
+ * and the display needs to be refreshed.
+ * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
+ */
+export function displayCurrentDeck(app) {
+    // Clear the current displayed items (assuming app.deckItems is what's rendered)
+    app.deckItems = [];
+
+    // Populate deckItems based on currentDeckGuids
+    app.currentDeckGuids.forEach(guid => {
+        const item = app.entries.find(e => e.id === guid);
+        if (item) {
+            app.deckItems.push(item);
+        }
+    });
+
+    console.log("Deck displayed:", app.deckItems.map(item => item.title));
+    app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
+}
+
+
+/**
  * Validates the current deck and regenerates it if all items are hidden or no longer exist.
  * This method is intended to be called during app initialization and after data syncs.
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
@@ -94,6 +117,7 @@ export async function validateAndRegenerateCurrentDeck(app) {
         app.currentDeckGuids = validGuidsInDeck;
         await saveCurrentDeck(db, app.currentDeckGuids);
     }
+    displayCurrentDeck(app); // Call displayCurrentDeck after validation/regeneration
 }
 
 /**
@@ -228,7 +252,7 @@ export async function loadNextDeck(app) {
     }
 
     app.updateCounts();
-    app.scrollToTop();
+    displayCurrentDeck(app); // Call displayCurrentDeck after loading a new deck
     app.isShuffled = true;
 }
 
@@ -283,6 +307,6 @@ export async function shuffleFeed(app) {
     await saveShuffleState(db, app.shuffleCount, today); // Save updated shuffle state
 
     app.updateCounts();
-    app.scrollToTop();
+    displayCurrentDeck(app); // Call displayCurrentDeck after shuffling
     app.isShuffled = true;
 }

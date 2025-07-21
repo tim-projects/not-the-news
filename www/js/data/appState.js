@@ -15,6 +15,8 @@ export const appState = () => ({
     loading: true,
     currentDeckGuids: [],
     errorMessage: '',
+    // --- ADD THIS NEW PROPERTY ---
+    deckItems: [], // This will hold the actual item objects to be displayed in the current deck
 
     // Placeholders for functions that will be mixed in or called from main app logic
     initApp: null, // Will be assigned the main init function
@@ -31,7 +33,8 @@ export const appState = () => ({
 
     get filteredEntries() {
         // Create a hash to memoize based on relevant properties
-        const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}`;
+        // Updated hash to include keywordBlacklistInput for more accurate memoization if it affects filteredEntries
+        const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}`;
 
         if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
             return this._cachedFilteredEntries;
@@ -58,6 +61,16 @@ export const appState = () => ({
             default:
                 filtered = this.entries;
                 break;
+        }
+        
+        // Apply keyword blacklist if it exists
+        const keywordBlacklist = this.keywordBlacklistInput.split(',').map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
+        if (keywordBlacklist.length > 0) {
+            filtered = filtered.filter(item => {
+                const title = item.title ? item.title.toLowerCase() : '';
+                const description = item.description ? item.description.toLowerCase() : '';
+                return !keywordBlacklist.some(keyword => title.includes(keyword) || description.includes(keyword));
+            });
         }
 
         this._cachedFilteredEntries = filtered;
