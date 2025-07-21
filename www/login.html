@@ -18,8 +18,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--bg);
-      color: var(--fg);
+      background: var(--bg); /* Use CSS variable */
+      color: var(--fg);     /* Use CSS variable */
     }
 
     .login-container {
@@ -89,12 +89,14 @@
     // Get theme from local storage
     let t = localStorage.getItem('theme');
 
-    // If a theme is explicitly saved as 'light', apply the 'light' class.
-    // Otherwise (t is null or 'dark'), no class is added, and the CSS :root (dark) takes effect.
+    // Default to dark mode unless 'light' is explicitly stored.
+    // If 't' is 'light', add 'light' class.
+    // Otherwise (t is 'dark' or null), add 'dark' class.
     if (t === 'light') {
       document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.add('dark');
     }
-    // No 'else' needed here, as the :root in CSS is now the default dark.
   </script>
 </head>
 
@@ -110,6 +112,7 @@
     </form>
   </div>
   <script>
+    // This script is for the login form submission, not theme initialization.
     document.getElementById("login-form").addEventListener('submit', async e => {
       e.preventDefault();
       const form = e.target;
