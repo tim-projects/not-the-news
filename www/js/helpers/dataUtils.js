@@ -29,8 +29,6 @@ export function formatDate(dateStr) {
 }
 
 export function shuffleArray(arr) {
-    // This function remains, as loadNextDeck still uses a partial shuffle logic online
-    // and it's a general utility.
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -115,17 +113,12 @@ export async function validateAndRegenerateCurrentDeck(app) {
         console.log("Current deck is empty/invalid. Loading next deck and increasing shuffle count.");
         await loadNextDeck(app); // Call the shared loadNextDeck, passing app scope
 
-        // NEW BEHAVIOR: Increase shuffle count when deck becomes empty due to hiding
+        // Reward: ALWAYS increase shuffle count when deck becomes empty due to hiding
         const today = new Date();
         today.setHours(0,0,0,0);
-        // Assuming max shuffle count is 2 (initial value)
-        if (app.shuffleCount < 2) {
-            app.shuffleCount++;
-            await saveShuffleState(db, app.shuffleCount, today);
-            createAndShowSaveMessage('Shuffle count increased!', 'success');
-        } else {
-             createAndShowSaveMessage('Shuffle count at maximum.', 'info');
-        }
+        app.shuffleCount++; // Increment without an upper limit
+        await saveShuffleState(db, app.shuffleCount, today);
+        createAndShowSaveMessage('Shuffle count increased!', 'success');
 
     } else if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
         // If some items were removed from the deck, update and save it
@@ -270,13 +263,12 @@ export async function loadNextDeck(app) {
 export async function shuffleFeed(app) {
     if (app.shuffleCount <= 0) {
         const shuffleButton = document.getElementById('shuffle-button'); // Assuming ID exists
-        createAndShowSaveMessage(shuffleButton, 'shuffle-error-msg', 'No shuffles left for today!'); // Use UI feedback
-        return;
+        // Don't error, just show a message that no shuffles are left
+        createAndShowSaveMessage(shuffleButton, 'shuffle-error-msg', 'No shuffles left for today!');
+        return; // Exit the function without doing anything else
     }
 
-    // Now, shuffleFeed simply triggers the loadNextDeck logic
-    // loadNextDeck handles getting the items, updating app.currentDeckGuids,
-    // saving to DB, updating counts, and displaying.
+    // Shuffle count is greater than 0, so proceed with the shuffle logic
     console.log("Shuffle button pressed. Loading next deck and decrementing shuffle count.");
     await loadNextDeck(app);
 
