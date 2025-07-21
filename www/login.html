@@ -86,8 +86,16 @@
     }
   </style>
   <script>
+    // Get theme from local storage
     let t = localStorage.getItem('theme');
-    document.documentElement.classList.add(t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+
+    // Default to dark if no theme is explicitly set in local storage or if system prefers dark.
+    // Otherwise, use the saved preference or default to light if system prefers light and no preference is saved.
+    if (t === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
   </script>
 </head>
 
