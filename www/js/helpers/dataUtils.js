@@ -3,8 +3,8 @@
 // Import necessary modules for deck functions
 import { dbPromise, saveStateValue } from '../data/database.js';
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
-// --- UPDATED IMPORT ---
-import { displayTemporaryMessageInTitle } from '../ui/uiUpdaters.js'; // Assuming this utility is available
+// --- UPDATED IMPORT: Import both message functions ---
+import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
 // --- END UPDATED IMPORT ---
 
 export function formatDate(dateStr) {
@@ -120,9 +120,8 @@ export async function validateAndRegenerateCurrentDeck(app) {
         today.setHours(0,0,0,0);
         app.shuffleCount++; // Increment without an upper limit
         await saveShuffleState(db, app.shuffleCount, today);
-        // --- UPDATED CALL ---
+        // This message goes to the title bar, as confirmed in previous steps.
         await displayTemporaryMessageInTitle('Shuffle count increased!');
-        // --- END UPDATED CALL ---
 
     } else if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
         // If some items were removed from the deck, update and save it
@@ -251,8 +250,8 @@ export async function loadNextDeck(app) {
     } else {
         app.currentDeckGuids = []; // Clear the deck if no more unread items
         await saveCurrentDeck(db, []); // Persist empty deck
-        // --- UPDATED CALL ---
-        await displayTemporaryMessageInTitle('No more unread items to load!');
+        // --- UPDATED CALL: Use createStatusBarMessage for less critical info ---
+        createStatusBarMessage('No more unread items to load!', 'info');
         // --- END UPDATED CALL ---
     }
 
@@ -268,8 +267,8 @@ export async function loadNextDeck(app) {
  */
 export async function shuffleFeed(app) {
     if (app.shuffleCount <= 0) {
-        // --- UPDATED CALL ---
-        await displayTemporaryMessageInTitle('No shuffles left for today!');
+        // --- UPDATED CALL: Use createStatusBarMessage for error messages ---
+        createStatusBarMessage('No shuffles left for today!', 'error');
         // --- END UPDATED CALL ---
         return; // Exit the function without doing anything else
     }
@@ -288,7 +287,7 @@ export async function shuffleFeed(app) {
     // displayCurrentDeck and updateCounts are already called by loadNextDeck
     // app.scrollToTop() is also called by displayCurrentDeck
     app.isShuffled = true; // Set shuffle state flag
-    // --- UPDATED CALL ---
+    // --- UPDATED CALL: Use displayTemporaryMessageInTitle for success message in title ---
     await displayTemporaryMessageInTitle('Feed shuffled!'); // Give positive feedback
     // --- END UPDATED CALL ---
 }

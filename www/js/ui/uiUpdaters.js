@@ -1,4 +1,4 @@
-// www/js/ui/uiUpdaters.js
+i// www/js/ui/uiUpdaters.js
 
 import {
     getMainSettingsBlock,
@@ -8,11 +8,11 @@ import {
     getRssFeedsTextarea,
     getKeywordsBlacklistTextarea,
     getFilterSelector,
-    getNtnTitleH2 // New import
+    getNtnTitleH2,
+    getMessageContainer // <-- NEW: Import the getter for the status bar message container
 } from './uiElements.js';
 import { dbPromise, saveStateValue } from '../data/database.js';
 
-// --- NEW HELPER FOR TEXT WRAPPING ---
 /**
  * Splits a message into two lines if it exceeds a certain character limit.
  * This is a heuristic and might need adjustment based on font/viewport.
@@ -47,7 +47,6 @@ function splitMessageIntoLines(message, maxCharsPerLine = 30) {
     return [line1.join(' '), line2.join(' ')].filter(Boolean); // Filter out empty strings
 }
 
-// --- MODIFIED MESSAGE DISPLAY FUNCTION ---
 /**
  * Displays a temporary status message by replacing the `ntn-title h2` text.
  * The message will be split into lines if too long, and revert to original after a delay.
@@ -85,10 +84,42 @@ export async function displayTemporaryMessageInTitle(message) {
         await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
-
     // Step 3: Revert to original text
     titleH2.textContent = originalText;
     titleH2.style.overflow = originalOverflow; // Restore original overflow style
+}
+
+// --- NEW/RENAMED STATUS BAR MESSAGE FUNCTION ---
+let messageTimeout; // To clear previous timeouts for the status bar message
+
+/**
+ * Creates and shows a message in the dedicated status bar area.
+ * It clears previous messages and hides after a delay.
+ * @param {string} message The message to display.
+ * @param {string} type Optional. 'success', 'error', 'info'. Determines styling.
+ */
+export function createStatusBarMessage(message, type = 'info') {
+    const messageContainer = getMessageContainer();
+    if (!messageContainer) {
+        console.warn("Message container not found. Cannot display status bar message.");
+        return;
+    }
+
+    // Clear any existing timeout to prevent messages from disappearing too early
+    clearTimeout(messageTimeout);
+
+    // Clear previous classes and content
+    messageContainer.className = 'message-container'; // Reset classes
+    messageContainer.textContent = message;
+    messageContainer.classList.add(`message-${type}`);
+    messageContainer.style.display = 'block'; // Make sure it's visible
+
+    // Hide the message after a few seconds
+    messageTimeout = setTimeout(() => {
+        messageContainer.style.display = 'none';
+        messageContainer.textContent = ''; // Clear text
+        messageContainer.className = 'message-container'; // Reset classes
+    }, 3000); // Message disappears after 3 seconds
 }
 
 
