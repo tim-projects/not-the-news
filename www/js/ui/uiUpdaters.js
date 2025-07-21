@@ -1,36 +1,96 @@
 // www/js/ui/uiUpdaters.js
 
-import { getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getFilterSelector } from './uiElements.js';
+import {
+    getMainSettingsBlock,
+    getRssSettingsBlock,
+    getKeywordsSettingsBlock,
+    getBackButton,
+    getRssFeedsTextarea,
+    getKeywordsBlacklistTextarea,
+    getFilterSelector,
+    getNtnTitleH2 // New import
+} from './uiElements.js';
 import { dbPromise, saveStateValue } from '../data/database.js';
 
-
+// --- NEW HELPER FOR TEXT WRAPPING ---
 /**
- * Creates and shows a temporary save message next to a button.
- * @param {HTMLElement} btn - The button element to place the message next to.
- * @param {string} msgId - The ID for the message span element.
- * @param {string} msgTxt - The text content of the message.
+ * Splits a message into two lines if it exceeds a certain character limit.
+ * This is a heuristic and might need adjustment based on font/viewport.
+ * @param {string} message - The full message to display.
+ * @param {number} maxCharsPerLine - Approximate maximum characters per line.
+ * @returns {string[]} An array containing 1 or 2 lines of text.
  */
-export function createAndShowSaveMessage(btn, msgId, msgTxt) {
-    // Add a check to ensure btn and its parent node exist
-    if (!btn || !btn.parentNode) {
-        console.warn("createAndShowSaveMessage: Target button or its parent not found, cannot display message.", { btn, msgId, msgTxt });
-        return; // Exit the function if we can't place the message
+function splitMessageIntoLines(message, maxCharsPerLine = 30) {
+    const words = message.split(' ');
+    let line1 = [];
+    let line2 = [];
+    let currentLineLength = 0;
+
+    for (const word of words) {
+        if (currentLineLength + word.length + (line1.length > 0 ? 1 : 0) <= maxCharsPerLine) {
+            line1.push(word);
+            currentLineLength += word.length + (line1.length > 1 ? 1 : 0);
+        } else {
+            line2.push(word);
+        }
     }
 
-    let msgEl = document.getElementById(msgId);
-    if (!msgEl) {
-        msgEl = document.createElement("span");
-        msgEl.id = msgId;
-        msgEl.className = "save-message";
-        msgEl.style.marginLeft = "0.5em";
-        msgEl.style.display = "none";
-        // Line 21: This line is now safe because btn.parentNode is checked
-        btn.parentNode.insertBefore(msgEl, btn.nextSibling);
+    // If line2 is too short, or line1 too long, try to balance
+    if (line1.length > 0 && line2.length > 0 && line1.join(' ').length > maxCharsPerLine && line2.join(' ').length < maxCharsPerLine / 2) {
+        // Simple redistribution: move one word from line1 to line2 if it helps balance
+        const lastWordLine1 = line1.pop();
+        if (lastWordLine1) {
+            line2.unshift(lastWordLine1);
+        }
     }
-    msgEl.textContent = msgTxt;
-    msgEl.style.display = "inline";
-    setTimeout(() => msgEl.style.display = "none", 2000);
+
+    return [line1.join(' '), line2.join(' ')].filter(Boolean); // Filter out empty strings
 }
+
+// --- MODIFIED MESSAGE DISPLAY FUNCTION ---
+/**
+ * Displays a temporary status message by replacing the `ntn-title h2` text.
+ * The message will be split into lines if too long, and revert to original after a delay.
+ * @param {string} message - The message text to display.
+ */
+export async function displayTemporaryMessageInTitle(message) {
+    const titleH2 = getNtnTitleH2();
+    if (!titleH2) {
+        console.warn("displayTemporaryMessageInTitle: 'ntn-title h2' element not found.");
+        return;
+    }
+
+    const originalText = "NOT THE NEWS"; // The fixed original text for the title
+    const lines = splitMessageIntoLines(message);
+
+    // Store the original overflow style to restore it later
+    const originalOverflow = titleH2.style.overflow;
+    titleH2.style.overflow = 'visible'; // Allow text to wrap if it somehow gets stuck
+
+    // Ensure initial display is empty or first part
+    titleH2.textContent = '';
+
+    // Step 1: Display first line
+    if (lines.length > 0) {
+        titleH2.textContent = lines[0];
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Display first line for 1.5 seconds
+    }
+
+    // Step 2: Display second line if it exists
+    if (lines.length > 1) {
+        titleH2.textContent = lines[0] + (lines[0] && lines[1] ? ' ' : '') + lines[1]; // Concatenate with space if both exist
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Display full message for 1.5 seconds
+    } else if (lines.length === 1) {
+        // If only one line, ensure it stays for total 3 seconds
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+
+    // Step 3: Revert to original text
+    titleH2.textContent = originalText;
+    titleH2.style.overflow = originalOverflow; // Restore original overflow style
+}
+
 
 /**
  * Updates the counts displayed on filter options (All, Hidden, Starred, Unread).
@@ -51,10 +111,18 @@ export function updateCounts(app) {
 
     Array.from(selector.options).forEach(opt => {
         switch (opt.value) {
-            case 'all': opt.text = `All (${allC})`; break;
-            case 'hidden': opt.text = `Hidden (${hiddenC})`; break;
-            case 'starred': opt.text = `Starred (${starredC})`; break;
-            case 'unread': opt.text = `Unread (${unreadInDeckC})`; break;
+            case 'all':
+                opt.text = `All (${allC})`;
+                break;
+            case 'hidden':
+                opt.text = `Hidden (${hiddenC})`;
+                break;
+            case 'starred':
+                opt.text = `Starred (${starredC})`;
+                break;
+            case 'unread':
+                opt.text = `Unread (${unreadInDeckC})`;
+                break;
         }
     });
 }
@@ -78,7 +146,9 @@ export async function manageSettingsPanelVisibility(app) {
     if (backBtn) backBtn.style.display = 'none';
 
     switch (app.modalView) {
-        case 'main': if (main) main.style.display = 'block'; break;
+        case 'main':
+            if (main) main.style.display = 'block';
+            break;
         case 'rss':
             if (rss) rss.style.display = 'block';
             if (backBtn) backBtn.style.display = 'block';

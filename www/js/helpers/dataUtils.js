@@ -3,7 +3,9 @@
 // Import necessary modules for deck functions
 import { dbPromise, saveStateValue } from '../data/database.js';
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
-import { createAndShowSaveMessage } from '../ui/uiUpdaters.js'; // Assuming this utility is available
+// --- UPDATED IMPORT ---
+import { displayTemporaryMessageInTitle } from '../ui/uiUpdaters.js'; // Assuming this utility is available
+// --- END UPDATED IMPORT ---
 
 export function formatDate(dateStr) {
     const now = new Date();
@@ -118,7 +120,9 @@ export async function validateAndRegenerateCurrentDeck(app) {
         today.setHours(0,0,0,0);
         app.shuffleCount++; // Increment without an upper limit
         await saveShuffleState(db, app.shuffleCount, today);
-        createAndShowSaveMessage('Shuffle count increased!', 'success');
+        // --- UPDATED CALL ---
+        await displayTemporaryMessageInTitle('Shuffle count increased!');
+        // --- END UPDATED CALL ---
 
     } else if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
         // If some items were removed from the deck, update and save it
@@ -247,7 +251,9 @@ export async function loadNextDeck(app) {
     } else {
         app.currentDeckGuids = []; // Clear the deck if no more unread items
         await saveCurrentDeck(db, []); // Persist empty deck
-        createAndShowSaveMessage('No more unread items to load!', 'info');
+        // --- UPDATED CALL ---
+        await displayTemporaryMessageInTitle('No more unread items to load!');
+        // --- END UPDATED CALL ---
     }
 
     app.updateCounts();
@@ -262,9 +268,9 @@ export async function loadNextDeck(app) {
  */
 export async function shuffleFeed(app) {
     if (app.shuffleCount <= 0) {
-        const shuffleButton = document.getElementById('shuffle-button'); // Assuming ID exists
-        // Don't error, just show a message that no shuffles are left
-        createAndShowSaveMessage(shuffleButton, 'shuffle-error-msg', 'No shuffles left for today!');
+        // --- UPDATED CALL ---
+        await displayTemporaryMessageInTitle('No shuffles left for today!');
+        // --- END UPDATED CALL ---
         return; // Exit the function without doing anything else
     }
 
@@ -282,5 +288,7 @@ export async function shuffleFeed(app) {
     // displayCurrentDeck and updateCounts are already called by loadNextDeck
     // app.scrollToTop() is also called by displayCurrentDeck
     app.isShuffled = true; // Set shuffle state flag
-    createAndShowSaveMessage('Feed shuffled!', 'success', 'shuffle-msg'); // Give positive feedback
+    // --- UPDATED CALL ---
+    await displayTemporaryMessageInTitle('Feed shuffled!'); // Give positive feedback
+    // --- END UPDATED CALL ---
 }

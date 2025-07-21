@@ -24,3 +24,8 @@ export const getSaveKeywordsButton = () => document.getElementById("save-keyword
 export const getSaveRssButton = () => document.getElementById("save-rss-btn");
 
 export const getScrollToTopButton = () => document.getElementById("scroll-to-top");
+
+// status bar
+export function getNtnTitleH2() {
+    return document.querySelector('.ntn-title h2');
+}
