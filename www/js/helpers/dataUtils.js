@@ -3,9 +3,7 @@
 // Import necessary modules for deck functions
 import { dbPromise, saveStateValue } from '../data/database.js';
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
-// --- UPDATED IMPORT: Import both message functions ---
 import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
-// --- END UPDATED IMPORT ---
 
 export function formatDate(dateStr) {
     const now = new Date();
@@ -79,7 +77,7 @@ export function mapRawItems(rawList, fmtFn) {
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
  */
 export function displayCurrentDeck(app) {
-    // Clear the current displayed items (assuming app.deckItems is what's rendered)
+    // Clear the current displayed items
     app.deckItems = [];
 
     // Populate deckItems based on currentDeckGuids
@@ -113,12 +111,12 @@ export async function validateAndRegenerateCurrentDeck(app) {
     // If the deck is empty or all items are invalid, generate a new deck
     if (validGuidsInDeck.length === 0 && app.entries.length > 0) {
         console.log("Current deck is empty/invalid. Loading next deck and increasing shuffle count.");
-        await loadNextDeck(app); // Call the shared loadNextDeck, passing app scope
+        await loadNextDeck(app);
 
         // Reward: ALWAYS increase shuffle count when deck becomes empty due to hiding
         const today = new Date();
         today.setHours(0,0,0,0);
-        app.shuffleCount++; // Increment without an upper limit
+        app.shuffleCount++;
         await saveShuffleState(db, app.shuffleCount, today);
         // This message goes to the title bar, as confirmed in previous steps.
         await displayTemporaryMessageInTitle('Shuffle count increased!');
@@ -129,7 +127,7 @@ export async function validateAndRegenerateCurrentDeck(app) {
         app.currentDeckGuids = validGuidsInDeck;
         await saveCurrentDeck(db, app.currentDeckGuids);
     }
-    displayCurrentDeck(app); // Call displayCurrentDeck after validation/regeneration
+    displayCurrentDeck(app);
 }
 
 /**
@@ -141,46 +139,103 @@ export async function validateAndRegenerateCurrentDeck(app) {
 export async function loadNextDeck(app) {
     const db = await dbPromise;
     // Ensure entries is up-to-date and correctly mapped before filtering
-    await app.loadFeedItemsFromDB(); // Call helper to populate app.entries
+    await app.loadFeedItemsFromDB();
 
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
-    // Filter out hidden items
-    const unreadItems = app.entries.filter(item => !hiddenSet.has(item.id));
+    // The full pool of unread items from which to draw
+    let unreadItems = app.entries.filter(item => !hiddenSet.has(item.id));
 
     let nextDeck = [];
+    const MAX_DECK_SIZE = 10;
+    let selectedIds = new Set(); // Keep track of IDs already added to nextDeck
 
-    if (navigator.onLine) {
-        // Online deck creation logic (prioritized items + random fill)
-        const longItems = unreadItems.filter(item => item.description.length >= 750);
-        const shortItems = unreadItems.filter(item => item.description.length < 750);
+    // Helper to add items to the deck without duplicates and respecting max size
+    const tryAddItemToDeck = (item) => {
+        if (nextDeck.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
+            nextDeck.push(item);
+            selectedIds.add(item.id);
+            return true;
+        }
+        return false;
+    };
 
-        const now = Date.now();
-        const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
-
-        // Get 2 long items, 2 short items, and 2 recent items
-        const numLong = Math.min(2, longItems.length);
-        const numShort = Math.min(2, shortItems.length);
-        const numRecent = Math.min(2, recentItems.length);
-
-        for (let i = 0; i < numLong; i++) nextDeck.push(longItems[i]);
-        for (let i = 0; i < numShort; i++) nextDeck.push(shortItems[i]);
-        for (let i = 0; i < numRecent; i++) nextDeck.push(recentItems[i]);
-
-        // Fill the rest with random items from remaining unread items
-        const remainingCount = 10 - nextDeck.length;
-        const remainingItems = unreadItems.filter(item => !nextDeck.includes(item));
-        const shuffledRemaining = shuffleArray(remainingItems).slice(0, remainingCount); // Shuffle for randomness
-        nextDeck = nextDeck.concat(shuffledRemaining);
-
-        // If the deck is still not full, fill it with any remaining unread items
-        // This ensures a full deck if enough unread items exist
-        while (nextDeck.length < 10 && unreadItems.length > nextDeck.length) {
-            const item = unreadItems[nextDeck.length]; // This will pick items sequentially from remaining unread
-            if (!nextDeck.includes(item)) { // Double check to prevent duplicates if any prior logic accidentally added
-                nextDeck.push(item);
+    // Helper to add multiple items from a filtered list, respecting a category limit
+    const addItemsFromCategory = (categoryItems, limit) => {
+        let count = 0;
+        // Iterate over categoryItems, add if not already in deck, and respect limit and MAX_DECK_SIZE
+        for (const item of categoryItems) {
+            if (count >= limit || nextDeck.length >= MAX_DECK_SIZE) {
+                break;
+            }
+            if (tryAddItemToDeck(item)) {
+                count++;
             }
         }
+    };
+
+    if (navigator.onLine) {
+        const now = Date.now();
+
+        // Define helper checks for prioritization
+        const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
+        const hasQuestionMarkInTitle = (item) => item.title.includes('?');
+        const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
+        const hasQuestionMarkInDescriptionLast150 = (item) => {
+            const desc = item.description;
+            return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
+        };
+        const hasImage = (item) => item.image !== "";
+        const isLongItem = (item) => item.description.length >= 750;
+        const isShortItem = (item) => item.description.length < 750;
+
+        // 1. Prioritize Recent Items (up to 2)
+        const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+        addItemsFromCategory(recentItems, 2);
+
+        // 2. Prioritize Items with Links (up to 1)
+        const itemsWithLinks = unreadItems.filter(hasHyperlink);
+        addItemsFromCategory(itemsWithLinks, 1);
+
+        // 3. Prioritize Items with Questions in Title (up to 1)
+        const itemsWithQuestionTitle = unreadItems.filter(hasQuestionMarkInTitle);
+        addItemsFromCategory(itemsWithQuestionTitle, 1);
+
+        // 4. Prioritize Items with Questions in First 150 Chars (up to 1)
+        const itemsWithQuestionFirst150 = unreadItems.filter(hasQuestionMarkInDescriptionFirst150);
+        addItemsFromCategory(itemsWithQuestionFirst150, 1);
+
+        // 5. Prioritize Items with Questions in Last 150 Chars (up to 1)
+        const itemsWithQuestionLast150 = unreadItems.filter(hasQuestionMarkInDescriptionLast150);
+        addItemsFromCategory(itemsWithQuestionLast150, 1);
+
+        // 6. Prioritize Items with Images (up to 1)
+        const itemsWithImages = unreadItems.filter(hasImage);
+        addItemsFromCategory(itemsWithImages, 1);
+
+        // 7. Prioritize Long or Short Items (up to 1 of each)
+        const longItems = unreadItems.filter(isLongItem);
+        addItemsFromCategory(longItems, 1);
+        const shortItems = unreadItems.filter(isShortItem);
+        addItemsFromCategory(shortItems, 1);
+
+        // 8. Fill with Random Remaining
+        // Get items not yet selected from the original unreadItems pool, then shuffle
+        const trulyRemainingItems = unreadItems.filter(item => !selectedIds.has(item.id));
+        const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
+
+        for (const item of shuffledRemaining) {
+            if (nextDeck.length >= MAX_DECK_SIZE) break;
+            tryAddItemToDeck(item);
+        }
+
+        // 9. Ensure Full Deck (final fill from any remaining unread, sequential if needed)
+        // This ensures the deck is full if there are enough unread items left.
+        for (const item of unreadItems) {
+            if (nextDeck.length >= MAX_DECK_SIZE) break;
+            tryAddItemToDeck(item);
+        }
+
     } else {
         // Offline fallback: (Prioritized items + specific filtering/unfiltering)
 
@@ -188,27 +243,30 @@ export async function loadNextDeck(app) {
 
         // Initial filters (remove items with specific patterns)
         const hasQuestionMarkInTitle = (item) => item.title.includes('?');
-        const hasQuestionMarkInDescriptionFirst100 = (item) => item.description.substring(0, 100).includes('?');
-        const hasQuestionMarkAtEndOfDescription = (item) => item.description.endsWith('?');
+        const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
+        const hasQuestionMarkInDescriptionLast150 = (item) => {
+            const desc = item.description;
+            return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
+        };
         const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
         const hasImage = (item) => item.image !== "";
 
         filteredItems = filteredItems.filter(item => !hasQuestionMarkInTitle(item));
-        filteredItems = filteredItems.filter(item => !hasQuestionMarkInDescriptionFirst100(item));
-        filteredItems = filteredItems.filter(item => !hasQuestionMarkAtEndOfDescription(item));
-        filteredItems = filteredItems.filter(item => !(item.description.length >= 750 && hasHyperlink(item)));
-        filteredItems = filteredItems.filter(item => !(item.description.length >= 750 && hasImage(item)));
+        filteredItems = filteredItems.filter(item => !hasQuestionMarkInDescriptionFirst150(item));
+        filteredItems = filteredItems.filter(item => !hasQuestionMarkInDescriptionLast150(item));
+        filteredItems = filteredItems.filter(item => !hasHyperlink(item)); // Updated filter
+        filteredItems = filteredItems.filter(item => !hasImage(item)); // Updated filter
 
         // Undo filters in reverse priority until we have 10 items
         if (filteredItems.length < 10) {
-            let itemsToRestore = unreadItems.filter(item => !filteredItems.includes(item)); // Items not already in filteredItems
+            let itemsToRestore = unreadItems.filter(item => !filteredItems.includes(item));
 
-            // Restore logic based on priority (reverse of filter application)
+            // Restore logic based on priority (reverse of filter application) - UPDATED ORDER
             const restoreOrder = [
-                (item) => (item.description.length >= 750 && hasImage(item)),
-                (item) => (item.description.length >= 750 && hasHyperlink(item)),
-                (item) => hasQuestionMarkAtEndOfDescription(item),
-                (item) => hasQuestionMarkInDescriptionFirst100(item),
+                (item) => hasImage(item), // Updated restore
+                (item) => hasHyperlink(item), // Updated restore
+                (item) => hasQuestionMarkInDescriptionLast150(item),
+                (item) => hasQuestionMarkInDescriptionFirst150(item),
                 (item) => hasQuestionMarkInTitle(item)
             ];
 
@@ -239,25 +297,23 @@ export async function loadNextDeck(app) {
         // Fill the rest of the deck with remaining items from filteredItems
         const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
         nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
-
-        // Sort the resulting deck chronologically for offline consistency
-        nextDeck.sort((a, b) => b.timestamp - a.timestamp);
     }
 
+    // --- NEW: Apply chronological sort to nextDeck for both online and offline paths ---
+    nextDeck.sort((a, b) => b.timestamp - a.timestamp);
+
     if (nextDeck.length > 0) {
-        app.currentDeckGuids = nextDeck.map(item => item.id); // Map using item.id
-        await saveCurrentDeck(db, app.currentDeckGuids); // Save the new deck
+        app.currentDeckGuids = nextDeck.map(item => item.id);
+        await saveCurrentDeck(db, app.currentDeckGuids);
     } else {
-        app.currentDeckGuids = []; // Clear the deck if no more unread items
-        await saveCurrentDeck(db, []); // Persist empty deck
-        // --- UPDATED CALL: Use createStatusBarMessage for less critical info ---
+        app.currentDeckGuids = [];
+        await saveCurrentDeck(db, []);
         createStatusBarMessage('No more unread items to load!', 'info');
-        // --- END UPDATED CALL ---
     }
 
     app.updateCounts();
-    displayCurrentDeck(app); // Call displayCurrentDeck after loading a new deck
-    app.isShuffled = false; // Reset shuffle state flag, as this isn't a "shuffle" operation itself
+    displayCurrentDeck(app);
+    app.isShuffled = false;
 }
 
 /**
@@ -267,13 +323,10 @@ export async function loadNextDeck(app) {
  */
 export async function shuffleFeed(app) {
     if (app.shuffleCount <= 0) {
-        // --- UPDATED CALL: Use createStatusBarMessage for error messages ---
         createStatusBarMessage('No shuffles left for today!', 'error');
-        // --- END UPDATED CALL ---
-        return; // Exit the function without doing anything else
+        return;
     }
 
-    // Shuffle count is greater than 0, so proceed with the shuffle logic
     console.log("Shuffle button pressed. Loading next deck and decrementing shuffle count.");
     await loadNextDeck(app);
 
@@ -281,13 +334,9 @@ export async function shuffleFeed(app) {
     app.shuffleCount--;
     const today = new Date();
     today.setHours(0,0,0,0);
-    const db = await dbPromise; // Need db here for saveShuffleState
+    const db = await dbPromise;
     await saveShuffleState(db, app.shuffleCount, today);
 
-    // displayCurrentDeck and updateCounts are already called by loadNextDeck
-    // app.scrollToTop() is also called by displayCurrentDeck
-    app.isShuffled = true; // Set shuffle state flag
-    // --- UPDATED CALL: Use displayTemporaryMessageInTitle for success message in title ---
-    await displayTemporaryMessageInTitle('Feed shuffled!'); // Give positive feedback
-    // --- END UPDATED CALL ---
+    app.isShuffled = true;
+    await displayTemporaryMessageInTitle('Feed shuffled!');
 }
