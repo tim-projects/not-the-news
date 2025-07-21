@@ -129,7 +129,15 @@ export async function pullUserState(db) {
             throw new Error(`Server error pulling user state: ${res.statusText}`);
         }
 
-        const { userState, serverTime } = await res.json(); // Assuming server returns { userState: { hidden: [...], starred: [...], currentDeckGuids: [...] }, serverTime: "nonce" }
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error("Failed to parse JSON:", text, e);
+            throw e;
+        }
+        const { userState, serverTime } = data; // Assuming server returns { userState: { hidden: [...], starred: [...], currentDeckGuids: [...] }, serverTime: "nonce" }
 
         const tx = db.transaction('userState', 'readwrite');
         const store = tx.objectStore('userState');
