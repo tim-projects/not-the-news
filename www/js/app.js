@@ -413,8 +413,8 @@ function convertUrlsToLinks(element, openInNewTab) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent;
       const newHtml = text.replace(urlRegex, (url) => {
-        console.log(`Found URL: ${url}`); // Log the URL
-        return `<a href="${url}" target="${openInNewTab ? '_blank' : '_self'}" rel="noopener noreferrer">${url}</a>`;
+        console.log(`Found URL: ${url}, openInNewTab: ${openInNewTab}`); // Log the URL and the value of openInNewTab
+        return `<a href="${url}" target="${openInNewTab === true ? '_blank' : '_self'}" rel="noopener noreferrer">${url}</a>`;
       });
 
       if (newHtml !== text) {
