@@ -315,6 +315,7 @@ document.addEventListener('alpine:init', () => {
             return this.hidden.some(e => e.id === guid);
         },
         async toggleHidden(guid) {
+            console.log("app.js: toggleHidden called with guid:", guid);
             await toggleHidden(this, guid);
             await validateAndRegenerateCurrentDeck(this);
         },

@@ -88,10 +88,11 @@ export function displayCurrentDeck(app) {
         }
     });
 
-    console.log("Deck displayed:", app.deckItems.map(item => item.title));
-    app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
-}
-
+    
+        console.log("Deck displayed:", app.deckItems.map(item => item.title));
+        console.log("dataUtils.js: displayCurrentDeck calling scrollToTop");
+        app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
+    }
 
 /**
  * Validates the current deck and regenerates it if all items are hidden or no longer exist.
@@ -99,6 +100,7 @@ export function displayCurrentDeck(app) {
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
  */
 export async function validateAndRegenerateCurrentDeck(app) {
+    console.log("dataUtils.js: validateAndRegenerateCurrentDeck called");
     const db = await dbPromise;
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
