@@ -129,7 +129,9 @@ export async function validateAndRegenerateCurrentDeck(app) {
         app.currentDeckGuids = validGuidsInDeck;
         await saveCurrentDeck(db, app.currentDeckGuids);
     }
-    displayCurrentDeck(app);
+    if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
+        displayCurrentDeck(app);
+    }
 }
 
 /**
