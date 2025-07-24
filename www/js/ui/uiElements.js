@@ -27,7 +27,7 @@ export const getScrollToTopButton = () => document.getElementById("scroll-to-top
 
 // status bar
 export function getNtnTitleH2() {
-    return document.querySelector('.ntn-title h2');
+    return document.querySelector('#ntn-title h2');
 }
 export function getMessageContainer() {
     // This assumes you have an element with id="status-bar-message" in your HTML
