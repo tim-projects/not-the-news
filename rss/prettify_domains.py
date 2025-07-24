@@ -57,6 +57,11 @@ def prettify_reddit_entry(entry):
     raw_link = entry.get("link", "").strip()
     m = re.search(r"(reddit\.com/r/[^/]+)", raw_link)
     source_url = m.group(1) if m else raw_link
+    
+    if "reddit.com" in source_url:
+        source_url = source_url.replace("reddit.com", "safereddit.com")
+    elif "old.reddit.com" in source_url:
+        source_url = source_url.replace("old.reddit.com", "safereddit.com")
 
     # wrap it in a hidden <span> instead of an HTML comment
     metadata_tag = f'<span class="source-url">{source_url}</span>'
