@@ -52,6 +52,7 @@ document.addEventListener("load", e => {
 
 // --- Alpine.js Data Definition ---
 // Define the Alpine data component immediately, so Alpine can find it.
+// This is crucial: Alpine.data must be called BEFORE Alpine.start()
 Alpine.data('rssApp', () => ({
     // --- Alpine.js Reactive properties with initial defaults ---
     loading: true, // Start as true, set to false after initApp completes
@@ -70,6 +71,7 @@ Alpine.data('rssApp', () => ({
     currentDeckGuids: [],
     errorMessage: '',
     isOnline: isOnline(), // Initialize with current online status
+    deckItems: [], // This will be populated by displayCurrentDeck
     _lastFilterHash: '', // For memoization
     _cachedFilteredEntries: null, // For memoization
 
@@ -77,7 +79,8 @@ Alpine.data('rssApp', () => ({
     get filteredEntries() {
         // We still check if db is initialized, but this computed property
         // should only be accessed after initApp() has run.
-        if (!db) {
+        // The 'db' variable here is the module-level imported db promise/instance.
+        if (!db) { // No longer need to check for this.db as db is imported at module scope
             console.warn("db not initialized, cannot filter entries yet.");
             return [];
         }
@@ -128,13 +131,22 @@ Alpine.data('rssApp', () => ({
     },
 
     // --- Alpine.js init method ---
+    // x-init will call this
     async initApp() {
         // Wait for the DB to be initialized before proceeding
-        await initDb();
-        console.log("app.js: IndexedDB initialized successfully within Alpine.js initApp().");
+        // initDb() is called *outside* this function to ensure DB is ready before Alpine.start().
+        // So, 'db' should already be the resolved instance here.
+        if (db instanceof Promise) {
+             console.warn("app.js: db is still a promise inside initApp. This indicates initDb() outside Alpine.start() might not have fully resolved or been awaited properly.");
+             // Potentially re-await here as a fallback, but ideally it's ready.
+             await db;
+        }
+        console.log("app.js: IndexedDB assumed initialized when Alpine.js initApp() starts.");
+
 
         try {
             // Load initial settings and user state from DB/localStorage
+            // Since 'db' is imported at the module level, we can just use it directly.
             this.syncEnabled = (await loadSimpleState(db, 'syncEnabled')).value;
             this.imagesEnabled = (await loadSimpleState(db, 'imagesEnabled')).value;
             this.openUrlsInNewTabEnabled = (await loadSimpleState(db, 'openUrlsInNewTabEnabled')).value;
@@ -179,6 +191,7 @@ Alpine.data('rssApp', () => ({
 
             this.currentDeckGuids = await loadCurrentDeck(db);
 
+            // Access helper functions directly, as they are imported at module scope
             await validateAndRegenerateCurrentDeck(this);
 
             const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
@@ -200,11 +213,11 @@ Alpine.data('rssApp', () => ({
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {
                     this.modalView = 'main';
-                    await manageSettingsPanelVisibility(this);
+                    await manageSettingsPanelVisibility(this); // Use imported function
                     this.rssFeedsInput = (await loadSimpleState(db, 'rssFeeds')).value || '';
                     this.keywordBlacklistInput = (await loadSimpleState(db, 'keywordBlacklist')).value || '';
                 } else {
-                    await saveCurrentScrollPosition();
+                    await saveCurrentScrollPosition(); // Use imported function
                 }
             });
             // Watch for changes to openUrlsInNewTabEnabled to re-apply link handling
@@ -213,15 +226,15 @@ Alpine.data('rssApp', () => ({
                 document.querySelectorAll('.itemdescription').forEach(el => this.handleEntryLinks(el));
             });
             this.$watch("modalView", async () => {
-                await manageSettingsPanelVisibility(this);
+                await manageSettingsPanelVisibility(this); // Use imported function
             });
             this.$watch('syncEnabled', value => saveSimpleState(db, 'syncEnabled', value));
             this.$watch('imagesEnabled', value => saveSimpleState(db, 'imagesEnabled', value));
             this.$watch('rssFeedsInput', value => saveSimpleState(db, 'rssFeeds', value));
             this.$watch('keywordBlacklistInput', value => saveSimpleState(db, 'keywordBlacklist', value));
-            this.$watch('filterMode', value => setFilterMode(this, db, value));
-            this.updateCounts();
-            await initScrollPosition(this);
+            this.$watch('filterMode', value => setFilterMode(this, db, value)); // Use imported function
+            this.updateCounts(); // Call the local method which wraps the imported function
+            await initScrollPosition(this); // Use imported function
 
             this.loading = false; // Hide loading screen
 
@@ -230,14 +243,14 @@ Alpine.data('rssApp', () => ({
                 setTimeout(async () => {
                     try {
                         console.log("app.js: Initiating background partial sync...");
-                        await performFeedSync(db);
-                        await pullUserState(db);
+                        await performFeedSync(db); // Use imported function
+                        await pullUserState(db); // Use imported function
                         this.hidden = (await loadArrayState(db, 'hidden')).value;
                         this.starred = (await loadArrayState(db, 'starred')).value;
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
+                        this.hidden = await pruneStaleHidden(db, this.entries, Date.now()); // Use imported function
                         this.updateCounts();
-                        await validateAndRegenerateCurrentDeck(this);
+                        await validateAndRegenerateCurrentDeck(this); // Use imported function
                         console.log("app.js: Background partial sync completed.");
                     } catch (error) {
                         console.error('app.js: Background partial sync failed', error);
@@ -245,20 +258,20 @@ Alpine.data('rssApp', () => ({
                 }, 0); // Use 0 timeout to allow initial render
             }
 
-            attachScrollToTopHandler();
+            attachScrollToTopHandler(); // Use imported function
 
             // Online/Offline detection and re-sync
             window.addEventListener('online', async () => {
                 this.isOnline = true;
                 if (this.syncEnabled) {
                     console.log("app.js: Online detected. Processing pending operations and resyncing.");
-                    await processPendingOperations(db);
+                    await processPendingOperations(db); // Use imported function
                     await this.loadFeedItemsFromDB();
                     this.hidden = (await loadArrayState(db, 'hidden')).value;
                     this.starred = (await loadArrayState(db, 'starred')).value;
-                    this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
+                    this.hidden = await pruneStaleHidden(db, this.entries, Date.now()); // Use imported function
                     this.updateCounts();
-                    await validateAndRegenerateCurrentDeck(this);
+                    await validateAndRegenerateCurrentDeck(this); // Use imported function
                     console.log("app.js: Online resync completed.");
                 }
             });
@@ -284,12 +297,12 @@ Alpine.data('rssApp', () => ({
                 }
                 try {
                     console.log("app.js: Performing periodic background sync...");
-                    await performFeedSync(db);
-                    await pullUserState(db);
+                    await performFeedSync(db); // Use imported function
+                    await pullUserState(db); // Use imported function
                     await this.loadFeedItemsFromDB();
-                    this.hidden = await pruneStaleHidden(db, this.entries, now);
+                    this.hidden = await pruneStaleHidden(db, this.entries, now); // Use imported function
                     this.updateCounts();
-                    await validateAndRegenerateCurrentDeck(this);
+                    await validateAndRegenerateCurrentDeck(this); // Use imported function
                     console.log("app.js: Periodic background sync completed.");
                 } catch (error) {
                     console.error("app.js: Periodic sync failed", error);
@@ -326,62 +339,66 @@ Alpine.data('rssApp', () => ({
 
     async loadFeedItemsFromDB() {
         // Ensure db is available before trying to use it
+        // 'db' is available at module scope, no need for this.db
         if (!db) {
             console.error("Database not initialized, cannot load feed items.");
             this.entries = [];
             return;
         }
         const rawItemsFromDb = await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
+        // Use imported mapRawItems and formatDate directly
         this.entries = mapRawItems(rawItemsFromDb, formatDate);
     },
 
+    // These methods now directly call the imported functions.
+    // They act as wrappers, making the imported functions available via `this.` in Alpine expressions.
     updateCounts() {
-        updateCounts(this);
+        updateCounts(this); // Call the imported function
     },
 
     scrollToTop() {
-        scrollToTop();
+        scrollToTop(); // Call the imported function
     },
 
     isStarred(guid) {
         return this.starred.some(e => e.id === guid);
     },
     async toggleStar(guid) {
-        await toggleStar(this, guid);
+        await toggleStar(this, guid); // Call the imported function
     },
     isHidden(guid) {
         return this.hidden.some(e => e.id === guid);
     },
     async toggleHidden(guid) {
         console.log("app.js: toggleHidden called with guid:", guid);
-        await toggleHidden(this, guid);
-        await validateAndRegenerateCurrentDeck(this);
+        await toggleHidden(this, guid); // Call the imported function
+        await validateAndRegenerateCurrentDeck(this); // Call the imported function
     },
     setFilter(mode) {
         this.filterMode = mode;
     },
     async loadNextDeck() {
-        await loadNextDeck(this);
+        await loadNextDeck(this); // Call the imported function
     },
 
     async shuffleFeed() {
-        await shuffleFeed(this);
+        await shuffleFeed(this); // Call the imported function
     },
 
     async saveRssFeeds() {
-        await saveSimpleState(db, 'rssFeeds', this.rssFeedsInput);
-        createStatusBarMessage('RSS Feeds saved!', 'success');
+        await saveSimpleState(db, 'rssFeeds', this.rssFeedsInput); // Use imported function
+        createStatusBarMessage('RSS Feeds saved!', 'success'); // Use imported function
         this.loading = true; // Show loading
-        await performFullSync(db);
+        await performFullSync(db); // Use imported function
         await this.loadFeedItemsFromDB();
-        await validateAndRegenerateCurrentDeck(this);
+        await validateAndRegenerateCurrentDeck(this); // Use imported function
         this.loading = false; // Hide loading
     },
 
     async saveKeywordBlacklist() {
-        await saveSimpleState(db, 'keywordBlacklist', this.keywordBlacklistInput);
-        createStatusBarMessage('Keyword Blacklist saved!', 'success');
-        this.updateCounts(); // Update counts if blacklist changes
+        await saveSimpleState(db, 'keywordBlacklist', this.keywordBlacklistInput); // Use imported function
+        createStatusBarMessage('Keyword Blacklist saved!', 'success'); // Use imported function
+        this.updateCounts(); // Call the local method which wraps the imported function
     }
 }));
 
@@ -389,11 +406,12 @@ Alpine.data('rssApp', () => ({
 // This part is crucial. We must ensure Alpine.start() is called *only once*
 // and *after* the `Alpine.data` definition.
 // The `initDb()` call should happen here, and then Alpine.start().
-// No need for the `db-initialized` custom event anymore, we can manage the flow directly.
+// This fixes the "rssApp is not defined" and other similar errors.
 
 (async () => {
     try {
         // Init DB. `db` will be globally available (imported).
+        // Await the DB initialization *before* starting Alpine.
         await initDb();
         console.log("app.js: IndexedDB initialized externally before Alpine.start().");
         // Start Alpine.js after the data component is defined and DB is ready.
