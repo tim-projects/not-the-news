@@ -1,647 +1,332 @@
-// database.js
-// This file manages IndexedDB interactions and synchronization with the server.
+// www/js/helpers/userStateUtils.js
 
-import { openDB } from '../libs/idb.js'; // Adjusted path to idb.js
+import {
+    dbPromise,
+    // Renamed for clarity: loadStateValue is now `loadSimpleState` and `saveStateValue` is `saveSimpleState`
+    loadSimpleState, 
+    saveSimpleState, 
+    // Specialized loaders for array types are now direct getters from database.js
+    getStarredItems,
+    getHiddenItems,
+    getCurrentDeckGuids, // New specialized loader for currentDeckGuids
+    addPendingOperation, // New function for persistent buffering
+    processPendingOperations, // New function for immediate sync
+    isOnline,
+    // loadArrayState and saveArrayState are internal to database.js for generic array handling
+    // and aren't typically exposed for direct use by userStateUtils. They are used internally
+    // by the new getStarredItems, getHiddenItems, getCurrentDeckGuids, and pushUserState.
+    // So, we'll remove them from this import.
+} from '../data/database.js'; // Adjusted path to database.js
 
-// --- IndexedDB Configuration ---
-const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 7; // *** IMPORTANT: Increment DB_VERSION for schema changes ***
-
-export let db = null; // Will hold the IndexedDB instance
-
-// Define schema for object stores
-const OBJECT_STORES_SCHEMA = [
-    { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
-    { name: 'starredItems', keyPath: 'id' }, // Stores { id: 'guid', starredAt: 'ISOString' }
-    { name: 'hiddenItems', keyPath: 'id' },  // Stores { id: 'guid', hiddenAt: 'ISOString' }
-    { name: 'currentDeckGuids', keyPath: 'id' }, // Dedicated store for current deck GUIDs
-    { name: 'userSettings', keyPath: 'key' }, // Stores { key: 'settingName', value: 'settingValue', lastModified: 'timestamp' }
-    { name: 'pendingOperations', keyPath: 'id', options: { autoIncrement: true } } // *** NEW: Store for buffered operations ***
-];
-
-// --- User State Definitions (Maps server keys to client IndexedDB storage) ---
-// This is crucial for the new pull/pushUserState logic.
-export const USER_STATE_DEFS = {
-    // Array-based states stored in their own dedicated object stores
-    starred: { store: 'starredItems', type: 'array', default: [] },
-    hidden: { store: 'hiddenItems', type: 'array', default: [] },
-    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
-
-    // Simple value states stored in the 'userSettings' object store
-    filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
-    syncEnabled: { store: 'userSettings', type: 'simple', default: true },
-    imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
-    rssFeeds: { store: 'userSettings', type: 'simple', default: [] },
-    keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] },
-    shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
-    lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
-    openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
-    // A specific key to store the global latest timestamp from server sync
-    lastStateSync: { store: 'userSettings', type: 'simple', default: null } 
-};
-
-// --- Initialization ---
-export async function initDb() {
-    db = await openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-            console.log(`[IndexedDB] Upgrading DB from version ${oldVersion} to ${newVersion}`);
-            
-            // Create or update object stores
-            OBJECT_STORES_SCHEMA.forEach(schema => {
-                if (!db.objectStoreNames.contains(schema.name)) {
-                    const store = db.createObjectStore(schema.name, { keyPath: schema.keyPath, ...schema.options });
-                    console.log(`[IndexedDB] Created object store: ${schema.name}`);
-                }
-            });
-
-            // Add specific migration logic here if DB_VERSION changes significantly
-            // For example, if you introduce 'pendingOperations' at version 7 from version 6:
-            if (oldVersion < 7) {
-                if (!db.objectStoreNames.contains('pendingOperations')) {
-                    db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
-                    console.log('[IndexedDB] Created new object store: pendingOperations');
-                }
-            }
-        },
-        blocked() {
-            console.warn('[IndexedDB] Database upgrade is blocked. Close other tabs for this site.');
-            alert('Database update blocked. Please close all other tabs with this site open.');
-        },
-        blocking() {
-            console.warn('[IndexedDB] Database is blocking. Other tabs need to close.');
-        }
-    });
-    console.log(`[IndexedDB] Database '${DB_NAME}' opened, version ${DB_VERSION}`);
-}
-
-// --- Generic State Loading/Saving Functions ---
 
 /**
- * Loads a single simple state (key-value pair) from the specified IndexedDB store.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} key The key of the state to load (e.g., 'filterMode').
- * @param {IDBTransaction} [tx=null] Optional transaction to use.
- * @returns {Promise<{value: any, lastModified: string|null}>} The value and last modification timestamp, or default.
+ * Toggles the starred status of an item and manages synchronization.
+ * @param {object} app - The main application state object (e.g., Vue instance).
+ * @param {string} guid - The unique identifier of the item.
  */
-export async function loadSimpleState(db, key, tx = null) {
-    const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'simple') {
-        console.error(`[loadSimpleState] Invalid or undefined simple state key: ${key}`);
-        return { value: def ? def.default : null, lastModified: null };
-    }
-    const storeName = def.store;
+export async function toggleStar(app, guid) {
+    const db = await dbPromise;
+    const tx = db.transaction('starredItems', 'readwrite');
+    const store = tx.objectStore('starredItems');
 
-    let transaction;
+    const starredAt = new Date().toISOString();
+    let action;
+
     try {
-        transaction = tx || db.transaction(storeName, 'readonly');
-        const data = await transaction.objectStore(storeName).get(key);
-        // Assuming data stored as { key: 'name', value: 'val', lastModified: 'timestamp' }
-        if (data && data.hasOwnProperty('value')) {
-            return { value: data.value, lastModified: data.lastModified || null };
-        }
-    } catch (e) {
-                console.error(`[loadSimpleState] Error loading ${key} from store ${storeName}:`, e);
-    } finally {
-        if (!tx && transaction) await transaction.done; // Only await if we created the transaction
-    }
-    // Return default if not found or error
-    return { value: def.default, lastModified: null };
-}
+        const existingItem = await store.get(guid);
 
-/**
- * Saves a single simple state (key-value pair) to the specified IndexedDB store.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} key The key of the state to save (e.g., 'filterMode').
- * @param {any} value The value to save.
- * @param {string} [serverTimestamp=null] Optional timestamp from the server.
- * @param {IDBTransaction} [tx=null] Optional transaction to use.
- * @returns {Promise<void>}
- */
-export async function saveSimpleState(db, key, value, serverTimestamp = null, tx = null) {
-    const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'simple') {
-        console.error(`[saveSimpleState] Invalid or undefined simple state key: ${key}`);
-        throw new Error(`Invalid or undefined simple state key: ${key}`);
-    }
-    const storeName = def.store;
-
-    let transaction;
-    try {
-        transaction = tx || db.transaction(storeName, 'readwrite');
-        const objectStore = transaction.objectStore(storeName);
-        
-        // Prepare object to save, including timestamp if provided
-        const objToSave = { key: key, value: value };
-        if (serverTimestamp) {
-            objToSave.lastModified = serverTimestamp;
+        if (existingItem) {
+            // Item is currently starred, so unstar it
+            await store.delete(guid);
+            action = "remove";
+            // Update app's in-memory starred list
+            app.starred = app.starred.filter(item => item.id !== guid);
         } else {
-            // If no server timestamp, use current client time (for client-only changes)
-            objToSave.lastModified = new Date().toISOString(); 
+            // Item is not starred, so star it
+            await store.put({
+                id: guid,
+                starredAt
+            });
+            action = "add";
+            // Update app's in-memory starred list
+            app.starred.push({
+                id: guid,
+                starredAt
+            });
         }
 
-        await objectStore.put(objToSave);
-        console.log(`[saveSimpleState] Saved "${key}" to store "${storeName}". Value:`, value);
-    } catch (e) {
-        console.error(`[saveSimpleState] Error saving "${key}" to store "${storeName}":`, e);
-        throw e;
-    } finally {
-        if (!tx && transaction) await transaction.done;
+        await tx.done; // Ensure the transaction completes
+
+        // Trigger UI update if necessary
+        if (typeof app.updateCounts === 'function') app.updateCounts();
+
+        // Add the operation to the persistent pending operations buffer
+        const deltaObject = {
+            id: guid,
+            action,
+            starredAt
+        };
+        await addPendingOperation(db, {
+            type: 'starDelta',
+            data: deltaObject
+        });
+
+        // Attempt immediate background sync if online
+        if (isOnline()) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync star change, operation remains buffered:", syncErr);
+                // The operation is already buffered, so no re-addition needed here.
+            }
+        }
+    } catch (error) {
+        console.error("Error in toggleStar:", error);
     }
 }
 
 /**
- * Loads an array state (e.g., starredItems) from its dedicated IndexedDB store.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} key The key of the array state (e.g., 'starred').
- * @param {IDBTransaction} [tx=null] Optional transaction to use.
- * @returns {Promise<{value: Array<any>, lastModified: string|null}>} The array and last modification timestamp, or default.
+ * Toggles the hidden status of an item and manages synchronization.
+ * @param {object} app - The main application state object.
+ * @param {string} guid - The unique identifier of the item.
  */
-export async function loadArrayState(db, key, tx = null) {
-    const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'array') {
-        console.error(`[loadArrayState] Invalid or undefined array state key: ${key}`);
-        return { value: def ? def.default : [], lastModified: null };
-    }
-    const storeName = def.store;
+export async function toggleHidden(app, guid) {
+    const db = await dbPromise;
+    const tx = db.transaction('hiddenItems', 'readwrite');
+    const store = tx.objectStore('hiddenItems');
 
-    let transaction;
+    const hiddenAt = new Date().toISOString();
+    let action;
+
     try {
-        transaction = tx || db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const allItems = await store.getAll(); // Get all items from the array store
-        
-        // For array types, 'lastModified' is generally from the API response for the entire collection.
-        // If you need a lastModified for the *local* array for some reason, you'd store it as a simple setting.
-        return { value: allItems, lastModified: null }; 
-    } catch (e) {
-        console.error(`[loadArrayState] Error loading ${key} from store ${storeName}:`, e);
-    } finally {
-        if (!tx && transaction) await transaction.done;
-    }
-    return { value: def.default, lastModified: null };
-}
+        const existingItem = await store.get(guid);
 
-
-/**
- * Saves an array state (e.g., starredItems) to its dedicated IndexedDB store.
- * This clears the store and adds all new items.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} key The key of the array state (e.g., 'starred').
- * @param {Array<any>} arr The array of items to save.
- * @param {string} [serverTimestamp=null] Optional timestamp from the server.
- * @param {IDBTransaction} [tx=null] Optional transaction to use.
- * @returns {Promise<void>}
- */
-export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = null) {
-    const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'array') {
-        console.error(`[saveArrayState] Invalid or undefined array state key: ${key}`);
-        throw new Error(`Invalid or undefined array state key: ${key}`);
-    }
-    const storeName = def.store;
-
-    let transaction;
-    try {
-        transaction = tx || db.transaction(storeName, 'readwrite');
-        const objectStore = transaction.objectStore(storeName);
-        
-        await objectStore.clear(); // Clear existing items
-
-        // Ensure array items are clonable (remove proxies/observers if any)
-        const clonableArr = JSON.parse(JSON.stringify(arr));
-        
-        // For array stores like 'starredItems', 'hiddenItems', 'currentDeckGuids',
-        // each element in the array is a separate record. The 'id' property in these objects
-        // should map to the object store's keyPath.
-        for (const item of clonableArr) {
-            // For currentDeckGuids, the server sends an array of strings (GUIDs).
-            // We need to store them as objects with an 'id' key for IndexedDB.
-            const itemToStore = (key === 'currentDeckGuids' && typeof item === 'string') 
-                               ? { id: item } 
-                               : item;
-            await objectStore.put(itemToStore);
+        if (existingItem) {
+            // Item is currently hidden, so unhide it
+            await store.delete(guid);
+            action = "remove";
+            // Update app's in-memory hidden list
+            app.hidden = app.hidden.filter(item => item.id !== guid);
+        } else {
+            // Item is not hidden, so hide it
+            await store.put({
+                id: guid,
+                hiddenAt
+            });
+            action = "add";
+            // Update app's in-memory hidden list
+            app.hidden.push({
+                id: guid,
+                hiddenAt
+            });
         }
-        
-        console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${storeName}".`);
 
-        // If a serverTimestamp is provided for the collection, update the 'lastStateSync'
-        // or a dedicated timestamp for this array if you introduce one.
-        // For now, `pullUserState` handles the global `lastStateSync` update.
-    } catch (e) {
-        console.error(`[saveArrayState] Error saving "${key}" to store "${storeName}":`, e);
-        throw e;
-    } finally {
-        if (!tx && transaction) await transaction.done;
+        await tx.done; // Ensure the transaction completes
+
+        // Trigger UI update if necessary
+        if (typeof app.updateCounts === 'function') app.updateCounts();
+
+        // Add the operation to the persistent pending operations buffer
+        const deltaObject = {
+            id: guid,
+            action,
+            hiddenAt
+        };
+        await addPendingOperation(db, {
+            type: 'hiddenDelta',
+            data: deltaObject
+        });
+
+        // Attempt immediate background sync if online
+        if (isOnline()) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync hidden change, operation remains buffered:", syncErr);
+                // The operation is already buffered, so no re-addition needed here.
+            }
+        }
+    } catch (error) {
+        console.error("Error in toggleHidden:", error);
     }
 }
 
-// --- Client-Server Synchronization Functions ---
-
-let _isPullingUserState = false; // Prevent multiple concurrent pulls
-let _lastPullAttemptTime = 0;
-const PULL_DEBOUNCE_MS = 500; // Minimum time between pull attempts
-
 /**
- * Pulls individual user state data from the server and updates IndexedDB.
+ * Prunes stale hidden items from the hiddenItems store.
+ * Items are considered stale if they are not in the current feedItems and are older than 30 days.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {Array<object>} feedItems - The array of current feed items (expected to have 'id' property).
+ * @param {number} currentTS - The current timestamp in milliseconds.
+ * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
  */
-export async function pullUserState(db) {
-    if (_isPullingUserState) {
-        console.log('[pullUserState] Already pulling user state. Skipping new request.');
-        return;
-    }
-    const now = Date.now();
-    if (now - _lastPullAttemptTime < PULL_DEBOUNCE_MS) {
-        console.log('[pullUserState] Debouncing pull request.');
-        return;
-    }
-    _lastPullAttemptTime = now;
-    _isPullingUserState = true;
-    
-    console.log('[pullUserState] Attempting to pull user state from server...');
-    const API_BASE_URL = window.location.origin;
+export async function pruneStaleHidden(db, feedItems, currentTS) {
+    // Use the specialized getter from database.js
+    const hiddenItems = await getHiddenItems(); 
 
-    // Get the global lastStateSync from IndexedDB to use for If-None-Match header
-    const { value: currentLastStateSync } = await loadSimpleState(db, 'lastStateSync');
-    let newestOverallTimestamp = currentLastStateSync;
+    // Basic validation
+    if (!Array.isArray(hiddenItems)) return [];
+    if (!Array.isArray(feedItems) || feedItems.length === 0 || !feedItems.every(e => e && typeof e.id === 'string')) return hiddenItems;
 
-    const fetchPromises = Object.entries(USER_STATE_DEFS).map(async ([key, def]) => {
-        // Skip 'lastStateSync' itself from being fetched as a user state key, as it's client-managed from other keys.
-        if (key === 'lastStateSync') return { key, status: 'skipped' };
+    const validFeedIds = new Set(feedItems.map(e => e.id.trim().toLowerCase()));
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-        const url = `${API_BASE_URL}/user-state/${key}`;
-        let localTimestamp = '';
-        
-        // For individual keys, we load their lastModified from the userSettings store (if it's a simple type)
-        // or from the global lastStateSync if a specific key timestamp isn't tracked individually.
-        // The most robust way is to store each key's `lastModified` as a separate simple setting.
-        const keySpecificState = await loadSimpleState(db, key); // For simple types, this gets value and lastModified
-        if (keySpecificState && keySpecificState.lastModified) {
-            localTimestamp = keySpecificState.lastModified;
-        } else if (def.type === 'array') { // For array types, we fetch the whole array and update based on server's timestamp
-            // If arrays don't have individual lastModified saved in userSettings, use global lastStateSync
-            localTimestamp = currentLastStateSync || ''; // Use global sync time as ETag for array if no specific one
-        }
-
-        try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (localTimestamp) {
-                headers['If-None-Match'] = localTimestamp;
-                console.log(`[pullUserState] Fetching ${key} with If-None-Match: ${localTimestamp.substring(0,20)}...`);
-            } else {
-                console.log(`[pullUserState] Fetching ${key} (no specific local ETag)`);
-            }
-
-            const response = await fetch(url, { method: 'GET', headers: headers });
-
-            if (response.status === 304) {
-                console.log(`[pullUserState] User state for key ${key}: No changes (304 Not Modified).`);
-                return { key, status: 304 };
-            }
-
-            if (!response.ok) {
-                if (response.status === 404) {
-                    console.warn(`[pullUserState] User state key ${key} not found on server (404). Using client default.`);
-                    // Optionally, if a 404 means the server has deleted it, you might clear local state.
-                    // For now, we'll let existing local data persist unless explicitly synced empty.
-                    return { key, status: 404 };
-                }
-                throw new Error(`HTTP error! status: ${response.status} for ${key}`);
-            }
-
-            const data = await response.json(); // Data will be { "value": ..., "lastModified": "..." }
-            console.log(`[pullUserState] Received new data for key ${key}:`, data);
-
-            const tx = db.transaction(def.store, 'readwrite');
-
-            // Store the value based on its type definition
-            if (def.type === 'array') {
-                await saveArrayState(db, key, data.value || def.default, data.lastModified, tx);
-            } else { // simple type
-                await saveSimpleState(db, key, data.value, data.lastModified, tx);
-            }
-            
-            // For simple types, also explicitly save the lastModified timestamp with the key itself
-            // in the 'userSettings' store. This allows individual ETag lookups later.
-            // For array types, their lastModified from server *is* the ETag for that resource.
-            // If the array's lastModified is not used to update the key-specific timestamp,
-            // then only the global lastStateSync will drive array updates, which is fine if desired.
-            if (data.lastModified) {
-                // If it's a simple setting, its lastModified is saved with its own entry.
-                // If it's an array type, we save its lastModified under its key in userSettings for ETag.
-                if (def.type === 'simple') {
-                    await saveSimpleState(db, key, data.value, data.lastModified, tx);
-                } else if (def.type === 'array') {
-                    // For arrays, store their lastModified in userSettings under their key
-                    // to support individual ETag checks. The 'value' here is just a placeholder.
-                    await saveSimpleState(db, key, null, data.lastModified, tx); // Value null/placeholder, only timestamp matters for ETag
-                }
-            }
-
-
-            await tx.done; // Commit transaction for this key
-
-            // Update the newest overall timestamp for 'lastStateSync'
-            if (data.lastModified && (!newestOverallTimestamp || data.lastModified > newestOverallTimestamp)) {
-                newestOverallTimestamp = data.lastModified;
-            }
-
-            return { key, data, status: 200 };
-
-        } catch (error) {
-            console.error(`[pullUserState] Failed to pull user state for key ${key}:`, error);
-            return { key, data: null, status: 'error', error };
-        }
+    const itemsToDelete = hiddenItems.filter(i => {
+        const normalizedId = String(i.id).trim().toLowerCase();
+        // Keep if the item is still present in the current feed
+        if (validFeedIds.has(normalizedId)) return false;
+        // Check if the item is older than 30 days
+        const hiddenAtTS = new Date(i.hiddenAt).getTime();
+        return (currentTS - hiddenAtTS) >= THIRTY_DAYS_MS;
     });
 
-    await Promise.all(fetchPromises); // Wait for all individual fetches to complete
-
-    // After all individual fetches, save the newest overall timestamp for global sync tracking
-    if (newestOverallTimestamp) {
-        await saveSimpleState(db, 'lastStateSync', newestOverallTimestamp);
-        console.log(`[pullUserState] Updated global lastStateSync to: ${newestOverallTimestamp}`);
-    } else {
-        console.log('[pullUserState] No new overall timestamp found from server pull.');
-    }
-
-    _isPullingUserState = false;
-    console.log('[pullUserState] All user state pull operations completed.');
-}
-
-
-/**
- * Pushes a single user state key-value pair to the server.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} keyToUpdate The key of the user state to update (e.g., 'filterMode', 'currentDeckGuids').
- * @param {any} valueToUpdate The new value for that state key.
- * @returns {Promise<boolean>} True if successful, false otherwise.
- */
-export async function pushUserState(db, keyToUpdate, valueToUpdate) {
-    console.log(`[pushUserState] Attempting to push user state for key: ${keyToUpdate}`);
-    const API_BASE_URL = window.location.origin;
-
-    const def = USER_STATE_DEFS[keyToUpdate];
-    if (!def) {
-        console.error(`[pushUserState] Attempted to push unknown key: ${keyToUpdate}`);
-        return false;
-    }
-
-    let url;
-    let method = 'POST';
-    let body;
-
-    // Determine the correct endpoint and body format based on key type
-    if (keyToUpdate === 'starred' || keyToUpdate === 'hidden') {
-        // These keys use delta endpoints, not the generic POST /user-state for full array replacement.
-        // Your UI should call pushStarredItemDelta or pushHiddenItemDelta directly for these.
-        console.warn(`[pushUserState] Cannot use generic push for delta-managed key: ${keyToUpdate}. Use specific delta functions.`);
-        return false;
-    } else {
-        url = `${API_BASE_URL}/user-state`; // Generic POST endpoint for simple key-value updates or full array replacements for non-delta types
-        body = JSON.stringify({ key: keyToUpdate, value: valueToUpdate });
-    }
-    
-    try {
-        const response = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: body
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} for ${keyToUpdate}`);
-        }
-
-        const data = await response.json(); // Should return { serverTime: '...' }
-        if (data.serverTime) {
-            // Update the local key's timestamp and the global lastStateSync
-            await saveSimpleState(db, keyToUpdate, valueToUpdate, data.serverTime); // Update specific key's value and timestamp
-            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
-        }
-        console.log(`[pushUserState] Successfully pushed ${keyToUpdate}. Server response:`, data);
-        return true;
-    } catch (error) {
-        console.error(`[pushUserState] Failed to push user state for key ${keyToUpdate}:`, error);
-        return false;
-    }
-}
-
-// --- Pending Operations Management ---
-// New object store 'pendingOperations' added in DB_VERSION 7 upgrade
-
-/**
- * Adds an operation to the 'pendingOperations' IndexedDB store.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @param {object} operation The operation object to store (e.g., { type: 'starDelta', data: {...} }).
- * @returns {Promise<void>}
- */
-export async function addPendingOperation(db, operation) { // *** EXPORTED NOW ***
-    try {
-        const tx = db.transaction('pendingOperations', 'readwrite');
-        await tx.objectStore('pendingOperations').add(operation);
-        await tx.done;
-        console.log('[addPendingOperation] Operation added to buffer:', operation);
-    } catch (error) {
-        console.error('[addPendingOperation] Error buffering operation:', error);
-    }
-}
-
-/**
- * Processes all pending operations in the buffer, attempting to sync them with the server.
- * @param {IDBDatabase} db The IndexedDB instance.
- * @returns {Promise<void>}
- */
-export async function processPendingOperations(db) { // *** EXPORTED NOW ***
-    console.log('[processPendingOperations] Starting to process pending operations...');
-    if (!isOnline()) { // Relies on isOnline, also needs to be exported
-        console.log('[processPendingOperations] Offline. Skipping sync.');
-        return;
-    }
-
-    const API_BASE_URL = window.location.origin;
-    let pendingOps = [];
-
-    // 1. Read all pending operations
-    try {
-        const tx = db.transaction('pendingOperations', 'readonly');
-        pendingOps = await tx.objectStore('pendingOperations').getAll();
-        await tx.done;
-        console.log(`[processPendingOperations] Found ${pendingOps.length} operations in buffer.`);
-    } catch (error) {
-        console.error('[processPendingOperations] Error reading pending operations:', error);
-        return;
-    }
-
-    if (pendingOps.length === 0) {
-        console.log('[processPendingOperations] No pending operations to process.');
-        return;
-    }
-
-    // Process operations sequentially to avoid race conditions on server state
-    for (const op of pendingOps) {
-        let success = false;
+    if (itemsToDelete.length > 0) {
+        const tx = db.transaction('hiddenItems', 'readwrite');
+        const store = tx.objectStore('hiddenItems');
         try {
-            if (op.type === 'starDelta') {
-                success = await pushStarredItemDelta(op.data.id, op.data.action, op.data.starredAt);
-            } else if (op.type === 'hiddenDelta') {
-                success = await pushHiddenItemDelta(op.data.id, op.data.action, op.data.hiddenAt);
-            } else if (op.type === 'simpleUpdate') {
-                success = await pushUserState(db, op.key, op.value);
-            } else {
-                console.warn('[processPendingOperations] Unknown operation type:', op.type, op);
-                success = true; // Treat as success to remove unknown ops
+            for (const item of itemsToDelete) {
+                await store.delete(item.id); // Direct delete from IndexedDB
             }
-
-            if (success) {
-                // If successfully synced, remove from pending operations
-                const deleteTx = db.transaction('pendingOperations', 'readwrite');
-                await deleteTx.objectStore('pendingOperations').delete(op.id);
-                await deleteTx.done;
-                console.log(`[processPendingOperations] Successfully synced and removed operation ${op.id} (${op.type}).`);
-            } else {
-                console.warn(`[processPendingOperations] Failed to sync operation ${op.id} (${op.type}). Will retry later.`);
-                // If sync fails, keep it in the buffer for next attempt
-            }
+            await tx.done; // Wait for all deletes to complete
+            // After successful deletion, filter the in-memory list to return the pruned list
+            return hiddenItems.filter(item => !itemsToDelete.includes(item));
         } catch (error) {
-            console.error(`[processPendingOperations] Error during sync of operation ${op.id} (${op.type}):`, error);
-            // Error during fetch/network, operation remains in buffer
+            console.error("Error pruning stale hidden items:", error);
+            // If deletion fails, return the original list to avoid potential data inconsistency in app state
+            return hiddenItems;
         }
     }
-    console.log('[processPendingOperations] Finished processing pending operations.');
+    return hiddenItems; // No items to prune, return original list
 }
 
-// --- Network Status Utility ---
-export function isOnline() { // *** EXPORTED NOW ***
-    return navigator.onLine;
+/**
+ * Loads the current deck of GUIDs.
+ * This function now relies on `getCurrentDeckGuids` getter which operates on the `currentDeckGuids` store.
+ * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
+ */
+export async function loadCurrentDeck() {
+    // No 'db' parameter needed here as getCurrentDeckGuids handles dbPromise internally
+    let guids = await getCurrentDeckGuids(); 
+    return Array.isArray(guids) ? guids : [];
 }
 
-// --- Specific API Calls (for delta updates) ---
-// These remain as direct calls from your UI where a specific item is added/removed.
-export async function pushStarredItemDelta(id, action, timestamp) {
-    console.log(`[pushStarredItemDelta] ID: ${id}, Action: ${action}`);
-    const API_BASE_URL = window.location.origin;
-    const url = `${API_BASE_URL}/user-state/starred/delta`;
-    
+/**
+ * Saves the current deck of GUIDs.
+ * This function now uses a direct IndexedDB transaction for the 'currentDeckGuids' store
+ * and also buffers the operation for server sync.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
+ */
+export async function saveCurrentDeck(db, guids) {
+    const tx = db.transaction('currentDeckGuids', 'readwrite');
+    const store = tx.objectStore('currentDeckGuids');
+
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id, action: action, starredAt: timestamp })
+        await store.clear(); // Clear existing deck
+        // Save each GUID as an object { id: guid }
+        for (const guid of guids) {
+            await store.put({ id: guid });
+        }
+        await tx.done; // Ensure transaction completes
+
+        console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
+
+        // Add the operation to the pending operations buffer for server sync
+        await addPendingOperation(db, {
+            type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
+            key: 'currentDeckGuids',
+            value: guids // Send the entire array to the server
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} for starred delta`);
+        // Attempt immediate background sync if online
+        if (isOnline()) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync currentDeckGuids change, operation remains buffered:", syncErr);
+            }
         }
-        const data = await response.json();
-        if (data.serverTime) {
-            // Update the local 'starred' state in IndexedDB (re-fetch or update directly)
-            // For delta operations, we usually rely on the next pull to reconcile the full array.
-            // Or, you could manually add/remove from IndexedDB here.
-            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
-            // Also update the starred's own lastModified timestamp if you track it separately:
-            // await saveSimpleState(db, 'starred', null, data.serverTime);
-        }
-        console.log(`[pushStarredItemDelta] Success. Server response:`, data);
-        return true;
     } catch (error) {
-        console.error(`[pushStarredItemDelta] Failed:`, error);
-        return false;
+        console.error("Error saving current deck:", error);
+        throw error; // Re-throw to indicate failure
     }
 }
 
-export async function pushHiddenItemDelta(id, action, timestamp) {
-    console.log(`[pushHiddenItemDelta] ID: ${id}, Action: ${action}`);
-    const API_BASE_URL = window.location.origin;
-    const url = `${API_BASE_URL}/user-state/hidden/delta`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id, action: action, hiddenAt: timestamp })
-        });
+/**
+ * Loads the shuffle state, including shuffle count and last reset date.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
+ */
+export async function loadShuffleState(db) {
+    // loadSimpleState returns an object { value, lastModified }
+    const { value: count } = await loadSimpleState(db, 'shuffleCount');
+    const { value: dateStr } = await loadSimpleState(db, 'lastShuffleResetDate');
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} for hidden delta`);
+    let shuffleCount = typeof count === 'number' ? count : 2; // Default if not found or invalid
+    let lastResetDate = null;
+    if (dateStr) {
+        try {
+            lastResetDate = new Date(dateStr);
+        } catch (err) {
+            console.warn("Invalid lastShuffleResetDate:", dateStr, err);
         }
-        const data = await response.json();
-        if (data.serverTime) {
-            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
-            // await saveSimpleState(db, 'hidden', null, data.serverTime);
+    }
+    return {
+        shuffleCount: shuffleCount,
+        lastShuffleResetDate: lastResetDate
+    };
+}
+
+/**
+ * Saves the shuffle state, including shuffle count and last reset date.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {number} count - The current shuffle count.
+ * @param {Date} resetDate - The date of the last shuffle reset.
+ */
+export async function saveShuffleState(db, count, resetDate) {
+    await saveSimpleState(db, 'shuffleCount', count);
+    await saveSimpleState(db, 'lastShuffleResetDate', resetDate.toISOString());
+
+    // Add these simple updates to the pending operations buffer
+    await addPendingOperation(db, { type: 'simpleUpdate', key: 'shuffleCount', value: count });
+    await addPendingOperation(db, { type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate.toISOString() });
+
+    if (isOnline()) {
+        try {
+            await processPendingOperations(db);
+        } catch (syncErr) {
+            console.error("Failed to immediately sync shuffle state change, operations remain buffered:", syncErr);
         }
-        console.log(`[pushHiddenItemDelta] Success. Server response:`, data);
-        return true;
-    } catch (error) {
-        console.error(`[pushHiddenItemDelta] Failed:`, error);
-        return false;
     }
 }
 
+/**
+ * Sets the current filter mode for the application.
+ * @param {object} app - The main application state object.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {string} mode - The filter mode to set (e.g., 'unread', 'starred').
+ */
+export async function setFilterMode(app, db, mode) {
+    app.filterMode = mode;
+    await saveSimpleState(db, 'filterMode', mode);
 
-// --- Functions to get data out of IndexedDB for UI ---
+    // Add this simple update to the pending operations buffer
+    await addPendingOperation(db, { type: 'simpleUpdate', key: 'filterMode', value: mode });
 
-export async function getStarredItems() {
-    await initDb(); // Ensure DB is open
-    const { value } = await loadArrayState(db, 'starred');
-    return value;
-}
-
-export async function getHiddenItems() {
-    await initDb(); // Ensure DB is open
-    const { value } = await loadArrayState(db, 'hidden');
-    return value;
-}
-
-// getCurrentDeckGuids now uses loadArrayState and expects array from server
-export async function getCurrentDeckGuids() {
-    await initDb(); // Ensure DB is open
-    const { value } = await loadArrayState(db, 'currentDeckGuids');
-    return value.map(item => item.id); // Return just the GUID strings
-}
-
-
-export async function getFilterMode() {
-    await initDb(); // Ensure DB is open
-    const { value } = await loadSimpleState(db, 'filterMode');
-    return value;
+    if (isOnline()) {
+        try {
+            await processPendingOperations(db);
+        } catch (syncErr) {
+            console.error("Failed to immediately sync filter mode change, operation remains buffered:", syncErr);
+        }
+    }
 }
 
-export async function getSyncEnabled() {
-    await initDb(); // Ensure DB is open
-    const { value } = await loadSimpleState(db, 'syncEnabled');
-    return value;
+/**
+ * Loads the current filter mode from storage.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @returns {Promise<string>} The current filter mode.
+ */
+export async function loadFilterMode(db) {
+    const { value: mode } = await loadSimpleState(db, 'filterMode');
+    return mode || 'unread'; // Provide a default if not found
 }
-
-export async function getImagesEnabled() {
-    await initDb();
-    const { value } = await loadSimpleState(db, 'imagesEnabled');
-    return value;
-}
-export async function getRssFeeds() {
-    await initDb();
-    const { value } = await loadSimpleState(db, 'rssFeeds');
-    return value;
-}
-export async function getKeywordBlacklist() {
-    await initDb();
-    const { value } = await loadSimpleState(db, 'keywordBlacklist');
-    return value;
-}
-export async function getShuffleCount() {
-    await initDb();
-    const { value } = await loadSimpleState(db, 'shuffleCount');
-    return value;
-}
-export async function getLastShuffleResetDate() {
-    await initDb();
-    const { value } = await loadSimpleState(db, 'lastShuffleResetDate');
-    return value;
-}
-export async function getOpenUrlsInNewTabEnabled() {
-    await initDb();
-    const { value } = await loadSimpleState(db, 'openUrlsInNewTabEnabled');
-    return value;
-}
-
-// You will need to make sure your main app.js or similar entry point
-// calls initDb() early on to establish the IndexedDB connection.
-// And then calls pullUserState(db) to synchronize data on startup.
