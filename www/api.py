@@ -37,6 +37,7 @@ def login():
         return resp
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
+        app.logger.error(f"Request data: {request.get_data()}")
         return jsonify({"error": "Internal server error"}), 500
 
 def _load_feed_items():
@@ -216,6 +217,7 @@ def post_user_state():
         return jsonify({"error": "Invalid or missing 'userState' dictionary in JSON body"}), 400
 
     server_time = None
+    app.logger.info(f"post_user_state: Received data: {data}")
     # Iterate over the provided user state map
     for key, val in data["userState"].items():
         # Load current state to allow for server-side merging if needed
