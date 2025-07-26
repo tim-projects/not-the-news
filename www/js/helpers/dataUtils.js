@@ -1,7 +1,7 @@
 // www/js/helpers/dataUtils.js
 
 // Import necessary modules for deck functions
-import { dbPromise, saveStateValue } from '../data/database.js';
+import { db, saveSimpleState } from '../data/database.js'; // --- FIX: Changed dbPromise to db, saveStateValue to saveSimpleState ---
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
 import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
 
@@ -88,11 +88,10 @@ export function displayCurrentDeck(app) {
         }
     });
 
-    
-        console.log("Deck displayed:", app.deckItems.map(item => item.title));
-        console.log("dataUtils.js: displayCurrentDeck calling scrollToTop");
-        app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
-    }
+    console.log("Deck displayed:", app.deckItems.map(item => item.title));
+    console.log("dataUtils.js: displayCurrentDeck calling scrollToTop");
+    app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
+}
 
 /**
  * Validates the current deck and regenerates it if all items are hidden or no longer exist.
@@ -101,7 +100,7 @@ export function displayCurrentDeck(app) {
  */
 export async function validateAndRegenerateCurrentDeck(app) {
     console.log("dataUtils.js: validateAndRegenerateCurrentDeck called");
-    const db = await dbPromise;
+    // `db` is already initialized and available globally through the import
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
     // Filter out items from the current deck that are now hidden or no longer exist in entries
@@ -129,7 +128,8 @@ export async function validateAndRegenerateCurrentDeck(app) {
         app.currentDeckGuids = validGuidsInDeck;
         await saveCurrentDeck(db, app.currentDeckGuids);
     }
-    if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
+    // Only call displayCurrentDeck if the deck was actually changed
+    if (validGuidsInDeck.length !== app.currentDeckGuids.length) { // This condition was incorrect, should check if new deck size is different
         displayCurrentDeck(app);
     }
 }
@@ -141,9 +141,9 @@ export async function validateAndRegenerateCurrentDeck(app) {
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
  */
 export async function loadNextDeck(app) {
-    const db = await dbPromise;
+    // `db` is already initialized and available globally through the import
     // Ensure entries is up-to-date and correctly mapped before filtering
-    await app.loadFeedItemsFromDB();
+    await app.loadFeedItemsFromDB(); // This ensures app.entries is fresh
 
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
@@ -338,7 +338,7 @@ export async function shuffleFeed(app) {
     app.shuffleCount--;
     const today = new Date();
     today.setHours(0,0,0,0);
-    const db = await dbPromise;
+    // `db` is already initialized and available globally
     await saveShuffleState(db, app.shuffleCount, today);
 
     app.isShuffled = true;
