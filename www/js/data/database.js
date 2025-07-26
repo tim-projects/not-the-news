@@ -22,7 +22,8 @@ const OBJECT_STORES_SCHEMA = [
 // --- User State Definitions (Maps server keys to client IndexedDB storage) ---
 // This is crucial for the new pull/pushUserState logic.
 export const USER_STATE_DEFS = {
-    // Array-based states stored in their own dedicated object stores
+    // Array-based states stored in their own dedicated object stores.
+    // Their *timestamps* will be stored as simple key-value pairs in 'userSettings'.
     starred: { store: 'starredItems', type: 'array', default: [] },
     hidden: { store: 'hiddenItems', type: 'array', default: [] },
     currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
@@ -78,18 +79,22 @@ export async function initDb() {
 
 /**
  * Loads a single simple state (key-value pair) from the specified IndexedDB store.
+ * This is used for all settings in 'userSettings', including timestamps for array types.
  * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} key The key of the state to load (e.g., 'filterMode').
+ * @param {string} key The key of the state to load (e.g., 'filterMode' or 'starred' for its timestamp).
  * @param {IDBTransaction} [tx=null] Optional transaction to use.
  * @returns {Promise<{value: any, lastModified: string|null}>} The value and last modification timestamp, or default.
  */
 export async function loadSimpleState(db, key, tx = null) {
     const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'simple') {
-        console.error(`[loadSimpleState] Invalid or undefined simple state key: ${key}`);
-        return { value: def ? def.default : null, lastModified: null };
+    // This function loads from 'userSettings'. It expects the key to be defined there
+    // either as a simple type or as a reference for its timestamp (for array types).
+    if (!def || def.store !== 'userSettings') {
+        console.error(`[loadSimpleState] Invalid or undefined state key for simple state loading, or not in 'userSettings' store: ${key}`);
+        // Return a default structure, but with null for value if not explicitly defined
+        return { value: (def && def.default !== undefined) ? def.default : null, lastModified: null };
     }
-    const storeName = def.store;
+    const storeName = def.store; // This will always be 'userSettings' for this function's intended use
 
     let transaction;
     try {
@@ -109,21 +114,23 @@ export async function loadSimpleState(db, key, tx = null) {
 }
 
 /**
- * Saves a single simple state (key-value pair) to the specified IndexedDB store.
+ * Saves a single simple state (key-value pair) to the 'userSettings' IndexedDB store.
+ * This is used for simple value settings and for storing the lastModified timestamps of array types.
  * @param {IDBDatabase} db The IndexedDB instance.
- * @param {string} key The key of the state to save (e.g., 'filterMode').
- * @param {any} value The value to save.
+ * @param {string} key The key of the state to save (e.g., 'filterMode' or 'starred' for its timestamp).
+ * @param {any} value The value to save. For array timestamps, this can be a placeholder (e.g., true or null).
  * @param {string} [serverTimestamp=null] Optional timestamp from the server.
  * @param {IDBTransaction} [tx=null] Optional transaction to use.
  * @returns {Promise<void>}
  */
 export async function saveSimpleState(db, key, value, serverTimestamp = null, tx = null) {
     const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'simple') {
-        console.error(`[saveSimpleState] Invalid or undefined simple state key: ${key}`);
+    // This function strictly saves to 'userSettings'. Ensure the key is valid for that store.
+    if (!def || def.store !== 'userSettings') {
+        console.error(`[saveSimpleState] Invalid or undefined state key for simple state saving, or not in 'userSettings' store: ${key}`);
         throw new Error(`Invalid or undefined simple state key: ${key}`);
     }
-    const storeName = def.store;
+    const storeName = def.store; // This will always be 'userSettings' for this function's intended use
 
     let transaction;
     try {
@@ -151,6 +158,7 @@ export async function saveSimpleState(db, key, value, serverTimestamp = null, tx
 
 /**
  * Loads an array state (e.g., starredItems) from its dedicated IndexedDB store.
+ * It also retrieves the lastModified timestamp for this array from 'userSettings'.
  * @param {IDBDatabase} db The IndexedDB instance.
  * @param {string} key The key of the array state (e.g., 'starred').
  * @param {IDBTransaction} [tx=null] Optional transaction to use.
@@ -162,19 +170,20 @@ export async function loadArrayState(db, key, tx = null) {
         console.error(`[loadArrayState] Invalid or undefined array state key: ${key}`);
         return { value: def ? def.default : [], lastModified: null };
     }
-    const storeName = def.store;
+    const arrayStoreName = def.store; // The store for the array's items (e.g., 'starredItems')
 
     let transaction;
     try {
-        transaction = tx || db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const allItems = await store.getAll(); // Get all items from the array store
+        transaction = tx || db.transaction([arrayStoreName, 'userSettings'], 'readonly'); // Need transaction for both stores
+        const arrayStore = transaction.objectStore(arrayStoreName);
+        const allItems = await arrayStore.getAll(); // Get all items from the array store
         
-        // For array types, 'lastModified' is generally from the API response for the entire collection.
-        // If you need a lastModified for the *local* array for some reason, you'd store it as a simple setting.
-        return { value: allItems, lastModified: null }; 
+        // Retrieve the lastModified timestamp for this array from 'userSettings'
+        const { lastModified: arrayTimestamp } = await loadSimpleState(db, key, transaction); // Pass the multi-store transaction
+
+        return { value: allItems, lastModified: arrayTimestamp }; 
     } catch (e) {
-        console.error(`[loadArrayState] Error loading ${key} from store ${storeName}:`, e);
+        console.error(`[loadArrayState] Error loading ${key} from store ${arrayStoreName}:`, e);
     } finally {
         if (!tx && transaction) await transaction.done;
     }
@@ -184,7 +193,8 @@ export async function loadArrayState(db, key, tx = null) {
 
 /**
  * Saves an array state (e.g., starredItems) to its dedicated IndexedDB store.
- * This clears the store and adds all new items.
+ * This clears the store and adds all new items. It also updates the lastModified timestamp
+ * for this array key in the 'userSettings' store.
  * @param {IDBDatabase} db The IndexedDB instance.
  * @param {string} key The key of the array state (e.g., 'starred').
  * @param {Array<any>} arr The array of items to save.
@@ -198,14 +208,14 @@ export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = 
         console.error(`[saveArrayState] Invalid or undefined array state key: ${key}`);
         throw new Error(`Invalid or undefined array state key: ${key}`);
     }
-    const storeName = def.store;
+    const arrayStoreName = def.store;
 
     let transaction;
     try {
-        transaction = tx || db.transaction(storeName, 'readwrite');
-        const objectStore = transaction.objectStore(storeName);
+        transaction = tx || db.transaction([arrayStoreName, 'userSettings'], 'readwrite'); // Need transaction for both stores
+        const arrayObjectStore = transaction.objectStore(arrayStoreName);
         
-        await objectStore.clear(); // Clear existing items
+        await arrayObjectStore.clear(); // Clear existing items
 
         // Ensure array items are clonable (remove proxies/observers if any)
         const clonableArr = JSON.parse(JSON.stringify(arr));
@@ -219,16 +229,18 @@ export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = 
             const itemToStore = (key === 'currentDeckGuids' && typeof item === 'string') 
                                ? { id: item } 
                                : item;
-            await objectStore.put(itemToStore);
+            await arrayObjectStore.put(itemToStore);
         }
         
-        console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${storeName}".`);
+        console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${arrayStoreName}".`);
 
-        // If a serverTimestamp is provided for the collection, update the 'lastStateSync'
-        // or a dedicated timestamp for this array if you introduce one.
-        // For now, `pullUserState` handles the global `lastStateSync` update.
+        // Update the lastModified timestamp for this array key in the 'userSettings' store.
+        // The actual 'value' for this simple setting in userSettings can be a placeholder (e.g., `true` or `null`),
+        // as we only care about its `lastModified` property for ETag checks.
+        await saveSimpleState(db, key, true, serverTimestamp, transaction); // Save timestamp for this array key in userSettings
+
     } catch (e) {
-        console.error(`[saveArrayState] Error saving "${key}" to store "${storeName}":`, e);
+        console.error(`[saveArrayState] Error saving "${key}" to store "${arrayStoreName}":`, e);
         throw e;
     } finally {
         if (!tx && transaction) await transaction.done;
@@ -236,7 +248,6 @@ export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = 
 }
 
 // --- Pending Operations Functions ---
-// These functions need to be exported!
 
 /**
  * Adds an operation to the pendingOperations store for later synchronization.
@@ -284,8 +295,8 @@ export async function processPendingOperations(db) {
         let success = false;
         try {
             if (op.type === 'starDelta' || op.type === 'hiddenDelta') {
-                const endpoint = op.type === 'starDelta' ? 'starred-items-delta' : 'hidden-items-delta';
-                const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
+                const endpoint = op.type === 'starDelta' ? 'starred/delta' : 'hidden/delta'; // Corrected endpoint for consistency
+                const response = await fetch(`${API_BASE_URL}/user-state/${endpoint}`, { // Use /user-state/ prefix
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(op.data)
@@ -299,9 +310,8 @@ export async function processPendingOperations(db) {
                 success = true;
 
             } else if (op.type === 'simpleUpdate') {
-                // Use the generic pushUserState function for simple updates
-                // Note: db is already passed here, no need to re-pass initDb or anything.
-                success = await pushUserState(db, op.key, op.value); // This is where pushUserState gets used
+                // For simple updates, use the pushUserState function
+                success = await pushUserState(db, op.key, op.value); 
             } else {
                 console.warn(`[processPendingOperations] Unknown operation type: ${op.type}. Skipping.`);
                 success = true; // Treat as success to remove unknown ops
@@ -329,9 +339,6 @@ export async function processPendingOperations(db) {
  */
 export async function getBufferedChangesCount() {
     if (!db) {
-        // If db is not initialized yet, return 0 or wait for it.
-        // For a quick check, returning 0 might be acceptable, but usually
-        // the caller should ensure db is ready (e.g., by calling initDb).
         await initDb(); // Ensure db is open before attempting to read.
     }
     try {
@@ -358,8 +365,9 @@ export function isOnline() {
 }
 
 // --- Client-Server Synchronization Functions ---
-// The pullUserState and pushUserState functions were already defined above.
-// They need to be exported as well.
+let _isPullingUserState = false; // Prevent multiple concurrent pulls
+let _lastPullAttemptTime = 0;
+const PULL_DEBOUNCE_MS = 500; // Minimum time between pull attempts
 
 export async function pullUserState(db) {
     if (_isPullingUserState) {
@@ -377,9 +385,10 @@ export async function pullUserState(db) {
     console.log('[pullUserState] Attempting to pull user state from server...');
     const API_BASE_URL = window.location.origin;
 
-    // Get the global lastStateSync from IndexedDB to use for If-None-Match header
-    const { value: currentLastStateSync } = await loadSimpleState(db, 'lastStateSync');
-    let newestOverallTimestamp = currentLastStateSync;
+    // We no longer use a global lastStateSync as the primary ETag for individual items.
+    // Each item's ETag is fetched individually.
+    // The global 'lastStateSync' will simply be updated to the latest timestamp among all synced items.
+    let newestOverallTimestamp = null; // Initialize to null
 
     const fetchPromises = Object.entries(USER_STATE_DEFS).map(async ([key, def]) => {
         // Skip 'lastStateSync' itself from being fetched as a user state key, as it's client-managed from other keys.
@@ -388,17 +397,11 @@ export async function pullUserState(db) {
         const url = `${API_BASE_URL}/user-state/${key}`;
         let localTimestamp = '';
         
-        // For individual keys, we load their lastModified from the userSettings store (if it's a simple type)
-        // or from the global lastStateSync if a specific key timestamp isn't tracked individually.
-        // The most robust way is to store each key's `lastModified` as a separate simple setting.
-        const keySpecificState = await loadSimpleState(db, key); // For simple types, this gets value and lastModified
-        if (keySpecificState && keySpecificState.lastModified) {
-            localTimestamp = keySpecificState.lastModified;
-        } else if (def.type === 'array') { // For array types, we fetch the whole array and update based on server's timestamp
-            // If arrays don't have individual lastModified saved in userSettings, use global lastStateSync
-            localTimestamp = currentLastStateSync || ''; // Use global sync time as ETag for array if no specific one
-        }
-
+        // For all defined user state keys, load their *specific* lastModified timestamp from 'userSettings'.
+        // This handles both 'simple' types and the timestamps for 'array' types.
+        const { lastModified } = await loadSimpleState(db, key);
+        localTimestamp = lastModified || ''; // Use empty string if no local timestamp found
+        
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (localTimestamp) {
@@ -412,14 +415,23 @@ export async function pullUserState(db) {
 
             if (response.status === 304) {
                 console.log(`[pullUserState] User state for key ${key}: No changes (304 Not Modified).`);
+                
+                // If 304, update the newestOverallTimestamp based on the ETag that caused 304,
+                // as that's the latest confirmed sync time for this item.
+                if (localTimestamp && (!newestOverallTimestamp || localTimestamp > newestOverallTimestamp)) {
+                    newestOverallTimestamp = localTimestamp;
+                }
                 return { key, status: 304 };
             }
 
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn(`[pullUserState] User state key ${key} not found on server (404). Using client default.`);
-                    // Optionally, if a 404 means the server has deleted it, you might clear local state.
-                    // For now, we'll let existing local data persist unless explicitly synced empty.
+                    // If server 404s, it implies the file might not exist or was deleted.
+                    // We can optionally clear the local state for this key and its timestamp
+                    // so it gets re-initialized next time, or just rely on local default.
+                    // For now, let's just log and continue, client's default will be used.
+                    // await clearLocalState(db, key, def); // A new helper function might be needed for this.
                     return { key, status: 404 };
                 }
                 throw new Error(`HTTP error! status: ${response.status} for ${key}`);
@@ -428,33 +440,21 @@ export async function pullUserState(db) {
             const data = await response.json(); // Data will be { "value": ..., "lastModified": "..." }
             console.log(`[pullUserState] Received new data for key ${key}:`, data);
 
-            const tx = db.transaction(def.store, 'readwrite');
+            // Start a transaction that includes all necessary stores for this key's data and its timestamp
+            const transactionStores = [def.store];
+            if (def.store !== 'userSettings') { // If it's not already userSettings (i.e., array type)
+                transactionStores.push('userSettings'); // Add userSettings to save timestamp
+            }
+            const tx = db.transaction(transactionStores, 'readwrite');
 
-            // Store the value based on its type definition
+            // Store the value based on its type definition and update its timestamp in userSettings
             if (def.type === 'array') {
                 await saveArrayState(db, key, data.value || def.default, data.lastModified, tx);
             } else { // simple type
+                // saveSimpleState already handles value and timestamp for simple types in 'userSettings'
                 await saveSimpleState(db, key, data.value, data.lastModified, tx);
             }
             
-            // For simple types, also explicitly save the lastModified timestamp with the key itself
-            // in the 'userSettings' store. This allows individual ETag lookups later.
-            // For array types, their lastModified from server *is* the ETag for that resource.
-            // If the array's lastModified is not used to update the key-specific timestamp,
-            // then only the global lastStateSync will drive array updates, which is fine if desired.
-            if (data.lastModified) {
-                // If it's a simple setting, its lastModified is saved with its own entry.
-                // If it's an array type, we save its lastModified under its key in userSettings for ETag.
-                if (def.type === 'simple') {
-                    await saveSimpleState(db, key, data.value, data.lastModified, tx);
-                } else if (def.type === 'array') {
-                    // For arrays, store their lastModified in userSettings under their key
-                    // to support individual ETag checks. The 'value' here is just a placeholder.
-                    await saveSimpleState(db, key, null, data.lastModified, tx); // Value null/placeholder, only timestamp matters for ETag
-                }
-            }
-
-
             await tx.done; // Commit transaction for this key
 
             // Update the newest overall timestamp for 'lastStateSync'
@@ -473,21 +473,18 @@ export async function pullUserState(db) {
     await Promise.all(fetchPromises); // Wait for all individual fetches to complete
 
     // After all individual fetches, save the newest overall timestamp for global sync tracking
+    // Only update if there was at least one successful pull that provided a timestamp
     if (newestOverallTimestamp) {
         await saveSimpleState(db, 'lastStateSync', newestOverallTimestamp);
         console.log(`[pullUserState] Updated global lastStateSync to: ${newestOverallTimestamp}`);
     } else {
-        console.log('[pullUserState] No new overall timestamp found from server pull.');
+        console.log('[pullUserState] No new overall timestamp found from server pull to update global lastStateSync.');
     }
 
     _isPullingUserState = false;
     console.log('[pullUserState] All user state pull operations completed.');
 }
 
-
-let _isPullingUserState = false; // Prevent multiple concurrent pulls
-let _lastPullAttemptTime = 0;
-const PULL_DEBOUNCE_MS = 500; // Minimum time between pull attempts
 
 export async function pushUserState(db, keyToUpdate, valueToUpdate) {
     console.log(`[pushUserState] Attempting to push user state for key: ${keyToUpdate}`);
@@ -528,8 +525,23 @@ export async function pushUserState(db, keyToUpdate, valueToUpdate) {
         const data = await response.json(); // Should return { serverTime: '...' }
         if (data.serverTime) {
             // Update the local key's timestamp and the global lastStateSync
-            await saveSimpleState(db, keyToUpdate, valueToUpdate, data.serverTime); // Update specific key's value and timestamp
-            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
+            // saveSimpleState for the keyToUpdate will handle setting its new timestamp
+            if (def.type === 'array') {
+                // For array types, we don't use generic pushUserState directly for full array replacement,
+                // but if it were used (e.g., for `currentDeckGuids`), we'd save the array and its timestamp.
+                // For now, rely on delta functions to update state and internal timestamp.
+                // If currentDeckGuids *is* managed by generic pushUserState, it would call saveArrayState
+                // which already updates its timestamp. So, this specific call below is redundant for arrays if called here.
+                // Let's remove this condition since delta functions are assumed to manage arrays, and simplePush handles simple.
+            } else { // It's a simple type
+                await saveSimpleState(db, keyToUpdate, valueToUpdate, data.serverTime); // Update specific key's value and timestamp
+            }
+            
+            // Only update global lastStateSync if the pushed item's serverTime is newer
+            const { value: currentLastStateSync } = await loadSimpleState(db, 'lastStateSync');
+            if (!currentLastStateSync || data.serverTime > currentLastStateSync) {
+                await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
+            }
         }
         console.log(`[pushUserState] Successfully pushed ${keyToUpdate}. Server response:`, data);
         return true;
@@ -562,7 +574,8 @@ export async function performFullSync(app) {
     console.log('[performFullSync] Placeholder for full synchronization (feed + user state).');
     await pullUserState(db);
     // You might pass the last sync timestamp from pullUserState to performFeedSync
-    // await performFeedSync(app, app.lastStateSync); // Assuming app.lastStateSync holds the timestamp
+    // const { value: lastStateSyncTime } = await loadSimpleState(db, 'lastStateSync');
+    // await performFeedSync(app, lastStateSyncTime);
     // createStatusBarMessage('Full sync complete!', 'success');
 }
 
