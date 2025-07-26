@@ -1,21 +1,14 @@
 // www/js/helpers/userStateUtils.js
 
 import {
-    dbPromise,
-    // Renamed for clarity: loadStateValue is now `loadSimpleState` and `saveStateValue` is `saveSimpleState`
-    loadSimpleState, 
-    saveSimpleState, 
-    // Specialized loaders for array types are now direct getters from database.js
-    getStarredItems,
-    getHiddenItems,
-    getCurrentDeckGuids, // New specialized loader for currentDeckGuids
-    addPendingOperation, // New function for persistent buffering
-    processPendingOperations, // New function for immediate sync
+    db, // --- FIX: Changed from dbPromise to db ---
+    loadSimpleState,
+    saveSimpleState,
+    addPendingOperation,
+    processPendingOperations,
     isOnline,
-    // loadArrayState and saveArrayState are internal to database.js for generic array handling
-    // and aren't typically exposed for direct use by userStateUtils. They are used internally
-    // by the new getStarredItems, getHiddenItems, getCurrentDeckGuids, and pushUserState.
-    // So, we'll remove them from this import.
+    loadArrayState, // --- FIX: Re-added loadArrayState ---
+    saveArrayState  // --- FIX: Re-added saveArrayState ---
 } from '../data/database.js'; // Adjusted path to database.js
 
 
@@ -25,7 +18,6 @@ import {
  * @param {string} guid - The unique identifier of the item.
  */
 export async function toggleStar(app, guid) {
-    const db = await dbPromise;
     const tx = db.transaction('starredItems', 'readwrite');
     const store = tx.objectStore('starredItems');
 
@@ -91,7 +83,6 @@ export async function toggleStar(app, guid) {
  * @param {string} guid - The unique identifier of the item.
  */
 export async function toggleHidden(app, guid) {
-    const db = await dbPromise;
     const tx = db.transaction('hiddenItems', 'readwrite');
     const store = tx.objectStore('hiddenItems');
 
@@ -160,8 +151,8 @@ export async function toggleHidden(app, guid) {
  * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
  */
 export async function pruneStaleHidden(db, feedItems, currentTS) {
-    // Use the specialized getter from database.js
-    const hiddenItems = await getHiddenItems(); 
+    // --- FIX: Use loadArrayState instead of getHiddenItems ---
+    const { value: hiddenItems } = await loadArrayState(db, 'hidden');
 
     // Basic validation
     if (!Array.isArray(hiddenItems)) return [];
@@ -200,12 +191,13 @@ export async function pruneStaleHidden(db, feedItems, currentTS) {
 
 /**
  * Loads the current deck of GUIDs.
- * This function now relies on `getCurrentDeckGuids` getter which operates on the `currentDeckGuids` store.
+ * This function now relies on `loadArrayState` which operates on the `currentDeckGuids` store.
+ * @param {IDBDatabase} db - The IndexedDB database instance. --- FIX: Added db parameter ---
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
-export async function loadCurrentDeck() {
-    // No 'db' parameter needed here as getCurrentDeckGuids handles dbPromise internally
-    let guids = await getCurrentDeckGuids(); 
+export async function loadCurrentDeck(db) { // --- FIX: Added db parameter ---
+    // --- FIX: Use loadArrayState instead of getCurrentDeckGuids ---
+    const { value: guids } = await loadArrayState(db, 'currentDeckGuids');
     return Array.isArray(guids) ? guids : [];
 }
 
@@ -217,37 +209,25 @@ export async function loadCurrentDeck() {
  * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(db, guids) {
-    const tx = db.transaction('currentDeckGuids', 'readwrite');
-    const store = tx.objectStore('currentDeckGuids');
+    // --- FIX: Use saveArrayState which handles the transaction and store operations ---
+    await saveArrayState(db, 'currentDeckGuids', guids);
 
-    try {
-        await store.clear(); // Clear existing deck
-        // Save each GUID as an object { id: guid }
-        for (const guid of guids) {
-            await store.put({ id: guid });
+    console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
+
+    // Add the operation to the pending operations buffer for server sync
+    await addPendingOperation(db, {
+        type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
+        key: 'currentDeckGuids',
+        value: guids // Send the entire array to the server
+    });
+
+    // Attempt immediate background sync if online
+    if (isOnline()) {
+        try {
+            await processPendingOperations(db);
+        } catch (syncErr) {
+            console.error("Failed to immediately sync currentDeckGuids change, operation remains buffered:", syncErr);
         }
-        await tx.done; // Ensure transaction completes
-
-        console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
-
-        // Add the operation to the pending operations buffer for server sync
-        await addPendingOperation(db, {
-            type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
-            key: 'currentDeckGuids',
-            value: guids // Send the entire array to the server
-        });
-
-        // Attempt immediate background sync if online
-        if (isOnline()) {
-            try {
-                await processPendingOperations(db);
-            } catch (syncErr) {
-                console.error("Failed to immediately sync currentDeckGuids change, operation remains buffered:", syncErr);
-            }
-        }
-    } catch (error) {
-        console.error("Error saving current deck:", error);
-        throw error; // Re-throw to indicate failure
     }
 }
 
