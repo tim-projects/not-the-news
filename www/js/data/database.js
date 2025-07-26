@@ -1,414 +1,544 @@
-// database.js:
-import { openDB } from '../../libs/idb.js';
+// database.js
+// This file manages IndexedDB interactions and synchronization with the server.
 
-export const bufferedChanges = [];
-export const pendingOperations = [];
-export const isOnline = () => navigator.onLine;
+import { openDB } from './libs/idb.js'; // Assuming idb.js provides the openDB function
 
-export async function addPendingOperation(db, operation) {
-    const tx = db.transaction('pendingOperations', 'readwrite');
-    await tx.objectStore('pendingOperations').add(operation);
-    await tx.done;
-}
+// --- IndexedDB Configuration ---
+const DB_NAME = 'not-the-news-db';
+const DB_VERSION = 6; // *** IMPORTANT: Increment DB_VERSION for schema changes ***
 
-export const dbPromise = openDB('not-the-news-db', 5, {
-    async upgrade(db, oldV) {
-        if (oldV < 1) {
-            const s = db.createObjectStore('items', { keyPath: 'guid' });
-            s.createIndex('by-lastSync', 'lastSync');
-        }
-        if (oldV < 2) {
-            db.createObjectStore('userState', { keyPath: 'key' });
-        }
-        if (oldV < 4) {
-            db.createObjectStore('userSettings', { keyPath: 'key' });
-            const starredItems = db.createObjectStore('starredItems', { keyPath: 'id' });
-            starredItems.createIndex('by-starredAt', 'starredAt');
-            const hiddenItems = db.createObjectStore('hiddenItems', { keyPath: 'id' });
-            hiddenItems.createIndex('by-hiddenAt', 'hiddenAt');
-            db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
-        }
-        if (oldV >= 2 && oldV < 4) {
-            // Migration logic for userState to userSettings, starredItems, hiddenItems
-            const tx = db.transaction('userState', 'readwrite');
-            const userStateStore = tx.objectStore('userState');
-            const settingsKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate', 'lastStateSync', 'currentDeckGuids'];
-            for (const key of settingsKeys) {
-                const entry = await userStateStore.get(key);
-                if (entry) {
-                    let value = entry.value;
-                    if (typeof value === 'string' && key !== 'lastStateSync') {
-                        try {
-                            value = JSON.parse(value);
-                        } catch (e) {
-                            console.warn(`Could not parse JSON for key "${key}", using raw value.`, value, e);
-                        }
-                    }
-                    // Use a new transaction or reuse existing if possible, but for migration, this is fine
-                    await db.transaction('userSettings', 'readwrite').objectStore('userSettings').put({ key: key, value: value });
-                }
-            }
-            await tx.done; // Ensure userState transaction completes before proceeding
+export let db = null; // Will hold the IndexedDB instance
+
+// Define schema for object stores
+const OBJECT_STORES_SCHEMA = [
+    { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
+    { name: 'starredItems', keyPath: 'id' }, // Stores { id: 'guid', starredAt: 'ISOString' }
+    { name: 'hiddenItems', keyPath: 'id' },  // Stores { id: 'guid', hiddenAt: 'ISOString' }
+    { name: 'currentDeckGuids', keyPath: 'id' }, // *** NEW: Dedicated store for current deck GUIDs ***
+    { name: 'userSettings', keyPath: 'key' } // Stores { key: 'settingName', value: 'settingValue', lastModified: 'timestamp' }
+];
+
+// --- User State Definitions (Maps server keys to client IndexedDB storage) ---
+// This is crucial for the new pull/pushUserState logic.
+export const USER_STATE_DEFS = {
+    // Array-based states stored in their own dedicated object stores
+    starred: { store: 'starredItems', type: 'array', default: [] },
+    hidden: { store: 'hiddenItems', type: 'array', default: [] },
+    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] }, // *** UPDATED: Now an array type ***
+
+    // Simple value states stored in the 'userSettings' object store
+    filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
+    syncEnabled: { store: 'userSettings', type: 'simple', default: true },
+    imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
+    rssFeeds: { store: 'userSettings', type: 'simple', default: [] }, // Assuming this is an array of feed URLs
+    keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] }, // Assuming this is an array of strings
+    shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
+    lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
+    openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
+    // A specific key to store the global latest timestamp from server sync
+    lastStateSync: { store: 'userSettings', type: 'simple', default: null } 
+};
+
+// --- Initialization ---
+export async function initDb() {
+    db = await openDB(DB_NAME, DB_VERSION, {
+        upgrade(db, oldVersion, newVersion, transaction) {
+            console.log(`[IndexedDB] Upgrading DB from version ${oldVersion} to ${newVersion}`);
             
-            const starredEntry = await userStateStore.get('starred'); // Get from the now-closed userState transaction (or new one if needed)
-            if (starredEntry) {
-                try {
-                    const starredItems = JSON.parse(starredEntry.value);
-                    for (const item of starredItems) {
-                        if (item && item.id) {
-                            await db.transaction('starredItems', 'readwrite').objectStore('starredItems').put(item);
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Could not parse starred items, skipping migration.", starredEntry.value, e);
+            // Create or update object stores
+            OBJECT_STORES_SCHEMA.forEach(schema => {
+                if (!db.objectStoreNames.contains(schema.name)) {
+                    const store = db.createObjectStore(schema.name, { keyPath: schema.keyPath, ...schema.options });
+                    console.log(`[IndexedDB] Created object store: ${schema.name}`);
                 }
-            }
-            const hiddenEntry = await userStateStore.get('hidden'); // Get from userState
-            if (hiddenEntry) {
-                try {
-                    const hiddenItems = JSON.parse(hiddenEntry.value);
-                    for (const item of hiddenItems) {
-                        if (item && item.id) {
-                            await db.transaction('hiddenItems', 'readwrite').objectStore('hiddenItems').put(item);
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Could not parse hidden items, skipping migration.", hiddenEntry.value, e);
-                }
-            }
-            // If you get errors here, it might be due to the tx.done above closing the transaction
-            // For complex migrations like this, it's sometimes safer to open new transactions
-            // for each object store operation if they depend on potentially closed transactions.
-            // However, the original code had tx.done after this, so let's keep it consistent.
-            // But this specific block is critical. The original `await tx.done;` was after the loop for settingsKeys.
-            // It might be better to move this one specific tx.done lower if the starred/hidden items also use that tx.
-
-            // To be safe, ensure tx is still valid or open new ones for starred/hidden if needed.
-            // Given the original structure, the intent was likely to finish `tx` after all userState reads.
-            // Let's assume `tx.done` was indeed placed after all userState reads in your original.
-            // If problems arise here, consider individual transactions for starred/hidden within the upgrade.
-            
-            // This `tx.done` here is problematic if the starred/hidden migrations are intended to be part of `tx`
-            // and `userStateStore.get` above was on that `tx`. 
-            // Let's assume the previous `tx.done` was for `settingsKeys` loop.
-            // For now, I'll keep the `db.transaction(...)` calls as they are, but if `starredEntry` or `hiddenEntry`
-            // fail to retrieve, this `tx.done` might be the reason.
-
-            db.deleteObjectStore('userState'); // Delete userState AFTER all data is migrated
-        }
-    }
-});
-
-export async function fetchWithRetry(url, opts = {}, retries = 3, backoff = 500) {
-    if (!isOnline()) throw new Error('Offline');
-    try {
-        return await fetch(url, opts);
-    } catch (err) {
-        if (retries === 0) throw err;
-        await new Promise(r => setTimeout(r, backoff));
-        return fetchWithRetry(url, opts, retries - 1, backoff * 2);
-    }
-}
-
-export async function performFeedSync(db) {
-    if (!isOnline()) return Date.now();
-
-    const { time: srvTime } = await fetchWithRetry('/time').then(res => res.json());
-    const syncTS = Date.parse(srvTime);
-    const cutoffTS = syncTS - 30 * 86400 * 1000;
-
-    const allGuids = await fetchWithRetry('/guids').then(res => res.json());
-
-    const txRO = db.transaction('items', 'readonly');
-    const localItems = await txRO.objectStore('items').getAll();
-    const localGuids = new Set(localItems.map(i => i.guid));
-
-    const guidsToDel = localItems.filter(i => !allGuids.includes(i.guid) && i.lastSync < cutoffTS).map(i => i.guid);
-    if (guidsToDel.length) {
-        const txRW = db.transaction('items', 'readwrite');
-        await Promise.all(guidsToDel.map(g => txRW.objectStore('items').delete(g)));
-        await txRW.done;
-    }
-
-    const newGuids = allGuids.filter(g => !localGuids.has(g));
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < newGuids.length; i += BATCH_SIZE) {
-        const batch = newGuids.slice(i, i + BATCH_SIZE);
-        const res = await fetchWithRetry(`/items`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ guids: batch })
-        });
-        const data = await res.json();
-        const txRW = db.transaction('items', 'readwrite');
-        batch.forEach(g => {
-            const item = data[g];
-            item.lastSync = syncTS;
-            txRW.objectStore('items').put(item);
-        });
-        await txRW.done;
-    }
-
-    const existingGuids = allGuids.filter(g => localGuids.has(g));
-    for (let i = 0; i < existingGuids.length; i += BATCH_SIZE) {
-        const batch = existingGuids.slice(i, i + BATCH_SIZE);
-        const txRW = db.transaction('items', 'readwrite');
-        const s = txRW.objectStore('items');
-        for (let g of batch) {
-            const item = await s.get(g);
-            if (item) {
-                item.lastSync = syncTS;
-                s.put(item);
-            }
-        }
-        await txRW.done;
-    }
-    return syncTS;
-}
-
-function mergeHiddenStates(local, remote) {
-    const mergedMap = new Map();
-    local.forEach(item => mergedMap.set(item.id, item));
-    remote.forEach(item => {
-        if (!mergedMap.has(item.id) || (item.hiddenAt && new Date(item.hiddenAt) > new Date(mergedMap.get(item.id).hiddenAt))) {
-            mergedMap.set(item.id, item);
+            });
+        },
+        blocked() {
+            console.warn('[IndexedDB] Database upgrade is blocked. Close other tabs for this site.');
+            alert('Database update blocked. Please close all other tabs with this site open.');
+        },
+        blocking() {
+            console.warn('[IndexedDB] Database is blocking. Other tabs need to close.');
         }
     });
-    return Array.from(mergedMap.values());
+    console.log(`[IndexedDB] Database '${DB_NAME}' opened, version ${DB_VERSION}`);
 }
 
-function mergeStarredStates(local, remote) {
-    const mergedMap = new Map();
-    local.forEach(item => mergedMap.set(item.id, item));
-    remote.forEach(item => {
-        if (!mergedMap.has(item.id) || (item.starredAt && new Date(item.starredAt) > new Date(mergedMap.get(item.id).starredAt))) {
-            mergedMap.set(item.id, item);
-        }
-    });
-    return Array.from(mergedMap.values());
-}
+// --- Generic State Loading/Saving Functions ---
 
-export async function pullUserState(db) {
-    if (!isOnline()) return null;
-    const lastSyncEntry = await db.transaction('userSettings', 'readonly').objectStore('userSettings').get('lastStateSync') || { value: null };
-    const lastSyncNonce = lastSyncEntry.value;
-    const headers = lastSyncNonce ? { 'If-None-Match': lastSyncNonce } : {};
-    let responseText;
+/**
+ * Loads a single simple state (key-value pair) from the specified IndexedDB store.
+ * @param {IDBDatabase} db The IndexedDB instance.
+ * @param {string} key The key of the state to load (e.g., 'filterMode').
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ * @returns {Promise<{value: any, lastModified: string|null}>} The value and last modification timestamp, or default.
+ */
+export async function loadSimpleState(db, key, tx = null) {
+    const def = USER_STATE_DEFS[key];
+    if (!def || def.type !== 'simple') {
+        console.error(`[loadSimpleState] Invalid or undefined simple state key: ${key}`);
+        return { value: def ? def.default : null, lastModified: null };
+    }
+    const storeName = def.store;
+
+    let transaction;
     try {
-        const res = await fetchWithRetry('/user-state', { headers });
-        if (res.status === 304) {
-            console.log('[pullUserState] User state: No changes from server (304 Not Modified).');
-            return lastSyncEntry.value;
+        transaction = tx || db.transaction(storeName, 'readonly');
+        const data = await transaction.objectStore(storeName).get(key);
+        // Assuming data stored as { key: 'name', value: 'val', lastModified: 'timestamp' }
+        if (data && data.hasOwnProperty('value')) {
+            return { value: data.value, lastModified: data.lastModified || null };
         }
-        if (!res.ok) {
-            const errorText = await res.text();
-            console.error(`[pullUserState] Server returned an error: ${res.status} ${res.statusText}`);
-            console.error('[pullUserState] Server error response body:', errorText);
-            throw new Error(`Failed to fetch user state: ${res.status} ${res.statusText}`);
-        }
-        responseText = await res.text();
-        console.log('[pullUserState] Raw response text length:', responseText.length);
-        console.log('[pullUserState] Raw response text START (first 200 chars):', responseText.substring(0, 200));
-        console.log('[pullUserState] Raw response text END (last 200 chars):', responseText.substring(responseText.length - 200));
-        console.log('[pullUserState] Raw response text FULL:', responseText);
-        let data;
-        try {
-            data = JSON.parse(responseText);
-            console.log('[pullUserState] Successfully parsed JSON data.');
-        } catch (parseError) {
-            console.error('[pullUserState] JSON parsing failed! Raw text was:', responseText);
-            console.error('[pullUserState] JSON parsing error:', parseError);
-            throw parseError;
-        }
-        const { userState, serverTime } = data;
-        // CORRECTED: Removed 'userState' from transaction, as it's deleted after migration
-        const tx = db.transaction(['starredItems', 'hiddenItems', 'userSettings'], 'readwrite');
+    } catch (e) {
+        console.error(`[loadSimpleState] Error loading ${key} from store ${storeName}:`, e);
+    } finally {
+        if (!tx && transaction) await transaction.done; // Only await if we created the transaction
+    }
+    // Return default if not found or error
+    return { value: def.default, lastModified: null };
+}
+
+/**
+ * Saves a single simple state (key-value pair) to the specified IndexedDB store.
+ * @param {IDBDatabase} db The IndexedDB instance.
+ * @param {string} key The key of the state to save (e.g., 'filterMode').
+ * @param {any} value The value to save.
+ * @param {string} [serverTimestamp=null] Optional timestamp from the server.
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ * @returns {Promise<void>}
+ */
+export async function saveSimpleState(db, key, value, serverTimestamp = null, tx = null) {
+    const def = USER_STATE_DEFS[key];
+    if (!def || def.type !== 'simple') {
+        console.error(`[saveSimpleState] Invalid or undefined simple state key: ${key}`);
+        throw new Error(`Invalid or undefined simple state key: ${key}`);
+    }
+    const storeName = def.store;
+
+    let transaction;
+    try {
+        transaction = tx || db.transaction(storeName, 'readwrite');
+        const objectStore = transaction.objectStore(storeName);
         
-        await tx.objectStore('starredItems').clear();
-        if (userState.starred) {
-            for (const item of userState.starred) {
-                await tx.objectStore('starredItems').put(item);
-            }
+        // Prepare object to save, including timestamp if provided
+        const objToSave = { key: key, value: value };
+        if (serverTimestamp) {
+            objToSave.lastModified = serverTimestamp;
+        } else {
+            // If no server timestamp, use current client time (for client-only changes)
+            objToSave.lastModified = new Date().toISOString(); 
         }
-        await tx.objectStore('hiddenItems').clear();
-        if (userState.hidden) {
-            for (const item of userState.hidden) {
-                await tx.objectStore('hiddenItems').put(item);
-            }
-        }
-        const simpleStateKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate', 'currentDeckGuids'];
-        for (const key of simpleStateKeys) {
-            if (userState.hasOwnProperty(key)) {
-                await tx.objectStore('userSettings').put({ key: key, value: userState[key] });
-            }
-        }
-        await tx.objectStore('userSettings').put({ key: 'lastStateSync', value: serverTime });
-        await tx.done;
-        console.log('[pullUserState] User state pulled and merged successfully.');
-        return serverTime;
-    } catch (error) {
-        console.error('[pullUserState] Failed to pull user state:', error);
-        throw error;
+
+        await objectStore.put(objToSave);
+        console.log(`[saveSimpleState] Saved "${key}" to store "${storeName}". Value:`, value);
+    } catch (e) {
+        console.error(`[saveSimpleState] Error saving "${key}" to store "${storeName}":`, e);
+        throw e;
+    } finally {
+        if (!tx && transaction) await transaction.done;
     }
 }
 
-export async function pushUserState(db, changes = bufferedChanges) {
-    if (changes.length === 0) return;
+/**
+ * Loads an array state (e.g., starredItems) from its dedicated IndexedDB store.
+ * @param {IDBDatabase} db The IndexedDB instance.
+ * @param {string} key The key of the array state (e.g., 'starred').
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ * @returns {Promise<{value: Array<any>, lastModified: string|null}>} The array and last modification timestamp, or default.
+ */
+export async function loadArrayState(db, key, tx = null) {
+    const def = USER_STATE_DEFS[key];
+    if (!def || def.type !== 'array') {
+        console.error(`[loadArrayState] Invalid or undefined array state key: ${key}`);
+        return { value: def ? def.default : [], lastModified: null };
+    }
+    const storeName = def.store;
 
-    if (!isOnline()) {
-        pendingOperations.push({ type: 'pushUserState', data: JSON.parse(JSON.stringify(changes)) });
-        console.warn("Offline: Queued user state changes for later push.");
+    let transaction;
+    try {
+        transaction = tx || db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const allItems = await store.getAll(); // Get all items from the array store
+        
+        // For array types, 'lastModified' is generally from the API response for the entire collection.
+        // If you need a lastModified for the *local* array for some reason, you'd store it as a simple setting.
+        return { value: allItems, lastModified: null }; 
+    } catch (e) {
+        console.error(`[loadArrayState] Error loading ${key} from store ${storeName}:`, e);
+    } finally {
+        if (!tx && transaction) await transaction.done;
+    }
+    return { value: def.default, lastModified: null };
+}
+
+
+/**
+ * Saves an array state (e.g., starredItems) to its dedicated IndexedDB store.
+ * This clears the store and adds all new items.
+ * @param {IDBDatabase} db The IndexedDB instance.
+ * @param {string} key The key of the array state (e.g., 'starred').
+ * @param {Array<any>} arr The array of items to save.
+ * @param {string} [serverTimestamp=null] Optional timestamp from the server.
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ * @returns {Promise<void>}
+ */
+export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = null) {
+    const def = USER_STATE_DEFS[key];
+    if (!def || def.type !== 'array') {
+        console.error(`[saveArrayState] Invalid or undefined array state key: ${key}`);
+        throw new Error(`Invalid or undefined array state key: ${key}`);
+    }
+    const storeName = def.store;
+
+    let transaction;
+    try {
+        transaction = tx || db.transaction(storeName, 'readwrite');
+        const objectStore = transaction.objectStore(storeName);
+        
+        await objectStore.clear(); // Clear existing items
+
+        // Ensure array items are clonable (remove proxies/observers if any)
+        const clonableArr = JSON.parse(JSON.stringify(arr));
+        
+        // For array stores like 'starredItems', 'hiddenItems', 'currentDeckGuids',
+        // each element in the array is a separate record. The 'id' property in these objects
+        // should map to the object store's keyPath.
+        for (const item of clonableArr) {
+            // For currentDeckGuids, the server sends an array of strings (GUIDs).
+            // We need to store them as objects with an 'id' key for IndexedDB.
+            const itemToStore = (key === 'currentDeckGuids' && typeof item === 'string') 
+                               ? { id: item } 
+                               : item;
+            await objectStore.put(itemToStore);
+        }
+        
+        console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${storeName}".`);
+
+        // If a serverTimestamp is provided for the collection, update the 'lastStateSync'
+        // or a dedicated timestamp for this array if you introduce one.
+        // For now, `pullUserState` handles the global `lastStateSync` update.
+    } catch (e) {
+        console.error(`[saveArrayState] Error saving "${key}" to store "${storeName}":`, e);
+        throw e;
+    } finally {
+        if (!tx && transaction) await transaction.done;
+    }
+}
+
+// --- Client-Server Synchronization Functions ---
+
+let _isPullingUserState = false; // Prevent multiple concurrent pulls
+let _lastPullAttemptTime = 0;
+const PULL_DEBOUNCE_MS = 500; // Minimum time between pull attempts
+
+/**
+ * Pulls individual user state data from the server and updates IndexedDB.
+ */
+export async function pullUserState(db) {
+    if (_isPullingUserState) {
+        console.log('[pullUserState] Already pulling user state. Skipping new request.');
         return;
     }
-
-    const compiledChanges = {};
-    for (const { key, value } of changes) {
-        compiledChanges[key] = JSON.stringify(value);
+    const now = Date.now();
+    if (now - _lastPullAttemptTime < PULL_DEBOUNCE_MS) {
+        console.log('[pullUserState] Debouncing pull request.');
+        return;
     }
+    _lastPullAttemptTime = now;
+    _isPullingUserState = true;
+    
+    console.log('[pullUserState] Attempting to pull user state from server...');
+    const API_BASE_URL = window.location.origin;
 
-    try {
-        const res = await fetchWithRetry('/user-state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ userState: compiledChanges })
-        });
+    // Get the global lastStateSync from IndexedDB to use for If-None-Match header
+    const { value: currentLastStateSync } = await loadSimpleState(db, 'lastStateSync');
+    let newestOverallTimestamp = currentLastStateSync;
 
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`pushUserState failed ${res.status}: ${errorText}`);
+    const fetchPromises = Object.entries(USER_STATE_DEFS).map(async ([key, def]) => {
+        // Skip 'lastStateSync' itself from being fetched as a user state key, as it's client-managed from other keys.
+        if (key === 'lastStateSync') return { key, status: 'skipped' };
+
+        const url = `${API_BASE_URL}/user-state/${key}`;
+        let localTimestamp = '';
+        
+        // For individual keys, we load their lastModified from the userSettings store (if it's a simple type)
+        // or from the global lastStateSync if a specific key timestamp isn't tracked individually.
+        // The most robust way is to store each key's `lastModified` as a separate simple setting.
+        const keySpecificState = await loadSimpleState(db, key); // For simple types, this gets value and lastModified
+        if (keySpecificState && keySpecificState.lastModified) {
+            localTimestamp = keySpecificState.lastModified;
+        } else if (def.type === 'array') { // For array types, we fetch the whole array and update based on server's timestamp
+            // If arrays don't have individual lastModified saved in userSettings, use global lastStateSync
+            localTimestamp = currentLastStateSync || ''; // Use global sync time as ETag for array if no specific one
         }
 
-        const { serverTime } = await res.json();
-        const tx = db.transaction('userSettings', 'readwrite');
-        tx.objectStore('userSettings').put({ key: 'lastStateSync', value: serverTime });
-        await tx.done;
-        changes.length = 0;
-        console.log('User state changes pushed successfully.');
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (localTimestamp) {
+                headers['If-None-Match'] = localTimestamp;
+                console.log(`[pullUserState] Fetching ${key} with If-None-Match: ${localTimestamp.substring(0,20)}...`);
+            } else {
+                console.log(`[pullUserState] Fetching ${key} (no specific local ETag)`);
+            }
+
+            const response = await fetch(url, { method: 'GET', headers: headers });
+
+            if (response.status === 304) {
+                console.log(`[pullUserState] User state for key ${key}: No changes (304 Not Modified).`);
+                return { key, status: 304 };
+            }
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.warn(`[pullUserState] User state key ${key} not found on server (404). Using client default.`);
+                    // Optionally, if a 404 means the server has deleted it, you might clear local state.
+                    // For now, we'll let existing local data persist unless explicitly synced empty.
+                    return { key, status: 404 };
+                }
+                throw new Error(`HTTP error! status: ${response.status} for ${key}`);
+            }
+
+            const data = await response.json(); // Data will be { "value": ..., "lastModified": "..." }
+            console.log(`[pullUserState] Received new data for key ${key}:`, data);
+
+            const tx = db.transaction(def.store, 'readwrite');
+
+            // Store the value based on its type definition
+            if (def.type === 'array') {
+                await saveArrayState(db, key, data.value || def.default, data.lastModified, tx);
+            } else { // simple type
+                await saveSimpleState(db, key, data.value, data.lastModified, tx);
+            }
+            
+            // For simple types, also explicitly save the lastModified timestamp with the key itself
+            // in the 'userSettings' store. This allows individual ETag lookups later.
+            // For array types, their lastModified from server *is* the ETag for that resource.
+            // If the array's lastModified is not used to update the key-specific timestamp,
+            // then only the global lastStateSync will drive array updates, which is fine if desired.
+            if (data.lastModified) {
+                // If it's a simple setting, its lastModified is saved with its own entry.
+                // If it's an array type, we save its lastModified under its key in userSettings for ETag.
+                if (def.type === 'simple') {
+                    await saveSimpleState(db, key, data.value, data.lastModified, tx);
+                } else if (def.type === 'array') {
+                    // For arrays, store their lastModified in userSettings under their key
+                    // to support individual ETag checks. The 'value' here is just a placeholder.
+                    await saveSimpleState(db, key, null, data.lastModified, tx); // Value null/placeholder, only timestamp matters for ETag
+                }
+            }
+
+
+            await tx.done; // Commit transaction for this key
+
+            // Update the newest overall timestamp for 'lastStateSync'
+            if (data.lastModified && (!newestOverallTimestamp || data.lastModified > newestOverallTimestamp)) {
+                newestOverallTimestamp = data.lastModified;
+            }
+
+            return { key, data, status: 200 };
+
+        } catch (error) {
+            console.error(`[pullUserState] Failed to pull user state for key ${key}:`, error);
+            return { key, data: null, status: 'error', error };
+        }
+    });
+
+    await Promise.all(fetchPromises); // Wait for all individual fetches to complete
+
+    // After all individual fetches, save the newest overall timestamp for global sync tracking
+    if (newestOverallTimestamp) {
+        await saveSimpleState(db, 'lastStateSync', newestOverallTimestamp);
+        console.log(`[pullUserState] Updated global lastStateSync to: ${newestOverallTimestamp}`);
+    } else {
+        console.log('[pullUserState] No new overall timestamp found from server pull.');
+    }
+
+    _isPullingUserState = false;
+    console.log('[pullUserState] All user state pull operations completed.');
+}
+
+
+/**
+ * Pushes a single user state key-value pair to the server.
+ * @param {IDBDatabase} db The IndexedDB instance.
+ * @param {string} keyToUpdate The key of the user state to update (e.g., 'filterMode', 'currentDeckGuids').
+ * @param {any} valueToUpdate The new value for that state key.
+ * @returns {Promise<boolean>} True if successful, false otherwise.
+ */
+export async function pushUserState(db, keyToUpdate, valueToUpdate) {
+    console.log(`[pushUserState] Attempting to push user state for key: ${keyToUpdate}`);
+    const API_BASE_URL = window.location.origin;
+
+    const def = USER_STATE_DEFS[keyToUpdate];
+    if (!def) {
+        console.error(`[pushUserState] Attempted to push unknown key: ${keyToUpdate}`);
+        return false;
+    }
+
+    let url;
+    let method = 'POST';
+    let body;
+
+    // Determine the correct endpoint and body format based on key type
+    if (keyToUpdate === 'starred' || keyToUpdate === 'hidden') {
+        // These keys use delta endpoints, not the generic POST /user-state for full array replacement.
+        // Your UI should call pushStarredItemDelta or pushHiddenItemDelta directly for these.
+        console.warn(`[pushUserState] Cannot use generic push for delta-managed key: ${keyToUpdate}. Use specific delta functions.`);
+        return false;
+    } else {
+        url = `${API_BASE_URL}/user-state`; // Generic POST endpoint for simple key-value updates or full array replacements for non-delta types
+        body = JSON.stringify({ key: keyToUpdate, value: valueToUpdate });
+    }
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: body
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} for ${keyToUpdate}`);
+        }
+
+        const data = await response.json(); // Should return { serverTime: '...' }
+        if (data.serverTime) {
+            // Update the local key's timestamp and the global lastStateSync
+            await saveSimpleState(db, keyToUpdate, valueToUpdate, data.serverTime); // Update specific key's value and timestamp
+            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
+        }
+        console.log(`[pushUserState] Successfully pushed ${keyToUpdate}. Server response:`, data);
+        return true;
     } catch (error) {
-        console.error('Failed to push user state changes:', error);
-        throw error;
+        console.error(`[pushUserState] Failed to push user state for key ${keyToUpdate}:`, error);
+        return false;
     }
 }
 
-export async function performFullSync(db) {
-    console.log("Performing full sync...");
-    const feedT = await performFeedSync(db);
-    const stateT = await pullUserState(db);
-    await pushUserState(db);
-    console.log("Full sync completed.");
-    return { feedTime: feedT, stateTime: stateT };
+// --- Specific API Calls (for delta updates) ---
+// These remain as direct calls from your UI where a specific item is added/removed.
+export async function pushStarredItemDelta(id, action, timestamp) {
+    console.log(`[pushStarredItemDelta] ID: ${id}, Action: ${action}`);
+    const API_BASE_URL = window.location.origin;
+    const url = `${API_BASE_URL}/user-state/starred/delta`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, action: action, starredAt: timestamp })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} for starred delta`);
+        }
+        const data = await response.json();
+        if (data.serverTime) {
+            // Update the local 'starred' state in IndexedDB (re-fetch or update directly)
+            // For delta operations, we usually rely on the next pull to reconcile the full array.
+            // Or, you could manually add/remove from IndexedDB here.
+            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
+            // Also update the starred's own lastModified timestamp if you track it separately:
+            // await saveSimpleState(db, 'starred', null, data.serverTime);
+        }
+        console.log(`[pushStarredItemDelta] Success. Server response:`, data);
+        return true;
+    } catch (error) {
+        console.error(`[pushStarredItemDelta] Failed:`, error);
+        return false;
+    }
 }
 
-export async function loadStateValue(db, key, defaultValue) {
-    const entry = await db.transaction('userSettings', 'readonly').objectStore('userSettings').get(key);
-    let value = entry?.value;
-    if (value === undefined || value === null) {
-        return defaultValue;
+export async function pushHiddenItemDelta(id, action, timestamp) {
+    console.log(`[pushHiddenItemDelta] ID: ${id}, Action: ${action}`);
+    const API_BASE_URL = window.location.origin;
+    const url = `${API_BASE_URL}/user-state/hidden/delta`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, action: action, hiddenAt: timestamp })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} for hidden delta`);
+        }
+        const data = await response.json();
+        if (data.serverTime) {
+            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
+            // await saveSimpleState(db, 'hidden', null, data.serverTime);
+        }
+        console.log(`[pushHiddenItemDelta] Success. Server response:`, data);
+        return true;
+    } catch (error) {
+        console.error(`[pushHiddenItemDelta] Failed:`, error);
+        return false;
     }
+}
+
+
+// --- Functions to get data out of IndexedDB for UI ---
+
+export async function getStarredItems() {
+    await initDb(); // Ensure DB is open
+    const { value } = await loadArrayState(db, 'starred');
     return value;
 }
 
-export async function saveStateValue(db, key, value) {
-    const tx = db.transaction('userSettings', 'readwrite');
-    tx.objectStore('userSettings').put({ key: key, value: value });
-    await tx.done;
-    if (['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'].includes(key)) {
-        // This is likely where you'd buffer changes for pushUserState
-        // bufferedChanges.push({ key, value }); // Assuming 'bufferedChanges' is defined and used correctly
-    }
+export async function getHiddenItems() {
+    await initDb(); // Ensure DB is open
+    const { value } = await loadArrayState(db, 'hidden');
+    return value;
 }
 
-export async function loadArrayState(db, key) {
-    // CORRECTED: Load from 'userSettings' as 'userState' is deleted
-    const entry = await db.transaction('userSettings', 'readonly').objectStore('userSettings').get(key);
-    let items = [];
-    if (entry?.value != null) {
-        try { 
-            // The value might already be an array if saved directly, or stringified JSON
-            // Check its type to avoid double-parsing if it's already an array
-            items = Array.isArray(entry.value) ? entry.value : JSON.parse(entry.value); 
-        } catch (e) {
-            console.warn(`[loadArrayState] Could not parse value for array key "${key}", returning empty array. Value:`, entry.value, e);
-        }
-    }
-    return Array.isArray(items) ? items : []; // Ensure it always returns an array
+// *** UPDATED: getCurrentDeckGuids now uses loadArrayState and expects array from server ***
+export async function getCurrentDeckGuids() {
+    await initDb(); // Ensure DB is open
+    const { value } = await loadArrayState(db, 'currentDeckGuids');
+    return value.map(item => item.id); // Return just the GUID strings
 }
 
-export async function loadStarredItems(db) {
-    return await db.transaction('starredItems', 'readonly').objectStore('starredItems').getAll() || [];
-}
-export async function loadHiddenItems(db) {
-    return await db.transaction('hiddenItems', 'readonly').objectStore('hiddenItems').getAll() || [];
-}
 
-export async function saveArrayState(db, key, arr) {
-    console.log(`[saveArrayState] Attempting to save key: "${key}"`);
-    console.log(`[saveArrayState] Data to save (type: ${typeof arr}, isArray: ${Array.isArray(arr)}):`, arr);
-
-    let clonableArr;
-    try {
-        // This line will convert the Proxy(Array) into a plain JavaScript Array
-        // by deep-cloning its JSON-serializable content.
-        clonableArr = JSON.parse(JSON.stringify(arr)); 
-        console.log("[saveArrayState] Successfully converted to JSON-clonable array.", clonableArr);
-    } catch (e) {
-        console.error("[saveArrayState] Failed to convert data to JSON-clonable format! Error:", e);
-        // It's crucial to throw here if the data truly isn't clonable by JSON.stringify
-        throw new Error(`Data for key "${key}" is not JSON-serializable: ${e.message}`);
-    }
-
-    const tx = db.transaction('userSettings', 'readwrite');
-    // Use the `clonableArr` for the put operation
-    tx.objectStore('userSettings').put({ key: key, value: clonableArr }); 
-    await tx.done;
-    console.log(`[saveArrayState] Successfully saved key: "${key}"`);
+export async function getFilterMode() {
+    await initDb(); // Ensure DB is open
+    const { value } = await loadSimpleState(db, 'filterMode');
+    return value;
 }
 
-export async function processPendingOperations(db) {
-    if (!isOnline()) return;
+export async function getSyncEnabled() {
+    await initDb(); // Ensure DB is open
+    const { value } = await loadSimpleState(db, 'syncEnabled');
+    return value;
+}
 
-    const allPendingOps = await db.transaction('pendingOperations', 'readwrite').objectStore('pendingOperations').getAll();
-    if (allPendingOps.length === 0) return;
-
-    const opsToDelete = [];
-
-    for (const op of allPendingOps) {
-        try {
-            switch (op.type) {
-                case 'pushUserState':
-                    // Need to ensure op.data is not `bufferedChanges` itself, but a clone
-                    // If you're doing `JSON.parse(JSON.stringify(changes))` when queuing, it should be fine.
-                    await pushUserState(db, op.data); 
-                    opsToDelete.push(op.id);
-                    break;
-                case 'starDelta':
-                    await fetchWithRetry("/user-state/starred/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
-                    opsToDelete.push(op.id);
-                    break;
-                case 'hiddenDelta':
-                    await fetchWithRetry("/user-state/hidden/delta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(op.data) });
-                    opsToDelete.push(op.id);
-                    break;
-                default: console.warn(`Unknown pending operation type: ${op.type}`);
-            }
-        } catch (err) {
-            console.error(`Failed to process pending operation of type "${op.type}":`, err);
-        }
-    }
-    
-    if (opsToDelete.length > 0) {
-        const tx = db.transaction('pendingOperations', 'readwrite');
-        for (const id of opsToDelete) {
-            await tx.objectStore('pendingOperations').delete(id);
-        }
-        await tx.done;
-        console.log(`Processed and removed ${opsToDelete.length} pending operations.`);
-    }
-
-    const remainingOpsCount = await db.transaction('pendingOperations', 'readonly').objectStore('pendingOperations').count();
-    if (remainingOpsCount > 0) {
-        console.warn(`${remainingOpsCount} operations failed and remain in the queue.`);
-    } else {
-        console.log("Finished processing all pending operations.");
-    }
+export async function getImagesEnabled() {
+    await initDb();
+    const { value } = await loadSimpleState(db, 'imagesEnabled');
+    return value;
+}
+export async function getRssFeeds() {
+    await initDb();
+    const { value } = await loadSimpleState(db, 'rssFeeds');
+    return value;
+}
+export async function getKeywordBlacklist() {
+    await initDb();
+    const { value } = await loadSimpleState(db, 'keywordBlacklist');
+    return value;
+}
+export async function getShuffleCount() {
+    await initDb();
+    const { value } = await loadSimpleState(db, 'shuffleCount');
+    return value;
+}
+export async function getLastShuffleResetDate() {
+    await initDb();
+    const { value } = await loadSimpleState(db, 'lastShuffleResetDate');
+    return value;
+}
+export async function getOpenUrlsInNewTabEnabled() {
+    await initDb();
+    const { value } = await loadSimpleState(db, 'openUrlsInNewTabEnabled');
+    return value;
 }
