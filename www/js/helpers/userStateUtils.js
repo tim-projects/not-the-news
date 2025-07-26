@@ -11,7 +11,7 @@ import {
     loadStateValue,
     loadArrayState, // Still used for currentDeckGuids
     saveArrayState // Still used for currentDeckGuids
-} from '../../data/database.js'; // Adjusted path to database.js
+} from '../data/database.js'; // Adjusted path to database.js
 
 /**
  * Toggles the starred status of an item and manages synchronization.
