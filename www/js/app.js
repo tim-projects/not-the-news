@@ -1,23 +1,22 @@
 // app.js
 
 // Import necessary modules
-// Ensure loadArrayState is imported here
-import { 
-    db, // --- FIX: Changed from dbPromise to db ---
-    performFeedSync, 
-    performFullSync, 
-    pullUserState, 
-    processPendingOperations, 
-    saveSimpleState, // --- FIX: Changed from saveStateValue to saveSimpleState ---
-    loadSimpleState,  // --- FIX: Changed from loadStateValue to loadSimpleState ---
-    loadArrayState, 
+import {
+    db, // db is the promise that resolves to the actual IDBDatabase instance
+    performFeedSync,
+    performFullSync,
+    pullUserState,
+    processPendingOperations,
+    saveSimpleState,
+    loadSimpleState,
+    loadArrayState,
     isOnline,
-    initDb // --- IMPORTANT: Ensure initDb is imported to be called at startup ---
-} from './data/database.js';
-import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
-import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
-import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
+    initDb
+} from './data/database.js'; // Ensure this path is correct
+import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js'; // Removed displayCurrentDeck from here as it's not directly used in Alpine data
+import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js'; // Ensure these are correctly implemented
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js'; // Ensure these are correctly implemented
+import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js'; // Ensure these are correctly implemented
 
 
 // Service Worker Registration
@@ -51,16 +50,11 @@ document.addEventListener("load", e => {
 }, true);
 
 
-// --- Prevent Alpine.js from starting automatically ---
-// This line must be added BEFORE you import Alpine.js
-// If Alpine.js is imported via a script tag, make sure this is above it.
-window.deferAlpine = true; // For Alpine v2, use Alpine.defer = true;
-
 // --- Initialize the database BEFORE Alpine.js starts ---
 // This is crucial so that 'db' is available when Alpine.js needs it.
 (async () => {
     try {
-        await initDb();
+        await initDb(); // initDb resolves with the db instance, and 'db' is imported as that instance
         console.log("app.js: IndexedDB initialized successfully before Alpine.js.");
         // Now that DB is open, proceed with Alpine.js initialization
         document.dispatchEvent(new CustomEvent('db-initialized')); // Custom event to signal DB readiness
@@ -73,7 +67,7 @@ window.deferAlpine = true; // For Alpine v2, use Alpine.defer = true;
 
 // Alpine.js Initialization
 // We'll listen for the custom 'db-initialized' event before setting up Alpine
-document.addEventListener('db-initialized', () => { // --- FIX: Listen for custom event ---
+document.addEventListener('db-initialized', () => {
     Alpine.data('rssApp', () => ({
         // --- Alpine.js Reactive properties with initial defaults ---
         loading: true, // Start as true, set to false after initApp completes
@@ -92,12 +86,18 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
         currentDeckGuids: [],
         errorMessage: '',
         isOnline: isOnline(), // Initialize with current online status
-        deckItems: [], // This will be populated by displayCurrentDeck
+        // deckItems: [], // This is typically populated by filteredEntries
         _lastFilterHash: '', // For memoization
         _cachedFilteredEntries: null, // For memoization
 
         // Computed property for filtered entries
         get filteredEntries() {
+            // Check if db is initialized before proceeding
+            if (!db) {
+                console.warn("db not initialized, cannot filter entries yet.");
+                return [];
+            }
+
             const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}`;
 
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
@@ -117,10 +117,14 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
                     filtered = this.entries.filter(e => deckSet.has(e.id) && !hiddenMap.has(e.id));
                     break;
                 case "hidden":
-                    filtered = this.entries.filter(e => hiddenMap.has(e.id)).sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+                    // Only include items that are both in entries and hidden, and sort by hiddenAt
+                    filtered = this.entries.filter(e => hiddenMap.has(e.id))
+                                         .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
                     break;
                 case "starred":
-                    filtered = this.entries.filter(e => starredMap.has(e.id)).sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
+                    // Only include items that are both in entries and starred, and sort by starredAt
+                    filtered = this.entries.filter(e => starredMap.has(e.id))
+                                         .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
                     break;
                 default:
                     filtered = this.entries;
@@ -144,16 +148,12 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
 
         // --- Alpine.js init method ---
         async initApp() {
-            // `db` is already initialized and available at the module level due to the IIFE
-            // const db = await dbPromise; // REMOVE THIS LINE, db is global and ready
-
             try {
                 // Load initial settings and user state from DB/localStorage
-                // These directly update the Alpine data properties
-                this.syncEnabled = (await loadSimpleState(db, 'syncEnabled')).value; // --- FIX: Use loadSimpleState correctly ---
-                this.imagesEnabled = (await loadSimpleState(db, 'imagesEnabled')).value; // --- FIX ---
-                this.openUrlsInNewTabEnabled = (await loadSimpleState(db, 'openUrlsInNewTabEnabled')).value; // --- FIX ---
-                this.filterMode = (await loadFilterMode(db)); // loadFilterMode should handle its own defaults
+                this.syncEnabled = (await loadSimpleState(db, 'syncEnabled')).value;
+                this.imagesEnabled = (await loadSimpleState(db, 'imagesEnabled')).value;
+                this.openUrlsInNewTabEnabled = (await loadSimpleState(db, 'openUrlsInNewTabEnabled')).value;
+                this.filterMode = (await loadFilterMode(db));
                 this.isOnline = isOnline(); // Set initial online status
 
                 // --- Attempt to pull user state (including current deck) from server early ---
@@ -174,19 +174,19 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
                 await this.loadFeedItemsFromDB();
 
                 // Load hidden and starred states from local DB. These might have been updated by early pullUserState.
-                this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX: Use loadArrayState correctly ---
-                this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX: Use loadArrayState correctly ---
+                this.hidden = (await loadArrayState(db, 'hidden')).value;
+                this.starred = (await loadArrayState(db, 'starred')).value;
 
                 // Determine sync completion time for pruning stale hidden entries.
-                const itemsCount = await db.transaction('feedItems', 'readonly').objectStore('feedItems').count(); // --- FIX: Use 'feedItems' store ---
+                const itemsCount = await db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
                 let syncCompletionTime = Date.now();
                 if (itemsCount === 0 && this.isOnline) {
                      const { feedTime } = await performFullSync(db);
                      syncCompletionTime = feedTime;
                      if (this.syncEnabled && this.isOnline) {
                          await pullUserState(db);
-                         this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX ---
-                         this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX ---
+                         this.hidden = (await loadArrayState(db, 'hidden')).value;
+                         this.starred = (await loadArrayState(db, 'starred')).value;
                      }
                      await this.loadFeedItemsFromDB();
                 }
@@ -198,11 +198,11 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
                 const today = new Date();
-                today.setHours(0,0,0,0);
+                today.setHours(0,0,0,0); // Normalize to start of day
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
-                    this.shuffleCount = 2;
+                    this.shuffleCount = 2; // Reset daily shuffle count
                     await saveShuffleState(db, 2, today);
                 }
 
@@ -216,58 +216,61 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
                     if (isOpen) {
                         this.modalView = 'main';
                         await manageSettingsPanelVisibility(this);
-                        this.rssFeedsInput = (await loadSimpleState(db, 'rssFeeds')).value || ''; // --- FIX ---
-                        this.keywordBlacklistInput = (await loadSimpleState(db, 'keywordBlacklist')).value || ''; // --- FIX ---
+                        this.rssFeedsInput = (await loadSimpleState(db, 'rssFeeds')).value || '';
+                        this.keywordBlacklistInput = (await loadSimpleState(db, 'keywordBlacklist')).value || '';
                     } else {
                         await saveCurrentScrollPosition();
                     }
                 });
+                // Watch for changes to openUrlsInNewTabEnabled to re-apply link handling
+                this.$watch('openUrlsInNewTabEnabled', () => {
+                    // Re-process links in all currently displayed entries
+                    document.querySelectorAll('.itemdescription').forEach(el => this.handleEntryLinks(el));
+                });
                 this.$watch("modalView", async () => {
                     await manageSettingsPanelVisibility(this);
                 });
-                this.$watch('syncEnabled', value => saveSimpleState(db, 'syncEnabled', value)); // --- FIX ---
-                this.$watch('imagesEnabled', value => saveSimpleState(db, 'imagesEnabled', value)); // --- FIX ---
-                this.$watch('openUrlsInNewTabEnabled', value => saveSimpleState(db, 'openUrlsInNewTabEnabled', value)); // --- FIX ---
-                this.$watch('rssFeedsInput', value => saveSimpleState(db, 'rssFeeds', value)); // --- FIX ---
-                this.$watch('keywordBlacklistInput', value => saveSimpleState(db, 'keywordBlacklist', value)); // --- FIX ---
+                this.$watch('syncEnabled', value => saveSimpleState(db, 'syncEnabled', value));
+                this.$watch('imagesEnabled', value => saveSimpleState(db, 'imagesEnabled', value));
+                this.$watch('rssFeedsInput', value => saveSimpleState(db, 'rssFeeds', value));
+                this.$watch('keywordBlacklistInput', value => saveSimpleState(db, 'keywordBlacklist', value));
                 this.$watch('filterMode', value => setFilterMode(this, db, value));
                 this.updateCounts();
                 await initScrollPosition(this);
 
-                await this.convertUrlsInEntries();
+                this.loading = false; // Hide loading screen
 
-                this.loading = false;
-
+                // Background sync
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
                             console.log("app.js: Initiating background partial sync...");
                             await performFeedSync(db);
                             await pullUserState(db);
-                            this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX ---
-                            this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX ---
+                            this.hidden = (await loadArrayState(db, 'hidden')).value;
+                            this.starred = (await loadArrayState(db, 'starred')).value;
                             await this.loadFeedItemsFromDB();
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
                             await validateAndRegenerateCurrentDeck(this);
                             console.log("app.js: Background partial sync completed.");
-                            await this.convertUrlsInEntries();
                         } catch (error) {
                             console.error('app.js: Background partial sync failed', error);
                         }
-                    }, 0);
+                    }, 0); // Use 0 timeout to allow initial render
                 }
 
                 attachScrollToTopHandler();
 
+                // Online/Offline detection and re-sync
                 window.addEventListener('online', async () => {
                     this.isOnline = true;
                     if (this.syncEnabled) {
                         console.log("app.js: Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations(db);
                         await this.loadFeedItemsFromDB();
-                        this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX ---
-                        this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX ---
+                        this.hidden = (await loadArrayState(db, 'hidden')).value;
+                        this.starred = (await loadArrayState(db, 'starred')).value;
                         this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this);
@@ -279,19 +282,20 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
                     console.warn("app.js: Offline detected. Syncing disabled.");
                 });
 
+                // Periodic sync based on activity
                 let lastActivityTimestamp = Date.now();
                 const recordActivity = () => { lastActivityTimestamp = Date.now(); };
                 ["mousemove", "mousedown", "keydown", "scroll", "click"].forEach(event => document.addEventListener(event, recordActivity, true));
                 document.addEventListener("visibilitychange", recordActivity, true);
                 window.addEventListener("focus", recordActivity, true);
 
-                const SYNC_INTERVAL_MS = 5 * 60 * 1000;
-                const INACTIVITY_TIMEOUT_MS = 60 * 1000;
+                const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+                const INACTIVITY_TIMEOUT_MS = 60 * 1000; // 1 minute
 
                 setInterval(async () => {
                     const now = Date.now();
                     if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
-                        return;
+                        return; // Skip sync if conditions not met
                     }
                     try {
                         console.log("app.js: Performing periodic background sync...");
@@ -302,7 +306,6 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this);
                         console.log("app.js: Periodic background sync completed.");
-                        await this.convertUrlsInEntries();
                     } catch (error) {
                         console.error("app.js: Periodic sync failed", error);
                     }
@@ -315,19 +318,35 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
             }
         },
 
-        // --- Convert URLs to links based on setting ---
-        async convertUrlsInEntries() {
-            const entriesContainer = document.getElementById('items');
-            if (entriesContainer) {
-                convertUrlsToLinks(entriesContainer, this.openUrlsInNewTabEnabled);
-            }
+        // --- New method to handle links within each entry's description ---
+        handleEntryLinks(element) {
+            // This function is called by x-init on the .itemdescription element
+            // `element` refers to the specific .itemdescription div
+            if (!element) return;
+
+            // Query for all anchor tags within this specific description element
+            const links = element.querySelectorAll('a');
+
+            links.forEach(link => {
+                // Check if the link is external (optional, but good practice)
+                if (link.hostname !== window.location.hostname) {
+                    if (this.openUrlsInNewTabEnabled) {
+                        link.setAttribute('target', '_blank');
+                        // Add rel="noopener noreferrer" for security and performance
+                        link.setAttribute('rel', 'noopener noreferrer');
+                    } else {
+                        link.removeAttribute('target');
+                        link.removeAttribute('rel');
+                    }
+                }
+            });
         },
+
 
         // --- Alpine.js methods ---
 
         async loadFeedItemsFromDB() {
-            // `db` is already initialized and available globally after initDb()
-            const rawItemsFromDb = await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll(); // --- FIX: Use 'feedItems' store ---
+            const rawItemsFromDb = await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
             this.entries = mapRawItems(rawItemsFromDb, formatDate);
         },
 
@@ -365,46 +384,20 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
         },
 
         async saveRssFeeds() {
-            // `db` is already initialized and available globally
-            await saveSimpleState(db, 'rssFeeds', this.rssFeedsInput); // --- FIX ---
+            await saveSimpleState(db, 'rssFeeds', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
-            this.loading = true;
+            this.loading = true; // Show loading
             await performFullSync(db);
             await this.loadFeedItemsFromDB();
             await validateAndRegenerateCurrentDeck(this);
-            this.loading = false;
+            this.loading = false; // Hide loading
         },
 
         async saveKeywordBlacklist() {
-            // `db` is already initialized and available globally
-            await saveSimpleState(db, 'keywordBlacklist', this.keywordBlacklistInput); // --- FIX ---
+            await saveSimpleState(db, 'keywordBlacklist', this.keywordBlacklistInput);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
-            this.updateCounts();
+            this.updateCounts(); // Update counts if blacklist changes
         }
     }));
-    Alpine.start();
-}); // --- FIX: Closing Alpine.js Initialization listener ---
-
-
-// Function to convert external URLs to links that open in a new tab
-function convertUrlsToLinks(element, openInNewTab) {
-  if (!element) return;
-
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-
-  element.querySelectorAll('*').forEach(node => {
-    if (node.nodeType === Node.TEXT_NODE && node.parentNode.tagName.toLowerCase() !== 'a') {
-      const text = node.textContent;
-      const newHtml = text.replace(urlRegex, (url) => {
-        const target = openInNewTab === true ? '_blank' : '_self';
-        return `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
-      });
-
-      if (newHtml !== text) {
-        const span = document.createElement('span');
-        span.innerHTML = newHtml;
-        node.replaceWith(span);
-      }
-    }
-  });
-}
+    Alpine.start(); // Manually start Alpine after everything is defined
+});

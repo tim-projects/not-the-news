@@ -52,8 +52,7 @@
 <div x-html="entry.title"></div>
 <button class="star" @click="toggleStar(entry.id)" :class="{'starred': isStarred(entry.id)}" aria-label="Star">★</button>
 </div>
-<div class="itemdescription">
-<div class="itemfrom">
+<div class="itemdescription" x-init="handleEntryLinks($el)"> <div class="itemfrom">
 <p class="source" x-text="`Source: ${entry.source}`"></p>
 <p class="pubdate" x-text="entry.pubDate"></p>
 </div>
@@ -140,7 +139,7 @@
 <h2>Configure RSS Feeds</h2>
 <div class="settings-group grow">
 <textarea id="rss-feeds-textarea" class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
-<button id="save-rss-btn" class="settings-button">Save RSS Feeds</button>
+<button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save RSS Feeds</button>
 <span id="rss-save-msg" class="save-message" style="display: none;"></span>
 </div>
 </div>
@@ -148,7 +147,7 @@
 <h2>Configure Keyword Blacklist</h2>
 <div class="settings-group grow">
 <textarea id="keywords-blacklist-textarea" class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords, one per line"></textarea>
-<button id="save-keywords-btn" class="settings-button">Save</button>
+<button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save</button>
 <span id="keywords-save-msg" class="save-message" style="display: none;"></span>
 </div>
 </div>
@@ -160,7 +159,7 @@
 </svg>
 </button>
 </div>
-<script type="module" defer src="js/app.js"></script>
 <script defer src="js/libs/rss-parser.min.js"></script>
+<script type="module" defer src="js/app.js"></script>
 </body>
 </html>
