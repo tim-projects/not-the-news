@@ -1,8 +1,7 @@
 // app.js
 
 // Import necessary modules
-// Ensure loadArrayState is imported here
-import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, loadArrayState, isOnline } from './data/database.js'; // Added loadArrayState
+import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, isOnline, loadStarredItems, loadHiddenItems } from './data/database.js'; // Updated imports
 import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
@@ -140,8 +139,8 @@ document.addEventListener('alpine:init', () => {
                 await this.loadFeedItemsFromDB();
 
                 // Load hidden and starred states from local DB. These might have been updated by early pullUserState.
-                this.hidden = await loadArrayState(db, 'hidden'); // Use the exported loadArrayState
-                this.starred = await loadArrayState(db, 'starred'); // Use the exported loadArrayState
+                this.hidden = await loadHiddenItems(db); // Updated
+                this.starred = await loadStarredItems(db); // Updated
 
                 // Determine sync completion time for pruning stale hidden entries.
                 const itemsCount = await db.transaction('items', 'readonly').objectStore('items').count();
@@ -151,8 +150,8 @@ document.addEventListener('alpine:init', () => {
                      syncCompletionTime = feedTime;
                      if (this.syncEnabled && this.isOnline) {
                          await pullUserState(db);
-                         this.hidden = await loadArrayState(db, 'hidden');
-                         this.starred = await loadArrayState(db, 'starred');
+                         this.hidden = await loadHiddenItems(db); // Updated
+                         this.starred = await loadStarredItems(db); // Updated
                      }
                      await this.loadFeedItemsFromDB();
                 }
@@ -204,14 +203,17 @@ document.addEventListener('alpine:init', () => {
 
                 this.loading = false;
 
+                // Added call to processPendingOperations after initial data loads
+                await processPendingOperations(db);
+
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
                             console.log("app.js: Initiating background partial sync...");
                             await performFeedSync(db);
                             await pullUserState(db);
-                            this.hidden = await loadArrayState(db, 'hidden');
-                            this.starred = await loadArrayState(db, 'starred');
+                            this.hidden = await loadHiddenItems(db); // Updated
+                            this.starred = await loadStarredItems(db); // Updated
                             await this.loadFeedItemsFromDB();
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
@@ -230,10 +232,10 @@ document.addEventListener('alpine:init', () => {
                     this.isOnline = true;
                     if (this.syncEnabled) {
                         console.log("app.js: Online detected. Processing pending operations and resyncing.");
-                        await processPendingOperations(db);
+                        await processPendingOperations(db); // Added call here
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await loadArrayState(db, 'hidden');
-                        this.starred = await loadArrayState(db, 'starred');
+                        this.hidden = await loadHiddenItems(db); // Updated
+                        this.starred = await loadStarredItems(db); // Updated
                         this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this);

@@ -6,7 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import json
 import secrets
-import sys # <--- ADD THIS IMPORT
+import sys
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -140,15 +140,15 @@ def get_user_state():
     user_state_keys = [
         "hidden",
         "starred",
-        "currentDeckGuids", # Add currentDeckGuids
-        "filterMode",       # Add filterMode
-        "syncEnabled",      # Add syncEnabled
-        "imagesEnabled",    # Add imagesEnabled
-        "rssFeeds",         # Add rssFeeds
-        "keywordBlacklist", # Add keywordBlacklist
-        "shuffleCount",     # Add shuffleCount
-        "lastShuffleResetDate" # Add lastShuffleResetDate
-        # Add any other single-value states that should be synced
+        "currentDeckGuids",
+        "filterMode",
+        "syncEnabled",
+        "imagesEnabled",
+        "rssFeeds",
+        "keywordBlacklist",
+        "shuffleCount",
+        "lastShuffleResetDate",
+        "openUrlsInNewTabEnabled" # Add openUrlsInNewTabEnabled
     ]
 
     # Collect current state and find the newest modification timestamp
@@ -170,7 +170,7 @@ def get_user_state():
                 out_user_state[key] = []
             elif key in ["filterMode", "rssFeeds", "keywordBlacklist"]:
                 out_user_state[key] = "" # Default to empty string for text fields
-            elif key in ["syncEnabled", "imagesEnabled", "openUrlsInNewTabEnabled"]: # Added openUrlsInNewTabEnabled
+            elif key in ["syncEnabled", "imagesEnabled", "openUrlsInNewTabEnabled"]: 
                 out_user_state[key] = True # Default to True for booleans if not found
             elif key == "shuffleCount":
                 out_user_state[key] = 2 # Default shuffle count

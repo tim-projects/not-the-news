@@ -1,128 +1,271 @@
-// userStateUtils.js
+// www/js/helpers/userStateUtils.js
 
-import { dbPromise, saveStateValue, loadArrayState, saveArrayState, pendingOperations, isOnline, loadStateValue } from '../data/database.js';
+import {
+    dbPromise,
+    saveStateValue,
+    loadStarredItems, // New specialized loader
+    loadHiddenItems, // New specialized loader
+    addPendingOperation, // New function for persistent buffering
+    processPendingOperations, // New function for immediate sync
+    isOnline,
+    loadStateValue,
+    loadArrayState, // Still used for currentDeckGuids
+    saveArrayState // Still used for currentDeckGuids
+} from '../../data/database.js'; // Adjusted path to database.js
 
+/**
+ * Toggles the starred status of an item and manages synchronization.
+ * @param {object} app - The main application state object (e.g., Vue instance).
+ * @param {string} guid - The unique identifier of the item.
+ */
 export async function toggleStar(app, guid) {
     const db = await dbPromise;
-    const items = await loadArrayState(db, 'starred');
-    const idx = items.findIndex(e => e.id === guid);
-    const action = idx === -1 ? "add" : "remove";
-    const starredAt = idx === -1 ? new Date().toISOString() : undefined;
+    const tx = db.transaction('starredItems', 'readwrite');
+    const store = tx.objectStore('starredItems');
 
-    if (idx === -1) {
-        items.push({ id: guid, starredAt });
-    } else {
-        items.splice(idx, 1);
-    }
-    app.starred = items; // Update app state reference
-    await saveArrayState(db, 'starred', items);
+    const starredAt = new Date().toISOString();
+    let action;
 
-    if (typeof app.updateCounts === 'function') app.updateCounts();
+    try {
+        const existingItem = await store.get(guid);
 
-    const delta = { id: guid, action, starredAt };
-    if (!isOnline()) {
-        pendingOperations.push({ type: 'starDelta', data: delta });
-    } else {
-        try {
-            await fetch("/user-state/starred/delta", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(delta)
+        if (existingItem) {
+            // Item is currently starred, so unstar it
+            await store.delete(guid);
+            action = "remove";
+            // Update app's in-memory starred list
+            app.starred = app.starred.filter(item => item.id !== guid);
+        } else {
+            // Item is not starred, so star it
+            await store.put({
+                id: guid,
+                starredAt
             });
-        } catch (err) {
-            console.error("Failed to sync star change:", err);
-            pendingOperations.push({ type: 'starDelta', data: delta });
+            action = "add";
+            // Update app's in-memory starred list
+            app.starred.push({
+                id: guid,
+                starredAt
+            });
         }
+
+        await tx.done; // Ensure the transaction completes
+
+        // Trigger UI update if necessary
+        if (typeof app.updateCounts === 'function') app.updateCounts();
+
+        // Add the operation to the persistent pending operations buffer
+        const deltaObject = {
+            id: guid,
+            action,
+            starredAt
+        };
+        await addPendingOperation(db, {
+            type: 'starDelta',
+            data: deltaObject
+        });
+
+        // Attempt immediate background sync if online
+        if (isOnline()) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync star change, operation remains buffered:", syncErr);
+                // The operation is already buffered, so no re-addition needed here.
+            }
+        }
+    } catch (error) {
+        console.error("Error in toggleStar:", error);
     }
 }
 
+/**
+ * Toggles the hidden status of an item and manages synchronization.
+ * @param {object} app - The main application state object.
+ * @param {string} guid - The unique identifier of the item.
+ */
 export async function toggleHidden(app, guid) {
     const db = await dbPromise;
-    const items = await loadArrayState(db, 'hidden');
-    const idx = items.findIndex(e => e.id === guid);
-    const action = idx === -1 ? "add" : "remove";
-    const hiddenAt = idx === -1 ? new Date().toISOString() : undefined;
+    const tx = db.transaction('hiddenItems', 'readwrite');
+    const store = tx.objectStore('hiddenItems');
 
-    if (idx === -1) {
-        items.push({ id: guid, hiddenAt });
-    } else {
-        items.splice(idx, 1);
-    }
-    app.hidden = items; // Update app state reference
-    await saveArrayState(db, 'hidden', items);
+    const hiddenAt = new Date().toISOString();
+    let action;
 
-    if (typeof app.updateCounts === 'function') app.updateCounts();
+    try {
+        const existingItem = await store.get(guid);
 
-    const delta = { id: guid, action, hiddenAt };
-    if (!isOnline()) {
-        pendingOperations.push({ type: 'hiddenDelta', data: delta });
-    } else {
-        try {
-            await fetch("/user-state/hidden/delta", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(delta)
+        if (existingItem) {
+            // Item is currently hidden, so unhide it
+            await store.delete(guid);
+            action = "remove";
+            // Update app's in-memory hidden list
+            app.hidden = app.hidden.filter(item => item.id !== guid);
+        } else {
+            // Item is not hidden, so hide it
+            await store.put({
+                id: guid,
+                hiddenAt
             });
-        } catch (err) {
-            console.error("Failed to sync hidden change:", err);
-            pendingOperations.push({ type: 'hiddenDelta', data: delta });
+            action = "add";
+            // Update app's in-memory hidden list
+            app.hidden.push({
+                id: guid,
+                hiddenAt
+            });
         }
+
+        await tx.done; // Ensure the transaction completes
+
+        // Trigger UI update if necessary
+        if (typeof app.updateCounts === 'function') app.updateCounts();
+
+        // Add the operation to the persistent pending operations buffer
+        const deltaObject = {
+            id: guid,
+            action,
+            hiddenAt
+        };
+        await addPendingOperation(db, {
+            type: 'hiddenDelta',
+            data: deltaObject
+        });
+
+        // Attempt immediate background sync if online
+        if (isOnline()) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync hidden change, operation remains buffered:", syncErr);
+                // The operation is already buffered, so no re-addition needed here.
+            }
+        }
+    } catch (error) {
+        console.error("Error in toggleHidden:", error);
     }
 }
 
+/**
+ * Prunes stale hidden items from the hiddenItems store.
+ * Items are considered stale if they are not in the current feedItems and are older than 30 days.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {Array<object>} feedItems - The array of current feed items.
+ * @param {number} currentTS - The current timestamp in milliseconds.
+ * @returns {Array<object>} The updated list of hidden items after pruning.
+ */
 export async function pruneStaleHidden(db, feedItems, currentTS) {
-    let hidden = await loadArrayState(db, 'hidden');
+    const hiddenItems = await loadHiddenItems(db); // Use the new specialized loader
 
-    if (!Array.isArray(hidden)) hidden = [];
-    if (!Array.isArray(feedItems) || feedItems.length === 0 || !feedItems.every(e => e && typeof e.id === 'string')) return hidden;
+    // Basic validation
+    if (!Array.isArray(hiddenItems)) return [];
+    if (!Array.isArray(feedItems) || feedItems.length === 0 || !feedItems.every(e => e && typeof e.id === 'string')) return hiddenItems;
 
     const validFeedIds = new Set(feedItems.map(e => e.id.trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-    const pruned = hidden.filter(i => {
+    const itemsToDelete = hiddenItems.filter(i => {
         const normalizedId = String(i.id).trim().toLowerCase();
-        if (validFeedIds.has(normalizedId)) return true;
+        // Keep if the item is still present in the current feed
+        if (validFeedIds.has(normalizedId)) return false;
+        // Check if the item is older than 30 days
         const hiddenAtTS = new Date(i.hiddenAt).getTime();
-        return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
+        return (currentTS - hiddenAtTS) >= THIRTY_DAYS_MS;
     });
 
-    if (pruned.length < hidden.length) {
-        await saveArrayState(db, 'hidden', pruned);
+    if (itemsToDelete.length > 0) {
+        const tx = db.transaction('hiddenItems', 'readwrite');
+        const store = tx.objectStore('hiddenItems');
+        try {
+            for (const item of itemsToDelete) {
+                await store.delete(item.id); // Direct delete from IndexedDB
+            }
+            await tx.done; // Wait for all deletes to complete
+            // After successful deletion, filter the in-memory list to return the pruned list
+            return hiddenItems.filter(item => !itemsToDelete.includes(item));
+        } catch (error) {
+            console.error("Error pruning stale hidden items:", error);
+            // If deletion fails, return the original list to avoid potential data inconsistency in app state
+            return hiddenItems;
+        }
     }
-    return pruned;
+    return hiddenItems; // No items to prune, return original list
 }
 
+/**
+ * Loads the current deck of GUIDs.
+ * This function now relies on `loadArrayState` which operates on the `userSettings` store.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
+ */
 export async function loadCurrentDeck(db) {
-    // FIX: Change key from 'currentDeck' to 'currentDeckGuids'
     let guids = await loadArrayState(db, 'currentDeckGuids');
     return Array.isArray(guids) ? guids : [];
 }
 
+/**
+ * Saves the current deck of GUIDs.
+ * This function now relies on `saveArrayState` which operates on the `userSettings` store.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
+ */
 export async function saveCurrentDeck(db, guids) {
-    // FIX: Change key from 'currentDeck' to 'currentDeckGuids'
     await saveArrayState(db, 'currentDeckGuids', guids);
 }
 
+/**
+ * Loads the shuffle state, including shuffle count and last reset date.
+ * This function now relies on `loadStateValue` which operates on the `userSettings` store.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
+ */
 export async function loadShuffleState(db) {
     const count = await loadStateValue(db, 'shuffleCount', 2);
     const dateStr = await loadStateValue(db, 'lastShuffleResetDate', null);
     let lastResetDate = null;
     if (dateStr) {
-        try { lastResetDate = new Date(dateStr); } catch (err) { console.warn("Invalid lastShuffleResetDate:", dateStr, err); }
+        try {
+            lastResetDate = new Date(dateStr);
+        } catch (err) {
+            console.warn("Invalid lastShuffleResetDate:", dateStr, err);
+        }
     }
-    return { shuffleCount: count, lastShuffleResetDate: lastResetDate };
+    return {
+        shuffleCount: count,
+        lastShuffleResetDate: lastResetDate
+    };
 }
 
+/**
+ * Saves the shuffle state, including shuffle count and last reset date.
+ * This function now relies on `saveStateValue` which operates on the `userSettings` store.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {number} count - The current shuffle count.
+ * @param {Date} resetDate - The date of the last shuffle reset.
+ */
 export async function saveShuffleState(db, count, resetDate) {
     await saveStateValue(db, 'shuffleCount', count);
     await saveStateValue(db, 'lastShuffleResetDate', resetDate.toISOString());
 }
 
+/**
+ * Sets the current filter mode for the application.
+ * This function now relies on `saveStateValue` which operates on the `userSettings` store
+ * and will handle pending operations and immediate sync.
+ * @param {object} app - The main application state object.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @param {string} mode - The filter mode to set (e.g., 'unread', 'starred').
+ */
 export async function setFilterMode(app, db, mode) {
     app.filterMode = mode;
     await saveStateValue(db, 'filterMode', mode);
 }
 
+/**
+ * Loads the current filter mode from storage.
+ * This function now relies on `loadStateValue` which operates on the `userSettings` store.
+ * @param {IDBDatabase} db - The IndexedDB database instance.
+ * @returns {Promise<string>} The current filter mode.
+ */
 export async function loadFilterMode(db) {
     return await loadStateValue(db, 'filterMode', 'unread');
 }
