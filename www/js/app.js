@@ -2,7 +2,18 @@
 
 // Import necessary modules
 // Ensure loadArrayState is imported here
-import { dbPromise, performFeedSync, performFullSync, pullUserState, processPendingOperations, saveStateValue, loadStateValue, loadArrayState, isOnline } from './data/database.js'; // Added loadArrayState
+import { 
+    db, // --- FIX: Changed from dbPromise to db ---
+    performFeedSync, 
+    performFullSync, 
+    pullUserState, 
+    processPendingOperations, 
+    saveSimpleState, // --- FIX: Changed from saveStateValue to saveSimpleState ---
+    loadSimpleState,  // --- FIX: Changed from loadStateValue to loadSimpleState ---
+    loadArrayState, 
+    isOnline,
+    initDb // --- IMPORTANT: Ensure initDb is imported to be called at startup ---
+} from './data/database.js';
 import { formatDate, shuffleArray, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed, displayCurrentDeck } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
@@ -39,8 +50,25 @@ document.addEventListener("load", e => {
     }
 }, true);
 
+
+// --- Initialize the database BEFORE Alpine.js starts ---
+// This is crucial so that 'db' is available when Alpine.js needs it.
+(async () => {
+    try {
+        await initDb();
+        console.log("app.js: IndexedDB initialized successfully before Alpine.js.");
+        // Now that DB is open, proceed with Alpine.js initialization
+        document.dispatchEvent(new CustomEvent('db-initialized')); // Custom event to signal DB readiness
+    } catch (error) {
+        console.error("app.js: Failed to initialize IndexedDB:", error);
+        // Handle database initialization failure (e.g., show error to user)
+    }
+})();
+
+
 // Alpine.js Initialization
-document.addEventListener('alpine:init', () => {
+// We'll listen for the custom 'db-initialized' event before setting up Alpine
+document.addEventListener('db-initialized', () => { // --- FIX: Listen for custom event ---
     Alpine.data('rssApp', () => ({
         // --- Alpine.js Reactive properties with initial defaults ---
         loading: true, // Start as true, set to false after initApp completes
@@ -111,15 +139,16 @@ document.addEventListener('alpine:init', () => {
 
         // --- Alpine.js init method ---
         async initApp() {
-            const db = await dbPromise;
+            // `db` is already initialized and available at the module level due to the IIFE
+            // const db = await dbPromise; // REMOVE THIS LINE, db is global and ready
 
             try {
                 // Load initial settings and user state from DB/localStorage
                 // These directly update the Alpine data properties
-                this.syncEnabled = await loadStateValue(db, 'syncEnabled', true);
-                this.imagesEnabled = await loadStateValue(db, 'imagesEnabled', true);
-                this.openUrlsInNewTabEnabled = await loadStateValue(db, 'openUrlsInNewTabEnabled', true);
-                this.filterMode = await loadFilterMode(db);
+                this.syncEnabled = (await loadSimpleState(db, 'syncEnabled')).value; // --- FIX: Use loadSimpleState correctly ---
+                this.imagesEnabled = (await loadSimpleState(db, 'imagesEnabled')).value; // --- FIX ---
+                this.openUrlsInNewTabEnabled = (await loadSimpleState(db, 'openUrlsInNewTabEnabled')).value; // --- FIX ---
+                this.filterMode = (await loadFilterMode(db)); // loadFilterMode should handle its own defaults
                 this.isOnline = isOnline(); // Set initial online status
 
                 // --- Attempt to pull user state (including current deck) from server early ---
@@ -140,19 +169,19 @@ document.addEventListener('alpine:init', () => {
                 await this.loadFeedItemsFromDB();
 
                 // Load hidden and starred states from local DB. These might have been updated by early pullUserState.
-                this.hidden = await loadArrayState(db, 'hidden'); // Use the exported loadArrayState
-                this.starred = await loadArrayState(db, 'starred'); // Use the exported loadArrayState
+                this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX: Use loadArrayState correctly ---
+                this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX: Use loadArrayState correctly ---
 
                 // Determine sync completion time for pruning stale hidden entries.
-                const itemsCount = await db.transaction('items', 'readonly').objectStore('items').count();
+                const itemsCount = await db.transaction('feedItems', 'readonly').objectStore('feedItems').count(); // --- FIX: Use 'feedItems' store ---
                 let syncCompletionTime = Date.now();
                 if (itemsCount === 0 && this.isOnline) {
                      const { feedTime } = await performFullSync(db);
                      syncCompletionTime = feedTime;
                      if (this.syncEnabled && this.isOnline) {
                          await pullUserState(db);
-                         this.hidden = await loadArrayState(db, 'hidden');
-                         this.starred = await loadArrayState(db, 'starred');
+                         this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX ---
+                         this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX ---
                      }
                      await this.loadFeedItemsFromDB();
                 }
@@ -182,8 +211,8 @@ document.addEventListener('alpine:init', () => {
                     if (isOpen) {
                         this.modalView = 'main';
                         await manageSettingsPanelVisibility(this);
-                        this.rssFeedsInput = await loadStateValue(db, 'rssFeeds', '');
-                        this.keywordBlacklistInput = await loadStateValue(db, 'keywordBlacklist', '');
+                        this.rssFeedsInput = (await loadSimpleState(db, 'rssFeeds')).value || ''; // --- FIX ---
+                        this.keywordBlacklistInput = (await loadSimpleState(db, 'keywordBlacklist')).value || ''; // --- FIX ---
                     } else {
                         await saveCurrentScrollPosition();
                     }
@@ -191,11 +220,11 @@ document.addEventListener('alpine:init', () => {
                 this.$watch("modalView", async () => {
                     await manageSettingsPanelVisibility(this);
                 });
-                this.$watch('syncEnabled', value => saveStateValue(db, 'syncEnabled', value));
-                this.$watch('imagesEnabled', value => saveStateValue(db, 'imagesEnabled', value));
-                this.$watch('openUrlsInNewTabEnabled', value => saveStateValue(db, 'openUrlsInNewTabEnabled', value));
-                this.$watch('rssFeedsInput', value => saveStateValue(db, 'rssFeeds', value));
-                this.$watch('keywordBlacklistInput', value => saveStateValue(db, 'keywordBlacklist', value));
+                this.$watch('syncEnabled', value => saveSimpleState(db, 'syncEnabled', value)); // --- FIX ---
+                this.$watch('imagesEnabled', value => saveSimpleState(db, 'imagesEnabled', value)); // --- FIX ---
+                this.$watch('openUrlsInNewTabEnabled', value => saveSimpleState(db, 'openUrlsInNewTabEnabled', value)); // --- FIX ---
+                this.$watch('rssFeedsInput', value => saveSimpleState(db, 'rssFeeds', value)); // --- FIX ---
+                this.$watch('keywordBlacklistInput', value => saveSimpleState(db, 'keywordBlacklist', value)); // --- FIX ---
                 this.$watch('filterMode', value => setFilterMode(this, db, value));
                 this.updateCounts();
                 await initScrollPosition(this);
@@ -210,8 +239,8 @@ document.addEventListener('alpine:init', () => {
                             console.log("app.js: Initiating background partial sync...");
                             await performFeedSync(db);
                             await pullUserState(db);
-                            this.hidden = await loadArrayState(db, 'hidden');
-                            this.starred = await loadArrayState(db, 'starred');
+                            this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX ---
+                            this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX ---
                             await this.loadFeedItemsFromDB();
                             this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                             this.updateCounts();
@@ -232,8 +261,8 @@ document.addEventListener('alpine:init', () => {
                         console.log("app.js: Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations(db);
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await loadArrayState(db, 'hidden');
-                        this.starred = await loadArrayState(db, 'starred');
+                        this.hidden = (await loadArrayState(db, 'hidden')).value; // --- FIX ---
+                        this.starred = (await loadArrayState(db, 'starred')).value; // --- FIX ---
                         this.hidden = await pruneStaleHidden(db, this.entries, Date.now());
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this);
@@ -292,8 +321,8 @@ document.addEventListener('alpine:init', () => {
         // --- Alpine.js methods ---
 
         async loadFeedItemsFromDB() {
-            const db = await dbPromise;
-            const rawItemsFromDb = await db.transaction('items', 'readonly').objectStore('items').getAll();
+            // `db` is already initialized and available globally after initDb()
+            const rawItemsFromDb = await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll(); // --- FIX: Use 'feedItems' store ---
             this.entries = mapRawItems(rawItemsFromDb, formatDate);
         },
 
@@ -331,8 +360,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveRssFeeds() {
-            const db = await dbPromise;
-            await saveStateValue(db, 'rssFeeds', this.rssFeedsInput);
+            // `db` is already initialized and available globally
+            await saveSimpleState(db, 'rssFeeds', this.rssFeedsInput); // --- FIX ---
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
             await performFullSync(db);
@@ -342,13 +371,14 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveKeywordBlacklist() {
-            const db = await dbPromise;
-            await saveStateValue(db, 'keywordBlacklist', this.keywordBlacklistInput);
+            // `db` is already initialized and available globally
+            await saveSimpleState(db, 'keywordBlacklist', this.keywordBlacklistInput); // --- FIX ---
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             this.updateCounts();
         }
     }));
-});
+}); // --- FIX: Closing Alpine.js Initialization listener ---
+
 
 // Function to convert external URLs to links that open in a new tab
 function convertUrlsToLinks(element, openInNewTab) {
