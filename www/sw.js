@@ -96,12 +96,12 @@ self.addEventListener('fetch', function(event) {
     event.respondWith(
       caches.match(event.request).then(function(cachedResponse) {
         // Return cached response if found
-        if (cachedResponse) {
-          console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
-          return cachedResponse;
-        }
+        //if (cachedResponse) {
+        //  console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
+        //  return cachedResponse;
+        //}
 
-        console.log('[Service Worker] Cache miss (dynamic GET) for:', requestUrl.href);
+        //console.log('[Service Worker] Cache miss (dynamic GET) for:', requestUrl.href);
         // If not in cache, fetch from network
         return fetch(event.request).then(function(networkResponse) {
           // Check if we received a valid response to cache
