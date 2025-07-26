@@ -34,7 +34,7 @@ def login():
         if submitted_pw != os.environ["APP_PASSWORD"]: return jsonify({"error": "Invalid password"}), 401
         auth_token = secrets.token_urlsafe(32)
         resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httpy_only=True, secure=True, samesite="Strict", path="/")
+        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
         return resp
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
