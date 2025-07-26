@@ -99,7 +99,7 @@ RUN sed -i "s|{\$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
 ##############################################################################
 # 8. Declare the data volume & expose ports
 VOLUME /data
-EXPOSE 80 443 3000
+EXPOSE 80 443 4575
 
 ##############################################################################
 # 9. Entrypoint + default CMD
