@@ -51,6 +51,11 @@ document.addEventListener("load", e => {
 }, true);
 
 
+// --- Prevent Alpine.js from starting automatically ---
+// This line must be added BEFORE you import Alpine.js
+// If Alpine.js is imported via a script tag, make sure this is above it.
+window.deferAlpine = true; // For Alpine v2, use Alpine.defer = true;
+
 // --- Initialize the database BEFORE Alpine.js starts ---
 // This is crucial so that 'db' is available when Alpine.js needs it.
 (async () => {
