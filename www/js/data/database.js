@@ -1,11 +1,11 @@
 // database.js
 // This file manages IndexedDB interactions and synchronization with the server.
 
-import { openDB } from '../libs/idb.js';
+import { openDB } from '../libs/idb.js'; // Adjusted path to idb.js
 
 // --- IndexedDB Configuration ---
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 6; // *** IMPORTANT: Increment DB_VERSION for schema changes ***
+const DB_VERSION = 7; // *** IMPORTANT: Increment DB_VERSION for schema changes ***
 
 export let db = null; // Will hold the IndexedDB instance
 
@@ -14,8 +14,9 @@ const OBJECT_STORES_SCHEMA = [
     { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
     { name: 'starredItems', keyPath: 'id' }, // Stores { id: 'guid', starredAt: 'ISOString' }
     { name: 'hiddenItems', keyPath: 'id' },  // Stores { id: 'guid', hiddenAt: 'ISOString' }
-    { name: 'currentDeckGuids', keyPath: 'id' }, // *** NEW: Dedicated store for current deck GUIDs ***
-    { name: 'userSettings', keyPath: 'key' } // Stores { key: 'settingName', value: 'settingValue', lastModified: 'timestamp' }
+    { name: 'currentDeckGuids', keyPath: 'id' }, // Dedicated store for current deck GUIDs
+    { name: 'userSettings', keyPath: 'key' }, // Stores { key: 'settingName', value: 'settingValue', lastModified: 'timestamp' }
+    { name: 'pendingOperations', keyPath: 'id', options: { autoIncrement: true } } // *** NEW: Store for buffered operations ***
 ];
 
 // --- User State Definitions (Maps server keys to client IndexedDB storage) ---
@@ -24,14 +25,14 @@ export const USER_STATE_DEFS = {
     // Array-based states stored in their own dedicated object stores
     starred: { store: 'starredItems', type: 'array', default: [] },
     hidden: { store: 'hiddenItems', type: 'array', default: [] },
-    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] }, // *** UPDATED: Now an array type ***
+    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
 
     // Simple value states stored in the 'userSettings' object store
     filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
     syncEnabled: { store: 'userSettings', type: 'simple', default: true },
     imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
-    rssFeeds: { store: 'userSettings', type: 'simple', default: [] }, // Assuming this is an array of feed URLs
-    keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] }, // Assuming this is an array of strings
+    rssFeeds: { store: 'userSettings', type: 'simple', default: [] },
+    keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] },
     shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
@@ -52,6 +53,15 @@ export async function initDb() {
                     console.log(`[IndexedDB] Created object store: ${schema.name}`);
                 }
             });
+
+            // Add specific migration logic here if DB_VERSION changes significantly
+            // For example, if you introduce 'pendingOperations' at version 7 from version 6:
+            if (oldVersion < 7) {
+                if (!db.objectStoreNames.contains('pendingOperations')) {
+                    db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
+                    console.log('[IndexedDB] Created new object store: pendingOperations');
+                }
+            }
         },
         blocked() {
             console.warn('[IndexedDB] Database upgrade is blocked. Close other tabs for this site.');
@@ -415,69 +425,6 @@ export async function pushUserState(db, keyToUpdate, valueToUpdate) {
     }
 }
 
-// --- Specific API Calls (for delta updates) ---
-// These remain as direct calls from your UI where a specific item is added/removed.
-export async function pushStarredItemDelta(id, action, timestamp) {
-    console.log(`[pushStarredItemDelta] ID: ${id}, Action: ${action}`);
-    const API_BASE_URL = window.location.origin;
-    const url = `${API_BASE_URL}/user-state/starred/delta`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id, action: action, starredAt: timestamp })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} for starred delta`);
-        }
-        const data = await response.json();
-        if (data.serverTime) {
-            // Update the local 'starred' state in IndexedDB (re-fetch or update directly)
-            // For delta operations, we usually rely on the next pull to reconcile the full array.
-            // Or, you could manually add/remove from IndexedDB here.
-            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
-            // Also update the starred's own lastModified timestamp if you track it separately:
-            // await saveSimpleState(db, 'starred', null, data.serverTime);
-        }
-        console.log(`[pushStarredItemDelta] Success. Server response:`, data);
-        return true;
-    } catch (error) {
-        console.error(`[pushStarredItemDelta] Failed:`, error);
-        return false;
-    }
-}
-
-export async function pushHiddenItemDelta(id, action, timestamp) {
-    console.log(`[pushHiddenItemDelta] ID: ${id}, Action: ${action}`);
-    const API_BASE_URL = window.location.origin;
-    const url = `${API_BASE_URL}/user-state/hidden/delta`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id, action: action, hiddenAt: timestamp })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} for hidden delta`);
-        }
-        const data = await response.json();
-        if (data.serverTime) {
-            await saveSimpleState(db, 'lastStateSync', data.serverTime); // Update global timestamp
-            // await saveSimpleState(db, 'hidden', null, data.serverTime);
-        }
-        console.log(`[pushHiddenItemDelta] Success. Server response:`, data);
-        return true;
-    } catch (error) {
-        console.error(`[pushHiddenItemDelta] Failed:`, error);
-        return false;
-    }
-}
-
-
 // --- Functions to get data out of IndexedDB for UI ---
 
 export async function getStarredItems() {
@@ -542,3 +489,7 @@ export async function getOpenUrlsInNewTabEnabled() {
     const { value } = await loadSimpleState(db, 'openUrlsInNewTabEnabled');
     return value;
 }
+
+// You will need to make sure your main app.js or similar entry point
+// calls initDb() early on to establish the IndexedDB connection.
+// And then calls pullUserState(db) to synchronize data on startup.
