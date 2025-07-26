@@ -17,6 +17,12 @@
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/content.css">
 <link rel="stylesheet" href="css/modal.css">
+
+<script>
+    window.deferAlpine = true;
+</script>
+<script defer src="js/libs/alpine.3.x.x.js"></script>
+
 </head>
 <body>
 <div id="app" x-data="rssApp" x-init="initApp()">
@@ -155,7 +161,6 @@
 </button>
 </div>
 <script type="module" defer src="js/app.js"></script>
-<script defer src="js/libs/alpine.3.x.x.js"></script>
 <script defer src="js/libs/rss-parser.min.js"></script>
 </body>
 </html>
