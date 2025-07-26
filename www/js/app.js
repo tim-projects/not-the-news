@@ -382,6 +382,7 @@ document.addEventListener('db-initialized', () => { // --- FIX: Listen for custo
             this.updateCounts();
         }
     }));
+    Alpine.start();
 }); // --- FIX: Closing Alpine.js Initialization listener ---
 
 
