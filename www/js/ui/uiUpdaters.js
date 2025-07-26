@@ -11,7 +11,11 @@ import {
     getNtnTitleH2,
     getMessageContainer // <-- NEW: Import the getter for the status bar message container
 } from './uiElements.js';
-import { dbPromise, saveStateValue } from '../data/database.js';
+// --- FIX START ---
+// We export `db` from database.js which is the already-opened DB instance.
+// `saveSimpleState` is the correct function to save individual settings.
+import { db, saveSimpleState } from '../data/database.js';
+// --- FIX END ---
 
 /**
  * Splits a message into two lines if it exceeds a certain character limit.
@@ -19,7 +23,7 @@ import { dbPromise, saveStateValue } from '../data/database.js';
  * @param {string} message - The full message to display.
  * @param {number} maxCharsPerLine - Approximate maximum characters per line.
  * @returns {string[]} An array containing 1 or 2 lines of text.
- */
+*/
 function splitMessageIntoLines(message, maxCharsPerLine = 30) {
     const words = message.split(' ');
     let line1 = [];
@@ -51,7 +55,7 @@ function splitMessageIntoLines(message, maxCharsPerLine = 30) {
  * Displays a temporary status message by replacing the `ntn-title h2` text.
  * The message will be split into lines if too long, and revert to original after a delay.
  * @param {string} message - The message text to display.
- */
+*/
 export async function displayTemporaryMessageInTitle(message) {
     const titleH2 = getNtnTitleH2();
     if (!titleH2) {
@@ -97,7 +101,7 @@ let messageTimeout; // To clear previous timeouts for the status bar message
  * It clears previous messages and hides after a delay.
  * @param {string} message The message to display.
  * @param {string} type Optional. 'success', 'error', 'info'. Determines styling.
- */
+*/
 export function createStatusBarMessage(message, type = 'info') {
     const messageContainer = getMessageContainer();
     if (!messageContainer) {
@@ -126,7 +130,7 @@ export function createStatusBarMessage(message, type = 'info') {
 /**
  * Updates the counts displayed on filter options (All, Hidden, Starred, Unread).
  * @param {object} app - The Alpine.js app state object.
- */
+*/
 export function updateCounts(app) {
     const hiddenSet = new Set(app.hidden.map(e => e.id));
     const starredSet = new Set(app.starred.map(s => s.id));
@@ -161,7 +165,7 @@ export function updateCounts(app) {
 /**
  * Manages the display of different settings panels based on the app's modalView state.
  * @param {object} app - The Alpine.js app state object.
- */
+*/
 export async function manageSettingsPanelVisibility(app) {
     const main = getMainSettingsBlock();
     const rss = getRssSettingsBlock();
@@ -231,16 +235,18 @@ export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
 }
 
 export async function saveCurrentScrollPosition() {
-    const db = await dbPromise;
-    const currentScrollY = window.scrollY;
-    await saveStateValue(db, 'feedScrollY', String(currentScrollY));
+    // --- FIX START ---
+    // The `db` instance is already available and exported from database.js
+    // `saveSimpleState` is the function to use now.
+    await saveSimpleState(db, 'feedScrollY', String(window.scrollY));
 
     // Save the link of the first visible entry
     const entryElements = document.querySelectorAll('.entry');
     for (const entryElement of entryElements) {
         if (entryElement.getBoundingClientRect().top >= 0) {
-            await saveStateValue(db, 'feedVisibleLink', entryElement.dataset.link || '');
+            await saveSimpleState(db, 'feedVisibleLink', entryElement.dataset.link || '');
             break;
         }
     }
+    // --- FIX END ---
 }
