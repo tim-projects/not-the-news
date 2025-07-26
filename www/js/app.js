@@ -133,6 +133,7 @@ Alpine.data('rssApp', () => ({
     // --- Alpine.js init method ---
     // x-init will call this
     async initApp() {
+        console.log('initApp has been called!');
         // Wait for the DB to be initialized before proceeding
         // initDb() is called *outside* this function to ensure DB is ready before Alpine.start().
         // So, 'db' should already be the resolved instance here.
