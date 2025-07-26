@@ -23,9 +23,9 @@ const cacheAssets = [
   'js/ui/uiElements.js',
   'js/ui/uiInitializers.js',
   'js/ui/uiUpdaters.js',
-  'libs/alpine.3.x.x.js',
-  'libs/idb.js',
-  'libs/rss-parser.min.js'
+  'js/libs/alpine.3.x.x.js',
+  'js/libs/idb.js',
+  'js/libs/rss-parser.min.js'
 ];
 
 self.addEventListener('install', function(event) {

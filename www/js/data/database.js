@@ -1,7 +1,7 @@
 // database.js
 // This file manages IndexedDB interactions and synchronization with the server.
 
-import { openDB } from './libs/idb.js'; // Assuming idb.js provides the openDB function
+import { openDB } from '../libs/idb.js';
 
 // --- IndexedDB Configuration ---
 const DB_NAME = 'not-the-news-db';
