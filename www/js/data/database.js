@@ -201,7 +201,7 @@ export async function pullUserState(db) {
             throw parseError;
         }
         const { userState, serverTime } = data;
-        const tx = db.transaction(['userState', 'starredItems', 'hiddenItems'], 'readwrite');
+        const tx = db.transaction(['starredItems', 'hiddenItems', 'userSettings'], 'readwrite');
         await tx.objectStore('starredItems').clear();
         if (userState.starred) {
             for (const item of userState.starred) {
