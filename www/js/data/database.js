@@ -345,19 +345,21 @@ export async function saveArrayState(db, key, arr) {
     console.log(`[saveArrayState] Attempting to save key: "${key}"`);
     console.log(`[saveArrayState] Data to save (type: ${typeof arr}, isArray: ${Array.isArray(arr)}):`, arr);
 
-    // Diagnostic check for clonability (important for DataCloneError)
+    let clonableArr;
     try {
-        const clonedArr = JSON.parse(JSON.stringify(arr));
-        console.log("[saveArrayState] Data appears JSON-clonable.", clonedArr);
+        // This line will convert the Proxy(Array) into a plain JavaScript Array
+        // by deep-cloning its JSON-serializable content.
+        clonableArr = JSON.parse(JSON.stringify(arr)); 
+        console.log("[saveArrayState] Successfully converted to JSON-clonable array.", clonableArr);
     } catch (e) {
-        console.error("[saveArrayState] Data is NOT JSON-clonable! Error:", e);
-        // Throwing here will stop the put operation, which might be desired
-        // Or you might want to handle it more gracefully, e.g., by logging and returning.
-        throw new Error(`Data for key "${key}" is not clonable for IndexedDB: ${e.message}`);
+        console.error("[saveArrayState] Failed to convert data to JSON-clonable format! Error:", e);
+        // It's crucial to throw here if the data truly isn't clonable by JSON.stringify
+        throw new Error(`Data for key "${key}" is not JSON-serializable: ${e.message}`);
     }
 
     const tx = db.transaction('userSettings', 'readwrite');
-    tx.objectStore('userSettings').put({ key: key, value: arr });
+    // Use the `clonableArr` for the put operation
+    tx.objectStore('userSettings').put({ key: key, value: clonableArr }); 
     await tx.done;
     console.log(`[saveArrayState] Successfully saved key: "${key}"`);
 }
