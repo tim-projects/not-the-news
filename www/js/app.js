@@ -17,7 +17,7 @@ import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
-
+import Alpine from './libs/alpine.3.x.x.js'
 
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
