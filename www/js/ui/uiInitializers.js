@@ -1,6 +1,16 @@
 // www/js/ui/uiInitializers.js
 
-import { dbPromise, loadStateValue, saveStateValue, bufferedChanges } from '../data/database.js';
+import {
+    db, // --- FIX: Changed from dbPromise to db ---
+    loadSimpleState, // --- FIX: Changed from loadStateValue ---
+    saveSimpleState, // --- FIX: Changed from saveStateValue ---
+    addPendingOperation, // --- FIX: Add addPendingOperation for buffering ---
+    getBufferedChangesCount, // --- FIX: Use the function to get count ---
+    processPendingOperations,
+    pullUserState, // Add pullUserState if it's used directly here
+    performFullSync // Add performFullSync if it's used directly here
+} from '../data/database.js';
+
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
 import { loadShuffleState, saveShuffleState } from '../helpers/userStateUtils.js';
 import { loadConfigFile, saveConfigFile } from '../helpers/apiUtils.js';
@@ -22,23 +32,49 @@ export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onT
 
     if (!toggleEl || !textEl) return;
 
-    const db = await dbPromise;
-    app[dbKey] = await loadStateValue(db, dbKey, true); // Default to true if not found
+    // --- FIX: Use 'db' directly and loadSimpleState ---
+    app[dbKey] = (await loadSimpleState(db, dbKey)).value; // Default to 'true' usually handled by USER_STATE_DEFS default
+    if (app[dbKey] === undefined || app[dbKey] === null) {
+        // Fallback for initial load if USER_STATE_DEFS default isn't picked up or if it's a new key
+        app[dbKey] = true; // Or appropriate default for your boolean setting
+    }
     toggleEl.checked = app[dbKey];
     textEl.textContent = app[dbKey] ? 'yes' : 'no';
 
     toggleEl.addEventListener('change', async () => {
         app[dbKey] = toggleEl.checked;
-        await saveStateValue(db, dbKey, app[dbKey]);
+        await saveSimpleState(db, dbKey, app[dbKey]); // --- FIX: Use saveSimpleState ---
+
+        // --- FIX: Buffer the change using addPendingOperation ---
+        await addPendingOperation(db, {
+            type: 'simpleUpdate',
+            key: dbKey,
+            value: app[dbKey]
+        });
+        // Attempt immediate sync for user-initiated changes
+        if (navigator.onLine) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync toggle change, operation remains buffered:", syncErr);
+            }
+        }
+        // --- END FIX ---
+
         textEl.textContent = app[dbKey] ? 'yes' : 'no';
-        bufferedChanges.push({ key: 'settings', value: { [dbKey]: app[dbKey] } });
         onToggleCb(app[dbKey]);
     });
 }
 
 export async function initSyncToggle(app) {
-    await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', (enabled) => {
-        if (enabled && app.initApp) app.initApp(); // Assuming app.initApp triggers a sync
+    await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => { // Added async
+        if (enabled) {
+            console.log("Sync enabled, triggering full sync from initSyncToggle.");
+            // Ensure db is ready, though it should be by this point
+            if (db) {
+                await performFullSync(app); // Full sync includes user state and feed
+            }
+        }
     });
 }
 
@@ -53,8 +89,9 @@ export async function initTheme(app) {
 
     if (!toggle || !text) return;
 
-    const db = await dbPromise; // Assumed to be an IndexedDB promise
-    let storedTheme = await loadStateValue(db, 'theme', null); // Loads theme from DB, defaults to null
+    // --- FIX: Use 'db' directly and loadSimpleState ---
+    let storedThemeResult = await loadSimpleState(db, 'theme'); // Loads theme from DB, defaults to null for unset
+    let storedTheme = storedThemeResult.value;
 
     let activeThemeIsDark;
 
@@ -63,7 +100,7 @@ export async function initTheme(app) {
         // User explicitly chose light mode
         activeThemeIsDark = false;
     } else {
-        // If storedTheme is 'dark' OR null (no saved preference), default to dark.
+        // If storedTheme is 'dark' OR null/undefined (no saved preference), default to dark.
         activeThemeIsDark = true;
     }
     // --- END CRITICAL CHANGE ---
@@ -77,21 +114,38 @@ export async function initTheme(app) {
         htmlEl.classList.toggle('dark', toggle.checked);
         htmlEl.classList.toggle('light', !toggle.checked);
 
-        await saveStateValue(db, 'theme', newTheme);
+        await saveSimpleState(db, 'theme', newTheme); // --- FIX: Use saveSimpleState ---
+        
+        // --- FIX: Buffer the change using addPendingOperation for theme ---
+        await addPendingOperation(db, {
+            type: 'simpleUpdate',
+            key: 'theme',
+            value: newTheme
+        });
+        // Attempt immediate sync for user-initiated changes
+        if (navigator.onLine) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync theme change, operation remains buffered:", syncErr);
+            }
+        }
+        // --- END FIX ---
+
         text.textContent = newTheme;
-        // Assuming bufferedChanges is defined elsewhere
-        // bufferedChanges.push({ key: 'settings', value: { theme: newTheme } });
     });
 }
 
 export async function initScrollPosition(app) {
-    const db = await dbPromise;
-    const savedScrollY = await loadStateValue(db, 'feedScrollY', '0');
+    // --- FIX: Use 'db' directly and loadSimpleState ---
+    const savedScrollYResult = await loadSimpleState(db, 'feedScrollY');
+    const savedScrollY = savedScrollYResult.value;
 
     if (!savedScrollY || savedScrollY === '0') return;
 
     window.requestAnimationFrame(async () => {
-        const savedLink = await loadStateValue(db, 'feedVisibleLink', '');
+        const savedLinkResult = await loadSimpleState(db, 'feedVisibleLink');
+        const savedLink = savedLinkResult.value;
         if (savedLink) {
             const targetEl = document.querySelector(`.entry[data-link="${savedLink}"]`);
             if (targetEl) {
@@ -105,7 +159,7 @@ export async function initScrollPosition(app) {
 }
 
 export async function initShuffleCount(app) {
-    const db = await dbPromise;
+    // db is already available from import
     const { shuffleCount: count, lastShuffleResetDate: lastReset } = await loadShuffleState(db);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
