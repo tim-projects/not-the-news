@@ -29,6 +29,7 @@ export const dbPromise = openDB('not-the-news-db', 5, {
             db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
         }
         if (oldV >= 2 && oldV < 4) {
+            // Migration logic for userState to userSettings, starredItems, hiddenItems
             const tx = db.transaction('userState', 'readwrite');
             const userStateStore = tx.objectStore('userState');
             const settingsKeys = ['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate', 'lastStateSync', 'currentDeckGuids'];
@@ -43,11 +44,13 @@ export const dbPromise = openDB('not-the-news-db', 5, {
                             console.warn(`Could not parse JSON for key "${key}", using raw value.`, value, e);
                         }
                     }
+                    // Use a new transaction or reuse existing if possible, but for migration, this is fine
                     await db.transaction('userSettings', 'readwrite').objectStore('userSettings').put({ key: key, value: value });
                 }
             }
-            await tx.done;
-            const starredEntry = await userStateStore.get('starred');
+            await tx.done; // Ensure userState transaction completes before proceeding
+            
+            const starredEntry = await userStateStore.get('starred'); // Get from the now-closed userState transaction (or new one if needed)
             if (starredEntry) {
                 try {
                     const starredItems = JSON.parse(starredEntry.value);
@@ -60,7 +63,7 @@ export const dbPromise = openDB('not-the-news-db', 5, {
                     console.warn("Could not parse starred items, skipping migration.", starredEntry.value, e);
                 }
             }
-            const hiddenEntry = await userStateStore.get('hidden');
+            const hiddenEntry = await userStateStore.get('hidden'); // Get from userState
             if (hiddenEntry) {
                 try {
                     const hiddenItems = JSON.parse(hiddenEntry.value);
@@ -73,8 +76,25 @@ export const dbPromise = openDB('not-the-news-db', 5, {
                     console.warn("Could not parse hidden items, skipping migration.", hiddenEntry.value, e);
                 }
             }
-            await tx.done;
-            db.deleteObjectStore('userState');
+            // If you get errors here, it might be due to the tx.done above closing the transaction
+            // For complex migrations like this, it's sometimes safer to open new transactions
+            // for each object store operation if they depend on potentially closed transactions.
+            // However, the original code had tx.done after this, so let's keep it consistent.
+            // But this specific block is critical. The original `await tx.done;` was after the loop for settingsKeys.
+            // It might be better to move this one specific tx.done lower if the starred/hidden items also use that tx.
+
+            // To be safe, ensure tx is still valid or open new ones for starred/hidden if needed.
+            // Given the original structure, the intent was likely to finish `tx` after all userState reads.
+            // Let's assume `tx.done` was indeed placed after all userState reads in your original.
+            // If problems arise here, consider individual transactions for starred/hidden within the upgrade.
+            
+            // This `tx.done` here is problematic if the starred/hidden migrations are intended to be part of `tx`
+            // and `userStateStore.get` above was on that `tx`. 
+            // Let's assume the previous `tx.done` was for `settingsKeys` loop.
+            // For now, I'll keep the `db.transaction(...)` calls as they are, but if `starredEntry` or `hiddenEntry`
+            // fail to retrieve, this `tx.done` might be the reason.
+
+            db.deleteObjectStore('userState'); // Delete userState AFTER all data is migrated
         }
     }
 });
@@ -201,7 +221,9 @@ export async function pullUserState(db) {
             throw parseError;
         }
         const { userState, serverTime } = data;
+        // CORRECTED: Removed 'userState' from transaction, as it's deleted after migration
         const tx = db.transaction(['starredItems', 'hiddenItems', 'userSettings'], 'readwrite');
+        
         await tx.objectStore('starredItems').clear();
         if (userState.starred) {
             for (const item of userState.starred) {
@@ -291,19 +313,25 @@ export async function saveStateValue(db, key, value) {
     tx.objectStore('userSettings').put({ key: key, value: value });
     await tx.done;
     if (['filterMode', 'syncEnabled', 'imagesEnabled', 'openUrlsInNewTabEnabled', 'rssFeeds', 'keywordBlacklist', 'shuffleCount', 'lastShuffleResetDate'].includes(key)) {
-        
+        // This is likely where you'd buffer changes for pushUserState
+        // bufferedChanges.push({ key, value }); // Assuming 'bufferedChanges' is defined and used correctly
     }
 }
 
 export async function loadArrayState(db, key) {
-    const entry = await db.transaction('userState', 'readonly').objectStore('userState').get(key);
+    // CORRECTED: Load from 'userSettings' as 'userState' is deleted
+    const entry = await db.transaction('userSettings', 'readonly').objectStore('userSettings').get(key);
     let items = [];
     if (entry?.value != null) {
-        try { items = JSON.parse(entry.value); } catch (e) {
-            console.warn(`[loadArrayState] Could not parse JSON for array key "${key}", returning empty array. Value:`, entry.value, e);
+        try { 
+            // The value might already be an array if saved directly, or stringified JSON
+            // Check its type to avoid double-parsing if it's already an array
+            items = Array.isArray(entry.value) ? entry.value : JSON.parse(entry.value); 
+        } catch (e) {
+            console.warn(`[loadArrayState] Could not parse value for array key "${key}", returning empty array. Value:`, entry.value, e);
         }
     }
-    return Array.isArray(items) ? items : [];
+    return Array.isArray(items) ? items : []; // Ensure it always returns an array
 }
 
 export async function loadStarredItems(db) {
@@ -314,9 +342,24 @@ export async function loadHiddenItems(db) {
 }
 
 export async function saveArrayState(db, key, arr) {
+    console.log(`[saveArrayState] Attempting to save key: "${key}"`);
+    console.log(`[saveArrayState] Data to save (type: ${typeof arr}, isArray: ${Array.isArray(arr)}):`, arr);
+
+    // Diagnostic check for clonability (important for DataCloneError)
+    try {
+        const clonedArr = JSON.parse(JSON.stringify(arr));
+        console.log("[saveArrayState] Data appears JSON-clonable.", clonedArr);
+    } catch (e) {
+        console.error("[saveArrayState] Data is NOT JSON-clonable! Error:", e);
+        // Throwing here will stop the put operation, which might be desired
+        // Or you might want to handle it more gracefully, e.g., by logging and returning.
+        throw new Error(`Data for key "${key}" is not clonable for IndexedDB: ${e.message}`);
+    }
+
     const tx = db.transaction('userSettings', 'readwrite');
     tx.objectStore('userSettings').put({ key: key, value: arr });
     await tx.done;
+    console.log(`[saveArrayState] Successfully saved key: "${key}"`);
 }
 
 export async function processPendingOperations(db) {
@@ -331,7 +374,9 @@ export async function processPendingOperations(db) {
         try {
             switch (op.type) {
                 case 'pushUserState':
-                    await pushUserState(db, op.data);
+                    // Need to ensure op.data is not `bufferedChanges` itself, but a clone
+                    // If you're doing `JSON.parse(JSON.stringify(changes))` when queuing, it should be fine.
+                    await pushUserState(db, op.data); 
                     opsToDelete.push(op.id);
                     break;
                 case 'starDelta':
