@@ -79,10 +79,10 @@ self.addEventListener('fetch', function(event) {
   if (cacheAssets.includes(requestUrl.pathname) || cacheAssets.includes(requestUrl.pathname.slice(1))) { // Handle both with and without leading slash
     event.respondWith(
       caches.match(event.request).then(function(response) {
-        if (response) {
-          console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href);
-          return response;
-        }
+        //if (response) {
+        //  console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href);
+        //  return response;
+        //}
         console.log('[Service Worker] Cache miss (static asset) for:', requestUrl.href, 'Falling back to network.');
         return fetch(event.request);
       })
