@@ -2,16 +2,22 @@
 
 import {
     dbPromise,
-    saveStateValue,
-    loadStarredItems, // New specialized loader
-    loadHiddenItems, // New specialized loader
+    // Renamed for clarity: loadStateValue is now `loadSimpleState` and `saveStateValue` is `saveSimpleState`
+    loadSimpleState, 
+    saveSimpleState, 
+    // Specialized loaders for array types are now direct getters from database.js
+    getStarredItems,
+    getHiddenItems,
+    getCurrentDeckGuids, // New specialized loader for currentDeckGuids
     addPendingOperation, // New function for persistent buffering
     processPendingOperations, // New function for immediate sync
     isOnline,
-    loadStateValue,
-    loadArrayState, // Still used for currentDeckGuids
-    saveArrayState // Still used for currentDeckGuids
+    // loadArrayState and saveArrayState are internal to database.js for generic array handling
+    // and aren't typically exposed for direct use by userStateUtils. They are used internally
+    // by the new getStarredItems, getHiddenItems, getCurrentDeckGuids, and pushUserState.
+    // So, we'll remove them from this import.
 } from '../data/database.js'; // Adjusted path to database.js
+
 
 /**
  * Toggles the starred status of an item and manages synchronization.
@@ -149,12 +155,13 @@ export async function toggleHidden(app, guid) {
  * Prunes stale hidden items from the hiddenItems store.
  * Items are considered stale if they are not in the current feedItems and are older than 30 days.
  * @param {IDBDatabase} db - The IndexedDB database instance.
- * @param {Array<object>} feedItems - The array of current feed items.
+ * @param {Array<object>} feedItems - The array of current feed items (expected to have 'id' property).
  * @param {number} currentTS - The current timestamp in milliseconds.
- * @returns {Array<object>} The updated list of hidden items after pruning.
+ * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
  */
 export async function pruneStaleHidden(db, feedItems, currentTS) {
-    const hiddenItems = await loadHiddenItems(db); // Use the new specialized loader
+    // Use the specialized getter from database.js
+    const hiddenItems = await getHiddenItems(); 
 
     // Basic validation
     if (!Array.isArray(hiddenItems)) return [];
@@ -193,34 +200,68 @@ export async function pruneStaleHidden(db, feedItems, currentTS) {
 
 /**
  * Loads the current deck of GUIDs.
- * This function now relies on `loadArrayState` which operates on the `userSettings` store.
- * @param {IDBDatabase} db - The IndexedDB database instance.
+ * This function now relies on `getCurrentDeckGuids` getter which operates on the `currentDeckGuids` store.
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
-export async function loadCurrentDeck(db) {
-    let guids = await loadArrayState(db, 'currentDeckGuids');
+export async function loadCurrentDeck() {
+    // No 'db' parameter needed here as getCurrentDeckGuids handles dbPromise internally
+    let guids = await getCurrentDeckGuids(); 
     return Array.isArray(guids) ? guids : [];
 }
 
 /**
  * Saves the current deck of GUIDs.
- * This function now relies on `saveArrayState` which operates on the `userSettings` store.
+ * This function now uses a direct IndexedDB transaction for the 'currentDeckGuids' store
+ * and also buffers the operation for server sync.
  * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(db, guids) {
-    await saveArrayState(db, 'currentDeckGuids', guids);
+    const tx = db.transaction('currentDeckGuids', 'readwrite');
+    const store = tx.objectStore('currentDeckGuids');
+
+    try {
+        await store.clear(); // Clear existing deck
+        // Save each GUID as an object { id: guid }
+        for (const guid of guids) {
+            await store.put({ id: guid });
+        }
+        await tx.done; // Ensure transaction completes
+
+        console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
+
+        // Add the operation to the pending operations buffer for server sync
+        await addPendingOperation(db, {
+            type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
+            key: 'currentDeckGuids',
+            value: guids // Send the entire array to the server
+        });
+
+        // Attempt immediate background sync if online
+        if (isOnline()) {
+            try {
+                await processPendingOperations(db);
+            } catch (syncErr) {
+                console.error("Failed to immediately sync currentDeckGuids change, operation remains buffered:", syncErr);
+            }
+        }
+    } catch (error) {
+        console.error("Error saving current deck:", error);
+        throw error; // Re-throw to indicate failure
+    }
 }
 
 /**
  * Loads the shuffle state, including shuffle count and last reset date.
- * This function now relies on `loadStateValue` which operates on the `userSettings` store.
  * @param {IDBDatabase} db - The IndexedDB database instance.
  * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
  */
 export async function loadShuffleState(db) {
-    const count = await loadStateValue(db, 'shuffleCount', 2);
-    const dateStr = await loadStateValue(db, 'lastShuffleResetDate', null);
+    // loadSimpleState returns an object { value, lastModified }
+    const { value: count } = await loadSimpleState(db, 'shuffleCount');
+    const { value: dateStr } = await loadSimpleState(db, 'lastShuffleResetDate');
+
+    let shuffleCount = typeof count === 'number' ? count : 2; // Default if not found or invalid
     let lastResetDate = null;
     if (dateStr) {
         try {
@@ -230,42 +271,62 @@ export async function loadShuffleState(db) {
         }
     }
     return {
-        shuffleCount: count,
+        shuffleCount: shuffleCount,
         lastShuffleResetDate: lastResetDate
     };
 }
 
 /**
  * Saves the shuffle state, including shuffle count and last reset date.
- * This function now relies on `saveStateValue` which operates on the `userSettings` store.
  * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {number} count - The current shuffle count.
  * @param {Date} resetDate - The date of the last shuffle reset.
  */
 export async function saveShuffleState(db, count, resetDate) {
-    await saveStateValue(db, 'shuffleCount', count);
-    await saveStateValue(db, 'lastShuffleResetDate', resetDate.toISOString());
+    await saveSimpleState(db, 'shuffleCount', count);
+    await saveSimpleState(db, 'lastShuffleResetDate', resetDate.toISOString());
+
+    // Add these simple updates to the pending operations buffer
+    await addPendingOperation(db, { type: 'simpleUpdate', key: 'shuffleCount', value: count });
+    await addPendingOperation(db, { type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate.toISOString() });
+
+    if (isOnline()) {
+        try {
+            await processPendingOperations(db);
+        } catch (syncErr) {
+            console.error("Failed to immediately sync shuffle state change, operations remain buffered:", syncErr);
+        }
+    }
 }
 
 /**
  * Sets the current filter mode for the application.
- * This function now relies on `saveStateValue` which operates on the `userSettings` store
- * and will handle pending operations and immediate sync.
  * @param {object} app - The main application state object.
  * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {string} mode - The filter mode to set (e.g., 'unread', 'starred').
  */
 export async function setFilterMode(app, db, mode) {
     app.filterMode = mode;
-    await saveStateValue(db, 'filterMode', mode);
+    await saveSimpleState(db, 'filterMode', mode);
+
+    // Add this simple update to the pending operations buffer
+    await addPendingOperation(db, { type: 'simpleUpdate', key: 'filterMode', value: mode });
+
+    if (isOnline()) {
+        try {
+            await processPendingOperations(db);
+        } catch (syncErr) {
+            console.error("Failed to immediately sync filter mode change, operation remains buffered:", syncErr);
+        }
+    }
 }
 
 /**
  * Loads the current filter mode from storage.
- * This function now relies on `loadStateValue` which operates on the `userSettings` store.
  * @param {IDBDatabase} db - The IndexedDB database instance.
  * @returns {Promise<string>} The current filter mode.
  */
 export async function loadFilterMode(db) {
-    return await loadStateValue(db, 'filterMode', 'unread');
+    const { value: mode } = await loadSimpleState(db, 'filterMode');
+    return mode || 'unread'; // Provide a default if not found
 }
