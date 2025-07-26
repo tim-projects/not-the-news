@@ -1,3 +1,4 @@
+# api.py
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -6,7 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import json
 import secrets
-import sys
+import sys # Keep this import
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -33,7 +34,7 @@ def login():
         if submitted_pw != os.environ["APP_PASSWORD"]: return jsonify({"error": "Invalid password"}), 401
         auth_token = secrets.token_urlsafe(32)
         resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
+        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httpy_only=True, secure=True, samesite="Strict", path="/")
         return resp
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
@@ -106,6 +107,7 @@ def _load_state(key):
     """Loads a single user state key, returning its value and last modification timestamp."""
     path = _user_state_path(key)
     if not os.path.exists(path):
+        app.logger.info(f"User state file not found for key {key} at {path}. Returning default.")
         return {"value": None, "lastModified": None}
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -135,7 +137,7 @@ def get_user_state():
     Supports If-None-Match header for caching.
     The client-side `pullUserState` expects `userState` object and `serverTime`.
     """
-    since = request.args.get("since") # This parameter is primarily for the delta endpoint, not full state
+    # Removed 'since' as it's not used for full state
     
     # Define all keys that make up the client's userState
     user_state_keys = [
@@ -149,7 +151,7 @@ def get_user_state():
         "keywordBlacklist",
         "shuffleCount",
         "lastShuffleResetDate",
-        "openUrlsInNewTabEnabled" # Add openUrlsInNewTabEnabled
+        "openUrlsInNewTabEnabled"
     ]
 
     # Collect current state and find the newest modification timestamp
@@ -170,38 +172,41 @@ def get_user_state():
             if key in ["hidden", "starred", "currentDeckGuids"]:
                 out_user_state[key] = []
             elif key in ["filterMode", "rssFeeds", "keywordBlacklist"]:
-                out_user_state[key] = "" # Default to empty string for text fields
+                out_user_state[key] = ""
             elif key in ["syncEnabled", "imagesEnabled", "openUrlsInNewTabEnabled"]: 
-                out_user_state[key] = True # Default to True for booleans if not found
+                out_user_state[key] = True
             elif key == "shuffleCount":
-                out_user_state[key] = 2 # Default shuffle count
+                out_user_state[key] = 2
             elif key == "lastShuffleResetDate":
-                out_user_state[key] = None # Default to None
+                out_user_state[key] = None
 
     # ETag logic for caching
-    etag = newest_timestamp if newest_timestamp else "" # Use newest timestamp as ETag
+    etag = newest_timestamp if newest_timestamp else ""
     if_none_match = request.headers.get("If-None-Match")
 
     # Log what's being returned for 304 (Not Modified)
     if if_none_match == etag:
-        print(f"API: Returning 304 Not Modified for /user-state. ETag: {etag}", file=sys.stderr)
-        return make_response("", 304) # Not Modified
+        app.logger.info(f"API: Returning 304 Not Modified for /user-state. ETag: {etag}")
+        return make_response("", 304)
 
     resp_payload = {"userState": out_user_state, "serverTime": etag}
+    
+    # --- ADDED DEBUGGING LOGS HERE ---
+    try:
+        json_str_to_send = json.dumps(resp_payload, indent=2) # indent for readability in logs
+        app.logger.info(f"API: Preparing 200 OK /user-state response. Payload size: {len(json_str_to_send)} bytes.")
+        app.logger.info(f"API: Payload START (first 200 chars): {json_str_to_send[:200]}")
+        app.logger.info(f"API: Payload END (last 200 chars): {json_str_to_send[-200:]}")
+        app.logger.info(f"API: FULL Payload (first 1000 chars): {json_str_to_send[:1000]}") # Log full payload snippet
+    except Exception as e:
+        app.logger.error(f"API ERROR: Could not log /user-state payload for inspection: {e}")
+        # Log the dictionary content if dumping failed
+        app.logger.error(f"API ERROR: Problematic resp_payload dictionary: {resp_payload}")
+
+
     resp = jsonify(resp_payload)
     resp.headers["ETag"] = etag
-
-    # --- IMPORTANT DEBUGGING STEP ---
-    # Log the size and a snippet of the JSON string being sent.
-    try:
-        json_str_payload = json.dumps(resp_payload) # Use resp_payload dictionary directly
-        print(f"API: Sending /user-state. Payload size: {len(json_str_payload)} bytes.", file=sys.stderr)
-        print(f"API: Payload START (first 200 chars): {json_str_payload[:200]}", file=sys.stderr)
-        print(f"API: Payload END (last 200 chars): {json_str_payload[-200:]}", file=sys.stderr)
-    except Exception as e:
-        print(f"API ERROR: Could not log /user-state payload for inspection: {e}", file=sys.stderr)
-        # If dumping for logging fails, it means `out_user_state` itself might be problematic.
-        # This is unlikely if jsonify succeeded, but good to catch.
+    resp.headers["Content-Type"] = "application/json" # Explicitly ensure Content-Type is set
 
     return resp, 200
 
@@ -220,32 +225,23 @@ def post_user_state():
     app.logger.info(f"post_user_state: Received data: {data}")
     # Iterate over the provided user state map
     for key, val in data["userState"].items():
-        # Load current state to allow for server-side merging if needed
-        # For simplicity, this implements a "last write wins" for all values.
-        # For lists like hidden/starred, more complex merging (union) would be needed here
-        # if client-side deltas aren't used for these specific types.
-        # However, you already have /hidden/delta and /starred/delta for that.
-        # So for /user-state POST, we assume client sends the full, desired state for each key.
         try:
-            server_time = _save_state(key, val) # `val` is already the decoded Python object (list, str, bool, int)
+            server_time = _save_state(key, val)
         except Exception as e:
-            # Log the specific key and value that failed to save
             app.logger.error(f"Error saving user state key '{key}' with value '{val}': {e}")
-            return jsonify({"error": f"Failed to save state for {key}", "details": str(e)}), 500 # Return specific error
+            return jsonify({"error": f"Failed to save state for {key}", "details": str(e)}), 500
 
     return jsonify({"serverTime": server_time}), 200
 
-# Delta endpoints remain largely the same, but ensure they also update lastModified
 @app.route("/user-state/hidden/delta", methods=["POST"])
 def hidden_delta():
     data = request.get_json(force=True)
-    state = _load_state("hidden")["value"] or [] # Load the actual list
+    state = _load_state("hidden")["value"] or []
     action = data.get("action")
     id_ = data.get("id")
     
     if action == "add":
         entry = {"id": id_, "hiddenAt": data.get("hiddenAt")}
-        # Check if already present to avoid duplicates
         if not any(h["id"] == id_ for h in state):
             state.append(entry)
     elif action == "remove":
@@ -253,19 +249,18 @@ def hidden_delta():
     else:
         abort(400, description="Invalid action")
     
-    server_time = _save_state("hidden", state) # Save the updated list
+    server_time = _save_state("hidden", state)
     return jsonify({"serverTime": server_time}), 200
 
 @app.route("/user-state/starred/delta", methods=["POST"])
 def starred_delta():
     data = request.get_json(force=True)
-    state = _load_state("starred")["value"] or [] # Load the actual list
+    state = _load_state("starred")["value"] or []
     action = data.get("action")
     id_ = data.get("id")
 
     if action == "add":
         entry = {"id": id_, "starredAt": data.get("starredAt")}
-        # Check if already present to avoid duplicates
         if not any(s["id"] == id_ for s in state):
             state.append(entry)
     elif action == "remove":
@@ -273,7 +268,7 @@ def starred_delta():
     else:
         abort(400, description="Invalid action")
     
-    server_time = _save_state("starred", state) # Save the updated list
+    server_time = _save_state("starred", state)
     return jsonify({"serverTime": server_time}), 200
 
 if __name__ == "__main__":

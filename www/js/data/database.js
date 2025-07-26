@@ -1,3 +1,4 @@
+// database.js:
 import { openDB } from '../../libs/idb.js';
 
 export const bufferedChanges = [];
@@ -10,7 +11,7 @@ export async function addPendingOperation(db, operation) {
     await tx.done;
 }
 
-export const dbPromise = openDB('not-the-news-db', 4, {
+export const dbPromise = openDB('not-the-news-db', 5, {
     async upgrade(db, oldV) {
         if (oldV < 1) {
             const s = db.createObjectStore('items', { keyPath: 'guid' });
