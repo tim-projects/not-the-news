@@ -8,9 +8,14 @@ import os
 import json
 import secrets
 import sys
+import logging # Import logging module
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Configure logging to show info messages
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+app.logger.setLevel(logging.INFO)
 
 # --- Configuration Paths ---
 DATA_DIR = "/data" # Base directory for all data
@@ -25,6 +30,31 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(USER_STATE_DIR, exist_ok=True)
 
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
+
+# --- User State Definitions (Mirroring database.js for server-side defaults) ---
+# These defaults will be used to initialize files if they don't exist.
+# Ensure these align with your database.js USER_STATE_DEFS
+USER_STATE_SERVER_DEFAULTS = {
+    'currentDeckGuids': {'type': 'array', 'default': []},
+    'rssFeeds': {'type': 'simple', 'default': []},
+    'lastShuffleResetDate': {'type': 'simple', 'default': None},
+    'keywordBlacklist': {'type': 'simple', 'default': []},
+    'shuffleCount': {'type': 'simple', 'default': 0},
+    'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
+    'starred': {'type': 'array', 'default': []}, # For delta endpoints, but good to have a default file
+    'hidden': {'type': 'array', 'default': []},   # For delta endpoints, but good to have a default file
+    'filterMode': {'type': 'simple', 'default': 'all'},
+    'syncEnabled': {'type': 'simple', 'default': True},
+    'imagesEnabled': {'type': 'simple', 'default': True},
+    'lastStateSync': {'type': 'simple', 'default': None}, # Global sync timestamp
+    # Add any other keys here that you might have in database.js's USER_STATE_DEFS
+    # and expect to be fetched/managed by the generic /user-state/<key> endpoint.
+    # Example from your `ls` output, if they are meant to be synced user state:
+    # 'feedScrollY': {'type': 'simple', 'default': 0},
+    # 'feedVisibleLink': {'type': 'simple', 'default': ''},
+    # 'theme': {'type': 'simple', 'default': 'light'}, # or your actual default theme
+}
+
 
 # --- Authentication Endpoint ---
 @app.route("/api/login", methods=["POST"])
@@ -179,16 +209,42 @@ def _user_state_path(key):
     return os.path.join(USER_STATE_DIR, f"{key}.json")
 
 def _load_state(key):
-    """Loads a single user state key, returning its value and last modification timestamp."""
+    """
+    Loads a single user state key, returning its value and last modification timestamp.
+    If the file does not exist, it initializes it with a default value and saves it.
+    """
     path = _user_state_path(key)
     app.logger.debug(f"Attempting to load user state file: {path}")
 
     if not os.path.exists(path):
-        app.logger.info(f"User state file not found for key '{key}' at '{path}'. Returning default (None).")
-        return {"value": None, "lastModified": None}
+        app.logger.info(f"User state file not found for key '{key}' at '{path}'. Attempting to initialize with default.")
+        
+        # --- NEW LOGIC: Initialize file with default if not found ---
+        default_data = USER_STATE_SERVER_DEFAULTS.get(key)
+        if default_data:
+            initial_value = default_data['default']
+            try:
+                # Save the initial state to create the file
+                app.logger.info(f"Initializing user state file for key '{key}' with default value: {initial_value}")
+                now_utc = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z' # Use 'Z' for consistency with client
+                initial_state = {"value": initial_value, "lastModified": now_utc}
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(initial_state, f, indent=2)
+                app.logger.info(f"Successfully initialized user state file for key '{key}'.")
+                return initial_state # Return the newly created state
+            except Exception as e:
+                app.logger.exception(f"Error initializing user state file for key '{key}' at '{path}': {e}")
+                # Fallback to returning None if initialization fails, client will use its default
+                return {"value": None, "lastModified": None}
+        else:
+            app.logger.warning(f"Key '{key}' not found in USER_STATE_SERVER_DEFAULTS. Cannot initialize. Returning default (None).")
+            return {"value": None, "lastModified": None} # Return default if key not in our defined defaults
+        # --- END NEW LOGIC ---
+
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+            
             # Ensure 'value' exists and default to None if not.
             # Convert 'lastModified' to current ISO format if it's not already,
             # for consistency with how it's saved.
@@ -196,15 +252,21 @@ def _load_state(key):
             if last_modified:
                 try:
                     # Parse existing timestamp to ensure it's in the expected format (e.g., handling older formats)
-                    # Note: .replace('Z', '+00:00') is for Python < 3.11 when parsing Z suffix
+                    # .replace('Z', '+00:00') is for Python < 3.11 when parsing Z suffix from client
                     dt_obj = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
-                    last_modified = dt_obj.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                    last_modified = dt_obj.astimezone(timezone.utc).isoformat(timespec='milliseconds') + 'Z' # Output 'Z' for consistency
                 except ValueError:
                     app.logger.warning(f"Invalid lastModified format for {key}: {last_modified}. Using raw value.")
             
             return {"value": data.get("value"), "lastModified": last_modified}
     except (json.JSONDecodeError, KeyError) as e:
         app.logger.error(f"Error loading user state for key '{key}' from '{path}': {e}")
+        # If file is corrupt, delete it and return default, so it can be re-initialized
+        try:
+            os.remove(path)
+            app.logger.warning(f"Corrupt file '{path}' removed. It will be re-initialized on next request.")
+        except OSError as oe:
+            app.logger.error(f"Error removing corrupt file '{path}': {oe}")
         return {"value": None, "lastModified": None} # Return default on error
     except Exception as e:
         app.logger.exception(f"An unexpected error occurred loading user state for key '{key}' from '{path}': {e}")
@@ -212,7 +274,8 @@ def _load_state(key):
 
 def _save_state(key, value):
     """Saves a single user state key with its value and updates its last modification timestamp."""
-    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    # Use 'Z' suffix for consistency with client-side JavaScript's toISOString()
+    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
     data = {"value": value, "lastModified": now}
     path = _user_state_path(key)
     try:
@@ -235,14 +298,14 @@ def get_single_user_state_key(key):
         app.logger.warning("GET /user-state/<key>: Key is missing")
         abort(400, description="User state key is required")
 
-    state_data = _load_state(key) # This returns {"value": ..., "lastModified": ...}
+    state_data = _load_state(key) # This will now auto-create the file if it doesn't exist
     
+    # If _load_state couldn't find/create/load the file, it will return {"value": None, "lastModified": None}
+    # In this case, we still return a 404, as per original logic,
+    # because even after attempting creation, it's not available.
     if state_data["value"] is None and state_data["lastModified"] is None:
-        # If the file wasn't found and _load_state returned default None values,
-        # return a 404 to indicate the specific key isn't present on the server.
-        # This allows the client to handle missing keys gracefully, e.g., by using local defaults.
-        app.logger.info(f"GET /user-state/{key}: File not found or empty, returning 404.")
-        abort(404, description=f"User state key '{key}' not found or has no content.")
+        app.logger.info(f"GET /user-state/{key}: File could not be loaded or initialized, returning 404.")
+        abort(404, description=f"User state key '{key}' not found or has no valid content after attempt to initialize.")
 
     # Check for If-None-Match header for caching (304 Not Modified)
     if_none_match = request.headers.get("If-None-Match")
@@ -297,6 +360,7 @@ def hidden_delta():
         app.logger.warning("POST /user-state/hidden/delta: Missing JSON body")
         abort(400, description="Missing JSON body")
 
+    # _load_state for 'hidden' will now auto-create hidden.json if it doesn't exist
     state_content = _load_state("hidden") 
     state = state_content["value"] or [] # Extract value, default to empty list
 
@@ -308,7 +372,8 @@ def hidden_delta():
         abort(400, description="ID and action are required")
 
     if action == "add":
-        entry = {"id": id_, "hiddenAt": data.get("hiddenAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')}
+        # Use 'Z' suffix for consistency with client-side JavaScript's toISOString()
+        entry = {"id": id_, "hiddenAt": data.get("hiddenAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'}
         if not any(h["id"] == id_ for h in state):
             state.append(entry)
             app.logger.info(f"hidden_delta: Added ID {id_}")
@@ -340,6 +405,7 @@ def starred_delta():
         app.logger.warning("POST /user-state/starred/delta: Missing JSON body")
         abort(400, description="Missing JSON body")
 
+    # _load_state for 'starred' will now auto-create starred.json if it doesn't exist
     state_content = _load_state("starred") 
     state = state_content["value"] or [] # Extract value, default to empty list
 
@@ -351,7 +417,8 @@ def starred_delta():
         abort(400, description="ID and action are required")
 
     if action == "add":
-        entry = {"id": id_, "starredAt": data.get("starredAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')}
+        # Use 'Z' suffix for consistency with client-side JavaScript's toISOString()
+        entry = {"id": id_, "starredAt": data.get("starredAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'}
         if not any(s["id"] == id_ for s in state):
             state.append(entry)
             app.logger.info(f"starred_delta: Added ID {id_}")
