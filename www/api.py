@@ -11,7 +11,7 @@ import sys
 import logging # Import logging module
 
 app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.wsgi_app = ProxyFix(app.wsgi_wsgi_app, x_proto=1, x_host=1)
 
 # Configure logging to show info messages
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,6 +53,8 @@ USER_STATE_SERVER_DEFAULTS = {
     # 'feedScrollY': {'type': 'simple', 'default': 0},
     # 'feedVisibleLink': {'type': 'simple', 'default': ''},
     # 'theme': {'type': 'simple', 'default': 'light'}, # or your actual default theme
+    'lastViewedItemId': {'type': 'simple', 'default': None},
+    'lastViewedItemOffset': {'type': 'simple', 'default': 0},
 }
 
 
