@@ -5,27 +5,22 @@
 }
 
 {$DOMAIN} {
-  # Block anything if the auth cookie isn't present,
-  # but let login.html, the login API, and static files through.
   @unauth {
     not header Cookie auth*
     not path /login.html
     not path /api/login*
-    not path /libs/*
+    not path /js/libs/*
     not path /*.css
     not path /*.js
     not path /*.svg
-    # --- NEW ADDITIONS TO ALLOW UNATHENTICATED ACCESS ---
-    not path /*.ttf       # Allow TrueType Font files
-    not path /*.woff      # Allow Web Open Font Format files
-    not path /*.woff2     # Allow Web Open Font Format 2 files
-    not path /manifest.json # Allow the PWA manifest file
-    not path /images/* # Allow all images (crucial for PWA icons)
-    # --- END NEW ADDITIONS ---
+    not path /*.ttf
+    not path /*.woff
+    not path /*.woff2
+    not path /manifest.json
+    not path /images/*
   }
   redir @unauth /login.html 302
 
-  # Proxy your login API _first_
   handle /api/login* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
@@ -33,7 +28,6 @@
     }
   }
 
-  # Proxy the new user-state endpoint (GET & POST) to Flask
   handle /user-state* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
@@ -52,19 +46,21 @@
       header_up Host {host}
     }
   }
-  # Proxy feed-sync API endpoints to Flask
   handle /time* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /guids* {
+  # --- CRITICAL CHANGE: Proxy /feed-guids to Flask ---
+  handle /feed-guids* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
+  # --- REMOVED: handle /guids* - this is no longer used by the app ---
+
   handle /items* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
@@ -72,16 +68,12 @@
     }
   }
 
-  # Ensure this root is correct for your static files (e.g., /app/www)
   root * /app/www
   file_server
 
-  # — Compression & caching for HTML/JS/XML/JSON assets —
   encode {
     br 11
     gzip 5
-
-    # only compress these MIME types
     match {
       header Content-Type text/html
       header Content-Type text/css
@@ -90,22 +82,10 @@
       header Content-Type application/xml
       header Content-Type text/xml
       header Content-Type application/json
-      # Add font MIME types for compression if desired
-      # header Content-Type font/ttf
-      # header Content-Type font/woff
-      # header Content-Type font/woff2
     }
-
-    # skip tiny responses
     minimum_length 512
   }
 
-  # instruct browsers and intermediate caches to keep for 1 hour
-  #header {
-  #  Cache-Control "public, max-age=3600"
-  #}
-
-  # Disable caching for config API endpoints
   @api_nocache {
     path /load-config*
     path /save-config*
