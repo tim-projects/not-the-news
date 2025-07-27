@@ -2,20 +2,19 @@
 
 // Import necessary modules
 import {
-    db, // db is the promise that resolves to the actual IDBDatabase instance
     performFeedSync,
     performFullSync,
     pullUserState,
     processPendingOperations,
-    saveSimpleState,
     loadSimpleState,
     loadArrayState,
+    getBufferedChangesCount,
     isOnline,
     initDb // Keep initDb import
 } from './data/database.js';
 import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
 
 // Service Worker Registration
@@ -65,6 +64,8 @@ document.addEventListener('alpine:init', () => {
     console.log("app.js: 'alpine:init' event fired. Defining 'rssApp' component.");
 
     window.Alpine.data('rssApp', () => ({
+        db: null,
+        scrollObserver: null,
         // --- Alpine.js Reactive properties with initial defaults ---
         loading: true, // Start as true, set to false after initApp completes
         filterMode: 'unread',
@@ -148,22 +149,22 @@ document.addEventListener('alpine:init', () => {
             try {
                 // Initialize DB inside initApp, now that Alpine is ready
                 // This will resolve the 'db' variable at module scope.
-                await initDb();
+                this.db = await initDb();
                 console.log("app.js: IndexedDB initialized within initApp().");
 
                 // Load initial settings and user state from DB/localStorage
                 // Since 'db' is imported at the module level, we can just use it directly.
-                this.syncEnabled = (await loadSimpleState(db, 'syncEnabled')).value;
-                this.imagesEnabled = (await loadSimpleState(db, 'imagesEnabled')).value;
-                this.openUrlsInNewTabEnabled = (await loadSimpleState(db, 'openUrlsInNewTabEnabled')).value;
-                this.filterMode = (await loadFilterMode(db));
+                this.syncEnabled = (await loadSimpleState(this.db, 'syncEnabled')).value;
+                this.imagesEnabled = (await loadSimpleState(this.db, 'imagesEnabled')).value;
+                this.openUrlsInNewTabEnabled = (await loadSimpleState(this.db, 'openUrlsInNewTabEnabled')).value;
+                this.filterMode = (await loadFilterMode(this.db));
                 this.isOnline = isOnline();
 
                 // --- Attempt to pull user state (including current deck) from server early ---
                 if (this.syncEnabled && this.isOnline) {
                     try {
                         console.log("app.js: Attempting early pull of user state (including current deck) from server...");
-                        await pullUserState(db);
+                        await pullUserState(this.db);
                         console.log("app.js: Early user state pull completed.");
                     } catch (error) {
                         console.warn("app.js: Early pullUserState failed, proceeding with local state. Error:", error);
@@ -177,51 +178,52 @@ document.addEventListener('alpine:init', () => {
                 await this.loadFeedItemsFromDB();
 
                 // Load hidden and starred states from local DB. These might have been updated by early pullUserState.
-                this.hidden = (await loadArrayState(db, 'hidden')).value;
-                this.starred = (await loadArrayState(db, 'starred')).value;
+                this.hidden = (await loadArrayState(this.db, 'hidden')).value;
+                this.starred = (await loadArrayState(this.db, 'starred')).value;
 
                 // Determine sync completion time for pruning stale hidden entries.
                 const itemsCount = await db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
                 let syncCompletionTime = Date.now();
                 if (itemsCount === 0 && this.isOnline) {
-                     const { feedTime } = await performFullSync(db);
+                     const { feedTime } = await performFullSync(this.db);
                      syncCompletionTime = feedTime;
                      if (this.syncEnabled && this.isOnline) {
-                         await pullUserState(db);
-                         this.hidden = (await loadArrayState(db, 'hidden')).value;
-                         this.starred = (await loadArrayState(db, 'starred')).value;
+                         await pullUserState(this.db);
+                         this.hidden = (await loadArrayState(this.db, 'hidden')).value;
+                         this.starred = (await loadArrayState(this.db, 'starred')).value;
                      }
                      await this.loadFeedItemsFromDB();
                 }
-                this.hidden = await pruneStaleHidden(db, this.entries, syncCompletionTime);
+                this.hidden = await pruneStaleHidden(this.db, this.entries, syncCompletionTime);
 
-                this.currentDeckGuids = await loadCurrentDeck(db);
+                this.currentDeckGuids = await loadCurrentDeck(this.db);
 
                 // Access helper functions directly, as they are imported at module scope
                 await validateAndRegenerateCurrentDeck(this);
 
-                const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(db);
+                const { shuffleCount, lastShuffleResetDate } = await loadShuffleState(this.db);
                 const today = new Date();
                 today.setHours(0,0,0,0); // Normalize to start of day
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
                     this.shuffleCount = 2; // Reset daily shuffle count
-                    await saveShuffleState(db, 2, today);
+                    await saveShuffleState(this.db, 2, today);
                 }
 
                 // Initialize UI components and their listeners
-                initTheme(this);
-                initSyncToggle(this);
-                initImagesToggle(this);
+                initTheme(this, this.db);
+                initSyncToggle(this, this.db);
+                initImagesToggle(this, this.db);
+                initShuffleCount(this, this.db);
                 initConfigPanelListeners(this);
 
                 this.$watch("openSettings", async (isOpen) => {
                     if (isOpen) {
                         this.modalView = 'main';
                         await manageSettingsPanelVisibility(this); // Use imported function
-                        this.rssFeedsInput = (await loadSimpleState(db, 'rssFeeds')).value || '';
-                        this.keywordBlacklistInput = (await loadSimpleState(db, 'keywordBlacklist')).value || '';
+                        this.rssFeedsInput = (await loadSimpleState(this.db, 'rssFeeds')).value || '';
+                        this.keywordBlacklistInput = (await loadSimpleState(this.db, 'keywordBlacklist')).value || '';
                     } else {
                         await saveCurrentScrollPosition(); // Use imported function
                     }
@@ -234,13 +236,13 @@ document.addEventListener('alpine:init', () => {
                 this.$watch("modalView", async () => {
                     await manageSettingsPanelVisibility(this); // Use imported function
                 });
-                this.$watch('syncEnabled', value => saveSimpleState(db, 'syncEnabled', value));
-                this.$watch('imagesEnabled', value => saveSimpleState(db, 'imagesEnabled', value));
-                this.$watch('rssFeedsInput', value => saveSimpleState(db, 'rssFeeds', value));
-                this.$watch('keywordBlacklistInput', value => saveSimpleState(db, 'keywordBlacklist', value));
-                this.$watch('filterMode', value => setFilterMode(this, db, value)); // Use imported function
+                this.$watch('syncEnabled', value => saveSimpleState(this.db, 'syncEnabled', value));
+                this.$watch('imagesEnabled', value => saveSimpleState(this.db, 'imagesEnabled', value));
+                this.$watch('rssFeedsInput', value => saveSimpleState(this.db, 'rssFeeds', value));
+                this.$watch('keywordBlacklistInput', value => saveSimpleState(this.db, 'keywordBlacklist', value));
+                this.$watch('filterMode', value => setFilterMode(this, this.db, value)); // Use imported function
                 this.updateCounts(); // Call the local method which wraps the imported function
-                await initScrollPosition(this); // Use imported function
+                await initScrollPosition(this, this.db); // Use imported function
 
                 this.loading = false; // Hide loading screen
 
@@ -249,12 +251,12 @@ document.addEventListener('alpine:init', () => {
                     setTimeout(async () => {
                         try {
                             console.log("app.js: Initiating background partial sync...");
-                            await performFeedSync(db); // Use imported function
-                            await pullUserState(db); // Use imported function
-                            this.hidden = (await loadArrayState(db, 'hidden')).value;
-                            this.starred = (await loadArrayState(db, 'starred')).value;
+                            await performFeedSync(this.db); // Use imported function
+                            await pullUserState(this.db); // Use imported function
+                            this.hidden = (await loadArrayState(this.db, 'hidden')).value;
+                            this.starred = (await loadArrayState(this.db, 'starred')).value;
                             await this.loadFeedItemsFromDB();
-                            this.hidden = await pruneStaleHidden(db, this.entries, Date.now()); // Use imported function
+                            this.hidden = await pruneStaleHidden(this.db, this.entries, Date.now()); // Use imported function
                             this.updateCounts();
                             await validateAndRegenerateCurrentDeck(this); // Use imported function
                             console.log("app.js: Background partial sync completed.");
@@ -271,11 +273,11 @@ document.addEventListener('alpine:init', () => {
                     this.isOnline = true;
                     if (this.syncEnabled) {
                         console.log("app.js: Online detected. Processing pending operations and resyncing.");
-                        await processPendingOperations(db); // Use imported function
+                        await processPendingOperations(this.db); // Use imported function
                         await this.loadFeedItemsFromDB();
-                        this.hidden = (await loadArrayState(db, 'hidden')).value;
-                        this.starred = (await loadArrayState(db, 'starred')).value;
-                        this.hidden = await pruneStaleHidden(db, this.entries, Date.now()); // Use imported function
+                        this.hidden = (await loadArrayState(this.db, 'hidden')).value;
+                        this.starred = (await loadArrayState(this.db, 'starred')).value;
+                        this.hidden = await pruneStaleHidden(this.db, this.entries, Date.now()); // Use imported function
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this); // Use imported function
                         console.log("app.js: Online resync completed.");
@@ -303,10 +305,10 @@ document.addEventListener('alpine:init', () => {
                     }
                     try {
                         console.log("app.js: Performing periodic background sync...");
-                        await performFeedSync(db); // Use imported function
-                        await pullUserState(db); // Use imported function
+                        await performFeedSync(this.db); // Use imported function
+                        await pullUserState(this.db); // Use imported function
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await pruneStaleHidden(db, this.entries, now); // Use imported function
+                        this.hidden = await pruneStaleHidden(this.db, this.entries, now); // Use imported function
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this); // Use imported function
                         console.log("app.js: Periodic background sync completed.");
@@ -320,6 +322,46 @@ document.addEventListener('alpine:init', () => {
                 this.errorMessage = "Could not load feed: " + error.message;
                 this.loading = false;
             }
+        },
+        initScrollObserver() {
+            const observer = new IntersectionObserver(async (entries) => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        const guid = entry.target.dataset.guid;
+                        if (guid) {
+                            console.log(`Saving scroll position for guid: ${guid}`);
+                            await saveSimpleState(this.db, `scrollPosition-${guid}`, entry.boundingClientRect.y);
+                        }
+                    }
+                }
+            }, {
+                root: document.querySelector('#feed-container'),
+                rootMargin: '0px',
+                threshold: 0.1
+            });
+
+            const feedContainer = document.querySelector('#feed-container');
+
+            // Function to observe all elements with data-guid
+            const observeElements = () => {
+                feedContainer.querySelectorAll('[data-guid]').forEach(item => {
+                    observer.observe(item);
+                });
+            };
+
+            // Initial observation
+            observeElements();
+
+            // MutationObserver to re-observe elements if the feed container's children change
+            const mutationObserver = new MutationObserver(mutations => {
+                console.log('Mutation detected in feed-container. Re-observing elements.');
+                observer.disconnect(); // Stop observing everything
+                observeElements(); // Re-observe
+            });
+
+            mutationObserver.observe(feedContainer, { childList: true, subtree: true });
+
+            this.scrollObserver = observer; // Store the observer instance
         },
 
         // --- Method to handle links within each entry's description ---
@@ -345,13 +387,12 @@ document.addEventListener('alpine:init', () => {
 
         async loadFeedItemsFromDB() {
             // Ensure db is available before trying to use it
-            // 'db' is available at module scope, no need for this.db
-            if (!db || db instanceof Promise) {
+            if (!this.db) {
                 console.error("Database not initialized or still a promise, cannot load feed items.");
                 this.entries = [];
                 return;
             }
-            const rawItemsFromDb = await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
+            const rawItemsFromDb = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
             // Use imported mapRawItems and formatDate directly
             this.entries = mapRawItems(rawItemsFromDb, formatDate);
         },
@@ -390,10 +431,10 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveRssFeeds() {
-            await saveSimpleState(db, 'rssFeeds', this.rssFeedsInput);
+            await saveSimpleState(this.db, 'rssFeeds', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
-            await performFullSync(db);
+            await performFullSync(this.db);
             await this.loadFeedItemsFromDB();
             await validateAndRegenerateCurrentDeck(this);
             this.loading = false;

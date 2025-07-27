@@ -1,14 +1,15 @@
 // www/js/ui/uiInitializers.js
 
 import {
-    db, // --- FIX: Changed from dbPromise to db ---
+    // db, // --- FIX: Changed from dbPromise to db --- // REMOVED
     loadSimpleState, // --- FIX: Changed from loadStateValue ---
     saveSimpleState, // --- FIX: Changed from saveStateValue ---
     addPendingOperation, // --- FIX: Add addPendingOperation for buffering ---
     getBufferedChangesCount, // --- FIX: Use the function to get count ---
     processPendingOperations,
     pullUserState, // Add pullUserState if it's used directly here
-    performFullSync // Add performFullSync if it's used directly here
+    performFullSync, // Add performFullSync if it's used directly here
+    isOnline // --- NEW: Import isOnline ---
 } from '../data/database.js';
 
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
@@ -21,12 +22,13 @@ import { createStatusBarMessage, attachScrollToTopHandler } from './uiUpdaters.j
 /**
  * Generic function to set up a boolean toggle UI element and sync its state with IndexedDB.
  * @param {object} app - The Alpine.js app state object.
+ * @param {IDBDatabase} db - The IndexedDB database instance. // --- NEW: db parameter ---
  * @param {Function} getToggleEl - Function returning the toggle DOM element.
  * @param {Function} getTextEl - Function returning the text display DOM element.
  * @param {string} dbKey - The key to use in the 'userState' object store for this setting.
  * @param {Function} [onToggleCb] - Optional callback function to execute when the toggle changes.
  */
-export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) {
+export async function setupBooleanToggle(app, db, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) { // --- NEW: db parameter ---
     const toggleEl = getToggleEl();
     const textEl = getTextEl();
 
@@ -52,7 +54,7 @@ export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onT
             value: app[dbKey]
         });
         // Attempt immediate sync for user-initiated changes
-        if (navigator.onLine) {
+        if (await isOnline()) { // --- NEW: Use isOnline() ---
             try {
                 await processPendingOperations(db);
             } catch (syncErr) {
@@ -66,23 +68,23 @@ export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onT
     });
 }
 
-export async function initSyncToggle(app) {
-    await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => { // Added async
+export async function initSyncToggle(app, db) { // --- NEW: db parameter ---
+    await setupBooleanToggle(app, db, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => { // Added async // --- NEW: Pass db ---
         if (enabled) {
             console.log("Sync enabled, triggering full sync from initSyncToggle.");
             // Ensure db is ready, though it should be by this point
             if (db) {
-                await performFullSync(app); // Full sync includes user state and feed
+                await performFullSync(app, db); // Full sync includes user state and feed // --- NEW: Pass db ---
             }
         }
     });
 }
 
-export async function initImagesToggle(app) {
-    await setupBooleanToggle(app, getImagesToggle, getImagesText, 'imagesEnabled');
+export async function initImagesToggle(app, db) { // --- NEW: db parameter ---
+    await setupBooleanToggle(app, db, getImagesToggle, getImagesText, 'imagesEnabled'); // --- NEW: Pass db ---
 }
 
-export async function initTheme(app) {
+export async function initTheme(app, db) { // --- NEW: db parameter ---
     const htmlEl = document.documentElement;
     const toggle = getThemeToggle(); // Assumed to get the theme switch element
     const text = getThemeText();     // Assumed to get an element to display theme name
@@ -123,7 +125,7 @@ export async function initTheme(app) {
             value: newTheme
         });
         // Attempt immediate sync for user-initiated changes
-        if (navigator.onLine) {
+        if (await isOnline()) { // --- NEW: Use isOnline() ---
             try {
                 await processPendingOperations(db);
             } catch (syncErr) {
@@ -136,29 +138,27 @@ export async function initTheme(app) {
     });
 }
 
-export async function initScrollPosition(app) {
-    // --- FIX: Use 'db' directly and loadSimpleState ---
-    const savedScrollYResult = await loadSimpleState(db, 'feedScrollY');
-    const savedScrollY = savedScrollYResult.value;
-
-    if (!savedScrollY || savedScrollY === '0') return;
-
+export async function initScrollPosition(app, db) { // --- NEW: db parameter ---
     window.requestAnimationFrame(async () => {
-        const savedLinkResult = await loadSimpleState(db, 'feedVisibleLink');
-        const savedLink = savedLinkResult.value;
-        if (savedLink) {
-            const targetEl = document.querySelector(`.entry[data-link="${savedLink}"]`);
+        const lastViewedItemIdResult = await loadSimpleState(db, 'lastViewedItemId');
+        const lastViewedItemId = lastViewedItemIdResult.value;
+
+        const lastViewedItemOffsetResult = await loadSimpleState(db, 'lastViewedItemOffset');
+        const lastViewedItemOffset = lastViewedItemOffsetResult.value;
+
+        if (lastViewedItemId) {
+            const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
             if (targetEl) {
-                targetEl.scrollIntoView({ block: 'start' });
-                return;
+                targetEl.scrollIntoView();
+                if (lastViewedItemOffset) {
+                    window.scrollBy(0, lastViewedItemOffset);
+                }
             }
         }
-        const yPos = Number(savedScrollY) || 0;
-        if (yPos) window.scrollTo({ top: yPos });
     });
 }
 
-export async function initShuffleCount(app) {
+export async function initShuffleCount(app, db) { // --- NEW: db parameter ---
     // db is already available from import
     const { shuffleCount: count, lastShuffleResetDate: lastReset } = await loadShuffleState(db);
     const today = new Date();

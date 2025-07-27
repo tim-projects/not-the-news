@@ -1,7 +1,6 @@
 // www/js/helpers/userStateUtils.js
 
 import {
-    db, // --- FIX: Changed from dbPromise to db ---
     loadSimpleState,
     saveSimpleState,
     addPendingOperation,
@@ -17,7 +16,29 @@ import {
  * @param {object} app - The main application state object (e.g., Vue instance).
  * @param {string} guid - The unique identifier of the item.
  */
-export async function toggleStar(app, guid) {
+export const USER_STATE_DEFS = {
+// Array-based states stored in their own dedicated object stores.
+// Their *timestamps* will be stored as simple key-value pairs in 'userSettings'
+// using their key name (e.g., 'starred' will have a timestamp in 'userSettings').
+starred: { store: 'starredItems', type: 'array', default: [] },
+hidden: { store: 'hiddenItems', type: 'array', default: [] },
+currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
+
+// Simple value states stored in the 'userSettings' object store
+filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
+syncEnabled: { store: 'userSettings', type: 'simple', default: true },
+imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
+rssFeeds: { store: 'userSettings', type: 'simple', default: [] },
+keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] },
+shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
+lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
+openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
+// A specific key to store the global latest timestamp from server sync
+lastStateSync: { store: 'userSettings', type: 'simple', default: null },
+lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
+lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
+};
+export async function toggleStar(app, db, guid) {
     const tx = db.transaction('starredItems', 'readwrite');
     const store = tx.objectStore('starredItems');
 

@@ -1,3 +1,4 @@
+// js/helpers/apiUtils.js
 // This file assumes fetchWithRetry is imported from database.js if it's not a global utility
 // For this structure, fetchWithRetry is a core DB utility for API calls.
 

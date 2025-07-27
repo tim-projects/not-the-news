@@ -7,7 +7,9 @@ import { openDB } from '../libs/idb.js'; // Adjusted path to idb.js
 const DB_NAME = 'not-the-news-db';
 const DB_VERSION = 7; // *** IMPORTANT: Increment DB_VERSION for schema changes ***
 
-export let db = null; // Will hold the IndexedDB instance
+let _dbInstance = null;
+let _dbInitPromise = null;
+
 
 // Define schema for object stores
 const OBJECT_STORES_SCHEMA = [
@@ -44,7 +46,8 @@ export const USER_STATE_DEFS = {
 
 // --- Initialization ---
 export async function initDb() {
-    db = await openDB(DB_NAME, DB_VERSION, {
+    if (_dbInitPromise) return _dbInitPromise;
+    _dbInitPromise = openDB(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, transaction) {
             console.log(`[IndexedDB] Upgrading DB from version ${oldVersion} to ${newVersion}`);
             
@@ -73,7 +76,9 @@ export async function initDb() {
             console.warn('[IndexedDB] Database is blocking. Other tabs need to close.');
         }
     });
+    _dbInstance = await _dbInitPromise;
     console.log(`[IndexedDB] Database '${DB_NAME}' opened, version ${DB_VERSION}`);
+    return _dbInstance;
 }
 
 // --- Generic State Loading/Saving Functions ---
@@ -591,64 +596,71 @@ export async function performFullSync(app) {
 // --- Functions to get data out of IndexedDB for UI ---
 
 export async function getStarredItems() {
-    await initDb(); // Ensure DB is open
+    const db = await getDb(); // Ensure DB is open
     const { value } = await loadArrayState(db, 'starred');
     return value;
 }
 
 export async function getHiddenItems() {
-    await initDb(); // Ensure DB is open
+    const db = await getDb(); // Ensure DB is open
     const { value } = await loadArrayState(db, 'hidden');
     return value;
 }
 
 // *** UPDATED: getCurrentDeckGuids now uses loadArrayState and expects array from server ***
 export async function getCurrentDeckGuids() {
-    await initDb(); // Ensure DB is open
+    const db = await getDb(); // Ensure DB is open
     const { value } = await loadArrayState(db, 'currentDeckGuids');
     return value.map(item => item.id); // Return just the GUID strings
 }
 
 
 export async function getFilterMode() {
-    await initDb(); // Ensure DB is open
+    const db = await getDb(); // Ensure DB is open
     const { value } = await loadSimpleState(db, 'filterMode');
     return value;
 }
 
 export async function getSyncEnabled() {
-    await initDb(); // Ensure DB is open
+    const db = await getDb(); // Ensure DB is open
     const { value } = await loadSimpleState(db, 'syncEnabled');
     return value;
 }
 
 export async function getImagesEnabled() {
-    await initDb();
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'imagesEnabled');
     return value;
 }
 export async function getRssFeeds() {
-    await initDb();
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'rssFeeds');
     return value;
 }
 export async function getKeywordBlacklist() {
-    await initDb();
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'keywordBlacklist');
     return value;
 }
 export async function getShuffleCount() {
-    await initDb();
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'shuffleCount');
     return value;
 }
 export async function getLastShuffleResetDate() {
-    await initDb();
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'lastShuffleResetDate');
     return value;
 }
 export async function getOpenUrlsInNewTabEnabled() {
-    await initDb();
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'openUrlsInNewTabEnabled');
     return value;
+}
+
+export async function getDb() {
+    if (!_dbInstance) {
+        await initDb();
+    }
+    return _dbInstance;
 }
