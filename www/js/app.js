@@ -3,14 +3,14 @@
 // Import necessary modules
 import {
     performFeedSync,
-    performFullSync,
+    performFullSync, // This function is now a placeholder and won't return feedTime
     pullUserState,
     processPendingOperations,
     loadSimpleState,
     loadArrayState,
     getBufferedChangesCount,
     isOnline,
-    initDb // Keep initDb import
+    initDb
 } from './data/database.js';
 import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
@@ -152,7 +152,6 @@ document.addEventListener('alpine:init', () => {
                 console.log("app.js: IndexedDB initialized within initApp().");
 
                 // Load initial settings and user state from DB/localStorage
-                // Since 'db' is imported at the module level, we can just use it directly.
                 this.syncEnabled = (await loadSimpleState(this.db, 'syncEnabled')).value;
                 this.imagesEnabled = (await loadSimpleState(this.db, 'imagesEnabled')).value;
                 this.openUrlsInNewTabEnabled = (await loadSimpleState(this.db, 'openUrlsInNewTabEnabled')).value;
@@ -181,11 +180,15 @@ document.addEventListener('alpine:init', () => {
                 this.starred = (await loadArrayState(this.db, 'starred')).value;
 
                 // Determine sync completion time for pruning stale hidden entries.
-                const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count(); // Use this.db
-                let syncCompletionTime = Date.now();
+                const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
+                let syncCompletionTime = Date.now(); // Default to current time
+
                 if (itemsCount === 0 && this.isOnline) {
-                     const { feedTime } = await performFullSync(this.db);
-                     syncCompletionTime = feedTime;
+                     // performFullSync is a placeholder and doesn't return feedTime
+                     await performFullSync(this.db);
+                     // Set syncCompletionTime after the full sync completes, suitable for pruneStaleHidden
+                     syncCompletionTime = Date.now();
+
                      if (this.syncEnabled && this.isOnline) {
                          await pullUserState(this.db);
                          this.hidden = (await loadArrayState(this.db, 'hidden')).value;
@@ -307,7 +310,7 @@ document.addEventListener('alpine:init', () => {
                         await performFeedSync(this.db); // Use imported function
                         await pullUserState(this.db); // Use imported function
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await pruneStaleHidden(this.db, now); // Use imported function
+                        this.hidden = await pruneStaleHidden(this.db, this.entries, now); // Use imported function
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this); // Use imported function
                         console.log("app.js: Periodic background sync completed.");
@@ -440,7 +443,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveKeywordBlacklist() {
-            // IMPORTANT: Use 'this.db' here as well
             await saveSimpleState(this.db, 'keywordBlacklist', this.keywordBlacklistInput);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             this.updateCounts();
