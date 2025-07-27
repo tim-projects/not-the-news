@@ -9,13 +9,9 @@ import {
     getKeywordsBlacklistTextarea,
     getFilterSelector,
     getNtnTitleH2,
-    getMessageContainer // <-- NEW: Import the getter for the status bar message container
+    getMessageContainer
 } from './uiElements.js';
-// --- FIX START ---
-// We export `db` from database.js which is the already-opened DB instance.
-// `saveSimpleState` is the correct function to save individual settings.
-import { db, saveSimpleState } from '../data/database.js';
-// --- FIX END ---
+import { getDb, saveSimpleState } from '../data/database.js';
 
 /**
  * Splits a message into two lines if it exceeds a certain character limit.
@@ -93,7 +89,6 @@ export async function displayTemporaryMessageInTitle(message) {
     titleH2.style.overflow = originalOverflow; // Restore original overflow style
 }
 
-// --- NEW/RENAMED STATUS BAR MESSAGE FUNCTION ---
 let messageTimeout; // To clear previous timeouts for the status bar message
 
 /**
@@ -235,9 +230,7 @@ export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
 }
 
 export async function saveCurrentScrollPosition() {
-    // --- FIX START ---
-    // The `db` instance is already available and exported from database.js
-    // `saveSimpleState` is the function to use now.
+    const db = await getDb();
     await saveSimpleState(db, 'feedScrollY', String(window.scrollY));
 
     // Save the link of the first visible entry
@@ -248,5 +241,4 @@ export async function saveCurrentScrollPosition() {
             break;
         }
     }
-    // --- FIX END ---
 }

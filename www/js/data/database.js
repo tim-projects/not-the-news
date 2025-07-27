@@ -40,6 +40,8 @@ export const USER_STATE_DEFS = {
     shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
+    lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
+    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
     // A specific key to store the global latest timestamp from server sync
     lastStateSync: { store: 'userSettings', type: 'simple', default: null } 
 };
@@ -78,6 +80,13 @@ export async function initDb() {
     });
     _dbInstance = await _dbInitPromise;
     console.log(`[IndexedDB] Database '${DB_NAME}' opened, version ${DB_VERSION}`);
+    return _dbInstance;
+}
+
+export async function getDb() {
+    if (!_dbInstance) {
+        await initDb();
+    }
     return _dbInstance;
 }
 
@@ -356,9 +365,7 @@ export async function processPendingOperations(db) {
  * @returns {Promise<number>} The number of buffered changes.
  */
 export async function getBufferedChangesCount() {
-    if (!db) {
-        await initDb(); // Ensure db is open before attempting to read.
-    }
+    const db = await getDb();
     try {
         const tx = db.transaction('pendingOperations', 'readonly');
         const store = tx.objectStore('pendingOperations');
@@ -449,7 +456,6 @@ export async function pullUserState(db) {
                     // If server 404s, it implies the file might not exist or was deleted.
                     // We can optionally clear the local state for this key and its timestamp
                     // so it gets re-initialized next time, or just rely on local default.
-                    // For now, let's just log and continue, client's default will be used.
                     // (Consider adding a clearLocalState(db, key) function if needed)
                     return { key, status: 404 };
                 }
@@ -585,6 +591,7 @@ export async function performFeedSync(app, lastSyncTime = null) {
 // Placeholder for performFullSync. This function likely orchestrates pullUserState and performFeedSync.
 export async function performFullSync(app) {
     console.log('[performFullSync] Placeholder for full synchronization (feed + user state).');
+    const db = await getDb();
     await pullUserState(db);
     // You might pass the last sync timestamp from pullUserState to performFeedSync
     // const { value: lastStateSyncTime } = await loadSimpleState(db, 'lastStateSync');
@@ -596,33 +603,33 @@ export async function performFullSync(app) {
 // --- Functions to get data out of IndexedDB for UI ---
 
 export async function getStarredItems() {
-    const db = await getDb(); // Ensure DB is open
+    const db = await getDb();
     const { value } = await loadArrayState(db, 'starred');
     return value;
 }
 
 export async function getHiddenItems() {
-    const db = await getDb(); // Ensure DB is open
+    const db = await getDb();
     const { value } = await loadArrayState(db, 'hidden');
     return value;
 }
 
 // *** UPDATED: getCurrentDeckGuids now uses loadArrayState and expects array from server ***
 export async function getCurrentDeckGuids() {
-    const db = await getDb(); // Ensure DB is open
+    const db = await getDb();
     const { value } = await loadArrayState(db, 'currentDeckGuids');
     return value.map(item => item.id); // Return just the GUID strings
 }
 
 
 export async function getFilterMode() {
-    const db = await getDb(); // Ensure DB is open
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'filterMode');
     return value;
 }
 
 export async function getSyncEnabled() {
-    const db = await getDb(); // Ensure DB is open
+    const db = await getDb();
     const { value } = await loadSimpleState(db, 'syncEnabled');
     return value;
 }
@@ -657,10 +664,15 @@ export async function getOpenUrlsInNewTabEnabled() {
     const { value } = await loadSimpleState(db, 'openUrlsInNewTabEnabled');
     return value;
 }
+// New functions for scroll position tracking
+export async function getLastViewedItemId() {
+    const db = await getDb();
+    const { value } = await loadSimpleState(db, 'lastViewedItemId');
+    return value;
+}
 
-export async function getDb() {
-    if (!_dbInstance) {
-        await initDb();
-    }
-    return _dbInstance;
+export async function getLastViewedItemOffset() {
+    const db = await getDb();
+    const { value } = await loadSimpleState(db, 'lastViewedItemOffset');
+    return value;
 }
