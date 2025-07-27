@@ -97,9 +97,8 @@ export function displayCurrentDeck(app) {
  * Validates the current deck and regenerates it if all items are hidden or no longer exist.
  * This method is intended to be called during app initialization and after data syncs.
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- * @param {IDBDatabase} db The IndexedDB database instance.
  */
-export async function validateAndRegenerateCurrentDeck(app, db) {
+export async function validateAndRegenerateCurrentDeck(app) {
     console.log("dataUtils.js: validateAndRegenerateCurrentDeck called");
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
@@ -112,13 +111,12 @@ export async function validateAndRegenerateCurrentDeck(app, db) {
     // If the deck is empty or all items are invalid, generate a new deck
     if (validGuidsInDeck.length === 0 && app.entries.length > 0) {
         console.log("Current deck is empty/invalid. Loading next deck and increasing shuffle count.");
-        await loadNextDeck(app, db); // Pass db
+        await loadNextDeck(app); // Removed db parameter
 
         // Reward: ALWAYS increase shuffle count when deck becomes empty due to hiding
         const today = new Date();
         today.setHours(0,0,0,0);
-        app.shuffleCount++;
-        await saveShuffleState(db, app.shuffleCount, today); // Pass db
+        await saveShuffleState(app.shuffleCount, today); // Removed db parameter
         // This message goes to the title bar, as confirmed in previous steps.
         await displayTemporaryMessageInTitle('Shuffle count increased!');
 
@@ -126,7 +124,7 @@ export async function validateAndRegenerateCurrentDeck(app, db) {
         // If some items were removed from the deck, update and save it
         console.log("Current deck contained hidden/non-existent items. Updating the deck.");
         app.currentDeckGuids = validGuidsInDeck;
-        await saveCurrentDeck(db, app.currentDeckGuids); // Pass db
+        await saveCurrentDeck(app.currentDeckGuids); // Removed db parameter
     }
     // Only call displayCurrentDeck if the deck was actually changed
     // This condition needs to be 'validGuidsInDeck.length !== app.currentDeckGuids.length' for correct logic.
@@ -143,9 +141,8 @@ export async function validateAndRegenerateCurrentDeck(app, db) {
  * is now shared by both 'Next Deck' button and 'Shuffle' button behavior,
  * and when the current deck becomes empty.
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- * @param {IDBDatabase} db The IndexedDB database instance.
  */
-export async function loadNextDeck(app, db) {
+export async function loadNextDeck(app) {
     // Ensure entries is up-to-date and correctly mapped before filtering
     await app.loadFeedItemsFromDB();
 
@@ -312,10 +309,10 @@ export async function loadNextDeck(app, db) {
 
     if (nextDeck.length > 0) {
         app.currentDeckGuids = nextDeck.map(item => item.id);
-        await saveCurrentDeck(db, app.currentDeckGuids); // Pass db
+        await saveCurrentDeck(app.currentDeckGuids); // Removed db parameter
     } else {
         app.currentDeckGuids = [];
-        await saveCurrentDeck(db, []); // Pass db
+        await saveCurrentDeck([]); // Removed db parameter
         createStatusBarMessage('No more unread items to load!', 'info');
     }
 
@@ -328,22 +325,21 @@ export async function loadNextDeck(app, db) {
  * Loads the next set of unread items into the current deck, and decrements the daily shuffle count.
  * This function now uses the same item selection logic as loadNextDeck.
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- * @param {IDBDatabase} db The IndexedDB database instance.
  */
-export async function shuffleFeed(app, db) {
+export async function shuffleFeed(app) {
     if (app.shuffleCount <= 0) {
         createStatusBarMessage('No shuffles left for today!', 'error');
         return;
     }
 
     console.log("Shuffle button pressed. Loading next deck and decrementing shuffle count.");
-    await loadNextDeck(app, db); // Pass db
+    await loadNextDeck(app); // Removed db parameter
 
     // After loadNextDeck completes, handle the shuffle count specific to shuffleFeed
     app.shuffleCount--;
     const today = new Date();
     today.setHours(0,0,0,0);
-    await saveShuffleState(db, app.shuffleCount, today); // Pass db
+    await saveShuffleState(app.shuffleCount, today); // Removed db parameter
 
     app.isShuffled = true;
     await displayTemporaryMessageInTitle('Feed shuffled!');

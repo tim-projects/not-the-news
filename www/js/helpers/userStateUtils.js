@@ -6,19 +6,19 @@ import {
     addPendingOperation,
     processPendingOperations,
     isOnline,
-    loadArrayState, // --- FIX: Re-added loadArrayState ---
-    saveArrayState, // --- FIX: Re-added saveArrayState ---
-    getDb // Add this line
+    loadArrayState,
+    saveArrayState,
+    getDb
 } from '../data/database.js'; // Adjusted path to database.js
 
 
 /**
  * Toggles the starred status of an item and manages synchronization.
  * @param {object} app - The main application state object (e.g., Vue instance).
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {string} guid - The unique identifier of the item.
  */
-export async function toggleStar(app, db, guid) {
+export async function toggleStar(app, guid) {
+    const db = await getDb();
     const tx = db.transaction('starredItems', 'readwrite');
     const store = tx.objectStore('starredItems');
 
@@ -59,7 +59,7 @@ export async function toggleStar(app, db, guid) {
             action,
             starredAt
         };
-        await addPendingOperation(db, {
+        await addPendingOperation({
             type: 'starDelta',
             data: deltaObject
         });
@@ -67,7 +67,7 @@ export async function toggleStar(app, db, guid) {
         // Attempt immediate background sync if online
         if (isOnline()) {
             try {
-                await processPendingOperations(db);
+                await processPendingOperations();
             } catch (syncErr) {
                 console.error("Failed to immediately sync star change, operation remains buffered:", syncErr);
                 // The operation is already buffered, so no re-addition needed here.
@@ -125,7 +125,7 @@ export async function toggleHidden(app, guid) {
             action,
             hiddenAt
         };
-        await addPendingOperation(db, {
+        await addPendingOperation({
             type: 'hiddenDelta',
             data: deltaObject
         });
@@ -133,7 +133,7 @@ export async function toggleHidden(app, guid) {
         // Attempt immediate background sync if online
         if (isOnline()) {
             try {
-                await processPendingOperations(db);
+                await processPendingOperations();
             } catch (syncErr) {
                 console.error("Failed to immediately sync hidden change, operation remains buffered:", syncErr);
                 // The operation is already buffered, so no re-addition needed here.
@@ -147,16 +147,15 @@ export async function toggleHidden(app, guid) {
 /**
  * Prunes stale hidden items from the hiddenItems store.
  * Items are considered stale if they are not in the current feedItems and are older than 30 days.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {Array<object>} feedItems - The array of current feed items (expected to have 'id' property).
  * @param {number} currentTS - The current timestamp in milliseconds.
  * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
  */
-export async function pruneStaleHidden(db, feedItems, currentTS) {
-    // --- FIX: Use loadArrayState instead of getHiddenItems ---
+export async function pruneStaleHidden(feedItems, currentTS) {
+    const db = await getDb();
     const {
         value: hiddenItems
-    } = await loadArrayState(db, 'hidden');
+    } = await loadArrayState('hidden');
 
     // Basic validation
     if (!Array.isArray(hiddenItems)) return [];
@@ -196,14 +195,13 @@ export async function pruneStaleHidden(db, feedItems, currentTS) {
 /**
  * Loads the current deck of GUIDs.
  * This function now relies on `loadArrayState` which operates on the `currentDeckGuids` store.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
-export async function loadCurrentDeck(db) { // --- FIX: Added db parameter ---
-    // --- FIX: Use loadArrayState instead of getCurrentDeckGuids ---
+export async function loadCurrentDeck() {
+    const db = await getDb();
     const {
         value: guids
-    } = await loadArrayState(db, 'currentDeckGuids');
+    } = await loadArrayState('currentDeckGuids');
     return Array.isArray(guids) ? guids : [];
 }
 
@@ -211,17 +209,16 @@ export async function loadCurrentDeck(db) { // --- FIX: Added db parameter ---
  * Saves the current deck of GUIDs.
  * This function now uses a direct IndexedDB transaction for the 'currentDeckGuids' store
  * and also buffers the operation for server sync.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
  */
-export async function saveCurrentDeck(db, guids) {
-    // --- FIX: Use saveArrayState which handles the transaction and store operations ---
-    await saveArrayState(db, 'currentDeckGuids', guids);
+export async function saveCurrentDeck(guids) {
+    const db = await getDb();
+    await saveArrayState('currentDeckGuids', guids);
 
     console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
 
     // Add the operation to the pending operations buffer for server sync
-    await addPendingOperation(db, {
+    await addPendingOperation({
         type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
         key: 'currentDeckGuids',
         value: guids // Send the entire array to the server
@@ -230,7 +227,7 @@ export async function saveCurrentDeck(db, guids) {
     // Attempt immediate background sync if online
     if (isOnline()) {
         try {
-            await processPendingOperations(db);
+            await processPendingOperations();
         } catch (syncErr) {
             console.error("Failed to immediately sync currentDeckGuids change, operation remains buffered:", syncErr);
         }
@@ -239,17 +236,17 @@ export async function saveCurrentDeck(db, guids) {
 
 /**
  * Loads the shuffle state, including shuffle count and last reset date.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
  */
-export async function loadShuffleState(db) {
+export async function loadShuffleState() {
+    const db = await getDb();
     // loadSimpleState returns an object { value, lastModified }
     const {
         value: count
-    } = await loadSimpleState(db, 'shuffleCount');
+    } = await loadSimpleState('shuffleCount');
     const {
         value: dateStr
-    } = await loadSimpleState(db, 'lastShuffleResetDate');
+    } = await loadSimpleState('lastShuffleResetDate');
 
     let shuffleCount = typeof count === 'number' ? count : 2; // Default if not found or invalid
     let lastResetDate = null;
@@ -268,21 +265,21 @@ export async function loadShuffleState(db) {
 
 /**
  * Saves the shuffle state, including shuffle count and last reset date.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {number} count - The current shuffle count.
  * @param {Date} resetDate - The date of the last shuffle reset.
  */
-export async function saveShuffleState(db, count, resetDate) {
-    await saveSimpleState(db, 'shuffleCount', count);
-    await saveSimpleState(db, 'lastShuffleResetDate', resetDate.toISOString());
+export async function saveShuffleState(count, resetDate) {
+    const db = await getDb();
+    await saveSimpleState('shuffleCount', count);
+    await saveSimpleState('lastShuffleResetDate', resetDate.toISOString());
 
     // Add these simple updates to the pending operations buffer
-    await addPendingOperation(db, {
+    await addPendingOperation({
         type: 'simpleUpdate',
         key: 'shuffleCount',
         value: count
     });
-    await addPendingOperation(db, {
+    await addPendingOperation({
         type: 'simpleUpdate',
         key: 'lastShuffleResetDate',
         value: resetDate.toISOString()
@@ -290,7 +287,7 @@ export async function saveShuffleState(db, count, resetDate) {
 
     if (isOnline()) {
         try {
-            await processPendingOperations(db);
+            await processPendingOperations();
         } catch (syncErr) {
             console.error("Failed to immediately sync shuffle state change, operations remain buffered:", syncErr);
         }
@@ -300,15 +297,15 @@ export async function saveShuffleState(db, count, resetDate) {
 /**
  * Sets the current filter mode for the application.
  * @param {object} app - The main application state object.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {string} mode - The filter mode to set (e.g., 'unread', 'starred').
  */
-export async function setFilterMode(app, db, mode) {
+export async function setFilterMode(app, mode) {
+    const db = await getDb();
     app.filterMode = mode;
-    await saveSimpleState(db, 'filterMode', mode);
+    await saveSimpleState('filterMode', mode);
 
     // Add this simple update to the pending operations buffer
-    await addPendingOperation(db, {
+    await addPendingOperation({
         type: 'simpleUpdate',
         key: 'filterMode',
         value: mode
@@ -316,7 +313,7 @@ export async function setFilterMode(app, db, mode) {
 
     if (isOnline()) {
         try {
-            await processPendingOperations(db);
+            await processPendingOperations();
         } catch (syncErr) {
             console.error("Failed to immediately sync filter mode change, operation remains buffered:", syncErr);
         }
@@ -325,12 +322,12 @@ export async function setFilterMode(app, db, mode) {
 
 /**
  * Loads the current filter mode from storage.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @returns {Promise<string>} The current filter mode.
  */
-export async function loadFilterMode(db) {
+export async function loadFilterMode() {
+    const db = await getDb();
     const {
         value: mode
-    } = await loadSimpleState(db, 'filterMode');
+    } = await loadSimpleState('filterMode');
     return mode || 'unread'; // Provide a default if not found
 }
