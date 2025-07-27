@@ -75,8 +75,8 @@ document.addEventListener('alpine:init', () => {
         _cachedFilteredEntries: null,
 
         get filteredEntries() {
-            if (!this.db || this.db instanceof Promise) {
-                console.warn("db not initialized or still a promise, cannot filter entries yet.");
+            if (!this.db) { // Changed from if (!this.db || this.db instanceof Promise) to if (!this.db)
+                console.warn("db not initialized, cannot filter entries yet.");
                 return [];
             }
 
@@ -129,7 +129,7 @@ document.addEventListener('alpine:init', () => {
             console.log('initApp has been called from x-init!');
 
             try {
-                this.db = await initDb();
+                this.db = await initDb(); // Ensure this is awaited first
                 console.log("IndexedDB initialized within initApp().");
 
                 this.syncEnabled = (await loadSimpleState(this.db, 'syncEnabled')).value;
@@ -157,12 +157,13 @@ document.addEventListener('alpine:init', () => {
                 this.starred = (await loadArrayState(this.db, 'starred')).value;
 
                 const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
-                let syncCompletionTime = Date.now(); 
+                let lastFeedSyncServerTime;
 
                 if (itemsCount === 0 && this.isOnline) {
-                     await performFullSync(this.db); // This function is a placeholder and doesn't return feedTime
-                     syncCompletionTime = Date.now(); // Set after full sync
-
+                     await performFullSync(this.db); // Keep this call as is.
+                     // Read from DB after full sync (which calls performFeedSync internally).
+                     lastFeedSyncServerTime = (await loadSimpleState(this.db, 'lastFeedSync')).value;
+                     
                      if (this.syncEnabled && this.isOnline) {
                          await pullUserState(this.db);
                          this.hidden = (await loadArrayState(this.db, 'hidden')).value;
@@ -171,9 +172,8 @@ document.addEventListener('alpine:init', () => {
                      await this.loadFeedItemsFromDB();
                 }
 
-                // --- MODIFIED: Capture serverTime from performFeedSync for accurate pruning ---
-                let lastFeedSyncServerTime = (await loadSimpleState(this.db, 'lastFeedSync')).value;
-                this.hidden = await pruneStaleHidden(this.db, this.entries, lastFeedSyncServerTime || syncCompletionTime);
+                // Use lastFeedSyncServerTime directly
+                this.hidden = await pruneStaleHidden(this.db, this.entries, lastFeedSyncServerTime);
 
                 this.currentDeckGuids = await loadCurrentDeck(this.db);
 
@@ -225,9 +225,9 @@ document.addEventListener('alpine:init', () => {
                     setTimeout(async () => {
                         try {
                             console.log("Initiating background partial sync...");
-                            // --- MODIFIED: Capture serverTime from performFeedSync ---
-                            const syncResult = await performFeedSync(this.db); 
-                            const currentFeedServerTime = syncResult ? syncResult.serverTime : Date.now(); // Use Date.now() as fallback
+                            // --- MODIFIED: Adjust performFeedSync call for serverTime retrieval ---
+                            await performFeedSync(this.db); 
+                            const currentFeedServerTime = (await loadSimpleState(this.db, 'lastFeedSync')).value || Date.now();
                             
                             await pullUserState(this.db);
                             this.hidden = (await loadArrayState(this.db, 'hidden')).value;
@@ -250,9 +250,9 @@ document.addEventListener('alpine:init', () => {
                     if (this.syncEnabled) {
                         console.log("Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations(this.db);
-                        // --- MODIFIED: Capture serverTime from performFeedSync for online re-sync ---
-                        const syncResult = await performFeedSync(this.db);
-                        const currentFeedServerTime = syncResult ? syncResult.serverTime : Date.now();
+                        // --- MODIFIED: Adjust performFeedSync call for online re-sync ---
+                        await performFeedSync(this.db);
+                        const currentFeedServerTime = (await loadSimpleState(this.db, 'lastFeedSync')).value || Date.now();
 
                         await pullUserState(this.db);
                         this.hidden = (await loadArrayState(this.db, 'hidden')).value;
@@ -285,9 +285,9 @@ document.addEventListener('alpine:init', () => {
                     }
                     try {
                         console.log("Performing periodic background sync...");
-                        // --- MODIFIED: Capture serverTime from performFeedSync for periodic sync ---
-                        const syncResult = await performFeedSync(this.db);
-                        const currentFeedServerTime = syncResult ? syncResult.serverTime : Date.now();
+                        // --- MODIFIED: Adjust performFeedSync call for periodic sync ---
+                        await performFeedSync(this.db);
+                        const currentFeedServerTime = (await loadSimpleState(this.db, 'lastFeedSync')).value || Date.now();
 
                         await pullUserState(this.db);
                         await this.loadFeedItemsFromDB();
@@ -363,7 +363,7 @@ document.addEventListener('alpine:init', () => {
 
         async loadFeedItemsFromDB() {
             if (!this.db) {
-                console.error("Database not initialized or still a promise, cannot load feed items.");
+                console.error("Database not initialized, cannot load feed items.");
                 this.entries = [];
                 return;
             }

@@ -7,37 +7,17 @@ import {
     processPendingOperations,
     isOnline,
     loadArrayState, // --- FIX: Re-added loadArrayState ---
-    saveArrayState  // --- FIX: Re-added saveArrayState ---
+    saveArrayState, // --- FIX: Re-added saveArrayState ---
+    getDb // Add this line
 } from '../data/database.js'; // Adjusted path to database.js
 
 
 /**
  * Toggles the starred status of an item and manages synchronization.
  * @param {object} app - The main application state object (e.g., Vue instance).
+ * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {string} guid - The unique identifier of the item.
  */
-export const USER_STATE_DEFS = {
-// Array-based states stored in their own dedicated object stores.
-// Their *timestamps* will be stored as simple key-value pairs in 'userSettings'
-// using their key name (e.g., 'starred' will have a timestamp in 'userSettings').
-starred: { store: 'starredItems', type: 'array', default: [] },
-hidden: { store: 'hiddenItems', type: 'array', default: [] },
-currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
-
-// Simple value states stored in the 'userSettings' object store
-filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
-syncEnabled: { store: 'userSettings', type: 'simple', default: true },
-imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
-rssFeeds: { store: 'userSettings', type: 'simple', default: [] },
-keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] },
-shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
-lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
-openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
-// A specific key to store the global latest timestamp from server sync
-lastStateSync: { store: 'userSettings', type: 'simple', default: null },
-lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
-lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
-};
 export async function toggleStar(app, db, guid) {
     const tx = db.transaction('starredItems', 'readwrite');
     const store = tx.objectStore('starredItems');
@@ -104,6 +84,7 @@ export async function toggleStar(app, db, guid) {
  * @param {string} guid - The unique identifier of the item.
  */
 export async function toggleHidden(app, guid) {
+    const db = await getDb(); // Add this line
     const tx = db.transaction('hiddenItems', 'readwrite');
     const store = tx.objectStore('hiddenItems');
 
@@ -173,7 +154,9 @@ export async function toggleHidden(app, guid) {
  */
 export async function pruneStaleHidden(db, feedItems, currentTS) {
     // --- FIX: Use loadArrayState instead of getHiddenItems ---
-    const { value: hiddenItems } = await loadArrayState(db, 'hidden');
+    const {
+        value: hiddenItems
+    } = await loadArrayState(db, 'hidden');
 
     // Basic validation
     if (!Array.isArray(hiddenItems)) return [];
@@ -213,12 +196,14 @@ export async function pruneStaleHidden(db, feedItems, currentTS) {
 /**
  * Loads the current deck of GUIDs.
  * This function now relies on `loadArrayState` which operates on the `currentDeckGuids` store.
- * @param {IDBDatabase} db - The IndexedDB database instance. --- FIX: Added db parameter ---
+ * @param {IDBDatabase} db - The IndexedDB database instance.
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck(db) { // --- FIX: Added db parameter ---
     // --- FIX: Use loadArrayState instead of getCurrentDeckGuids ---
-    const { value: guids } = await loadArrayState(db, 'currentDeckGuids');
+    const {
+        value: guids
+    } = await loadArrayState(db, 'currentDeckGuids');
     return Array.isArray(guids) ? guids : [];
 }
 
@@ -259,8 +244,12 @@ export async function saveCurrentDeck(db, guids) {
  */
 export async function loadShuffleState(db) {
     // loadSimpleState returns an object { value, lastModified }
-    const { value: count } = await loadSimpleState(db, 'shuffleCount');
-    const { value: dateStr } = await loadSimpleState(db, 'lastShuffleResetDate');
+    const {
+        value: count
+    } = await loadSimpleState(db, 'shuffleCount');
+    const {
+        value: dateStr
+    } = await loadSimpleState(db, 'lastShuffleResetDate');
 
     let shuffleCount = typeof count === 'number' ? count : 2; // Default if not found or invalid
     let lastResetDate = null;
@@ -288,8 +277,16 @@ export async function saveShuffleState(db, count, resetDate) {
     await saveSimpleState(db, 'lastShuffleResetDate', resetDate.toISOString());
 
     // Add these simple updates to the pending operations buffer
-    await addPendingOperation(db, { type: 'simpleUpdate', key: 'shuffleCount', value: count });
-    await addPendingOperation(db, { type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate.toISOString() });
+    await addPendingOperation(db, {
+        type: 'simpleUpdate',
+        key: 'shuffleCount',
+        value: count
+    });
+    await addPendingOperation(db, {
+        type: 'simpleUpdate',
+        key: 'lastShuffleResetDate',
+        value: resetDate.toISOString()
+    });
 
     if (isOnline()) {
         try {
@@ -311,7 +308,11 @@ export async function setFilterMode(app, db, mode) {
     await saveSimpleState(db, 'filterMode', mode);
 
     // Add this simple update to the pending operations buffer
-    await addPendingOperation(db, { type: 'simpleUpdate', key: 'filterMode', value: mode });
+    await addPendingOperation(db, {
+        type: 'simpleUpdate',
+        key: 'filterMode',
+        value: mode
+    });
 
     if (isOnline()) {
         try {
@@ -328,6 +329,8 @@ export async function setFilterMode(app, db, mode) {
  * @returns {Promise<string>} The current filter mode.
  */
 export async function loadFilterMode(db) {
-    const { value: mode } = await loadSimpleState(db, 'filterMode');
+    const {
+        value: mode
+    } = await loadSimpleState(db, 'filterMode');
     return mode || 'unread'; // Provide a default if not found
 }

@@ -1,8 +1,7 @@
 // www/js/helpers/dataUtils.js
 
 // Import necessary modules for deck functions
-// Removed 'db' import as it will be passed as a parameter
-import { saveSimpleState } from '../data/database.js';
+import { saveSimpleState, getDb } from '../data/database.js'; // Add getDb here
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
 import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
 

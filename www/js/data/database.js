@@ -81,7 +81,8 @@ export async function getDb() {
     return _dbInstance;
 }
 
-export async function loadSimpleState(db, key, tx = null) {
+export async function loadSimpleState(key, tx = null) {
+    const db = await getDb(); // ADDED
     const def = USER_STATE_DEFS[key];
     if (!def) {
         console.error(`[loadSimpleState] Invalid or undefined state key: ${key}.`);
@@ -114,7 +115,8 @@ export async function loadSimpleState(db, key, tx = null) {
     return { value: def.default, lastModified: null };
 }
 
-export async function saveSimpleState(db, key, value, serverTimestamp = null, tx = null) {
+export async function saveSimpleState(key, value, serverTimestamp = null, tx = null) {
+    const db = await getDb(); // ADDED
     const def = USER_STATE_DEFS[key];
     if (!def) {
         console.error(`[saveSimpleState] Invalid or undefined state key: ${key}.`);
@@ -153,7 +155,8 @@ export async function saveSimpleState(db, key, value, serverTimestamp = null, tx
     }
 }
 
-export async function loadArrayState(db, key, tx = null) {
+export async function loadArrayState(key, tx = null) {
+    const db = await getDb(); // ADDED
     const def = USER_STATE_DEFS[key];
     if (!def || def.type !== 'array') {
         console.error(`[loadArrayState] Invalid or undefined array state key: ${key}`);
@@ -167,7 +170,7 @@ export async function loadArrayState(db, key, tx = null) {
         const arrayStore = transaction.objectStore(arrayStoreName);
         const allItems = await arrayStore.getAll();
         
-        const { lastModified: arrayTimestamp } = await loadSimpleState(db, key, transaction); 
+        const { lastModified: arrayTimestamp } = await loadSimpleState(key, transaction); // db param removed here too
 
         return { value: allItems, lastModified: arrayTimestamp }; 
     } catch (e) {
@@ -186,7 +189,8 @@ export async function loadArrayState(db, key, tx = null) {
     return { value: def.default, lastModified: null };
 }
 
-export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = null) {
+export async function saveArrayState(key, arr, serverTimestamp = null, tx = null) {
+    const db = await getDb(); // ADDED
     const def = USER_STATE_DEFS[key];
     if (!def || def.type !== 'array') {
         console.error(`[saveArrayState] Invalid or undefined array state key: ${key}`);
@@ -212,7 +216,7 @@ export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = 
         
         console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${arrayStoreName}".`);
 
-        await saveSimpleState(db, key, null, serverTimestamp, transaction); 
+        await saveSimpleState(key, null, serverTimestamp, transaction); // db param removed here too
 
     } catch (e) {
         console.error(`[saveArrayState] Error saving "${key}" to store "${arrayStoreName}":`, e);
@@ -230,7 +234,8 @@ export async function saveArrayState(db, key, arr, serverTimestamp = null, tx = 
     }
 }
 
-export async function addPendingOperation(db, operation) {
+export async function addPendingOperation(operation) {
+    const db = await getDb(); // ADDED
     const tx = db.transaction('pendingOperations', 'readwrite');
     const store = tx.objectStore('pendingOperations');
     try {
@@ -243,15 +248,17 @@ export async function addPendingOperation(db, operation) {
     }
 }
 
-export async function processPendingOperations(db) {
+export async function processPendingOperations() {
+    const db = await getDb(); // ADDED and moved to the beginning
+
     if (!isOnline()) {
         console.log('[processPendingOperations] Offline. Skipping sync.');
         return;
     }
 
-    // --- CHANGED: Fetch all operations, but do NOT open a transaction yet. ---
     let operations;
     try {
+        // MOVED this block after db is acquired
         const fetchTx = db.transaction('pendingOperations', 'readonly');
         operations = await fetchTx.objectStore('pendingOperations').getAll();
         await fetchTx.done;
@@ -287,7 +294,7 @@ export async function processPendingOperations(db) {
                 success = true;
 
             } else if (op.type === 'simpleUpdate') {
-                success = await pushUserState(db, op.key, op.value); 
+                success = await pushUserState(op.key, op.value); // db param removed here
             } else {
                 console.warn(`[processPendingOperations] Unknown operation type: ${op.type}. Skipping.`);
                 success = true;
@@ -339,7 +346,8 @@ let _isPullingUserState = false;
 let _lastPullAttemptTime = 0;
 const PULL_DEBOUNCE_MS = 500;
 
-export async function pullUserState(db) {
+export async function pullUserState() {
+    const db = await getDb(); // ADDED
     if (_isPullingUserState) {
         console.log('[pullUserState] Already pulling user state. Skipping new request.');
         return;
@@ -367,7 +375,7 @@ export async function pullUserState(db) {
         const url = `${API_BASE_URL}/user-state/${key}`;
         let localTimestamp = '';
         
-        const { lastModified } = await loadSimpleState(db, key);
+        const { lastModified } = await loadSimpleState(key); // db param removed here
         localTimestamp = lastModified || '';
         
         try {
@@ -408,9 +416,9 @@ export async function pullUserState(db) {
             const tx = db.transaction(transactionStores, 'readwrite');
 
             if (def.type === 'array') {
-                await saveArrayState(db, key, data.value || def.default, data.lastModified, tx);
+                await saveArrayState(key, data.value || def.default, data.lastModified, tx); // db param removed here
             } else {
-                await saveSimpleState(db, key, data.value, data.lastModified, tx);
+                await saveSimpleState(key, data.value, data.lastModified, tx); // db param removed here
             }
             
             await tx.done;
@@ -430,7 +438,7 @@ export async function pullUserState(db) {
     await Promise.all(fetchPromises);
 
     if (newestOverallTimestamp) {
-        await saveSimpleState(db, 'lastStateSync', newestOverallTimestamp);
+        await saveSimpleState('lastStateSync', newestOverallTimestamp); // db param removed here
         console.log(`[pullUserState] Updated global lastStateSync to: ${newestOverallTimestamp}`);
     } else {
         console.log('[pullUserState] No new overall timestamp found from server pull to update global lastStateSync.');
@@ -440,7 +448,8 @@ export async function pullUserState(db) {
     console.log('[pullUserState] All user state pull operations completed.');
 }
 
-export async function pushUserState(db, keyToUpdate, valueToUpdate) {
+export async function pushUserState(keyToUpdate, valueToUpdate) {
+    const db = await getDb(); // ADDED
     console.log(`[pushUserState] Attempting to push user state for key: ${keyToUpdate}`);
     const API_BASE_URL = window.location.origin;
 
@@ -475,11 +484,11 @@ export async function pushUserState(db, keyToUpdate, valueToUpdate) {
 
         const data = await response.json();
         if (data.serverTime) {
-            await saveSimpleState(db, keyToUpdate, valueToUpdate, data.serverTime);
+            await saveSimpleState(keyToUpdate, valueToUpdate, data.serverTime); // db param removed here
             
-            const { value: currentLastStateSync } = await loadSimpleState(db, 'lastStateSync');
+            const { value: currentLastStateSync } = await loadSimpleState('lastStateSync'); // db param removed here
             if (!currentLastStateSync || data.serverTime > currentLastStateSync) {
-                await saveSimpleState(db, 'lastStateSync', data.serverTime);
+                await saveSimpleState('lastStateSync', data.serverTime); // db param removed here
             }
         }
         console.log(`[pushUserState] Successfully pushed ${keyToUpdate}. Server response:`, data);
@@ -503,7 +512,7 @@ export async function performFeedSync(app) {
 
     try {
         // 1. Get local lastFeedSync timestamp
-        const { value: lastFeedSyncTime } = await loadSimpleState(db, 'lastFeedSync');
+        const { value: lastFeedSyncTime } = await loadSimpleState('lastFeedSync');
         const sinceTimestamp = lastFeedSyncTime || '';
 
         // 2. Fetch new and updated GUIDs from server
@@ -575,7 +584,7 @@ export async function performFeedSync(app) {
 
         // 5. Update lastFeedSync timestamp
         if (serverTime) {
-            await saveSimpleState(db, 'lastFeedSync', serverTime);
+            await saveSimpleState('lastFeedSync', serverTime);
             console.log(`[performFeedSync] Updated lastFeedSync to: ${serverTime}`);
         }
 
@@ -607,7 +616,7 @@ export async function performFullSync(app) {
     console.log('[performFullSync] Initiating full synchronization (feed + user state).');
     const db = await getDb();
     try {
-        await pullUserState(db); // First, pull user state
+        await pullUserState(); // db param removed here
         await performFeedSync(app); // Then, pull feed items
         // if (typeof createStatusBarMessage === 'function') {
         //     createStatusBarMessage('Full sync complete!', 'success');
@@ -623,73 +632,73 @@ export async function performFullSync(app) {
 
 export async function getStarredItems() {
     const db = await getDb();
-    const { value } = await loadArrayState(db, 'starred');
+    const { value } = await loadArrayState('starred');
     return value;
 }
 
 export async function getHiddenItems() {
     const db = await getDb();
-    const { value } = await loadArrayState(db, 'hidden');
+    const { value } = await loadArrayState('hidden');
     return value;
 }
 
 export async function getCurrentDeckGuids() {
     const db = await getDb();
-    const { value } = await loadArrayState(db, 'currentDeckGuids');
+    const { value } = await loadArrayState('currentDeckGuids');
     return value.map(item => item.id);
 }
 
 export async function getFilterMode() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'filterMode');
+    const { value } = await loadSimpleState('filterMode');
     return value;
 }
 
 export async function getSyncEnabled() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'syncEnabled');
+    const { value } = await loadSimpleState('syncEnabled');
     return value;
 }
 
 export async function getImagesEnabled() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'imagesEnabled');
+    const { value } = await loadSimpleState('imagesEnabled');
     return value;
 }
 export async function getRssFeeds() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'rssFeeds');
+    const { value } = await loadSimpleState('rssFeeds');
     return value;
 }
 export async function getKeywordBlacklist() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'keywordBlacklist');
+    const { value } = await loadSimpleState('keywordBlacklist');
     return value;
 }
 export async function getShuffleCount() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'shuffleCount');
+    const { value } = await loadSimpleState('shuffleCount');
     return value;
 }
 export async function getLastShuffleResetDate() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'lastShuffleResetDate');
+    const { value } = await loadSimpleState('lastShuffleResetDate');
     return value;
 }
 export async function getOpenUrlsInNewTabEnabled() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'openUrlsInNewTabEnabled');
+    const { value } = await loadSimpleState('openUrlsInNewTabEnabled');
     return value;
 }
 
 export async function getLastViewedItemId() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'lastViewedItemId');
+    const { value } = await loadSimpleState('lastViewedItemId');
     return value;
 }
 
 export async function getLastViewedItemOffset() {
     const db = await getDb();
-    const { value } = await loadSimpleState(db, 'lastViewedItemOffset');
+    const { value } = await loadSimpleState('lastViewedItemOffset');
     return value;
 }
