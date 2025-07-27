@@ -64,7 +64,7 @@ document.addEventListener('alpine:init', () => {
     console.log("app.js: 'alpine:init' event fired. Defining 'rssApp' component.");
 
     window.Alpine.data('rssApp', () => ({
-        db: null,
+        db: null, // This will hold the IndexedDB instance
         scrollObserver: null,
         // --- Alpine.js Reactive properties with initial defaults ---
         loading: true, // Start as true, set to false after initApp completes
@@ -89,9 +89,8 @@ document.addEventListener('alpine:init', () => {
 
         // Computed property for filtered entries
         get filteredEntries() {
-            // db is imported at module scope, but initDb() is now called inside initApp().
-            // So, db might still be a Promise or not fully resolved if this getter is accessed too early.
-            if (!db || db instanceof Promise) {
+            // IMPORTANT: Use 'this.db' to refer to the database instance within the Alpine component's data.
+            if (!this.db || this.db instanceof Promise) {
                 console.warn("db not initialized or still a promise, cannot filter entries yet.");
                 return [];
             }
@@ -149,7 +148,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 // Initialize DB inside initApp, now that Alpine is ready
                 // This will resolve the 'db' variable at module scope.
-                this.db = await initDb();
+                this.db = await initDb(); // Assign the initialized DB instance to 'this.db'
                 console.log("app.js: IndexedDB initialized within initApp().");
 
                 // Load initial settings and user state from DB/localStorage
@@ -182,7 +181,7 @@ document.addEventListener('alpine:init', () => {
                 this.starred = (await loadArrayState(this.db, 'starred')).value;
 
                 // Determine sync completion time for pruning stale hidden entries.
-                const itemsCount = await db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
+                const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count(); // Use this.db
                 let syncCompletionTime = Date.now();
                 if (itemsCount === 0 && this.isOnline) {
                      const { feedTime } = await performFullSync(this.db);
@@ -308,7 +307,7 @@ document.addEventListener('alpine:init', () => {
                         await performFeedSync(this.db); // Use imported function
                         await pullUserState(this.db); // Use imported function
                         await this.loadFeedItemsFromDB();
-                        this.hidden = await pruneStaleHidden(this.db, this.entries, now); // Use imported function
+                        this.hidden = await pruneStaleHidden(this.db, now); // Use imported function
                         this.updateCounts();
                         await validateAndRegenerateCurrentDeck(this); // Use imported function
                         console.log("app.js: Periodic background sync completed.");
@@ -441,7 +440,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveKeywordBlacklist() {
-            await saveSimpleState(db, 'keywordBlacklist', this.keywordBlacklistInput);
+            // IMPORTANT: Use 'this.db' here as well
+            await saveSimpleState(this.db, 'keywordBlacklist', this.keywordBlacklistInput);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             this.updateCounts();
         }
