@@ -1,4 +1,3 @@
-# api.py
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -7,23 +6,19 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import json
 import secrets
-import sys
-import logging # Import logging module
+import logging
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure logging to show info messages
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 app.logger.setLevel(logging.INFO)
 
-# --- Configuration Paths ---
-DATA_DIR = "/data" # Base directory for all data
+DATA_DIR = "/data"
 FEED_DIR = os.path.join(DATA_DIR, "feed")
 CONFIG_DIR = os.path.join(DATA_DIR, "config")
 USER_STATE_DIR = os.path.join(DATA_DIR, "user_state")
 
-# Ensure directories exist
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(FEED_DIR, exist_ok=True)
 os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -31,9 +26,6 @@ os.makedirs(USER_STATE_DIR, exist_ok=True)
 
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
 
-# --- User State Definitions (Mirroring database.js for server-side defaults) ---
-# These defaults will be used to initialize files if they don't exist.
-# Ensure these align with your database.js USER_STATE_DEFS
 USER_STATE_SERVER_DEFAULTS = {
     'currentDeckGuids': {'type': 'array', 'default': []},
     'rssFeeds': {'type': 'simple', 'default': []},
@@ -41,24 +33,22 @@ USER_STATE_SERVER_DEFAULTS = {
     'keywordBlacklist': {'type': 'simple', 'default': []},
     'shuffleCount': {'type': 'simple', 'default': 0},
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
-    'starred': {'type': 'array', 'default': []}, # For delta endpoints, but good to have a default file
-    'hidden': {'type': 'array', 'default': []},   # For delta endpoints, but good to have a default file
+    'starred': {'type': 'array', 'default': []},
+    'hidden': {'type': 'array', 'default': []},
     'filterMode': {'type': 'simple', 'default': 'all'},
     'syncEnabled': {'type': 'simple', 'default': True},
     'imagesEnabled': {'type': 'simple', 'default': True},
-    'lastStateSync': {'type': 'simple', 'default': None}, # Global sync timestamp
-    # Add any other keys here that you might have in database.js's USER_STATE_DEFS
-    # and expect to be fetched/managed by the generic /user-state/<key> endpoint.
-    # Example from your `ls` output, if they are meant to be synced user state:
-    # 'feedScrollY': {'type': 'simple', 'default': 0},
-    # 'feedVisibleLink': {'type': 'simple', 'default': ''},
-    # 'theme': {'type': 'simple', 'default': 'light'}, # or your actual default theme
+    'lastStateSync': {'type': 'simple', 'default': None},
     'lastViewedItemId': {'type': 'simple', 'default': None},
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
+    # --- ADDED/UPDATED ---
+    'theme': {'type': 'simple', 'default': 'light'}, # Added default for theme
+    'lastFeedSync': {'type': 'simple', 'default': None}, # Added default for lastFeedSync
+    'feedScrollY': {'type': 'simple', 'default': 0}, # Added default for feedScrollY
+    'feedVisibleLink': {'type': 'simple', 'default': ''}, # Added default for feedVisibleLink
+    # --- /ADDED/UPDATED ---
 }
 
-
-# --- Authentication Endpoint ---
 @app.route("/api/login", methods=["POST"])
 def login():
     try:
@@ -82,25 +72,22 @@ def login():
         
         auth_token = secrets.token_urlsafe(32)
         resp = make_response(jsonify({"status": "ok"}))
-        # Secure, HttpOnly, SameSite=Strict cookies for production
         resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
         app.logger.info("Login: Successful authentication")
         return resp
     except Exception as e:
-        app.logger.exception(f"Login error: {str(e)}") # Use exception to log traceback
+        app.logger.exception(f"Login error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
-# --- Feed Management Helpers ---
 def _load_feed_items():
     """Loads RSS feed items from feed.xml and returns them as a dictionary."""
     try:
         tree = ET.parse(FEED_XML)
     except (FileNotFoundError, ET.ParseError) as e:
         app.logger.warning(f"Failed to load or parse feed.xml: {e}")
-        return {} # Return empty dict if file not found or invalid XML
+        return {}
 
     root = tree.getroot()
-    # Remove XML namespace prefixes for easier parsing
     for elem in root.iter():
         if "}" in elem.tag:
             elem.tag = elem.tag.split("}", 1)[1]
@@ -110,14 +97,14 @@ def _load_feed_items():
         guid = it.findtext("guid") or it.findtext("link")
         if not guid:
             app.logger.warning(f"Feed item missing GUID or Link: {ET.tostring(it, encoding='unicode')}")
-            continue # Skip items without a unique identifier
+            continue
 
         raw_date = it.findtext("pubDate") or ""
         try:
             dt = parsedate_to_datetime(raw_date)
             pub_iso = dt.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         except Exception:
-            pub_iso = raw_date # Keep raw date if parsing fails
+            pub_iso = raw_date
 
         data = {
             "guid": guid,
@@ -129,8 +116,7 @@ def _load_feed_items():
         items[guid] = data
     return items
 
-# --- Config Management Endpoints ---
-@app.route("/load-config", methods=["GET", "POST"]) # POST method for backward compatibility if needed
+@app.route("/load-config", methods=["GET", "POST"])
 def load_config():
     filename = request.args.get("filename")
     if not filename:
@@ -156,8 +142,8 @@ def save_config():
     if not filename:
         abort(400, description="filename query parameter is required")
     
-    data = request.get_json(silent=True) # Use silent=True to avoid errors on non-JSON
-    content = data.get("content", "") if data else "" # Handle case where data is None
+    data = request.get_json(silent=True)
+    content = data.get("content", "") if data else ""
     
     filepath = os.path.join(CONFIG_DIR, filename)
     try:
@@ -169,7 +155,6 @@ def save_config():
         app.logger.exception(f"Error saving config file {filename}: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- Time Endpoint ---
 @app.route("/time", methods=["GET"])
 def time():
     """Returns the current UTC time in ISO format."""
@@ -177,16 +162,18 @@ def time():
     app.logger.debug(f"Time requested: {now}")
     return jsonify({"time": now}), 200
 
-# --- GUIDs and Items Endpoints ---
-@app.route("/guids", methods=["GET"])
-def guids():
-    """Returns a list of all item GUIDs from the feed."""
+# --- UPDATED: Feed GUIDs Endpoint with serverTime ---
+@app.route("/feed-guids", methods=["GET"])
+def feed_guids():
+    """Returns a list of all item GUIDs from the feed and the server's current time."""
     items = _load_feed_items()
-    app.logger.info(f"Returning {len(items)} GUIDs.")
-    return jsonify(list(items.keys())), 200
+    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    app.logger.info(f"Returning {len(items)} GUIDs with server time.")
+    return jsonify({"guids": list(items.keys()), "serverTime": now}), 200
 
-@app.route("/items", methods=["GET", "POST"])
-def items():
+# --- RENAMED & UPDATED: Feed Items Endpoint ---
+@app.route("/feed-items", methods=["GET", "POST"])
+def feed_items():
     """
     Returns full item data for specified GUIDs.
     GET: guids comma-separated in query param.
@@ -203,9 +190,8 @@ def items():
     all_items = _load_feed_items()
     result = {g: all_items[g] for g in wanted if g in all_items}
     app.logger.info(f"Returning {len(result)} items for {len(wanted)} requested GUIDs.")
-    return jsonify(result), 200
+    return jsonify(list(result.values())), 200 # Return list of item objects, not dict of items
 
-# --- User State Management Helpers ---
 def _user_state_path(key):
     """Constructs the full file path for a given user state key."""
     return os.path.join(USER_STATE_DIR, f"{key}.json")
@@ -221,75 +207,63 @@ def _load_state(key):
     if not os.path.exists(path):
         app.logger.info(f"User state file not found for key '{key}' at '{path}'. Attempting to initialize with default.")
         
-        # --- NEW LOGIC: Initialize file with default if not found ---
         default_data = USER_STATE_SERVER_DEFAULTS.get(key)
         if default_data:
             initial_value = default_data['default']
             try:
-                # Save the initial state to create the file
                 app.logger.info(f"Initializing user state file for key '{key}' with default value: {initial_value}")
-                now_utc = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z' # Use 'Z' for consistency with client
+                now_utc = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
                 initial_state = {"value": initial_value, "lastModified": now_utc}
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(initial_state, f, indent=2)
                 app.logger.info(f"Successfully initialized user state file for key '{key}'.")
-                return initial_state # Return the newly created state
+                return initial_state
             except Exception as e:
                 app.logger.exception(f"Error initializing user state file for key '{key}' at '{path}': {e}")
-                # Fallback to returning None if initialization fails, client will use its default
                 return {"value": None, "lastModified": None}
         else:
             app.logger.warning(f"Key '{key}' not found in USER_STATE_SERVER_DEFAULTS. Cannot initialize. Returning default (None).")
-            return {"value": None, "lastModified": None} # Return default if key not in our defined defaults
-        # --- END NEW LOGIC ---
+            return {"value": None, "lastModified": None}
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             
-            # Ensure 'value' exists and default to None if not.
-            # Convert 'lastModified' to current ISO format if it's not already,
-            # for consistency with how it's saved.
             last_modified = data.get("lastModified")
             if last_modified:
                 try:
-                    # Parse existing timestamp to ensure it's in the expected format (e.g., handling older formats)
-                    # .replace('Z', '+00:00') is for Python < 3.11 when parsing Z suffix from client
                     dt_obj = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
-                    last_modified = dt_obj.astimezone(timezone.utc).isoformat(timespec='milliseconds') + 'Z' # Output 'Z' for consistency
+                    last_modified = dt_obj.astimezone(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
                 except ValueError:
                     app.logger.warning(f"Invalid lastModified format for {key}: {last_modified}. Using raw value.")
             
             return {"value": data.get("value"), "lastModified": last_modified}
     except (json.JSONDecodeError, KeyError) as e:
         app.logger.error(f"Error loading user state for key '{key}' from '{path}': {e}")
-        # If file is corrupt, delete it and return default, so it can be re-initialized
         try:
             os.remove(path)
             app.logger.warning(f"Corrupt file '{path}' removed. It will be re-initialized on next request.")
         except OSError as oe:
             app.logger.error(f"Error removing corrupt file '{path}': {oe}")
-        return {"value": None, "lastModified": None} # Return default on error
+        return {"value": None, "lastModified": None}
     except Exception as e:
         app.logger.exception(f"An unexpected error occurred loading user state for key '{key}' from '{path}': {e}")
         return {"value": None, "lastModified": None}
 
 def _save_state(key, value):
     """Saves a single user state key with its value and updates its last modification timestamp."""
-    # Use 'Z' suffix for consistency with client-side JavaScript's toISOString()
     now = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
     data = {"value": value, "lastModified": now}
     path = _user_state_path(key)
     try:
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2) # Add indent for readability of saved JSON files
+            json.dump(data, f, indent=2)
         app.logger.info(f"Saved user state for key '{key}' to '{path}'. Timestamp: {now}")
         return now
     except Exception as e:
         app.logger.exception(f"Error saving user state for key '{key}' to '{path}': {e}")
-        raise # Re-raise to indicate failure
+        raise
 
-# --- NEW: Generic endpoint for fetching individual user state keys ---
 @app.route("/user-state/<key>", methods=["GET"])
 def get_single_user_state_key(key):
     """
@@ -300,29 +274,24 @@ def get_single_user_state_key(key):
         app.logger.warning("GET /user-state/<key>: Key is missing")
         abort(400, description="User state key is required")
 
-    state_data = _load_state(key) # This will now auto-create the file if it doesn't exist
+    state_data = _load_state(key)
     
-    # If _load_state couldn't find/create/load the file, it will return {"value": None, "lastModified": None}
-    # In this case, we still return a 404, as per original logic,
-    # because even after attempting creation, it's not available.
     if state_data["value"] is None and state_data["lastModified"] is None:
         app.logger.info(f"GET /user-state/{key}: File could not be loaded or initialized, returning 404.")
         abort(404, description=f"User state key '{key}' not found or has no valid content after attempt to initialize.")
 
-    # Check for If-None-Match header for caching (304 Not Modified)
     if_none_match = request.headers.get("If-None-Match")
     if state_data["lastModified"] and if_none_match == state_data["lastModified"]:
         app.logger.info(f"GET /user-state/{key}: Returning 304 Not Modified. ETag: {state_data['lastModified']}")
         return make_response("", 304)
 
-    # Return the full state_data object (which includes 'value' and 'lastModified')
     resp_payload = {
         "value": state_data["value"], 
         "lastModified": state_data["lastModified"]
     }
     
     resp = jsonify(resp_payload)
-    if state_data["lastModified"]: # Only set ETag if there's a modification timestamp
+    if state_data["lastModified"]:
         resp.headers["ETag"] = state_data["lastModified"]
     resp.headers["Content-Type"] = "application/json"
     
@@ -330,7 +299,6 @@ def get_single_user_state_key(key):
     app.logger.debug(f"GET /user-state/{key}: Payload: {resp_payload}")
     return resp, 200
 
-# --- Generic POST endpoint for single user state updates ---
 @app.route("/user-state", methods=["POST"])
 def post_user_state():
     """
@@ -353,7 +321,6 @@ def post_user_state():
         app.logger.exception(f"POST /user-state: Error saving user state key '{key}' with value '{value}': {e}")
         return jsonify({"error": f"Failed to save state for {key}", "details": str(e)}), 500
 
-# --- Delta Endpoints for Arrays (Hidden/Starred) ---
 @app.route("/user-state/hidden/delta", methods=["POST"])
 def hidden_delta():
     """Adds or removes an item from the hidden list."""
@@ -362,9 +329,8 @@ def hidden_delta():
         app.logger.warning("POST /user-state/hidden/delta: Missing JSON body")
         abort(400, description="Missing JSON body")
 
-    # _load_state for 'hidden' will now auto-create hidden.json if it doesn't exist
     state_content = _load_state("hidden") 
-    state = state_content["value"] or [] # Extract value, default to empty list
+    state = state_content["value"] or []
 
     action = data.get("action")
     id_ = data.get("id")
@@ -374,7 +340,6 @@ def hidden_delta():
         abort(400, description="ID and action are required")
 
     if action == "add":
-        # Use 'Z' suffix for consistency with client-side JavaScript's toISOString()
         entry = {"id": id_, "hiddenAt": data.get("hiddenAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'}
         if not any(h["id"] == id_ for h in state):
             state.append(entry)
@@ -407,9 +372,8 @@ def starred_delta():
         app.logger.warning("POST /user-state/starred/delta: Missing JSON body")
         abort(400, description="Missing JSON body")
 
-    # _load_state for 'starred' will now auto-create starred.json if it doesn't exist
     state_content = _load_state("starred") 
-    state = state_content["value"] or [] # Extract value, default to empty list
+    state = state_content["value"] or []
 
     action = data.get("action")
     id_ = data.get("id")
@@ -419,7 +383,6 @@ def starred_delta():
         abort(400, description="ID and action are required")
 
     if action == "add":
-        # Use 'Z' suffix for consistency with client-side JavaScript's toISOString()
         entry = {"id": id_, "starredAt": data.get("starredAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'}
         if not any(s["id"] == id_ for s in state):
             state.append(entry)
@@ -444,6 +407,5 @@ def starred_delta():
         app.logger.exception(f"Error in starred_delta for ID {id_}, action {action}: {e}")
         return jsonify({"error": f"Failed to save starred state", "details": str(e)}), 500
 
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=4575, debug=True) # Run in debug mode for development logging
+    app.run(host="0.0.0.0", port=4575, debug=True)
