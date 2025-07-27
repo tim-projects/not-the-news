@@ -52,21 +52,21 @@
       header_up Host {host}
     }
   }
-  # --- CRITICAL CHANGE: Proxy /feed-guids to Flask ---
   handle /feed-guids* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  # --- REMOVED: handle /guids* - this is no longer used by the app ---
 
-  handle /items* {
+  # --- CRITICAL CHANGE: Proxy /feed-items directly to Flask ---
+  handle /feed-items* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
+  # Removed the old `handle /items*` since Flask now uses `/feed-items`
 
   root * /app/www
   file_server
