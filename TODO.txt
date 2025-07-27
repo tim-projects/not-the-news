@@ -3,152 +3,42 @@
 
 -----
 
-### **Prompt for `www/js/data/database.js`**
+III. Verification and Testing Plan
+After implementing these changes, thorough testing will be critical:
 
-**File Path:** `www/js/data/database.js`
+Core App Initialization & Data Loading:
 
-**Overall Goal:** Refactor IndexedDB access to guarantee a resolved `IDBDatabase` instance, eliminating direct `db` exports and centralizing instance retrieval. Add new user settings for scroll position tracking.
+- [ ] Verify the db not initialized error disappears or is handled gracefully during early Alpine.js reactivity.
 
-**Instructions:** Do not reflect on the issues. Just do exactly what is asked.
+- [ ] Confirm DataCloneError is resolved.
 
-1.  **Remove Global Export:** Delete the line `export let db = null;`.
-2.  **Introduce Internal State:** Add two new module-scoped variables *after* the `DB_VERSION` constant:
-      * `let _dbInstance = null;`
-      * `let _dbInitPromise = null;`
-3.  **Modify `initDb` Function:**
-      * At the very beginning of `initDb`, add: `if (_dbInitPromise) return _dbInitPromise;`
-      * Change the line `db = await openDB(...)` to `_dbInitPromise = openDB(...)`.
-      * Change the line `db = await _dbInitPromise;` to `_dbInstance = await _dbInitPromise;`.
-      * Change the return to `return _dbInstance;`.
-4.  **Add `getDb` Function:** Create a new exported asynchronous function `getDb()`:
-    ```javascript
-    export async function getDb() {
-        if (!_dbInstance) {
-            await initDb();
-        }
-        return _dbInstance;
-    }
-    ```
-5.  **Update `USER_STATE_DEFS`:** Add two new entries to the `USER_STATE_DEFS` object:
-    ```javascript
-    lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
-    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
-    ```
-6.  **Update `get...()` Helper Functions:** For *every* exported `async function get...()` at the bottom of the file (e.g., `getStarredItems`, `getHiddenItems`, `getFilterMode`, etc.), change the first line from `await initDb();` to `const db = await getDb();`.
-7.  **Crucial Constraint:** DO NOT add `db` as a parameter to `loadSimpleState`, `saveSimpleState`, etc., as they already correctly accept it.
+Basic Functionality:
 
-**Provide the complete, modified content for `www/js/data/database.js`.**
+- [ ] Verify starring/unstarring and hiding/unhiding items works locally and syncs correctly to the server.
 
------
+- [ ] Verify "Next Deck" and "Shuffle" functionality works.
 
-### **Prompt for `www/js/app.js`**
+- [ ] Verify all other user preferences (theme, new tab, images, filter mode) save and load correctly.
 
-**File Path:** `www/js/app.js`
+rssFeeds & keywordBlacklist:
 
-**Overall Goal:** Orchestrate database initialization and pass the resolved `IDBDatabase` instance (`this.db`) to all helper functions and Alpine methods that require it. Implement the Intersection Observer for scroll position saving.
+- [ ] Verify user can input RSS feed URLs and keyword blacklists, save them, and they persist correctly on the server in the CONFIG_DIR.
 
-**Instructions:** Do not reflect on the issues. Just do exactly what is asked.
+- [ ] Verify changes made on one client reflect on another client after refresh/sync.
 
-1.  **Update Imports:**
-      * Ensure `db` is *not* imported from `database.js`.
-      * Ensure `initDb`, `performFullSync`, `pullUserState`, `processPendingOperations`, `loadSimpleState`, `loadArrayState`, `getBufferedChangesCount` are imported from `database.js`.
-      * Ensure all necessary `init*` functions (`initSyncToggle`, `initImagesToggle`, `initTheme`, `initScrollPosition`, `initShuffleCount`, `initConfigPanelListeners`) are imported from `uiInitializers.js`.
-      * Ensure `validateAndRegenerateCurrentDeck`, `loadNextDeck`, `shuffleFeed` are imported from `dataUtils.js`.
-      * Ensure `toggleStar`, `toggleHidden`, `loadCurrentDeck`, `saveCurrentDeck`, `loadShuffleState`, `saveShuffleState`, `setFilterMode`, `loadFilterMode` are imported from `userStateUtils.js`.
-2.  **Add Properties to Alpine Data:** Inside the `Alpine.data('app', () => ({...}))` object, add:
-      * `db: null,`
-      * `scrollObserver: null,`
-3.  **Modify `initApp()` Method:**
-      * At the start of `initApp`, change the line initializing the database to: `this.db = await initDb();`
-      * **Crucial:** For *every* function call within `initApp()` that requires the `db` instance (e.g., `initSyncToggle`, `initImagesToggle`, `initTheme`, `initScrollPosition`, `initShuffleCount`, `loadSimpleState`, `loadArrayState`, `performFullSync`, `processPendingOperations`, `getBufferedChangesCount`, `loadCurrentDeck`, `saveCurrentDeck`, `setFilterMode`, `loadFilterMode`), ensure `this.db` is passed as an argument.
-          * Example change: `await initSyncToggle(this);` becomes `await initSyncToggle(this, this.db);`
-          * Example change: `await loadSimpleState('syncEnabled')` (if it was ever directly called without `db`) becomes `await loadSimpleState(this.db, 'syncEnabled')`.
-      * Call `await initScrollPosition(this, this.db);` *after* `this.loadFeedItemsFromDB();`
-      * Call `this.initScrollObserver();` *after* `initScrollPosition()` and `this.loadFeedItemsFromDB()`.
-4.  **Add `initScrollObserver()` Method:** Implement the `initScrollObserver` method as described in the plan, inside the Alpine data object.
-      * It must use `this.db` for `saveSimpleState` and `addPendingOperation`.
-      * It must observe elements with `data-guid` attributes inside `#feed-container`.
-      * It must include the `MutationObserver` logic to re-observe if `feed-container`'s children change.
-5.  **Modify Other Alpine Methods:** For any existing Alpine method within `app.js` (e.g., `loadFeedItemsFromDB`, `updateCounts`, `displayCurrentDeck`, `saveFilterMode`, `handleShuffleDeck`, etc.) that directly interacts with IndexedDB or calls a helper that uses DB, ensure it uses `this.db` for its operations.
-      * Example: If `loadFeedItemsFromDB` was `db.transaction(...)`, change it to `this.db.transaction(...)`.
-      * Example: If `updateCounts` calls `getStarredItems()`, that function will handle `db` itself. But if `updateCounts` calls a *new* helper that needs `db`, ensure `this.db` is passed.
+Crucially, verify that these do not appear in the USER_STATE_DIR on the server anymore.
 
-**Crucial Constraints:**
+Sync Behavior:
 
-  * DO NOT import `db` directly from `database.js`.
-  * DO NOT remove or change the `x-data` or `x-init` attributes on your main Alpine component.
-  * Ensure that every call to a function that requires `db` explicitly passes `this.db`.
+- [ ] Observe network traffic for currentDeckGuids updates (should be full array, but small).
 
-**Provide the complete, modified content for `www/js/app.js`.**
+- [ ] Observe network traffic for rssFeeds and keywordBlacklist updates (should be full file transfers via save-config).
 
------
+- [ ] Observe network traffic for starred/hidden updates (should be small delta objects).
 
-### **Prompt for `www/js/helpers/userStateUtils.js`**
+- [ ] Verify If-None-Match caching for GET /user-state/<key> works as expected (304 responses).
 
-**File Path:** `www/js/helpers/userStateUtils.js`
-
-**Overall Goal:** Decouple from direct `db` import and ensure `toggleStar` and `toggleHidden` explicitly receive the resolved `IDBDatabase` instance as a parameter.
-
-**Instructions:** Do not reflect on the issues. Just do exactly what is asked.
-
-1.  **Remove `db` Import:** Delete `db,` from the import statement for `../data/database.js`.
-2.  **Modify `toggleStar` Function Signature:** Change its signature from `(app, guid)` to `(app, db, guid)`.
-3.  **Modify `toggleHidden` Function Signature:** Change its signature from `(app, guid)` to `(app, db, guid)`.
-4.  **Crucial Constraint:** DO NOT change the function signatures or internal logic for `pruneStaleHidden`, `loadCurrentDeck`, `saveCurrentDeck`, `loadShuffleState`, `saveShuffleState`, `setFilterMode`, or `loadFilterMode`, as these already correctly accept `db` as a parameter.
-
-**Provide the complete, modified content for `www/js/helpers/userStateUtils.js`.**
-
------
-
-### **Prompt for `www/js/ui/uiInitializers.js`**
-
-**File Path:** `www/js/ui/uiInitializers.js`
-
-**Overall Goal:** Remove direct `db` import. Ensure all UI initialization functions that interact with the database explicitly receive the resolved `IDBDatabase` instance as a parameter. Implement the new `initScrollPosition` logic.
-
-**Instructions:** Do not reflect on the issues. Just do exactly what is asked.
-
-1.  **Update Imports:**
-      * Remove `db,` from the import statement for `../data/database.js`.
-      * Ensure `isOnline` is also imported from `../data/database.js`.
-2.  **Modify Function Signatures and Internal `db` Usage:** For the following functions, add `db` as the second parameter (after `app`), and ensure all internal calls to `loadSimpleState`, `saveSimpleState`, `addPendingOperation`, `processPendingOperations`, `performFullSync` correctly pass this `db` parameter:
-      * `setupBooleanToggle(app, db, getToggleEl, getTextEl, dbKey, onToggleCb)`
-      * `initSyncToggle(app, db)`
-      * `initImagesToggle(app, db)`
-      * `initTheme(app, db)`
-      * `initShuffleCount(app, db)`
-3.  **Replace `initScrollPosition` Logic:** Completely replace the existing `initScrollPosition` function with the new implementation:
-      * It must accept `app, db` as parameters.
-      * It must load `lastViewedItemId` and `lastViewedItemOffset` using `loadSimpleState(db, ...)`.
-      * It must use `document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`)` to find the target element.
-      * It must use `targetEl.scrollIntoView()` and optionally `window.scrollBy()` for position restoration.
-      * It must wrap the scroll logic in `window.requestAnimationFrame()`.
-4.  **Replace `navigator.onLine`:** Wherever `navigator.onLine` is directly used within `setupBooleanToggle` or `initTheme`, replace it with a call to the imported `isOnline()` function.
-5.  **Crucial Constraint:** DO NOT modify the `initConfigPanelListeners` function signature, as it does not directly use `db`.
-
-**Provide the complete, modified content for `www/js/ui/uiInitializers.js`.**
-
------
-
-### **Prompt for `www/js/helpers/dataUtils.js`**
-
-**File Path:** `www/js/helpers/dataUtils.js`
-
-**Overall Goal:** Ensure helper functions that interact with user state (via `userStateUtils.js` functions like `saveShuffleState`, `saveCurrentDeck`) receive the resolved `IDBDatabase` instance as a parameter.
-
-**Instructions:** Do not reflect on the issues. Just do exactly what is asked.
-
-1.  **Check Imports:** Ensure `db` is *not* imported from `../data/database.js` if it currently is.
-2.  **Modify Function Signatures:** For the following functions, add `db` as the second parameter (after `app`):
-      * `validateAndRegenerateCurrentDeck(app, db)`
-      * `loadNextDeck(app, db)`
-      * `shuffleFeed(app, db)`
-3.  **Ensure `db` is Passed Down:** Within the modified functions, ensure that `db` is passed to any calls to functions that require it, such as `saveShuffleState(db, ...)` or `saveCurrentDeck(db, ...)`.
-
-**Crucial Constraint:** DO NOT add `db` as a parameter to any other functions in this file not explicitly listed, unless it's a new helper function you are adding that directly uses `db`.
-
-**Provide the complete, modified content for `www/js/helpers/dataUtils.js`.**
-
+- [ ] Offline Functionality: Ensure the application continues to function robustly when offline, leveraging IndexedDB for all relevant user state and feed data.d
 
 
 - fix the wrong url on reddit/wired titles
