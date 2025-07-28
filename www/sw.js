@@ -83,7 +83,7 @@ self.addEventListener('fetch', function(event) {
           console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href);
           return response;
         }
-        //console.log('[Service Worker] Cache miss (static asset) for:', requestUrl.href, 'Falling back to network.');
+        console.log('[Service Worker] Cache miss (static asset) for:', requestUrl.href, 'Falling back to network.');
         return fetch(event.request);
       })
     );
@@ -97,7 +97,7 @@ self.addEventListener('fetch', function(event) {
       caches.match(event.request).then(function(cachedResponse) {
         // Return cached response if found
         if (cachedResponse) {
-          //console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
+          console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
           return cachedResponse;
         }
 
