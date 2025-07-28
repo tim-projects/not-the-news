@@ -133,21 +133,33 @@ export async function initScrollPosition(app) {
 }
 
 export async function initShuffleCount(app) {
-    const { shuffleCount: count, lastShuffleResetDate: lastReset } = await loadShuffleState();
+    const { shuffleCount: count, lastShuffleResetDate: lastReset, itemsClearedCount: clearedCount } = await loadShuffleState(); // MODIFIED
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    let newShuffleCount = count;
+    let newItemsClearedCount = clearedCount;
     let shouldReset = false;
-    if (!lastReset || lastReset.toDateString() !== today.toDateString()) {
+
+    // Check if lastReset is not today (or null/undefined)
+    if (!lastReset || new Date(lastReset).toDateString() !== today.toDateString()) {
         shouldReset = true;
     }
 
     if (shouldReset) {
-        app.shuffleCount = 2;
-        await saveShuffleState(app.shuffleCount, today);
+        newShuffleCount = 2; // Reset to 2 daily
+        newItemsClearedCount = 0; // Reset cleared items count daily
+        await saveShuffleState(newShuffleCount, today, newItemsClearedCount); // Save reset state
     } else {
-        app.shuffleCount = count;
+        // If it's the same day, ensure initial load sets it correctly if it was somehow 0 but should be 2
+        if (newShuffleCount === 0 && newItemsClearedCount === 0) {
+             newShuffleCount = 2; // If just initialized and it's 0, set to 2.
+             await saveShuffleState(newShuffleCount, today, newItemsClearedCount);
+        }
     }
+
+    app.shuffleCount = newShuffleCount; // Update Alpine state
+    // app.itemsClearedCount = newItemsClearedCount; // Not strictly necessary to expose to Alpine, but good for debugging if desired
 
     const shuffleDisplay = getShuffleCountDisplay();
     if (shuffleDisplay) shuffleDisplay.textContent = app.shuffleCount;

@@ -33,12 +33,11 @@ export const USER_STATE_DEFS = {
     lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
     lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
     lastStateSync: { store: 'userSettings', type: 'simple', default: null },
-    // --- ADDED ---
     theme: { store: 'userSettings', type: 'simple', default: 'light' },
     lastFeedSync: { store: 'userSettings', type: 'simple', default: null },
     feedScrollY: { store: 'userSettings', type: 'simple', default: 0 }, // Assuming numerical scroll position
-    feedVisibleLink: { store: 'userSettings', type: 'simple', default: '' } // Assuming string URL/ID for visible link
-    // --- /ADDED ---
+    feedVisibleLink: { store: 'userSettings', type: 'simple', default: '' }, // Assuming string URL/ID for visible link
+    itemsClearedCount: { store: 'userSettings', type: 'simple', default: 0 }, // New: Track items cleared for shuffle count
 };
 
 export async function initDb() {
@@ -170,7 +169,7 @@ export async function loadArrayState(key, tx = null) {
         const arrayStore = transaction.objectStore(arrayStoreName);
         const allItems = await arrayStore.getAll();
         
-        const { lastModified: arrayTimestamp } = await loadSimpleState(key, transaction); // db param removed here too
+        const { lastModified: arrayTimestamp } = await loadSimpleState(key, transaction); // db param removed here
 
         return { value: allItems, lastModified: arrayTimestamp }; 
     } catch (e) {
@@ -216,7 +215,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
         
         console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${arrayStoreName}".`);
 
-        await saveSimpleState(key, null, serverTimestamp, transaction); // db param removed here too
+        await saveSimpleState(key, null, serverTimestamp, transaction); // db param removed here
 
     } catch (e) {
         console.error(`[saveArrayState] Error saving "${key}" to store "${arrayStoreName}":`, e);
@@ -366,7 +365,7 @@ export async function pullUserState() {
     let newestOverallTimestamp = null;
 
     const fetchPromises = Object.entries(USER_STATE_DEFS).map(async ([key, def]) => {
-        if (key === 'lastStateSync' || key === 'lastFeedSync' || key === 'feedScrollY' || key === 'feedVisibleLink') {
+        if (key === 'lastStateSync' || key === 'lastFeedSync' || key === 'feedScrollY' || key === 'feedVisibleLink' || key === 'itemsClearedCount') {
             // These keys are managed client-side or by specific feed sync.
             // They don't have direct server-side counterparts for individual pull in this loop.
             return { key, status: 'skipped' };

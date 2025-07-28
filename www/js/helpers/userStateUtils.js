@@ -84,64 +84,50 @@ export async function toggleStar(app, guid) {
  * @param {string} guid - The unique identifier of the item.
  */
 export async function toggleHidden(app, guid) {
-    const db = await getDb(); // Add this line
-    const tx = db.transaction('hiddenItems', 'readwrite');
-    const store = tx.objectStore('hiddenItems');
+    let { shuffleCount, lastShuffleResetDate, itemsClearedCount } = await loadShuffleState(); // Load latest counts
+    let updateShuffleCount = false;
 
-    const hiddenAt = new Date().toISOString();
-    let action;
+    const existingIndex = app.hidden.findIndex(item => item.id === guid);
 
-    try {
-        const existingItem = await store.get(guid);
-
-        if (existingItem) {
-            // Item is currently hidden, so unhide it
-            await store.delete(guid);
-            action = "remove";
-            // Update app's in-memory hidden list
-            app.hidden = app.hidden.filter(item => item.id !== guid);
-        } else {
-            // Item is not hidden, so hide it
-            await store.put({
-                id: guid,
-                hiddenAt
-            });
-            action = "add";
-            // Update app's in-memory hidden list
-            app.hidden.push({
-                id: guid,
-                hiddenAt
-            });
+    if (existingIndex > -1) {
+        // Unhide item
+        app.hidden.splice(existingIndex, 1);
+        // Decrement itemsClearedCount if unhiding to maintain accuracy, but don't go below zero
+        itemsClearedCount = Math.max(0, itemsClearedCount - 1);
+        await addPendingOperation({ type: 'hiddenDelta', data: { action: 'remove', guid: guid } });
+        // Assuming createStatusBarMessage is available in the scope or globally
+        // createStatusBarMessage('Item unhidden.', 'info');
+    } else {
+        // Hide item
+        app.hidden.push({ id: guid, hiddenAt: new Date().toISOString() });
+        itemsClearedCount++; // Increment count for items cleared
+        if (itemsClearedCount % 10 === 0) {
+            // Increment shuffleCount every 10 items
+            shuffleCount++;
+            updateShuffleCount = true;
+            // Assuming createStatusBarMessage is available in the scope or globally
+            // createStatusBarMessage('Shuffle count increased!', 'success');
         }
-
-        await tx.done; // Ensure the transaction completes
-
-        // Trigger UI update if necessary
-        if (typeof app.updateCounts === 'function') app.updateCounts();
-
-        // Add the operation to the persistent pending operations buffer
-        const deltaObject = {
-            id: guid,
-            action,
-            hiddenAt
-        };
-        await addPendingOperation({
-            type: 'hiddenDelta',
-            data: deltaObject
-        });
-
-        // Attempt immediate background sync if online
-        if (isOnline()) {
-            try {
-                await processPendingOperations();
-            } catch (syncErr) {
-                console.error("Failed to immediately sync hidden change, operation remains buffered:", syncErr);
-                // The operation is already buffered, so no re-addition needed here.
-            }
-        }
-    } catch (error) {
-        console.error("Error in toggleHidden:", error);
+        await addPendingOperation({ type: 'hiddenDelta', data: { action: 'add', guid: guid, timestamp: new Date().toISOString() } });
+        // Assuming createStatusBarMessage is available in the scope or globally
+        // createStatusBarMessage('Item hidden.', 'info');
     }
+
+    await saveArrayState('hidden', app.hidden); // Save the updated hidden array
+    if (updateShuffleCount) {
+        // Only save shuffleCount and itemsClearedCount if shuffleCount was updated
+        await saveShuffleState(shuffleCount, lastShuffleResetDate, itemsClearedCount);
+        app.shuffleCount = shuffleCount; // Update Alpine state immediately for UI
+    } else {
+        // Always save itemsClearedCount
+        await saveShuffleState(shuffleCount, lastShuffleResetDate, itemsClearedCount);
+    }
+
+    // Ensure app.updateCounts is a function before calling it
+    if (typeof app.updateCounts === 'function') {
+        app.updateCounts();
+    }
+    // The deck regeneration is handled by app.js after this call.
 }
 
 /**
@@ -235,43 +221,30 @@ export async function saveCurrentDeck(guids) {
 }
 
 /**
- * Loads the shuffle state, including shuffle count and last reset date.
- * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
+ * Loads the shuffle state, including shuffle count, last reset date, and items cleared count.
+ * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null, itemsClearedCount: number}>} The shuffle state.
  */
 export async function loadShuffleState() {
-    const db = await getDb();
-    // loadSimpleState returns an object { value, lastModified }
-    const {
-        value: count
-    } = await loadSimpleState('shuffleCount');
-    const {
-        value: dateStr
-    } = await loadSimpleState('lastShuffleResetDate');
-
-    let shuffleCount = typeof count === 'number' ? count : 2; // Default if not found or invalid
-    let lastResetDate = null;
-    if (dateStr) {
-        try {
-            lastResetDate = new Date(dateStr);
-        } catch (err) {
-            console.warn("Invalid lastShuffleResetDate:", dateStr, err);
-        }
-    }
+    const { value: shuffleCount } = await loadSimpleState('shuffleCount');
+    const { value: lastShuffleResetDate } = await loadSimpleState('lastShuffleResetDate');
+    const { value: itemsClearedCount } = await loadSimpleState('itemsClearedCount'); // NEW
     return {
-        shuffleCount: shuffleCount,
-        lastShuffleResetDate: lastResetDate
+        shuffleCount: typeof shuffleCount === 'number' ? shuffleCount : 2, // Default if not found or invalid
+        lastShuffleResetDate: lastShuffleResetDate ? new Date(lastShuffleResetDate) : null,
+        itemsClearedCount: itemsClearedCount || 0 // NEW: Ensure default to 0
     };
 }
 
 /**
- * Saves the shuffle state, including shuffle count and last reset date.
+ * Saves the shuffle state, including shuffle count, last reset date, and items cleared count.
  * @param {number} count - The current shuffle count.
- * @param {Date} resetDate - The date of the last shuffle reset.
+ * @param {Date|null} resetDate - The date of the last shuffle reset.
+ * @param {number} itemsClearedCount - The count of items cleared.
  */
-export async function saveShuffleState(count, resetDate) {
-    const db = await getDb();
+export async function saveShuffleState(count, resetDate, itemsClearedCount) { // MODIFIED parameters
     await saveSimpleState('shuffleCount', count);
-    await saveSimpleState('lastShuffleResetDate', resetDate.toISOString());
+    await saveSimpleState('lastShuffleResetDate', resetDate ? resetDate.toISOString() : null);
+    await saveSimpleState('itemsClearedCount', itemsClearedCount); // NEW
 
     // Add these simple updates to the pending operations buffer
     await addPendingOperation({
@@ -282,7 +255,12 @@ export async function saveShuffleState(count, resetDate) {
     await addPendingOperation({
         type: 'simpleUpdate',
         key: 'lastShuffleResetDate',
-        value: resetDate.toISOString()
+        value: resetDate ? resetDate.toISOString() : null
+    });
+    await addPendingOperation({ // NEW
+        type: 'simpleUpdate',
+        key: 'itemsClearedCount',
+        value: itemsClearedCount
     });
 
     if (isOnline()) {

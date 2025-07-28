@@ -213,15 +213,6 @@ document.addEventListener('alpine:init', () => {
                 // validateAndRegenerateCurrentDeck will update this.currentDeckGuids, which triggers the $watch and then loadAndDisplayDeck()
                 await validateAndRegenerateCurrentDeck(this);
 
-                const { shuffleCount, lastShuffleResetDate } = await loadShuffleState();
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
-                    this.shuffleCount = shuffleCount;
-                } else {
-                    this.shuffleCount = 2;
-                    await saveShuffleState(2, today);
-                }
 
                 initTheme(this);
                 initSyncToggle(this);
