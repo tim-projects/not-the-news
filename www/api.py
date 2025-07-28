@@ -71,7 +71,7 @@ def login():
         
         auth_token = secrets.token_urlsafe(32)
         resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httpy_only=True, secure=True, samesite="Strict", path="/")
+        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, http_only=True, secure=True, samesite="Strict", path="/")
         app.logger.info("Login: Successful authentication")
         return resp
     except Exception as e:
