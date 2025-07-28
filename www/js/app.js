@@ -107,6 +107,7 @@ document.addEventListener('alpine:init', () => {
             if (guidsToDisplay && Array.isArray(guidsToDisplay) && guidsToDisplay.length > 0) {
                 const items = guidsToDisplay
                     .map(guid => {
+                        // Ensure guid is a string and not empty before looking it up
                         if (typeof guid !== 'string' || guid.trim() === '') {
                             console.warn("Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck):", guid);
                             return null;
@@ -155,6 +156,7 @@ document.addEventListener('alpine:init', () => {
 
                 // Add the new $watch property here
                 this.$watch('currentDeckGuids', async (newGuids, oldGuids) => {
+                    // Compare content to avoid unnecessary re-renders if the array reference changes but content is same
                     if (JSON.stringify(newGuids) !== JSON.stringify(oldGuids)) {
                         console.log('currentDeckGuids changed. Triggering loadAndDisplayDeck.');
                         await this.loadAndDisplayDeck();
@@ -196,7 +198,14 @@ document.addEventListener('alpine:init', () => {
 
                 this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
 
-                this.currentDeckGuids = await loadCurrentDeck();
+                // --- IMPORTANT FIX START ---
+                // Load currentDeckGuids and ensure they are always strings (GUIDs)
+                let storedGuidsResult = await loadCurrentDeck(); // loadCurrentDeck internally uses loadSimpleState
+                this.currentDeckGuids = (storedGuidsResult || []).map(item => {
+                    // If 'item' is an object with an 'id' property, use item.id, otherwise use the item itself (assuming it's already a string)
+                    return typeof item === 'object' && item !== null && item.id ? item.id : String(item);
+                });
+                // --- IMPORTANT FIX END ---
 
                 // validateAndRegenerateCurrentDeck will update this.currentDeckGuids, which triggers the $watch and then loadAndDisplayDeck()
                 await validateAndRegenerateCurrentDeck(this); 
@@ -255,11 +264,19 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false; // Set loading to false after everything is ready
 
                 // Initial load of the deck, triggered once after init
-                if (this.currentDeckGuids.length > 0 || this.entries.length > 0) {
-                    await this.loadAndDisplayDeck();
-                } else {
-                    console.log("No initial GUIDs or entries to load. Deck will remain empty.");
-                }
+                // The $watch on currentDeckGuids handles this automatically after validateAndRegenerateCurrentDeck.
+                // We don't need an explicit call here unless currentDeckGuids *starts* empty and needs initial population.
+                // Since validateAndRegenerateCurrentDeck always tries to populate it, this explicit call is redundant
+                // and might even cause double loading if currentDeckGuids is already set.
+                // If you *must* have an initial display before any changes, ensure currentDeckGuids is correctly set by
+                // validateAndRegenerateCurrentDeck before this point, and the $watch will handle it.
+                // For now, removing this redundant call.
+                // if (this.currentDeckGuids.length > 0 || this.entries.length > 0) {
+                //     await this.loadAndDisplayDeck();
+                // } else {
+                //     console.log("No initial GUIDs or entries to load. Deck will remain empty.");
+                // }
+
 
                 if (this.syncEnabled) {
                     setTimeout(async () => {
