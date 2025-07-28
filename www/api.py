@@ -1,3 +1,4 @@
+# www/api.py
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -28,9 +29,7 @@ FEED_XML = os.path.join(FEED_DIR, "feed.xml")
 
 USER_STATE_SERVER_DEFAULTS = {
     'currentDeckGuids': {'type': 'array', 'default': []},
-    'rssFeeds': {'type': 'simple', 'default': []},
     'lastShuffleResetDate': {'type': 'simple', 'default': None},
-    'keywordBlacklist': {'type': 'simple', 'default': []},
     'shuffleCount': {'type': 'simple', 'default': 0},
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
     'starred': {'type': 'array', 'default': []},
@@ -72,7 +71,7 @@ def login():
         
         auth_token = secrets.token_urlsafe(32)
         resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
+        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httpy_only=True, secure=True, samesite="Strict", path="/")
         app.logger.info("Login: Successful authentication")
         return resp
     except Exception as e:

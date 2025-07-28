@@ -9,6 +9,7 @@ import {
     initDb,
     saveSimpleState // Import saveSimpleState, as it was missing for some watches
 } from './data/database.js';
+import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
 import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
@@ -52,7 +53,6 @@ document.addEventListener('alpine:init', () => {
     console.log("'alpine:init' event fired. Defining 'rssApp' component.");
 
     window.Alpine.data('rssApp', () => ({
-        db: null,
         scrollObserver: null,
         loading: true,
         filterMode: 'unread',
@@ -199,8 +199,18 @@ document.addEventListener('alpine:init', () => {
                     if (isOpen) {
                         this.modalView = 'main';
                         await manageSettingsPanelVisibility(this);
-                        this.rssFeedsInput = (await loadSimpleState('rssFeeds')).value || '';
-                        this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
+                        try {
+                            this.rssFeedsInput = (await loadConfigFile('rssFeeds.txt')).content || '';
+                        } catch (e) {
+                            console.warn("Failed to load rssFeeds.txt from server, falling back to local storage:", e);
+                            this.rssFeedsInput = (await loadSimpleState('rssFeeds')).value || '';
+                        }
+                        try {
+                            this.keywordBlacklistInput = (await loadConfigFile('keywordBlacklist.txt')).content || '';
+                        } catch (e) {
+                            console.warn("Failed to load keywordBlacklist.txt from server, falling back to local storage:", e);
+                            this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
+                        }
                     } else {
                         await saveCurrentScrollPosition();
                     }
@@ -213,8 +223,6 @@ document.addEventListener('alpine:init', () => {
                 });
                 this.$watch('syncEnabled', value => saveSimpleState('syncEnabled', value));
                 this.$watch('imagesEnabled', value => saveSimpleState('imagesEnabled', value));
-                this.$watch('rssFeedsInput', value => saveSimpleState('rssFeeds', value));
-                this.$watch('keywordBlacklistInput', value => saveSimpleState('keywordBlacklist', value));
                 this.$watch('filterMode', value => setFilterMode(this, value));
                 this.updateCounts();
                 await initScrollPosition(this);
@@ -405,7 +413,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveRssFeeds() {
-            await saveSimpleState('rssFeeds', this.rssFeedsInput);
+            await saveConfigFile('rssFeeds.txt', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
             await performFullSync();
@@ -415,7 +423,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveKeywordBlacklist() {
-            await saveSimpleState('keywordBlacklist', this.keywordBlacklistInput);
+            await saveConfigFile('keywordBlacklist.txt', this.keywordBlacklistInput);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             this.updateCounts();
         }

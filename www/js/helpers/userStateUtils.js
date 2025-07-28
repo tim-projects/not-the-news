@@ -221,7 +221,7 @@ export async function saveCurrentDeck(guids) {
     await addPendingOperation({
         type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
         key: 'currentDeckGuids',
-        value: guids // Send the entire array to the server
+        value: Array.from(guids) // Send the entire array to the server
     });
 
     // Attempt immediate background sync if online
