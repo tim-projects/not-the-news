@@ -79,11 +79,11 @@ self.addEventListener('fetch', function(event) {
   if (cacheAssets.includes(requestUrl.pathname) || cacheAssets.includes(requestUrl.pathname.slice(1))) { // Handle both with and without leading slash
     event.respondWith(
       caches.match(event.request).then(function(response) {
-        //if (response) {
-        //  console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href);
-        //  return response;
-        //}
-        console.log('[Service Worker] Cache miss (static asset) for:', requestUrl.href, 'Falling back to network.');
+        if (response) {
+          console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href);
+          return response;
+        }
+        //console.log('[Service Worker] Cache miss (static asset) for:', requestUrl.href, 'Falling back to network.');
         return fetch(event.request);
       })
     );
@@ -96,10 +96,10 @@ self.addEventListener('fetch', function(event) {
     event.respondWith(
       caches.match(event.request).then(function(cachedResponse) {
         // Return cached response if found
-        //if (cachedResponse) {
-        //  console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
-        //  return cachedResponse;
-        //}
+        if (cachedResponse) {
+          //console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
+          return cachedResponse;
+        }
 
         //console.log('[Service Worker] Cache miss (dynamic GET) for:', requestUrl.href);
         // If not in cache, fetch from network
