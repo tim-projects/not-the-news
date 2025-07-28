@@ -11,7 +11,7 @@ import {
 } from './data/database.js';
 import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
-import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
+import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } = from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
 
@@ -53,6 +53,8 @@ document.addEventListener('alpine:init', () => {
     console.log("'alpine:init' event fired. Defining 'rssApp' component.");
 
     window.Alpine.data('rssApp', () => ({
+        // Add new property to manage application initialization state
+        appInitialized: false, // <-- Added this line
         scrollObserver: null,
         loading: true,
         filterMode: 'unread',
@@ -207,7 +209,8 @@ document.addEventListener('alpine:init', () => {
                         }
                         try {
                             this.keywordBlacklistInput = (await loadConfigFile('keywordBlacklist.txt')).content || '';
-                        } catch (e) {
+                        }
+                        catch (e) {
                             console.warn("Failed to load keywordBlacklist.txt from server, falling back to local storage:", e);
                             this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
                         }
@@ -228,13 +231,14 @@ document.addEventListener('alpine:init', () => {
                 await initScrollPosition(this);
 
                 this.loading = false;
+                this.appInitialized = true; // <-- Added this line
 
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
                             console.log("Initiating background partial sync...");
                             // --- MODIFIED: Adjust performFeedSync call for serverTime retrieval ---
-                            await performFeedSync(); 
+                            await performFeedSync(this); 
                             const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
                             
                             await pullUserState();
@@ -259,7 +263,7 @@ document.addEventListener('alpine:init', () => {
                         console.log("Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations();
                         // --- MODIFIED: Adjust performFeedSync call for online re-sync ---
-                        await performFeedSync();
+                        await performFeedSync(this);
                         const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                         await pullUserState();
@@ -294,7 +298,7 @@ document.addEventListener('alpine:init', () => {
                     try {
                         console.log("Performing periodic background sync...");
                         // --- MODIFIED: Adjust performFeedSync call for periodic sync ---
-                        await performFeedSync();
+                        await performFeedSync(this);
                         const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                         await pullUserState();
@@ -312,6 +316,7 @@ document.addEventListener('alpine:init', () => {
                 console.error("Initialization failed:", error);
                 this.errorMessage = "Could not load feed: " + error.message;
                 this.loading = false;
+                this.appInitialized = true; // <-- Also set to true on error to avoid indefinite loading
             }
         },
         initScrollObserver() {

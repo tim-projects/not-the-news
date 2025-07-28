@@ -22,7 +22,7 @@
 <body>
 <div id="app" x-data="rssApp" x-init="initApp()">
 <div id="loading-screen" x-show="loading" class="loading-screen">Loading…</div>
-<header id="header" x-show="!loading" class="header">
+<header id="header" x-show="!loading" class="header" x-cloak>
 <div id="ntn-title"><h2>Not The News</h2></div>
 <div id="header-options">
 <button id="shuffle-button" @click="shuffleFeed()" class="shuffle-btn" title="Shuffle">
@@ -39,7 +39,7 @@
 </button>
 </div>
 </header>
-<main id="items" x-show="!loading">
+<main id="items" x-show="!loading" x-cloak>
 <template x-for="entry in filteredEntries" :key="entry.id">
 <div class="item entry" x-bind:data-link="entry.id" x-transition:leave="transition ease-in duration-200 transform" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 translate-x-full">
 <div class="itemtitle">

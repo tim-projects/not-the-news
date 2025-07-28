@@ -230,14 +230,15 @@ export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
 }
 
 export async function saveCurrentScrollPosition() {
-    const db = await getDb();
-    await saveSimpleState(db, 'feedScrollY', String(window.scrollY));
+    // db argument removed from saveSimpleState calls as it's redundant.
+    await saveSimpleState('feedScrollY', String(window.scrollY));
 
     // Save the link of the first visible entry
     const entryElements = document.querySelectorAll('.entry');
     for (const entryElement of entryElements) {
         if (entryElement.getBoundingClientRect().top >= 0) {
-            await saveSimpleState(db, 'feedVisibleLink', entryElement.dataset.link || '');
+            // db argument removed from saveSimpleState call.
+            await saveSimpleState('feedVisibleLink', entryElement.dataset.link || '');
             break;
         }
     }

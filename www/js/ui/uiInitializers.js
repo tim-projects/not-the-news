@@ -8,7 +8,8 @@ import {
     processPendingOperations,
     pullUserState,
     performFullSync,
-    isOnline
+    isOnline,
+    getDb // Added getDb import
 } from '../data/database.js';
 
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
@@ -19,19 +20,19 @@ import { createStatusBarMessage, attachScrollToTopHandler } from './uiUpdaters.j
 /**
  * Generic function to set up a boolean toggle UI element and sync its state with IndexedDB.
  * @param {object} app - The Alpine.js app state object.
- * @param {IDBDatabase} db - The IndexedDB database instance.
  * @param {Function} getToggleEl - Function returning the toggle DOM element.
  * @param {Function} getTextEl - Function returning the text display DOM element.
  * @param {string} dbKey - The key to use in the 'userState' object store for this setting.
  * @param {Function} [onToggleCb] - Optional callback function to execute when the toggle changes.
  */
-export async function setupBooleanToggle(app, db, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) {
+export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) {
+    const db = await getDb(); // Obtain db internally
     const toggleEl = getToggleEl();
     const textEl = getTextEl();
 
     if (!toggleEl || !textEl) return;
 
-    app[dbKey] = (await loadSimpleState(db, dbKey)).value;
+    app[dbKey] = (await loadSimpleState(dbKey)).value;
     if (app[dbKey] === undefined || app[dbKey] === null) {
         app[dbKey] = true;
     }
@@ -39,17 +40,18 @@ export async function setupBooleanToggle(app, db, getToggleEl, getTextEl, dbKey,
     textEl.textContent = app[dbKey] ? 'yes' : 'no';
 
     toggleEl.addEventListener('change', async () => {
+        // const currentDb = await getDb(); // Re-obtain db if needed in event listener - No longer needed, as db is obtained internally by the functions
         app[dbKey] = toggleEl.checked;
-        await saveSimpleState(db, dbKey, app[dbKey]);
+        await saveSimpleState(dbKey, app[dbKey]);
 
-        await addPendingOperation(db, {
+        await addPendingOperation({
             type: 'simpleUpdate',
             key: dbKey,
             value: app[dbKey]
         });
         if (await isOnline()) {
             try {
-                await processPendingOperations(db);
+                await processPendingOperations();
             } catch (syncErr) {
                 console.error("Failed to immediately sync toggle change, operation remains buffered:", syncErr);
             }
@@ -60,29 +62,29 @@ export async function setupBooleanToggle(app, db, getToggleEl, getTextEl, dbKey,
     });
 }
 
-export async function initSyncToggle(app, db) {
-    await setupBooleanToggle(app, db, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => {
+export async function initSyncToggle(app) {
+    await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => {
         if (enabled) {
             console.log("Sync enabled, triggering full sync from initSyncToggle.");
-            if (db) {
-                await performFullSync(app, db);
-            }
+            // const db = await getDb(); // Obtain db internally for callback - No longer needed as performFullSync handles it
+            await performFullSync(app);
         }
     });
 }
 
-export async function initImagesToggle(app, db) {
-    await setupBooleanToggle(app, db, getImagesToggle, getImagesText, 'imagesEnabled');
+export async function initImagesToggle(app) {
+    await setupBooleanToggle(app, getImagesToggle, getImagesText, 'imagesEnabled');
 }
 
-export async function initTheme(app, db) {
+export async function initTheme(app) {
+    // const db = await getDb(); // Obtain db internally - No longer needed
     const htmlEl = document.documentElement;
     const toggle = getThemeToggle();
     const text = getThemeText();
 
     if (!toggle || !text) return;
 
-    let storedThemeResult = await loadSimpleState(db, 'theme');
+    let storedThemeResult = await loadSimpleState('theme');
     let storedTheme = storedThemeResult.value;
 
     let activeThemeIsDark;
@@ -98,20 +100,21 @@ export async function initTheme(app, db) {
     text.textContent = activeThemeIsDark ? 'dark' : 'light';
 
     toggle.addEventListener('change', async () => {
+        // const currentDb = await getDb(); // Re-obtain db if needed in event listener - No longer needed
         const newTheme = toggle.checked ? 'dark' : 'light';
         htmlEl.classList.toggle('dark', toggle.checked);
         htmlEl.classList.toggle('light', !toggle.checked);
 
-        await saveSimpleState(db, 'theme', newTheme);
+        await saveSimpleState('theme', newTheme);
 
-        await addPendingOperation(db, {
+        await addPendingOperation({
             type: 'simpleUpdate',
             key: 'theme',
             value: newTheme
         });
         if (await isOnline()) {
             try {
-                await processPendingOperations(db);
+                await processPendingOperations();
             } catch (syncErr) {
                 console.error("Failed to immediately sync theme change, operation remains buffered:", syncErr);
             }
@@ -121,9 +124,10 @@ export async function initTheme(app, db) {
     });
 }
 
-export async function initScrollPosition(app, db) {
+export async function initScrollPosition(app) {
+    // const db = await getDb(); // Obtain db internally - No longer needed
     window.requestAnimationFrame(async () => {
-        const lastViewedItemIdResult = await loadSimpleState(db, 'lastViewedItemId');
+        const lastViewedItemIdResult = await loadSimpleState('lastViewedItemId');
         const lastViewedItemId = lastViewedItemIdResult.value;
 
         if (lastViewedItemId) {
@@ -135,8 +139,9 @@ export async function initScrollPosition(app, db) {
     });
 }
 
-export async function initShuffleCount(app, db) {
-    const { shuffleCount: count, lastShuffleResetDate: lastReset } = await loadShuffleState(db);
+export async function initShuffleCount(app) {
+    // const db = await getDb(); // Obtain db internally - No longer needed
+    const { shuffleCount: count, lastShuffleResetDate: lastReset } = await loadShuffleState();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -147,7 +152,7 @@ export async function initShuffleCount(app, db) {
 
     if (shouldReset) {
         app.shuffleCount = 2;
-        await saveShuffleState(db, app.shuffleCount, today);
+        await saveShuffleState(app.shuffleCount, today);
     } else {
         app.shuffleCount = count;
     }
@@ -183,9 +188,9 @@ export async function initConfigPanelListeners(app) {
             app.keywordBlacklistInput = content;
             createStatusBarMessage("Keywords saved.", 'success');
         } catch (err) {
-            console.error(err);
-            createStatusBarMessage("Error saving keywords!", 'error');
-        }
+                console.error(err);
+                createStatusBarMessage("Error saving keywords!", 'error');
+            }
     });
 
     const saveRssBtn = getSaveRssButton();
@@ -197,9 +202,9 @@ export async function initConfigPanelListeners(app) {
             app.rssFeedsInput = content;
             createStatusBarMessage("RSS feeds saved.", 'success');
         } catch (err) {
-            console.error(err);
-            createStatusBarMessage("Error saving RSS feeds!", 'error');
-        }
+                console.error(err);
+                createStatusBarMessage("Error saving RSS feeds!", 'error');
+            }
     });
 }
 let deferredPrompt;
