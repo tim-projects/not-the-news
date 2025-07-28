@@ -12,7 +12,7 @@ import {
 } from '../data/database.js';
 
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
-import { loadShuffleState, saveShuffleState } from '../data/database.js'; // Ensure imports are correct
+import { loadShuffleState, saveShuffleState } from '../data/uiInitializers.js';
 import { loadConfigFile, saveConfigFile } from '../helpers/apiUtils.js';
 import { createStatusBarMessage, attachScrollToTopHandler } from './uiUpdaters.js';
 
