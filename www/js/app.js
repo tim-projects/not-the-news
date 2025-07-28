@@ -24,7 +24,7 @@ import {
     loadFilterMode
 } from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
-import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } = require('./ui/uiUpdaters.js');
+import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js'
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
