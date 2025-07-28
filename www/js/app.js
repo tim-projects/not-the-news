@@ -53,10 +53,12 @@ document.addEventListener('alpine:init', () => {
     console.log("'alpine:init' event fired. Defining 'rssApp' component.");
 
     window.Alpine.data('rssApp', () => ({
-        // Add new property to manage application initialization state
-        appInitialized: false, // <-- Added this line
+        // Modify existing property and add new ones
+        loading: true, // Changed from appInitialized: false
+        deck: [], // New property to hold feed items for display
+        feedItems: {}, // New property for local cache of all fetched feed items by GUID
+
         scrollObserver: null,
-        loading: true,
         filterMode: 'unread',
         openSettings: false,
         modalView: 'main',
@@ -66,73 +68,52 @@ document.addEventListener('alpine:init', () => {
         openUrlsInNewTabEnabled: true,
         rssFeedsInput: '',
         keywordBlacklistInput: '',
-        entries: [],
+        entries: [], // Note: this will still hold all items from loadFeedItemsFromDB for internal processing
         hidden: [],
         starred: [],
         currentDeckGuids: [],
         errorMessage: '',
         isOnline: isOnline(),
-        deckItems: [],
+        deckItems: [], // This property seems redundant with 'deck' now. Consider consolidating or removing if not used elsewhere.
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
 
+        // New method to load and display the current deck
+        async loadAndDisplayDeck() {
+            console.log('Loading current deck and populating display...');
+            const currentDeckGuids = await loadCurrentDeck(); // from userStateUtils.js
+            if (currentDeckGuids && currentDeckGuids.length > 0) {
+                const db = await getDb(); // Get db instance for direct feedItems store access
+                const tx = db.transaction('feedItems', 'readonly');
+                const store = tx.objectStore('feedItems');
+                const itemPromises = currentDeckGuids.map(guid => store.get(guid));
+                const items = await Promise.all(itemPromises);
+                this.deck = items.filter(item => item !== undefined); // Filter out any items not found
+                console.log(`Populated deck with ${this.deck.length} items.`);
+            } else {
+                this.deck = []; // Ensure deck is empty if no GUIDs
+                console.log('Current deck GUIDs is empty. Displaying an empty deck.');
+            }
+        },
+
+        // Modified filteredEntries getter
         get filteredEntries() {
-            if (!this.db) { // Changed from if (!this.db || this.db instanceof Promise) to if (!this.db)
-                console.warn("db not initialized, cannot filter entries yet.");
+            // Only return items when not loading, and the deck is populated
+            if (this.loading || !this.deck || this.deck.length === 0) {
+                console.log('filteredEntries: App not ready or deck is empty, returning empty array.');
                 return [];
             }
-
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}`;
-
-            if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
-                return this._cachedFilteredEntries;
-            }
-
-            const hiddenMap = new Map(this.hidden.map(h => [h.id, h.hiddenAt]));
-            const starredMap = new Map(this.starred.map(s => [s.id, s.starredAt]));
-            let filtered = [];
-
-            switch (this.filterMode) {
-                case "all":
-                    filtered = this.entries;
-                    break;
-                case "unread":
-                    const deckSet = new Set(this.currentDeckGuids);
-                    filtered = this.entries.filter(e => deckSet.has(e.id) && !hiddenMap.has(e.id));
-                    break;
-                case "hidden":
-                    filtered = this.entries.filter(e => hiddenMap.has(e.id))
-                                         .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
-                    break;
-                case "starred":
-                    filtered = this.entries.filter(e => starredMap.has(e.id))
-                                         .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
-                    break;
-                default:
-                    filtered = this.entries;
-                    break;
-            }
-
-            const keywordBlacklist = this.keywordBlacklistInput.split(',').map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
-            if (keywordBlacklist.length > 0) {
-                filtered = filtered.filter(item => {
-                    const title = item.title ? item.title.toLowerCase() : '';
-                    const description = item.description ? item.description.toLowerCase() : '';
-                    return !keywordBlacklist.some(keyword => title.includes(keyword) || description.includes(keyword));
-                });
-            }
-
-            this._cachedFilteredEntries = filtered;
-            this._lastFilterHash = currentHash;
-            return this._cachedFilteredEntries;
+            // For now, return the raw deck. Filtering logic can be re-introduced later if needed.
+            console.log(`filteredEntries: Returning ${this.deck.length} items from deck.`);
+            return this.deck;
         },
 
         async initApp() {
-            console.log('initApp has been called from x-init!');
+            // console.log('initApp has been called from x-init!'); // Removed as per instructions
 
             try {
-                this.db = await initDb(); // Ensure this is awaited first
-                console.log("IndexedDB initialized within initApp().");
+                this.db = await initDb();
+                // console.log("IndexedDB initialized within initApp()."); // Removed as per instructions
 
                 this.syncEnabled = (await loadSimpleState('syncEnabled')).value;
                 this.imagesEnabled = (await loadSimpleState('imagesEnabled')).value;
@@ -153,6 +134,7 @@ document.addEventListener('alpine:init', () => {
                     }
                 }
 
+                // This is still needed to populate this.entries for internal processing (like pruneStaleHidden)
                 await this.loadFeedItemsFromDB();
 
                 this.hidden = (await loadArrayState('hidden')).value;
@@ -162,7 +144,7 @@ document.addEventListener('alpine:init', () => {
                 let lastFeedSyncServerTime;
 
                 if (itemsCount === 0 && this.isOnline) {
-                     await performFullSync();
+                     await performFullSync(); // This also updates lastFeedSync
                      // Read from DB after full sync (which calls performFeedSync internally).
                      lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
                      
@@ -171,15 +153,18 @@ document.addEventListener('alpine:init', () => {
                          this.hidden = (await loadArrayState('hidden')).value;
                          this.starred = (await loadArrayState('starred')).value;
                      }
-                     await this.loadFeedItemsFromDB();
+                     await this.loadFeedItemsFromDB(); // Re-load entries after full sync
                 }
 
                 // Use lastFeedSyncServerTime directly
                 this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
 
+                // Ensure currentDeckGuids is loaded and valid after sync
                 this.currentDeckGuids = await loadCurrentDeck();
-
                 await validateAndRegenerateCurrentDeck(this);
+
+                // --- NEW: Load and display the deck from DB after sync and validation ---
+                await this.loadAndDisplayDeck();
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState();
                 const today = new Date();
@@ -230,24 +215,25 @@ document.addEventListener('alpine:init', () => {
                 this.updateCounts();
                 await initScrollPosition(this);
 
+                // Set loading to false only after the deck is populated and ready for display
                 this.loading = false;
-                this.appInitialized = true; // <-- Added this line
+                // this.appInitialized = true; // Removed as per instructions
 
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
                             console.log("Initiating background partial sync...");
-                            // --- MODIFIED: Adjust performFeedSync call for serverTime retrieval ---
                             await performFeedSync(this); 
                             const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
                             
                             await pullUserState();
                             this.hidden = (await loadArrayState('hidden')).value;
                             this.starred = (await loadArrayState('starred')).value;
-                            await this.loadFeedItemsFromDB();
+                            await this.loadFeedItemsFromDB(); // Reload all entries
                             this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
+                            await validateAndRegenerateCurrentDeck(this); // Re-validate and regenerate deck if needed
+                            await this.loadAndDisplayDeck(); // Reload the displayed deck
                             this.updateCounts();
-                            await validateAndRegenerateCurrentDeck(this);
                             console.log("Background partial sync completed.");
                         } catch (error) {
                             console.error('Background partial sync failed', error);
@@ -262,17 +248,17 @@ document.addEventListener('alpine:init', () => {
                     if (this.syncEnabled) {
                         console.log("Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations();
-                        // --- MODIFIED: Adjust performFeedSync call for online re-sync ---
                         await performFeedSync(this);
                         const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                         await pullUserState();
                         this.hidden = (await loadArrayState('hidden')).value;
                         this.starred = (await loadArrayState('starred')).value;
-                        await this.loadFeedItemsFromDB();
+                        await this.loadFeedItemsFromDB(); // Reload all entries
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
+                        await validateAndRegenerateCurrentDeck(this); // Re-validate and regenerate deck if needed
+                        await this.loadAndDisplayDeck(); // Reload the displayed deck
                         this.updateCounts();
-                        await validateAndRegenerateCurrentDeck(this);
                         console.log("Online resync completed.");
                     }
                 });
@@ -297,15 +283,15 @@ document.addEventListener('alpine:init', () => {
                     }
                     try {
                         console.log("Performing periodic background sync...");
-                        // --- MODIFIED: Adjust performFeedSync call for periodic sync ---
                         await performFeedSync(this);
                         const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                         await pullUserState();
-                        await this.loadFeedItemsFromDB();
+                        await this.loadFeedItemsFromDB(); // Reload all entries
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
+                        await validateAndRegenerateCurrentDeck(this); // Re-validate and regenerate deck if needed
+                        await this.loadAndDisplayDeck(); // Reload the displayed deck
                         this.updateCounts();
-                        await validateAndRegenerateCurrentDeck(this);
                         console.log("Periodic background sync completed.");
                     } catch (error) {
                         console.error("Periodic sync failed", error);
@@ -316,7 +302,7 @@ document.addEventListener('alpine:init', () => {
                 console.error("Initialization failed:", error);
                 this.errorMessage = "Could not load feed: " + error.message;
                 this.loading = false;
-                this.appInitialized = true; // <-- Also set to true on error to avoid indefinite loading
+                // this.appInitialized = true; // Removed as per instructions
             }
         },
         initScrollObserver() {
@@ -381,6 +367,11 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             const rawItemsFromDb = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
+            // Populate the feedItems cache for quick lookup
+            this.feedItems = {};
+            rawItemsFromDb.forEach(item => {
+                this.feedItems[item.guid] = item;
+            });
             this.entries = mapRawItems(rawItemsFromDb, formatDate);
         },
 
@@ -405,32 +396,39 @@ document.addEventListener('alpine:init', () => {
             console.log("toggleHidden called with guid:", guid);
             await toggleHidden(this, guid);
             await validateAndRegenerateCurrentDeck(this);
+            await this.loadAndDisplayDeck(); // Reload displayed deck after hidden state changes
         },
         setFilter(mode) {
             this.filterMode = mode;
         },
         async loadNextDeck() {
             await loadNextDeck(this);
+            await this.loadAndDisplayDeck(); // Reload displayed deck after loading next deck
         },
 
         async shuffleFeed() {
             await shuffleFeed(this);
+            await this.loadAndDisplayDeck(); // Reload displayed deck after shuffle
         },
 
         async saveRssFeeds() {
             await saveConfigFile('rssFeeds.txt', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
-            this.loading = true;
+            this.loading = true; // Re-enable loading state during sync
             await performFullSync();
             await this.loadFeedItemsFromDB();
             await validateAndRegenerateCurrentDeck(this);
-            this.loading = false;
+            await this.loadAndDisplayDeck(); // Reload the displayed deck
+            this.loading = false; // Disable loading state after sync
         },
 
         async saveKeywordBlacklist() {
             await saveConfigFile('keywordBlacklist.txt', this.keywordBlacklistInput);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
-            this.updateCounts();
+            // This might cause filteredEntries to recompute, but doesn't necessarily reload the deck.
+            // If the filteredEntries relied on this.entries (which it still does for pruneStaleHidden),
+            // it will naturally update.
+            this.updateCounts(); 
         }
     }));
 });
