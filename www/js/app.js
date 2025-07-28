@@ -14,7 +14,7 @@ import {
 } from './data/database.js';
 import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 // Removed 'displayCurrentDeck' from dataUtils.js imports as it will be removed/refactored there
-import { formatDate, mapRawItems, mapRawItem, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
+import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
 import {
     loadCurrentDeck,
     saveCurrentDeck,
@@ -92,53 +92,50 @@ document.addEventListener('alpine:init', () => {
         // New method to load and display the current deck
         async loadAndDisplayDeck() {
             console.log("Loading current deck and populating display (app.js:loadAndDisplayDeck)...");
-            // Ensure feedItems is fresh
-            await this.loadFeedItemsFromDB(); // Crucial to ensure feedItems is up-to-date and unique
+            await this.loadFeedItemsFromDB(); // Ensure feedItems is up-to-date and unique. Keep this line.
 
-            // guidsToDisplay should already be an array of strings (GUIDs) from currentDeckGuids
-            const guidsToDisplay = this.currentDeckGuids;
+            const guidsToDisplay = this.currentDeckGuids; // Keep this line.
 
-            console.log(`DEBUG app.js: loadAndDisplayDeck - type of guidsToDisplay: ${typeof guidsToDisplay} Array.isArray: ${Array.isArray(guidsToDisplay)}`);
-            if (Array.isArray(guidsToDisplay) && guidsToDisplay.length > 0) {
-                console.log(`DEBUG app.js: loadAndDisplayDeck - first 5 GUIDs: ${guidsToDisplay.slice(0, 5).map(g => typeof g === 'string' ? g : g.id).join(', ')}`);
-                console.log(`DEBUG app.js: loadAndDisplayDeck - type of first GUID (if any): ${typeof guidsToDisplay[0]}`);
+            console.log("DEBUG app.js: loadAndDisplayDeck - type of guidsToDisplay:", typeof guidsToDisplay, "Array.isArray:", Array.isArray(guidsToDisplay));
+            if (Array.isArray(guidsToDisplay)) {
+                console.log("DEBUG app.js: loadAndDisplayDeck - first 5 GUIDs:", guidsToDisplay.slice(0, 5));
+                console.log("DEBUG app.js: loadAndDisplayDeck - type of first GUID (if any):", guidsToDisplay.length > 0 ? typeof guidsToDisplay[0] : 'N/A');
             }
 
-            const items = [];
-            const hiddenSet = new Set(this.hidden.map(h => h.id));
-            const starredSet = new Set(this.starred.map(s => s.id));
-            const seenGuidsForDeck = new Set(); // New Set for unique items in the deck
+            const items = []; // Existing line, keep this.
+            const hiddenSet = new Set(this.hidden.map(h => h.id)); // Existing line, keep this.
+            const starredSet = new Set(this.starred.map(s => s.id)); // Existing line, keep this.
+            // --- INSERT NEW CODE BELOW THIS LINE ---
+            const seenGuidsForDeck = new Set(); // To track unique items added to the deck.
+            // --- END INSERT NEW CODE ---
 
-            if (guidsToDisplay && Array.isArray(guidsToDisplay)) {
-                for (const guid of guidsToDisplay) {
+            if (guidsToDisplay && Array.isArray(guidsToDisplay)) { // Existing line, keep this.
+                for (const guid of guidsToDisplay) { // Existing line, keep this.
+                    // --- MODIFY THE IF/ELSE IF/ELSE BLOCK BELOW ---
+                    // Replace the entire content of this `for` loop (the if/else if/else block) with:
                     if (typeof guid !== 'string') {
                         console.warn(`Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck): ${JSON.stringify(guid)}. Skipping.`);
-                        continue; // Skip non-string GUIDs
+                        continue;
                     }
 
                     const item = this.feedItems[guid];
-                    if (item && !seenGuidsForDeck.has(item.guid)) { // Check for uniqueness using the new Set
-                        const mappedItem = mapRawItem(item, formatDate); // Ensure proper mapping
+                    if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
+                        const mappedItem = mapRawItem(item, formatDate);
                         mappedItem.isHidden = hiddenSet.has(item.guid);
                         mappedItem.isStarred = starredSet.has(item.guid);
                         items.push(mappedItem);
-                        seenGuidsForDeck.add(item.guid); // Add to the seen set for the deck
-                    } else if (item && seenGuidsForDeck.has(item.guid)) {
+                        seenGuidsForDeck.add(item.guid); // Mark as seen for the deck
+                    } else if (item && item.guid && seenGuidsForDeck.has(item.guid)) {
                         console.warn(`Duplicate item (GUID: ${item.guid}) already added to deck. Skipping.`);
                     } else {
-                        // This case means the GUID was in currentDeckGuids but not in feedItems
-                        // This can happen if a feed item was deleted from DB but its GUID persisted in currentDeckGuids
-                        console.warn(`Feed item with GUID ${guid} not found in feedItems cache. Skipping.`);
+                        console.warn(`Feed item with GUID ${guid} not found in feedItems cache or has invalid GUID. Skipping.`);
                     }
+                    // --- END MODIFY ---
                 }
             }
 
-            // Apply filterMode before setting the deck, if filteredEntries is still a computed property
-            // If filteredEntries is a computed property, `this.deck` should contain ALL valid items
-            // and `filteredEntries` will filter `this.deck`.
-            // So, for `this.deck`, we just assign the unique items found.
-            this.deck = items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-            console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
+            this.deck = items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate)); // Existing line, keep this.
+            console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`); // Existing line, keep this.
         },
 
         get filteredEntries() {
@@ -148,7 +145,7 @@ document.addEventListener('alpine:init', () => {
             }
             console.log(`filteredEntries: Returning ${this.deck.length} items from deck.`);
             return this.deck;
-        },
+        } /* No comma needed here if this is the last getter/property before a method */ ,
 
         async initApp() {
             try {
@@ -194,12 +191,12 @@ document.addEventListener('alpine:init', () => {
                 let lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                 if (itemsCount === 0 && this.isOnline) {
-                     await performFullSync(this);
-                     lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-                     // Re-load state after full sync
-                     await this.loadFeedItemsFromDB();
-                     this.hidden = (await loadArrayState('hidden')).value;
-                     this.starred = (await loadArrayState('starred')).value;
+                    await performFullSync(this);
+                    lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
+                    // Re-load state after full sync
+                    await this.loadFeedItemsFromDB();
+                    this.hidden = (await loadArrayState('hidden')).value;
+                    this.starred = (await loadArrayState('starred')).value;
                 }
 
                 this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
@@ -218,7 +215,7 @@ document.addEventListener('alpine:init', () => {
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState();
                 const today = new Date();
-                today.setHours(0,0,0,0);
+                today.setHours(0, 0, 0, 0);
                 if (lastShuffleResetDate && new Date(lastShuffleResetDate).toDateString() === today.toDateString()) {
                     this.shuffleCount = shuffleCount;
                 } else {
@@ -246,8 +243,7 @@ document.addEventListener('alpine:init', () => {
                         try {
                             // Corrected file path from keywordBlacklist.txt to filter_keywords.txt
                             this.keywordBlacklistInput = (await loadConfigFile('filter_keywords.txt')).content || '';
-                        }
-                        catch (e) {
+                        } catch (e) {
                             console.warn("Failed to load filter_keywords.txt from server, falling back to local storage:", e);
                             this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
                         }
@@ -433,20 +429,28 @@ document.addEventListener('alpine:init', () => {
             const rawItemsFromDb = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
 
             this.feedItems = {}; // Clear previous cache
+            // --- INSERT NEW CODE BELOW THIS LINE ---
             const uniqueEntries = [];
-            const seenGuids = new Set(); // Use a Set to track seen GUIDs for uniqueness
+            const seenGuids = new Set();
+            // --- END INSERT NEW CODE ---
 
             rawItemsFromDb.forEach(item => {
-                if (!seenGuids.has(item.guid)) {
-                    this.feedItems[item.guid] = item; // Add to lookup cache
-                    uniqueEntries.push(item); // Add to a temporary array
-                    seenGuids.add(item.guid); // Mark as seen
-                } else {
+                // --- MODIFY THE IF CONDITION AND CONTENT BELOW ---
+                if (item && item.guid && !seenGuids.has(item.guid)) {
+                    this.feedItems[item.guid] = item;
+                    uniqueEntries.push(item); // Add to a temporary unique array
+                    seenGuids.add(item.guid);
+                } else if (item && item.guid && seenGuids.has(item.guid)) {
                     console.warn(`Duplicate GUID found in raw database items during loadFeedItemsFromDB: ${item.guid}. Skipping duplicate.`);
+                } else {
+                    console.warn('Item or GUID missing when processing raw database items. Skipping:', item);
                 }
+                // --- END MODIFY ---
             });
 
-            this.entries = mapRawItems(uniqueEntries, formatDate); // Map the unique items
+            // --- REPLACE THE LINE THAT SETS this.entries ---
+            this.entries = mapRawItems(uniqueEntries, formatDate);
+            // --- END REPLACE ---
         },
 
         updateCounts() {
