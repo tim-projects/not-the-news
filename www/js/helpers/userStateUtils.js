@@ -9,7 +9,10 @@ import {
     loadArrayState,
     saveArrayState,
     getDb
-} from '../data/database.js'; // Adjusted path to database.js
+} from '../data/database.js';
+
+// Ensure these imports exist as specified in the prompt for toggleHidden
+import { createStatusBarMessage } from '../ui/uiUpdaters.js'; 
 
 
 /**
@@ -84,50 +87,45 @@ export async function toggleStar(app, guid) {
  * @param {string} guid - The unique identifier of the item.
  */
 export async function toggleHidden(app, guid) {
-    let { shuffleCount, lastShuffleResetDate, itemsClearedCount } = await loadShuffleState(); // Load latest counts
-    let updateShuffleCount = false;
+    // Load the current state of shuffleCount, lastShuffleResetDate, and itemsClearedCount
+    let { shuffleCount, lastShuffleResetDate, itemsClearedCount } = await loadShuffleState();
 
     const existingIndex = app.hidden.findIndex(item => item.id === guid);
 
     if (existingIndex > -1) {
         // Unhide item
         app.hidden.splice(existingIndex, 1);
-        // Decrement itemsClearedCount if unhiding to maintain accuracy, but don't go below zero
+        // Decrement itemsClearedCount if unhiding. Ensure it doesn't go below zero.
         itemsClearedCount = Math.max(0, itemsClearedCount - 1);
         await addPendingOperation({ type: 'hiddenDelta', data: { action: 'remove', guid: guid } });
-        // Assuming createStatusBarMessage is available in the scope or globally
-        // createStatusBarMessage('Item unhidden.', 'info');
+        createStatusBarMessage('Item unhidden.', 'info');
     } else {
         // Hide item
         app.hidden.push({ id: guid, hiddenAt: new Date().toISOString() });
         itemsClearedCount++; // Increment count for items cleared
+
+        // Check if shuffleCount needs to be incremented (every 10 items)
         if (itemsClearedCount % 10 === 0) {
-            // Increment shuffleCount every 10 items
             shuffleCount++;
-            updateShuffleCount = true;
-            // Assuming createStatusBarMessage is available in the scope or globally
-            // createStatusBarMessage('Shuffle count increased!', 'success');
+            createStatusBarMessage('Shuffle count increased!', 'success');
         }
         await addPendingOperation({ type: 'hiddenDelta', data: { action: 'add', guid: guid, timestamp: new Date().toISOString() } });
-        // Assuming createStatusBarMessage is available in the scope or globally
-        // createStatusBarMessage('Item hidden.', 'info');
+        createStatusBarMessage('Item hidden.', 'info');
     }
 
-    await saveArrayState('hidden', app.hidden); // Save the updated hidden array
-    if (updateShuffleCount) {
-        // Only save shuffleCount and itemsClearedCount if shuffleCount was updated
-        await saveShuffleState(shuffleCount, lastShuffleResetDate, itemsClearedCount);
-        app.shuffleCount = shuffleCount; // Update Alpine state immediately for UI
-    } else {
-        // Always save itemsClearedCount
-        await saveShuffleState(shuffleCount, lastShuffleResetDate, itemsClearedCount);
-    }
+    // Save the updated hidden array to IndexedDB
+    await saveArrayState('hidden', app.hidden);
 
-    // Ensure app.updateCounts is a function before calling it
-    if (typeof app.updateCounts === 'function') {
-        app.updateCounts();
-    }
-    // The deck regeneration is handled by app.js after this call.
+    // Save the updated shuffle state (shuffleCount, lastShuffleResetDate, itemsClearedCount)
+    await saveShuffleState(shuffleCount, lastShuffleResetDate, itemsClearedCount);
+
+    // Update the Alpine.js app state so the UI reflects changes immediately
+    app.shuffleCount = shuffleCount;
+    // Optionally, if you want to display itemsClearedCount in UI: app.itemsClearedCount = itemsClearedCount;
+
+    // Trigger an update to the counts displayed in the UI (e.g., hidden count)
+    app.updateCounts();
+    // The deck regeneration is handled by app.js after this call due to currentDeckGuids $watch.
 }
 
 /**

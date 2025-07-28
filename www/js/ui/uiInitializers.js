@@ -12,7 +12,7 @@ import {
 } from '../data/database.js';
 
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
-import { loadShuffleState, saveShuffleState } from '../helpers/userStateUtils.js';
+import { loadShuffleState, saveShuffleState } from '../data/database.js'; // Ensure imports are correct
 import { loadConfigFile, saveConfigFile } from '../helpers/apiUtils.js';
 import { createStatusBarMessage, attachScrollToTopHandler } from './uiUpdaters.js';
 
@@ -133,36 +133,43 @@ export async function initScrollPosition(app) {
 }
 
 export async function initShuffleCount(app) {
-    const { shuffleCount: count, lastShuffleResetDate: lastReset, itemsClearedCount: clearedCount } = await loadShuffleState(); // MODIFIED
+    // Load the current state of all shuffle-related values
+    let { shuffleCount: currentShuffleCount, lastShuffleResetDate: lastResetDate, itemsClearedCount: currentItemsClearedCount } = await loadShuffleState();
+
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0); // Normalize 'today' to midnight for comparison
 
-    let newShuffleCount = count;
-    let newItemsClearedCount = clearedCount;
-    let shouldReset = false;
+    let newShuffleCount = currentShuffleCount;
+    let newItemsClearedCount = currentItemsClearedCount;
 
-    // Check if lastReset is not today (or null/undefined)
-    if (!lastReset || new Date(lastReset).toDateString() !== today.toDateString()) {
-        shouldReset = true;
-    }
+    // Determine if a daily reset is needed
+    const isNewDay = !lastResetDate || new Date(lastResetDate).toDateString() !== today.toDateString();
 
-    if (shouldReset) {
-        newShuffleCount = 2; // Reset to 2 daily
-        newItemsClearedCount = 0; // Reset cleared items count daily
-        await saveShuffleState(newShuffleCount, today, newItemsClearedCount); // Save reset state
+    if (isNewDay) {
+        newShuffleCount = 2; // Reset shuffleCount to 2 for a new day
+        newItemsClearedCount = 0; // Reset itemsClearedCount to 0 for a new day
+        // Log for debugging to confirm daily reset
+        console.log(`[initShuffleCount] New day detected (${today.toDateString()}). Resetting shuffleCount to ${newShuffleCount} and itemsClearedCount to ${newItemsClearedCount}.`);
+        await saveShuffleState(newShuffleCount, today, newItemsClearedCount); // Save the reset state
     } else {
-        // If it's the same day, ensure initial load sets it correctly if it was somehow 0 but should be 2
-        if (newShuffleCount === 0 && newItemsClearedCount === 0) {
-             newShuffleCount = 2; // If just initialized and it's 0, set to 2.
-             await saveShuffleState(newShuffleCount, today, newItemsClearedCount);
+        // If it's the same day, ensure shuffleCount is at least 2 if it's currently 0 (e.g., first load of the app ever)
+        // This catches the case where default 0 was loaded before daily reset logic runs for the very first time.
+        if (newShuffleCount === 0) {
+             newShuffleCount = 2;
+             await saveShuffleState(newShuffleCount, today, newItemsClearedCount); // Save to persist this initial adjustment
+             console.log(`[initShuffleCount] Initial load on same day, adjusted shuffleCount to ${newShuffleCount}.`);
         }
     }
 
-    app.shuffleCount = newShuffleCount; // Update Alpine state
-    // app.itemsClearedCount = newItemsClearedCount; // Not strictly necessary to expose to Alpine, but good for debugging if desired
+    // Update the Alpine.js app property
+    app.shuffleCount = newShuffleCount;
 
+    // Update the UI display element
     const shuffleDisplay = getShuffleCountDisplay();
-    if (shuffleDisplay) shuffleDisplay.textContent = app.shuffleCount;
+    if (shuffleDisplay) {
+        shuffleDisplay.textContent = app.shuffleCount;
+        console.log(`[initShuffleCount] Display updated to: ${app.shuffleCount}`);
+    }
 }
 
 export async function initConfigPanelListeners(app) {
