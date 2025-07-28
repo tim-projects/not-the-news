@@ -71,37 +71,6 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 /**
- * Updates the UI to display the items in the current deck.
- * This function should be called whenever app.currentDeckGuids is updated
- * and the display needs to be refreshed.
- * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- */
-export function displayCurrentDeck(app) {
-    // --- CRITICAL CHANGE: Use app.deck instead of app.deckItems ---
-    app.deck = []; // Clear the current displayed items (now app.deck)
-
-    // Populate app.deck based on app.currentDeckGuids
-    app.currentDeckGuids.forEach(guid => {
-        // Ensure app.feedItems is used for lookup if it's the primary cache
-        // or app.entries if that's the canonical list of all items.
-        // Given app.js's loadFeedItemsFromDB populates app.feedItems, that's better.
-        const item = app.feedItems[guid]; // Assuming app.feedItems is a map by GUID
-        // Fallback to app.entries.find if app.feedItems is not reliably a map or if item.guid !== item.id
-        // For consistency with app.entries.find(e => e.id === guid) in validateAndRegenerateCurrentDeck,
-        // let's stick to app.entries.find for now to ensure all items are considered.
-        const itemFromEntries = app.entries.find(e => e.id === guid);
-
-        if (itemFromEntries) {
-            app.deck.push(itemFromEntries); // Add to app.deck
-        }
-    });
-
-    console.log("Deck displayed:", app.deck.map(item => item.title));
-    console.log("dataUtils.js: displayCurrentDeck calling scrollToTop");
-    app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
-}
-
-/**
  * Validates the current deck and regenerates it if all items are hidden or no longer exist.
  * This method is intended to be called during app initialization and after data syncs.
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
@@ -119,12 +88,12 @@ export async function validateAndRegenerateCurrentDeck(app) {
     // If the deck is empty or all items are invalid, generate a new deck
     if (validGuidsInDeck.length === 0 && app.entries.length > 0) {
         console.log("Current deck is empty/invalid. Loading next deck and increasing shuffle count.");
-        await loadNextDeck(app); // Removed db parameter
+        await loadNextDeck(app);
 
         // Reward: ALWAYS increase shuffle count when deck becomes empty due to hiding
         const today = new Date();
         today.setHours(0,0,0,0);
-        await saveShuffleState(app.shuffleCount, today); // Removed db parameter
+        await saveShuffleState(app.shuffleCount, today);
         // This message goes to the title bar, as confirmed in previous steps.
         await displayTemporaryMessageInTitle('Shuffle count increased!');
 
@@ -132,16 +101,12 @@ export async function validateAndRegenerateCurrentDeck(app) {
         // If some items were removed from the deck, update and save it
         console.log("Current deck contained hidden/non-existent items. Updating the deck.");
         app.currentDeckGuids = validGuidsInDeck;
-        await saveCurrentDeck(app.currentDeckGuids); // Removed db parameter
+        await saveCurrentDeck(app.currentDeckGuids);
+        // Ensure app.loadAndDisplayDeck is called immediately after currentDeckGuids is updated
+        await app.loadAndDisplayDeck();
     }
-    // Only call displayCurrentDeck if the deck was actually changed
-    // This condition needs to be 'validGuidsInDeck.length !== app.currentDeckGuids.length' for correct logic.
-    // However, since loadNextDeck and saveCurrentDeck are called above, and app.currentDeckGuids is updated,
-    // a simpler check is whether currentDeckGuids was modified.
-    // If the deck changed, or if it was regenerated (first if-block), redisplay.
-    // The previous `displayCurrentDeck(app);` below this if statement was likely always intended.
-    // Let's ensure displayCurrentDeck is called if `app.currentDeckGuids` has potentially changed.
-    displayCurrentDeck(app); // Call regardless, as currentDeckGuids might have been updated by loadNextDeck
+    // If loadNextDeck was called, it handles its own app.loadAndDisplayDeck().
+    // If only currentDeckGuids was updated due to filtering, the `else if` block handles the UI update.
 }
 
 /**
@@ -317,15 +282,15 @@ export async function loadNextDeck(app) {
 
     if (nextDeck.length > 0) {
         app.currentDeckGuids = nextDeck.map(item => item.id);
-        await saveCurrentDeck(app.currentDeckGuids); // Removed db parameter
+        await saveCurrentDeck(app.currentDeckGuids);
     } else {
         app.currentDeckGuids = [];
-        await saveCurrentDeck([]); // Removed db parameter
+        await saveCurrentDeck([]);
         createStatusBarMessage('No more unread items to load!', 'info');
     }
 
     app.updateCounts();
-    displayCurrentDeck(app);
+    await app.loadAndDisplayDeck(); // Call app.loadAndDisplayDeck to update UI
     app.isShuffled = false;
 }
 
@@ -341,13 +306,14 @@ export async function shuffleFeed(app) {
     }
 
     console.log("Shuffle button pressed. Loading next deck and decrementing shuffle count.");
-    await loadNextDeck(app); // Removed db parameter
+    // loadNextDeck will handle calling app.loadAndDisplayDeck()
+    await loadNextDeck(app);
 
     // After loadNextDeck completes, handle the shuffle count specific to shuffleFeed
     app.shuffleCount--;
     const today = new Date();
     today.setHours(0,0,0,0);
-    await saveShuffleState(app.shuffleCount, today); // Removed db parameter
+    await saveShuffleState(app.shuffleCount, today);
 
     app.isShuffled = true;
     await displayTemporaryMessageInTitle('Feed shuffled!');
