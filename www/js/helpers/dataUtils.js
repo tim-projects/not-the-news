@@ -77,18 +77,26 @@ export function mapRawItems(rawList, fmtFn) {
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
  */
 export function displayCurrentDeck(app) {
-    // Clear the current displayed items
-    app.deckItems = [];
+    // --- CRITICAL CHANGE: Use app.deck instead of app.deckItems ---
+    app.deck = []; // Clear the current displayed items (now app.deck)
 
-    // Populate deckItems based on currentDeckGuids
+    // Populate app.deck based on app.currentDeckGuids
     app.currentDeckGuids.forEach(guid => {
-        const item = app.entries.find(e => e.id === guid);
-        if (item) {
-            app.deckItems.push(item);
+        // Ensure app.feedItems is used for lookup if it's the primary cache
+        // or app.entries if that's the canonical list of all items.
+        // Given app.js's loadFeedItemsFromDB populates app.feedItems, that's better.
+        const item = app.feedItems[guid]; // Assuming app.feedItems is a map by GUID
+        // Fallback to app.entries.find if app.feedItems is not reliably a map or if item.guid !== item.id
+        // For consistency with app.entries.find(e => e.id === guid) in validateAndRegenerateCurrentDeck,
+        // let's stick to app.entries.find for now to ensure all items are considered.
+        const itemFromEntries = app.entries.find(e => e.id === guid);
+
+        if (itemFromEntries) {
+            app.deck.push(itemFromEntries); // Add to app.deck
         }
     });
 
-    console.log("Deck displayed:", app.deckItems.map(item => item.title));
+    console.log("Deck displayed:", app.deck.map(item => item.title));
     console.log("dataUtils.js: displayCurrentDeck calling scrollToTop");
     app.scrollToTop(); // Assuming this is a desired behavior for displaying a new deck
 }

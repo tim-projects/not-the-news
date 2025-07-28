@@ -85,7 +85,6 @@ document.addEventListener('alpine:init', () => {
         currentDeckGuids: [],
         errorMessage: '',
         isOnline: isOnline(),
-        deckItems: [], // This property seems redundant with 'deck' now. Consider consolidating or removing if not used elsewhere.
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
 
