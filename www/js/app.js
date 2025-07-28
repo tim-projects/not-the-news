@@ -92,6 +92,11 @@ document.addEventListener('alpine:init', () => {
         // New method to load and display the current deck
         async loadAndDisplayDeck() {
             console.log("Loading current deck and populating display (app.js:loadAndDisplayDeck)...");
+            // This method's primary role is to populate 'this.deck' specifically for the 'unread' filter mode.
+            // Other filter modes ('all', 'hidden', 'starred') will use 'filteredEntries' directly from 'this.entries'.
+            if (this.filterMode !== 'unread') {
+                console.log(`loadAndDisplayDeck called, but current filterMode is '${this.filterMode}'. 'this.deck' will still be updated, but 'filteredEntries' will use 'this.entries' directly.`);
+            }
             await this.loadFeedItemsFromDB(); // Ensure feedItems is up-to-date and unique. Keep this line.
 
             const guidsToDisplay = this.currentDeckGuids; // Keep this line.
@@ -139,13 +144,65 @@ document.addEventListener('alpine:init', () => {
         },
 
         get filteredEntries() {
-            if (this.loading || !this.deck || this.deck.length === 0) {
-                console.log('filteredEntries: App not ready or deck is empty, returning empty array.');
-                return [];
+            // Calculate a hash to determine if state variables affecting filtering have changed.
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}-${this.deck.length}`;
+
+            // If the state hasn't changed and we have a cached result, return it for performance.
+            if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
+                return this._cachedFilteredEntries;
             }
-            console.log(`filteredEntries: Returning ${this.deck.length} items from deck.`);
-            return this.deck;
-        } /* No comma needed here if this is the last getter/property before a method */ ,
+
+            let filtered = [];
+            // Create Sets/Maps for efficient lookup of hidden and starred items.
+            const hiddenMap = new Map(this.hidden.map(h => [h.id, h.hiddenAt]));
+            const starredMap = new Map(this.starred.map(s => [s.id, s.starredAt]));
+
+            // Apply filtering logic based on the current filterMode.
+            switch (this.filterMode) {
+                case "unread":
+                    // When in "unread" mode, we display the items from the 'deck'.
+                    // The 'deck' is specifically populated with unread items via loadAndDisplayDeck.
+                    filtered = this.deck;
+                    break;
+                case "all":
+                    // In "all" mode, display all entries.
+                    filtered = this.entries;
+                    break;
+                case "hidden":
+                    // In "hidden" mode, filter for items that are present in the 'hidden' array.
+                    // Sort them by the time they were hidden, most recent first.
+                    filtered = this.entries.filter(e => hiddenMap.has(e.id))
+                                           .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+                    break;
+                case "starred":
+                    // In "starred" mode, filter for items present in the 'starred' array.
+                    // Sort them by the time they were starred, most recent first.
+                    filtered = this.entries.filter(e => starredMap.has(e.id))
+                                           .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
+                    break;
+                default:
+                    // Fallback for any unexpected filter mode, defaulting to "unread".
+                    console.warn(`Unknown filterMode: ${this.filterMode}. Defaulting to 'unread'.`);
+                    filtered = this.deck;
+                    break;
+            }
+
+            // Apply the keyword blacklist filter to the result, regardless of the filterMode.
+            const keywordBlacklist = this.keywordBlacklistInput.split(',').map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
+            if (keywordBlacklist.length > 0) {
+                filtered = filtered.filter(item => {
+                    const title = item.title ? item.title.toLowerCase() : '';
+                    const description = item.description ? item.description.toLowerCase() : '';
+                    // An item is kept if *none* of the blacklisted keywords are found in its title or description.
+                    return !keywordBlacklist.some(keyword => title.includes(keyword) || description.includes(keyword));
+                });
+            }
+
+            // Cache the newly computed result and the hash for future efficiency.
+            this._cachedFilteredEntries = filtered;
+            this._lastFilterHash = currentHash;
+            return filtered;
+        }, // IMPORTANT: Ensure this comma is present as it's a property in an object.
 
         async initApp() {
             try {
@@ -250,26 +307,35 @@ document.addEventListener('alpine:init', () => {
                 });
                 this.$watch('syncEnabled', value => saveSimpleState('syncEnabled', value));
                 this.$watch('imagesEnabled', value => saveSimpleState('imagesEnabled', value));
-                this.$watch('filterMode', value => setFilterMode(this, value));
+                
+                // Custom $watch for filterMode to trigger re-evaluation of displayed items
+                this.$watch('filterMode', async (newMode) => {
+                    // Update the filter mode in the database for persistence.
+                    await setFilterMode(this, newMode);
+                    console.log(`Filter mode changed to: ${newMode}`);
+
+                    // If the new mode is 'unread', we need to validate and potentially regenerate the deck.
+                    // This action will update `this.currentDeckGuids`, which in turn triggers its own
+                    // `$watch` (defined elsewhere in initApp) to call `loadAndDisplayDeck()`.
+                    if (newMode === 'unread') {
+                        console.log('Filter set to unread. Validating and regenerating current deck to populate this.deck.');
+                        await validateAndRegenerateCurrentDeck(this);
+                    } else {
+                        // For 'all', 'hidden', or 'starred' modes, the `filteredEntries` computed property
+                        // will automatically re-evaluate based on `this.entries` (the full item list).
+                        console.log(`Filter set to ${newMode}. The 'filteredEntries' computed property will automatically re-evaluate from all items.`);
+                    }
+
+                    // Always update display counts and scroll to the top for a consistent user experience
+                    // when the filter mode changes.
+                    this.updateCounts();
+                    this.scrollToTop();
+                });
+
                 this.updateCounts();
                 await initScrollPosition(this);
 
                 this.loading = false; // Set loading to false after everything is ready
-
-                // Initial load of the deck, triggered once after init
-                // The $watch on currentDeckGuids handles this automatically after validateAndRegenerateCurrentDeck.
-                // We don't need an explicit call here unless currentDeckGuids *starts* empty and needs initial population.
-                // Since validateAndRegenerateCurrentDeck always tries to populate it, this explicit call is redundant
-                // and might even cause double loading if currentDeckGuids is already set.
-                // If you *must* have an initial display before any changes, ensure currentDeckGuids is correctly set by
-                // validateAndRegenerateCurrentDeck before this point, and the $watch will handle it.
-                // For now, removing this redundant call.
-                // if (this.currentDeckGuids.length > 0 || this.entries.length > 0) {
-                //     await this.loadAndDisplayDeck();
-                // } else {
-                //     console.log("No initial GUIDs or entries to load. Deck will remain empty.");
-                // }
-
 
                 if (this.syncEnabled) {
                     setTimeout(async () => {
