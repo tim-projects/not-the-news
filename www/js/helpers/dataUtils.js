@@ -36,38 +36,51 @@ export function shuffleArray(arr) {
     return arr;
 }
 
+export function mapRawItem(item, fmtFn) {
+    if (!item) {
+        console.warn("mapRawItem received an undefined or null item. Returning null.");
+        return null;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(item.desc || "", "text/html");
+
+    const imgEl = doc.querySelector("img");
+    const imgSrc = imgEl?.src || "";
+    imgEl?.remove();
+
+    let sourceUrl = "";
+    const sourceEl = doc.querySelector(".source-url") || doc.querySelector("a");
+    if (sourceEl) {
+        sourceUrl = sourceEl.textContent.trim();
+        sourceEl.remove();
+    } else {
+        sourceUrl = item.link ? new URL(item.link).hostname : "";
+    }
+
+    const descContent = doc.body.innerHTML.trim();
+    const ts = Date.parse(item.pubDate) || 0;
+
+    return {
+        id: item.guid,
+        image: imgSrc,
+        title: item.title,
+        link: item.link,
+        pubDate: fmtFn(item.pubDate || ""),
+        description: descContent,
+        source: sourceUrl,
+        timestamp: ts
+    };
+}
 export function mapRawItems(rawList, fmtFn) {
-    return rawList.map(item => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(item.desc || "", "text/html");
-
-        const imgEl = doc.querySelector("img");
-        const imgSrc = imgEl?.src || "";
-        imgEl?.remove();
-
-        let sourceUrl = "";
-        const sourceEl = doc.querySelector(".source-url") || doc.querySelector("a");
-        if (sourceEl) {
-            sourceUrl = sourceEl.textContent.trim();
-            sourceEl.remove();
-        } else {
-            sourceUrl = item.link ? new URL(item.link).hostname : "";
-        }
-
-        const descContent = doc.body.innerHTML.trim();
-        const ts = Date.parse(item.pubDate) || 0;
-
-        return {
-            id: item.guid,
-            image: imgSrc,
-            title: item.title,
-            link: item.link,
-            pubDate: fmtFn(item.pubDate || ""),
-            description: descContent,
-            source: sourceUrl,
-            timestamp: ts
-        };
-    }).sort((a, b) => b.timestamp - a.timestamp);
+    if (!Array.isArray(rawList)) {
+        console.warn("mapRawItems received a non-array input. Returning empty array.");
+        return [];
+    }
+    return rawList
+        .map(item => mapRawItem(item, fmtFn))
+        .filter(item => item !== null)
+        .sort((a, b) => b.timestamp - a.timestamp);
 }
 
 /**

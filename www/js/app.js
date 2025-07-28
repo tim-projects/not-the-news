@@ -15,6 +15,7 @@ import {
 import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 // Removed 'displayCurrentDeck' from dataUtils.js imports as it will be removed/refactored there
 import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
+import { mapRawItem, mapRawItems, formatDate } from './helpers/dataUtils.js';
 import {
     loadCurrentDeck,
     saveCurrentDeck,
