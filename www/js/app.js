@@ -92,6 +92,10 @@ document.addEventListener('alpine:init', () => {
         // New method to load and display the current deck
         async loadAndDisplayDeck() {
             console.log('Loading current deck and populating display (app.js:loadAndDisplayDeck)...');
+
+            // Ensure feedItems cache is always fresh before building the deck
+            await this.loadFeedItemsFromDB();
+
             const guidsToDisplay = this.currentDeckGuids;
 
             console.log("DEBUG app.js: loadAndDisplayDeck - type of guidsToDisplay:", typeof guidsToDisplay, "Array.isArray:", Array.isArray(guidsToDisplay));
@@ -101,19 +105,28 @@ document.addEventListener('alpine:init', () => {
             }
 
             if (guidsToDisplay && Array.isArray(guidsToDisplay) && guidsToDisplay.length > 0) {
-                const db = await getDb();
-                const tx = db.transaction('feedItems', 'readonly');
-                const store = tx.objectStore('feedItems');
-                const itemPromises = guidsToDisplay.map(guid => {
-                    console.log("DEBUG app.js: loadAndDisplayDeck - Attempting to get item for GUID:", guid);
-                    if (typeof guid !== 'string' || guid.trim() === '') {
-                         console.warn("Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck):", guid);
-                         return Promise.resolve(null);
+                const items = guidsToDisplay
+                    .map(guid => {
+                        if (typeof guid !== 'string' || guid.trim() === '') {
+                            console.warn("Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck):", guid);
+                            return null;
+                        }
+                        return this.feedItems[guid]; // Get item directly from the cache
+                    })
+                    .filter(item => item !== undefined && item !== null); // Filter out undefined or null entries
+
+                // Duplicate check
+                const seenGuids = new Set();
+                const uniqueItems = [];
+                for (const item of items) {
+                    if (!seenGuids.has(item.guid)) {
+                        uniqueItems.push(item);
+                        seenGuids.add(item.guid);
+                    } else {
+                        console.warn(`Duplicate item found in deck creation (GUID: ${item.guid}). Skipping.`);
                     }
-                    return store.get(guid);
-                });
-                const items = await Promise.all(itemPromises);
-                this.deck = items.filter(item => item !== undefined && item !== null);
+                }
+                this.deck = uniqueItems;
                 console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
             } else {
                 this.deck = [];
@@ -140,6 +153,16 @@ document.addEventListener('alpine:init', () => {
                 this.filterMode = (await loadFilterMode());
                 this.isOnline = isOnline();
 
+                // Add the new $watch property here
+                this.$watch('currentDeckGuids', async (newGuids, oldGuids) => {
+                    if (JSON.stringify(newGuids) !== JSON.stringify(oldGuids)) {
+                        console.log('currentDeckGuids changed. Triggering loadAndDisplayDeck.');
+                        await this.loadAndDisplayDeck();
+                    } else {
+                        console.log('currentDeckGuids changed, but content is identical. Skipping re-display.');
+                    }
+                });
+
                 if (this.syncEnabled && this.isOnline) {
                     try {
                         console.log("Attempting early pull of user state (including current deck) from server...");
@@ -153,6 +176,7 @@ document.addEventListener('alpine:init', () => {
                     }
                 }
 
+                // Ensure feedItems cache is loaded BEFORE hidden/starred for pruneStaleHidden
                 await this.loadFeedItemsFromDB();
 
                 this.hidden = (await loadArrayState('hidden')).value;
@@ -164,17 +188,18 @@ document.addEventListener('alpine:init', () => {
                 if (itemsCount === 0 && this.isOnline) {
                      await performFullSync(this);
                      lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
+                     // Re-load state after full sync
+                     await this.loadFeedItemsFromDB();
                      this.hidden = (await loadArrayState('hidden')).value;
                      this.starred = (await loadArrayState('starred')).value;
-                     await this.loadFeedItemsFromDB();
                 }
 
                 this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
 
                 this.currentDeckGuids = await loadCurrentDeck();
 
-                // validateAndRegenerateCurrentDeck will update this.currentDeckGuids and call app.loadAndDisplayDeck()
-                await validateAndRegenerateCurrentDeck(this); // THIS IS NOW THE PRIMARY CALLER OF app.loadAndDisplayDeck()
+                // validateAndRegenerateCurrentDeck will update this.currentDeckGuids, which triggers the $watch and then loadAndDisplayDeck()
+                await validateAndRegenerateCurrentDeck(this); 
 
                 const { shuffleCount, lastShuffleResetDate } = await loadShuffleState();
                 const today = new Date();
@@ -197,16 +222,18 @@ document.addEventListener('alpine:init', () => {
                         this.modalView = 'main';
                         await manageSettingsPanelVisibility(this);
                         try {
-                            this.rssFeedsInput = (await loadConfigFile('rssFeeds.txt')).content || '';
+                            // Corrected file path from rssFeeds.txt to feeds.txt
+                            this.rssFeedsInput = (await loadConfigFile('feeds.txt')).content || '';
                         } catch (e) {
-                            console.warn("Failed to load rssFeeds.txt from server, falling back to local storage:", e);
+                            console.warn("Failed to load feeds.txt from server, falling back to local storage:", e);
                             this.rssFeedsInput = (await loadSimpleState('rssFeeds')).value || '';
                         }
                         try {
-                            this.keywordBlacklistInput = (await loadConfigFile('keywordBlacklist.txt')).content || '';
+                            // Corrected file path from keywordBlacklist.txt to filter_keywords.txt
+                            this.keywordBlacklistInput = (await loadConfigFile('filter_keywords.txt')).content || '';
                         }
                         catch (e) {
-                            console.warn("Failed to load keywordBlacklist.txt from server, falling back to local storage:", e);
+                            console.warn("Failed to load filter_keywords.txt from server, falling back to local storage:", e);
                             this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
                         }
                     } else {
@@ -227,6 +254,13 @@ document.addEventListener('alpine:init', () => {
 
                 this.loading = false; // Set loading to false after everything is ready
 
+                // Initial load of the deck, triggered once after init
+                if (this.currentDeckGuids.length > 0 || this.entries.length > 0) {
+                    await this.loadAndDisplayDeck();
+                } else {
+                    console.log("No initial GUIDs or entries to load. Deck will remain empty.");
+                }
+
                 if (this.syncEnabled) {
                     setTimeout(async () => {
                         try {
@@ -235,12 +269,12 @@ document.addEventListener('alpine:init', () => {
                             const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                             await pullUserState();
+                            // Re-load hidden/starred after pullUserState
                             this.hidden = (await loadArrayState('hidden')).value;
                             this.starred = (await loadArrayState('starred')).value;
-                            await this.loadFeedItemsFromDB();
+                            await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                             this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                            await validateAndRegenerateCurrentDeck(this); // THIS CALLS app.loadAndDisplayDeck()
-                            // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+                            await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
                             this.updateCounts();
                             console.log("Background partial sync completed.");
                         } catch (error) {
@@ -260,12 +294,12 @@ document.addEventListener('alpine:init', () => {
                         const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                         await pullUserState();
+                        // Re-load hidden/starred after pullUserState
                         this.hidden = (await loadArrayState('hidden')).value;
                         this.starred = (await loadArrayState('starred')).value;
-                        await this.loadFeedItemsFromDB();
+                        await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                        await validateAndRegenerateCurrentDeck(this); // THIS CALLS app.loadAndDisplayDeck()
-                        // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+                        await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
                         this.updateCounts();
                         console.log("Online resync completed.");
                     }
@@ -295,10 +329,9 @@ document.addEventListener('alpine:init', () => {
                         const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                         await pullUserState();
-                        await this.loadFeedItemsFromDB();
+                        await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                        await validateAndRegenerateCurrentDeck(this); // THIS CALLS app.loadAndDisplayDeck()
-                        // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+                        await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
                         this.updateCounts();
                         console.log("Periodic background sync completed.");
                     } catch (error) {
@@ -394,40 +427,41 @@ document.addEventListener('alpine:init', () => {
         },
         async toggleStar(guid) {
             await toggleStar(this, guid);
-            // No need to call loadAndDisplayDeck here, validateAndRegenerateCurrentDeck or next operations will handle it.
+            // The deck will be re-rendered via the $watch on currentDeckGuids if toggling affects it (e.g., filterMode)
+            // or by subsequent deck operations. No direct loadAndDisplayDeck needed here.
         },
         async toggleHidden(guid) {
             console.log("toggleHidden called with guid:", guid);
             await toggleHidden(this, guid);
-            await validateAndRegenerateCurrentDeck(this); // This will call loadAndDisplayDeck if the deck changes
-            // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+            // validateAndRegenerateCurrentDeck will update currentDeckGuids, triggering the $watch
+            await validateAndRegenerateCurrentDeck(this); 
         },
         setFilter(mode) {
             this.filterMode = mode;
         },
         async loadNextDeck() {
-            await loadNextDeck(this); // This calls app.loadAndDisplayDeck()
-            // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+            // loadNextDeck (from dataUtils) will update this.currentDeckGuids, triggering the $watch
+            await loadNextDeck(this); 
         },
 
         async shuffleFeed() {
-            await shuffleFeed(this); // This calls app.loadAndDisplayDeck()
-            // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+            // shuffleFeed (from dataUtils) will update this.currentDeckGuids, triggering the $watch
+            await shuffleFeed(this); 
         },
 
         async saveRssFeeds() {
-            await saveConfigFile('rssFeeds.txt', this.rssFeedsInput);
+            await saveConfigFile('feeds.txt', this.rssFeedsInput); // Corrected to feeds.txt
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true; // Re-enable loading state during sync
             await performFullSync();
-            await this.loadFeedItemsFromDB();
-            await validateAndRegenerateCurrentDeck(this); // This will call loadAndDisplayDeck
-            // await this.loadAndDisplayDeck(); // <-- REMOVED THIS REDUNDANT CALL
+            await this.loadFeedItemsFromDB(); // Refresh feedItems cache after full sync
+            // validateAndRegenerateCurrentDeck will update currentDeckGuids, triggering the $watch
+            await validateAndRegenerateCurrentDeck(this); 
             this.loading = false; // Disable loading state after sync
         },
 
         async saveKeywordBlacklist() {
-            await saveConfigFile('keywordBlacklist.txt', this.keywordBlacklistInput);
+            await saveConfigFile('filter_keywords.txt', this.keywordBlacklistInput); // Corrected to filter_keywords.txt
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             // This does not directly affect the deck content, only filtering, so no loadAndDisplayDeck needed
             this.updateCounts();

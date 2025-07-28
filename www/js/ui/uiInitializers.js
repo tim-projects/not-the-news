@@ -8,8 +8,7 @@ import {
     processPendingOperations,
     pullUserState,
     performFullSync,
-    isOnline,
-    getDb // Added getDb import
+    isOnline
 } from '../data/database.js';
 
 import { getSyncToggle, getSyncText, getImagesToggle, getImagesText, getThemeToggle, getThemeText, getShuffleCountDisplay, getMainSettingsBlock, getRssSettingsBlock, getKeywordsSettingsBlock, getBackButton, getRssFeedsTextarea, getKeywordsBlacklistTextarea, getConfigureRssButton, getConfigureKeywordsButton, getSaveKeywordsButton, getSaveRssButton } from './uiElements.js';
@@ -26,7 +25,6 @@ import { createStatusBarMessage, attachScrollToTopHandler } from './uiUpdaters.j
  * @param {Function} [onToggleCb] - Optional callback function to execute when the toggle changes.
  */
 export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) {
-    const db = await getDb(); // Obtain db internally
     const toggleEl = getToggleEl();
     const textEl = getTextEl();
 
@@ -40,7 +38,6 @@ export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onT
     textEl.textContent = app[dbKey] ? 'yes' : 'no';
 
     toggleEl.addEventListener('change', async () => {
-        // const currentDb = await getDb(); // Re-obtain db if needed in event listener - No longer needed, as db is obtained internally by the functions
         app[dbKey] = toggleEl.checked;
         await saveSimpleState(dbKey, app[dbKey]);
 
@@ -66,7 +63,6 @@ export async function initSyncToggle(app) {
     await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => {
         if (enabled) {
             console.log("Sync enabled, triggering full sync from initSyncToggle.");
-            // const db = await getDb(); // Obtain db internally for callback - No longer needed as performFullSync handles it
             await performFullSync(app);
         }
     });
@@ -77,7 +73,6 @@ export async function initImagesToggle(app) {
 }
 
 export async function initTheme(app) {
-    // const db = await getDb(); // Obtain db internally - No longer needed
     const htmlEl = document.documentElement;
     const toggle = getThemeToggle();
     const text = getThemeText();
@@ -100,7 +95,6 @@ export async function initTheme(app) {
     text.textContent = activeThemeIsDark ? 'dark' : 'light';
 
     toggle.addEventListener('change', async () => {
-        // const currentDb = await getDb(); // Re-obtain db if needed in event listener - No longer needed
         const newTheme = toggle.checked ? 'dark' : 'light';
         htmlEl.classList.toggle('dark', toggle.checked);
         htmlEl.classList.toggle('light', !toggle.checked);
@@ -125,7 +119,6 @@ export async function initTheme(app) {
 }
 
 export async function initScrollPosition(app) {
-    // const db = await getDb(); // Obtain db internally - No longer needed
     window.requestAnimationFrame(async () => {
         const lastViewedItemIdResult = await loadSimpleState('lastViewedItemId');
         const lastViewedItemId = lastViewedItemIdResult.value;
@@ -140,7 +133,6 @@ export async function initScrollPosition(app) {
 }
 
 export async function initShuffleCount(app) {
-    // const db = await getDb(); // Obtain db internally - No longer needed
     const { shuffleCount: count, lastShuffleResetDate: lastReset } = await loadShuffleState();
     const today = new Date();
     today.setHours(0, 0, 0, 0);

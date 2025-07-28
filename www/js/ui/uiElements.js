@@ -1,3 +1,5 @@
+//www/js/ui/uiElements.js
+
 // Centralized DOM element access for reuse
 
 export const getSyncToggle = () => document.getElementById('sync-toggle');

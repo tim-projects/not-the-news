@@ -1,9 +1,11 @@
 // www/js/helpers/dataUtils.js
 
 // Import necessary modules for deck functions
-import { saveSimpleState, getDb } from '../data/database.js'; // Add getDb here
+import { saveSimpleState, getDb } from '../data/database.js';
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
 import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
+import { loadNextDeck } from './dataUtils.js'; // Ensure loadNextDeck is imported if validateAndRegenerateCurrentDeck calls it
+
 
 export function formatDate(dateStr) {
     const now = new Date();
@@ -77,6 +79,9 @@ export function mapRawItems(rawList, fmtFn) {
  */
 export async function validateAndRegenerateCurrentDeck(app) {
     console.log("dataUtils.js: validateAndRegenerateCurrentDeck called");
+    // Ensure data is fresh before validation
+    await app.loadFeedItemsFromDB();
+
     const hiddenSet = new Set(app.hidden.map(h => h.id));
 
     // Filter out items from the current deck that are now hidden or no longer exist in entries
@@ -102,11 +107,11 @@ export async function validateAndRegenerateCurrentDeck(app) {
         console.log("Current deck contained hidden/non-existent items. Updating the deck.");
         app.currentDeckGuids = validGuidsInDeck;
         await saveCurrentDeck(app.currentDeckGuids);
-        // Ensure app.loadAndDisplayDeck is called immediately after currentDeckGuids is updated
-        await app.loadAndDisplayDeck();
+        // app.js's $watch on app.currentDeckGuids will handle UI update
     }
-    // If loadNextDeck was called, it handles its own app.loadAndDisplayDeck().
-    // If only currentDeckGuids was updated due to filtering, the `else if` block handles the UI update.
+    // No direct call to app.loadAndDisplayDeck() here.
+    // The $watch on app.currentDeckGuids will handle UI updates.
+    // If loadNextDeck was called, it handles updating app.currentDeckGuids and saving.
 }
 
 /**
@@ -230,10 +235,10 @@ export async function loadNextDeck(app) {
         const hasImage = (item) => item.image !== "";
 
         filteredItems = filteredItems.filter(item => !hasQuestionMarkInTitle(item));
-        filteredItems = filteredItems.filter(item => !hasQuestionMarkInDescriptionFirst150(item));
-        filteredItems = filteredItems.filter(item => !hasQuestionMarkInDescriptionLast150(item));
-        filteredItems = filteredItems.filter(item => !hasHyperlink(item)); // Updated filter
-        filteredItems = filteredItems.filter(item => !hasImage(item)); // Updated filter
+        filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionFirst150(item)));
+        filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionLast150(item)));
+        filteredItems = filteredItems.filter(item => !hasHyperlink(item));
+        filteredItems = filteredItems.filter(item => !hasImage(item));
 
         // Undo filters in reverse priority until we have 10 items
         if (filteredItems.length < 10) {
@@ -241,10 +246,10 @@ export async function loadNextDeck(app) {
 
             // Restore logic based on priority (reverse of filter application) - UPDATED ORDER
             const restoreOrder = [
-                (item) => hasImage(item), // Updated restore
-                (item) => hasHyperlink(item), // Updated restore
-                (item) => hasQuestionMarkInDescriptionLast150(item),
-                (item) => hasQuestionMarkInDescriptionFirst150(item),
+                (item) => hasImage(item),
+                (item) => hasHyperlink(item),
+                (item) => (item.description && hasQuestionMarkInDescriptionLast150(item)),
+                (item) => (item.description && hasQuestionMarkInDescriptionFirst150(item)),
                 (item) => hasQuestionMarkInTitle(item)
             ];
 
@@ -290,7 +295,8 @@ export async function loadNextDeck(app) {
     }
 
     app.updateCounts();
-    await app.loadAndDisplayDeck(); // Call app.loadAndDisplayDeck to update UI
+    // No direct call to app.loadAndDisplayDeck() here.
+    // The $watch on app.currentDeckGuids will handle UI updates.
     app.isShuffled = false;
 }
 
@@ -306,7 +312,7 @@ export async function shuffleFeed(app) {
     }
 
     console.log("Shuffle button pressed. Loading next deck and decrementing shuffle count.");
-    // loadNextDeck will handle calling app.loadAndDisplayDeck()
+    // loadNextDeck will handle updating app.currentDeckGuids and saving.
     await loadNextDeck(app);
 
     // After loadNextDeck completes, handle the shuffle count specific to shuffleFeed
@@ -317,4 +323,6 @@ export async function shuffleFeed(app) {
 
     app.isShuffled = true;
     await displayTemporaryMessageInTitle('Feed shuffled!');
+    // No direct call to app.loadAndDisplayDeck() here.
+    // The $watch on app.currentDeckGuids will handle UI updates.
 }
