@@ -4,8 +4,6 @@
 import { saveSimpleState, getDb } from '../data/database.js';
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
 import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
-import { loadNextDeck } from './dataUtils.js'; // Ensure loadNextDeck is imported if validateAndRegenerateCurrentDeck calls it
-
 
 export function formatDate(dateStr) {
     const now = new Date();
