@@ -1,4 +1,5 @@
 import {
+    getDb, // <-- ADDED THIS
     performFeedSync,
     performFullSync,
     pullUserState,
@@ -11,7 +12,17 @@ import {
 } from './data/database.js';
 import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 import { formatDate, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
-import { toggleStar, toggleHidden, pruneStaleHidden, loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, setFilterMode, loadFilterMode } from './helpers/userStateUtils.js';
+import {
+    loadCurrentDeck, // <-- ADDED THIS
+    saveCurrentDeck,
+    toggleStar,
+    toggleHidden,
+    pruneStaleHidden,
+    saveShuffleState,
+    loadShuffleState,
+    setFilterMode,
+    loadFilterMode
+} from './helpers/userStateUtils.js';
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js';
 
@@ -147,7 +158,7 @@ document.addEventListener('alpine:init', () => {
                      await performFullSync(); // This also updates lastFeedSync
                      // Read from DB after full sync (which calls performFeedSync internally).
                      lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-                     
+
                      if (this.syncEnabled && this.isOnline) {
                          await pullUserState();
                          this.hidden = (await loadArrayState('hidden')).value;
@@ -223,9 +234,9 @@ document.addEventListener('alpine:init', () => {
                     setTimeout(async () => {
                         try {
                             console.log("Initiating background partial sync...");
-                            await performFeedSync(this); 
+                            await performFeedSync(this);
                             const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-                            
+
                             await pullUserState();
                             this.hidden = (await loadArrayState('hidden')).value;
                             this.starred = (await loadArrayState('starred')).value;
@@ -428,7 +439,7 @@ document.addEventListener('alpine:init', () => {
             // This might cause filteredEntries to recompute, but doesn't necessarily reload the deck.
             // If the filteredEntries relied on this.entries (which it still does for pruneStaleHidden),
             // it will naturally update.
-            this.updateCounts(); 
+            this.updateCounts();
         }
     }));
 });
