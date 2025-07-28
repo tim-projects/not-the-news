@@ -1,4 +1,4 @@
-const cacheName = 'not-the-news-v3'; // IMPORTANT: Increment this cacheName for new SW versions!
+const cacheName = 'not-the-news-v8'; // IMPORTANT: Incremented cacheName to v8 for new SW version!
 const cacheAssets = [
   '/', // Include the root path
   'index.html',
@@ -9,7 +9,7 @@ const cacheAssets = [
   'css/layout.css',
   'css/modal.css',
   'css/variables.css',
-  'css/fonts/Playfair_Display.ttf',
+  // 'css/fonts/Playfair_Display.ttf', // This is commented out as we are caching the online Google Fonts version
   'images/placeholder.svg',
   'images/favicon.svg',
   'images/icon-192.png',
@@ -25,7 +25,8 @@ const cacheAssets = [
   'js/ui/uiUpdaters.js',
   'js/libs/alpine.3.x.x.js',
   'js/libs/idb.js',
-  'js/libs/rss-parser.min.js'
+  'js/libs/rss-parser.min.js',
+  'manifest.json' // Added manifest.json to cache assets
 ];
 
 self.addEventListener('install', function(event) {
@@ -34,10 +35,20 @@ self.addEventListener('install', function(event) {
     caches.open(cacheName)
       .then(function(cache) {
         console.log('[Service Worker] Caching all app shell and core content');
-        return cache.addAll(cacheAssets);
+        // Use Promise.all with individual cache.add for better error reporting
+        return Promise.all(cacheAssets.map(function(url) {
+          return cache.add(url).catch(function(error) {
+            console.error('[Service Worker] Failed to cache:', url, error);
+            // Re-throw the error to cause the install event to fail if any critical asset fails
+            throw error;
+          });
+        }));
+      })
+      .then(function() {
+        console.log('[Service Worker] All core assets cached successfully!');
       })
       .catch(function(error) {
-        console.error('[Service Worker] Failed to cache initial assets:', error);
+        console.error('[Service Worker] Installation failed overall:', error);
       })
   );
 });
@@ -57,11 +68,8 @@ self.addEventListener('activate', function(event) {
       return self.clients.claim();
     }).then(function() {
         // Force all open clients to reload to ensure they are controlled by the new SW.
-        // This is the mechanism that replaces the removed app.js 'controllerchange' listener.
         self.clients.matchAll({ type: 'window' }).then(function (clients) {
             clients.forEach(function (client) {
-                // Only reload if the client is still visible and the URL matches
-                // and it's not already controlled by *this* SW instance's scriptURL (avoid self-reloads)
                 if (client.url && client.visibilityState === 'visible' && client.url.startsWith(self.location.origin) && !client.url.includes(self.location.origin + '/sw.js')) {
                     console.log('[Service Worker] Forcing client reload for:', client.url);
                     client.navigate(client.url); // Reloads the current page
@@ -74,74 +82,143 @@ self.addEventListener('activate', function(event) {
 
 self.addEventListener('fetch', function(event) {
   const requestUrl = new URL(event.request.url);
+  const requestMethod = event.request.method;
 
-  // Serve static assets from cache first, then network
+  // --- NEW: Handle navigation requests (e.g., refreshing the page) first ---
+  // This is crucial for fixing "Site can't be reached" when offline.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.match(event.request).then(function(response) {
+        if (response) {
+          console.log('[Service Worker] Cache hit (navigation) for:', requestUrl.href);
+          return response;
+        }
+        // If the specific navigation URL isn't cached, try index.html as a fallback
+        return caches.match('index.html').then(function(indexResponse) {
+          if (indexResponse) {
+            console.log('[Service Worker] Serving index.html as navigation fallback for:', requestUrl.href);
+            return indexResponse;
+          }
+          // If even index.html isn't cached, try network (will fail offline but log the attempt)
+          console.log('[Service Worker] No cached response for navigation, falling back to network:', requestUrl.href);
+          return fetch(event.request);
+        }).catch(function(err) {
+            console.error('[Service Worker] Navigation fallback failed (e.g., network error or no cache):', err);
+            // Still try network fetch as a last resort, which will ultimately fail offline
+            return fetch(event.request);
+        });
+      })
+    );
+    return; // Stop processing this fetch event as it's a navigation request
+  }
+
+  // Strategy: Cache First for static assets (app shell)
+  // This serves your main app files from cache first for speed and offline.
   if (cacheAssets.includes(requestUrl.pathname) || cacheAssets.includes(requestUrl.pathname.slice(1))) { // Handle both with and without leading slash
     event.respondWith(
       caches.match(event.request).then(function(response) {
         if (response) {
-          console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href);
+          // console.log('[Service Worker] Cache hit (static asset) for:', requestUrl.href); // Keep this commented unless debugging
           return response;
         }
         console.log('[Service Worker] Cache miss (static asset) for:', requestUrl.href, 'Falling back to network.');
+        // Fallback to network (will fail if offline and not in cache)
         return fetch(event.request);
       })
     );
     return; // Stop processing this fetch event if it's a static asset
   }
 
-  // Handle API calls and other dynamic requests
-  // Only cache GET requests that are successful and basic type (same-origin)
-  if (event.request.method === 'GET') {
+  // Strategy: Cache First, then Network for Google Fonts
+  // This specifically targets font CSS and font files from Google's CDN for offline access.
+  if (requestUrl.origin === 'https://fonts.googleapis.com' || requestUrl.origin === 'https://fonts.gstatic.com') {
     event.respondWith(
       caches.match(event.request).then(function(cachedResponse) {
-        // Return cached response if found
         if (cachedResponse) {
-          console.log('[Service Worker] Cache hit (dynamic GET) for:', requestUrl.href);
+          console.log('[Service Worker] Cache hit (Google Font) for:', requestUrl.href);
           return cachedResponse;
         }
-
-        //console.log('[Service Worker] Cache miss (dynamic GET) for:', requestUrl.href);
-        // If not in cache, fetch from network
+        console.log('[Service Worker] Cache miss (Google Font) for:', requestUrl.href, 'Falling back to network.');
         return fetch(event.request).then(function(networkResponse) {
+          // Check for valid response before caching. Opaque responses can be cached.
+          if (networkResponse.status === 200 || networkResponse.type === 'opaque') {
+            const responseToCache = networkResponse.clone();
+            caches.open(cacheName).then(function(cache) {
+              cache.put(event.request, responseToCache);
+              console.log('[Service Worker] Caching Google Font:', requestUrl.href);
+            });
+          }
+          return networkResponse;
+        }).catch(function(err) {
+          console.error('[Service Worker] Network fetch failed for Google Font:', requestUrl.href, err);
+          // If both cache and network fail, it will propagate the error,
+          // which is expected if the font cannot be served offline and wasn't cached.
+          throw err;
+        });
+      })
+    );
+    return; // Stop processing this fetch event if it's a Google Font
+  }
+
+  // Strategy: Cache First, then Network with Cache Update for specific API GET requests
+  // This ensures offline availability for user state and feed data that has been previously fetched.
+  // It also ensures fresh data is fetched when online.
+  const isApiGetRequest = requestMethod === 'GET' && (
+      requestUrl.pathname.startsWith('/user-state') ||
+      requestUrl.pathname.startsWith('/feed-guids') ||
+      requestUrl.pathname.startsWith('/feed-items') || // Assuming this is also a GET endpoint for items
+      requestUrl.pathname.startsWith('/config/') // For any dynamic config files
+  );
+
+  if (requestMethod === 'GET') {
+    event.respondWith(
+      caches.match(event.request).then(function(cachedResponse) {
+        // This is the core 'Cache First, then Network' for API.
+        // It immediately responds with cached data if available,
+        // but always attempts to fetch from the network to update the cache for next time.
+        const fetchPromise = fetch(event.request).then(function(networkResponse) {
           // Check if we received a valid response to cache
-          // Do not cache:
-          // - Responses that are not OK (e.g., 404, 500)
-          // - Opaque responses (cross-origin without CORS headers, like some images or fonts)
-          // - Specific API endpoints that should always be fresh (e.g., /user-state, /time)
-          // - Images that might be very large or change frequently (like external preview images)
-          const shouldCache = networkResponse.ok &&
-                              networkResponse.status === 200 &&
-                              networkResponse.type === 'basic' && // 'basic' for same-origin, 'opaque' for cross-origin.
-                              !requestUrl.pathname.includes('/user-state') && // Exclude user-state from generic caching
-                              !requestUrl.pathname.includes('/time') && // Exclude time endpoint from generic caching
-                              !requestUrl.pathname.includes('/items'); // Exclude /items from generic GET caching if it's dynamic
-                                                                      // and fetched frequently by the app to ensure freshness.
-                                                                      // If /items is only read from IndexedDB, this might not be needed.
-                                                                      // Consider whether /items should be cached here based on its usage.
+          // Only cache 'basic' (same-origin) successful responses.
+          const shouldCache = networkResponse.ok && networkResponse.status === 200 && networkResponse.type === 'basic';
 
           if (shouldCache) {
-            // IMPORTANT: Clone the response because a response can only be consumed once.
             const responseToCache = networkResponse.clone();
             caches.open(cacheName).then(function(cache) {
               cache.put(event.request, responseToCache);
               console.log('[Service Worker] Caching new response for:', requestUrl.href);
             });
           } else {
+            // Log reasons why a response isn't cached (e.g., 404, cross-origin opaque, etc.)
             console.log('[Service Worker] Not caching response for:', requestUrl.href, ' (Status:', networkResponse.status, ', Type:', networkResponse.type, ', OK:', networkResponse.ok, ')');
           }
           return networkResponse;
         }).catch(function(err) {
-          // This catch handles network errors (e.g., user is offline, DNS lookup failed), not HTTP errors (like 404).
+          // This catch handles true network errors (e.g., user is offline, DNS lookup failed).
           console.error('[Service Worker] Network fetch failed for GET:', requestUrl.href, err);
-          // For GET requests that fail, you might want to serve an an offline page or specific fallback.
-          // For now, re-throwing to let your app's initApp catch it if it's a critical API call.
+          // If network fails, and there's a cached response, serve the cached response.
+          if (cachedResponse) {
+            console.log('[Service Worker] Network failed, serving cached response for:', requestUrl.href);
+            return cachedResponse;
+          }
+          // If no cache and network failed, re-throw the error to indicate failure to the main thread.
           throw err;
         });
+
+        // For API calls, if we have a cached response, serve it immediately
+        // but *also* trigger the network fetch in the background to update the cache.
+        if (isApiGetRequest && cachedResponse) {
+          event.waitUntil(fetchPromise); // Keep the Service Worker alive until the background fetch completes
+          return cachedResponse;
+        }
+
+        // For all other GET requests (non-API, non-static) or when no cached response is available,
+        // just return the network fetch promise. This effectively makes them Network First.
+        return fetchPromise;
       })
     );
   } else {
-    // For non-GET requests (POST, PUT, DELETE), always go to the network and do not cache.
+    // For non-GET requests (POST, PUT, DELETE, etc.), always go to the network and do not cache.
+    // These typically involve sending data to the server and should always be fresh.
     console.log('[Service Worker] Network-only fetch for non-GET request:', event.request.method, requestUrl.href);
     event.respondWith(fetch(event.request).catch(function(err) {
       console.error('[Service Worker] Network fetch failed for non-GET:', requestUrl.href, err);
