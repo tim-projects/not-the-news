@@ -464,6 +464,10 @@ document.addEventListener('alpine:init', () => {
         isStarred(guid) {
             return this.starred.some(e => e.id === guid);
         },
+        // Inserted isHidden method here as per instructions
+        isHidden(guid) {
+            return this.hidden.some(e => e.id === guid);
+        },
         async toggleStar(guid) {
             await toggleStar(this, guid);
             // The deck will be re-rendered via the $watch on currentDeckGuids if toggling affects it (e.g., filterMode)
