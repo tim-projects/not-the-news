@@ -44,6 +44,8 @@ ENV DOMAIN=${DOMAIN} \
 # 3. System deps
 RUN apk add --no-cache \
       bash procps python3 py3-pip py3-virtualenv ca-certificates \
+      # --- ADDED: Install gosu for safe user switching ---
+      gosu \
     && update-ca-certificates
 
 ##############################################################################
@@ -63,7 +65,6 @@ COPY rss/ /rss/
 COPY www/ /app/www/
 COPY data/ /data/feed/
 
-# --- FIX START ---
 # Create a dedicated non-root user for the Flask application
 # Add 'appuser' user and 'appgroup' group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -79,13 +80,6 @@ RUN chown -R appuser:appgroup /data
 # Set working directory ownership to the app user as well
 RUN chown -R appuser:appgroup /app /rss
 
-# Set the USER for subsequent commands and the application runtime
-# The Caddy part of the entrypoint will still run as root initially to bind to privileged ports (80/443)
-# but we'll modify the gunicorn command to run as 'appuser'.
-# We can't set `USER appuser` here for the whole container because Caddy needs root to bind to 80/443.
-# So we'll manage the user for Gunicorn specifically.
-# --- FIX END ---
-
 ##############################################################################
 # 6. Build entrypoint
 RUN mkdir -p /usr/local/bin && \
@@ -97,7 +91,7 @@ RUN mkdir -p /usr/local/bin && \
     # For now, keep as is, as redis owns its own /data/redis already.
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'dir /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'dir /data/redis' >> /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'save 900 1' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'save 300 10' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendonly yes' >> /usr/local/bin/docker-entrypoint.sh && \
@@ -107,11 +101,9 @@ RUN mkdir -p /usr/local/bin && \
     echo 'EOF' >> /usr/local/bin/docker-entrypoint.sh && \
     # Start background services
     echo 'redis-server /etc/redis.conf --daemonize yes &' >> /usr/local/bin/docker-entrypoint.sh && \
-    # --- FIX START: Run Gunicorn as the new 'appuser' ---
-    # `su - appuser -c "..."` runs the command as 'appuser'
-    echo 'su - appuser -c "gunicorn --chdir /app/www --bind 127.0.0.1:4575 --workers 1 --threads 3 api:app &"' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'su - appuser -c "python3 /rss/run.py --daemon &"' >> /usr/local/bin/docker-entrypoint.sh && \
-    # --- FIX END ---
+    # --- MODIFIED: Run Gunicorn and Python script using gosu ---
+    echo 'gosu appuser /venv/bin/gunicorn --chdir /app/www --bind 127.0.0.1:4575 --workers 1 --threads 3 api:app &' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'gosu appuser python3 /rss/run.py --daemon &' >> /usr/local/bin/docker-entrypoint.sh && \
     # Single Caddy execution with fallback
     echo 'if ! caddy run --config /etc/caddy/Caddyfile --adapter caddyfile; then' >> /usr/local/bin/docker-entrypoint.sh && \
     echo '  echo "Falling back to Let''s Encrypt staging CA"' >> /usr/local/bin/docker-entrypoint.sh && \
