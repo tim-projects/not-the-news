@@ -47,11 +47,17 @@ RUN apk add --no-cache \
       curl \
       gnupg \
     && update-ca-certificates \
-    # --- FIX START: Use apk --print-arch instead of dpkg --print-architecture ---
+    # --- FIX START: Map Alpine architecture to gosu release architecture ---
     && GOSU_VERSION="1.16" \
-    && ARCH="$(apk --print-arch)" \
-    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${ARCH}" \
-    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${ARCH}.asc" \
+    && ALPINE_ARCH="$(apk --print-arch)" \
+    && case "${ALPINE_ARCH}" in \
+        x86_64) GOSU_ARCH="amd64" ;; \
+        aarch64) GOSU_ARCH="arm64" ;; \
+        armhf) GOSU_ARCH="armhf" ;; \
+        *) echo "Unsupported architecture: ${ALPINE_ARCH}"; exit 1 ;; \
+       esac \
+    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" \
+    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" \
     # --- FIX END ---
     # Verify signature
     && export GNUPGHOME="$(mktemp -d)" \
