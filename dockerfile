@@ -44,9 +44,21 @@ ENV DOMAIN=${DOMAIN} \
 # 3. System deps
 RUN apk add --no-cache \
       bash procps python3 py3-pip py3-virtualenv ca-certificates \
-      # --- ADDED: Install gosu for safe user switching ---
-      gosu \
-    && update-ca-certificates
+      # --- ADDED: curl and gnupg for gosu download and verification ---
+      curl \
+      gnupg \
+    && update-ca-certificates \
+    # --- ADDED: Manually download and install gosu ---
+    && GOSU_VERSION="1.16" \
+    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-$(dpkg --print-architecture)" \
+    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-$(dpkg --print-architecture).asc" \
+    # Verify signature
+    && export GNUPGHOME="$(mktemp -d)" \
+    && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+    && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
+    && rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
+    # Make gosu executable
+    && chmod +x /usr/local/bin/gosu
 
 ##############################################################################
 # 4. Python venv & packages
@@ -85,13 +97,10 @@ RUN chown -R appuser:appgroup /app /rss
 RUN mkdir -p /usr/local/bin && \
     echo '#!/usr/bin/env bash' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh && \
-    # Redis setup (can run as redis user or appuser if redis is just for this app)
-    # The default caddy image already has 'redis' user. If redis-server supports running as non-root,
-    # it's better to leverage that or explicitly run it as appuser if it simplifies permissions.
-    # For now, keep as is, as redis owns its own /data/redis already.
+    # Redis setup
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'dir /data/redis' >> /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'dir /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'save 900 1' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'save 300 10' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendonly yes' >> /usr/local/bin/docker-entrypoint.sh && \
@@ -101,7 +110,7 @@ RUN mkdir -p /usr/local/bin && \
     echo 'EOF' >> /usr/local/bin/docker-entrypoint.sh && \
     # Start background services
     echo 'redis-server /etc/redis.conf --daemonize yes &' >> /usr/local/bin/docker-entrypoint.sh && \
-    # --- MODIFIED: Run Gunicorn and Python script using gosu ---
+    # Use gosu for Gunicorn and Python script
     echo 'gosu appuser /venv/bin/gunicorn --chdir /app/www --bind 127.0.0.1:4575 --workers 1 --threads 3 api:app &' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'gosu appuser python3 /rss/run.py --daemon &' >> /usr/local/bin/docker-entrypoint.sh && \
     # Single Caddy execution with fallback
