@@ -33,7 +33,8 @@ import { manageDailyDeck, processShuffle } from './helpers/deckManager.js';
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        // --- MODIFIED LINE HERE ---
+        navigator.serviceWorker.register('/sw.js', { type: 'module', scope: '/' }) // Add type: 'module'
             .then(reg => {
                 console.log('Service Worker registered:', reg.scope);
 

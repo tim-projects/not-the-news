@@ -18,7 +18,7 @@ const cacheAssets = [
   'images/icon-512.png',
   'js/app.js',
   'js/data/appState.js',
-  'js/data/database.js',
+  // 'js/data/database.js', // REMOVED from cacheAssets as it's now imported as a module
   'js/helpers/apiUtils.js',
   'js/helpers/dataUtils.js',
   'js/helpers/userStateUtils.js',
@@ -31,8 +31,8 @@ const cacheAssets = [
   'manifest.json' // Added manifest.json to cache assets
 ];
 
-// --- NEW: Import database.js to access IndexedDB functions within the Service Worker ---
-importScripts('./js/data/database.js'); // This is CRUCIAL for processPendingOperations() to work in SW
+// --- MODIFIED: Use standard ES Module import to bring in functions from database.js ---
+import { processPendingOperations, isOnline, getDb, loadSimpleState, saveSimpleState, pullUserState, performFeedSync } from './js/data/database.js';
 
 self.addEventListener('install', function(event) {
   console.log('[Service Worker] Installing Service Worker ...', event);
