@@ -228,18 +228,22 @@ export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
         scrollToTop();
     });
 }
-
 export async function saveCurrentScrollPosition() {
-    // db argument removed from saveSimpleState calls as it's redundant.
-    await saveSimpleState('feedScrollY', String(window.scrollY));
+    let lastViewedItemId = '';
 
-    // Save the link of the first visible entry
-    const entryElements = document.querySelectorAll('.entry');
+    // Find the GUID of the first entry element whose top is at or above the viewport's top.
+    // This is typically considered the "last viewed" item when scrolling down.
+    const entryElements = document.querySelectorAll('.entry[data-guid]');
     for (const entryElement of entryElements) {
-        if (entryElement.getBoundingClientRect().top >= 0) {
-            // db argument removed from saveSimpleState call.
-            await saveSimpleState('feedVisibleLink', entryElement.dataset.link || '');
-            break;
+        const rect = entryElement.getBoundingClientRect();
+        // If the top of the entry is visible (at or above the viewport's top)
+        if (rect.top >= 0) {
+            lastViewedItemId = entryElement.dataset.guid;
+            break; // Found the first visible item from the top, stop searching
         }
     }
+
+    // Save only the lastViewedItemId (GUID string) to IndexedDB.
+    // If no visible item is found (e.g., scrolled to bottom, empty feed), an empty string will be saved.
+    await saveSimpleState('lastViewedItemId', lastViewedItemId);
 }

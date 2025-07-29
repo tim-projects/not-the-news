@@ -10,7 +10,8 @@ import {
     loadArrayState,
     isOnline,
     initDb,
-    saveSimpleState
+    saveSimpleState,
+    getAllFeedItems
 } from './data/database.js';
 import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 // Removed 'displayCurrentDeck' from dataUtils.js imports as it will be removed/refactored there
@@ -110,14 +111,10 @@ document.addEventListener('alpine:init', () => {
             const items = []; // Existing line, keep this.
             const hiddenSet = new Set(this.hidden.map(h => h.id)); // Existing line, keep this.
             const starredSet = new Set(this.starred.map(s => s.id)); // Existing line, keep this.
-            // --- INSERT NEW CODE BELOW THIS LINE ---
             const seenGuidsForDeck = new Set(); // To track unique items added to the deck.
-            // --- END INSERT NEW CODE ---
 
             if (guidsToDisplay && Array.isArray(guidsToDisplay)) { // Existing line, keep this.
                 for (const guid of guidsToDisplay) { // Existing line, keep this.
-                    // --- MODIFY THE IF/ELSE IF/ELSE BLOCK BELOW ---
-                    // Replace the entire content of this `for` loop (the if/else if/else block) with:
                     if (typeof guid !== 'string') {
                         console.warn(`Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck): ${JSON.stringify(guid)}. Skipping.`);
                         continue;
@@ -213,6 +210,7 @@ document.addEventListener('alpine:init', () => {
                 this.openUrlsInNewTabEnabled = (await loadSimpleState('openUrlsInNewTabEnabled')).value;
                 this.filterMode = (await loadFilterMode());
                 this.isOnline = isOnline();
+                await this.loadFeedItemsFromDB(); // Refresh feedItems cache after full sync
 
                 // Add the new $watch property here
                 this.$watch('currentDeckGuids', async (newGuids, oldGuids) => {
@@ -241,9 +239,6 @@ document.addEventListener('alpine:init', () => {
                 // Ensure feedItems cache is loaded BEFORE hidden/starred for pruneStaleHidden
                 await this.loadFeedItemsFromDB();
 
-                this.hidden = (await loadArrayState('hidden')).value;
-                this.starred = (await loadArrayState('starred')).value;
-
                 const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
                 let lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
@@ -252,20 +247,16 @@ document.addEventListener('alpine:init', () => {
                     lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
                     // Re-load state after full sync
                     await this.loadFeedItemsFromDB();
-                    this.hidden = (await loadArrayState('hidden')).value;
-                    this.starred = (await loadArrayState('starred')).value;
                 }
 
                 this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
 
-                // --- IMPORTANT FIX START ---
                 // Load currentDeckGuids and ensure they are always strings (GUIDs)
                 let storedGuidsResult = await loadCurrentDeck(); // loadCurrentDeck internally uses loadSimpleState
                 this.currentDeckGuids = (storedGuidsResult || []).map(item => {
                     // If 'item' is an object with an 'id' property, use item.id, otherwise use the item itself (assuming it's already a string)
                     return typeof item === 'object' && item !== null && item.id ? item.id : String(item);
                 });
-                // --- IMPORTANT FIX END ---
 
                 // validateAndRegenerateCurrentDeck will update this.currentDeckGuids, which triggers the $watch and then loadAndDisplayDeck()
                 await validateAndRegenerateCurrentDeck(this);
@@ -346,8 +337,6 @@ document.addEventListener('alpine:init', () => {
 
                             await pullUserState();
                             // Re-load hidden/starred after pullUserState
-                            this.hidden = (await loadArrayState('hidden')).value;
-                            this.starred = (await loadArrayState('starred')).value;
                             await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                             this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
                             await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
@@ -371,8 +360,6 @@ document.addEventListener('alpine:init', () => {
 
                         await pullUserState();
                         // Re-load hidden/starred after pullUserState
-                        this.hidden = (await loadArrayState('hidden')).value;
-                        this.starred = (await loadArrayState('starred')).value;
                         await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
                         await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
@@ -483,16 +470,13 @@ document.addEventListener('alpine:init', () => {
                 this.feedItems = {};
                 return;
             }
-            const rawItemsFromDb = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
+            const rawItemsFromDb = await getAllFeedItems();
 
             this.feedItems = {}; // Clear previous cache
-            // --- INSERT NEW CODE BELOW THIS LINE ---
             const uniqueEntries = [];
             const seenGuids = new Set();
-            // --- END INSERT NEW CODE ---
 
             rawItemsFromDb.forEach(item => {
-                // --- MODIFY THE IF CONDITION AND CONTENT BELOW ---
                 if (item && item.guid && !seenGuids.has(item.guid)) {
                     this.feedItems[item.guid] = item;
                     uniqueEntries.push(item); // Add to a temporary unique array
@@ -502,12 +486,11 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     console.warn('Item or GUID missing when processing raw database items. Skipping:', item);
                 }
-                // --- END MODIFY ---
             });
 
-            // --- REPLACE THE LINE THAT SETS this.entries ---
             this.entries = mapRawItems(uniqueEntries, formatDate);
-            // --- END REPLACE ---
+            this.hidden = (await loadArrayState('hidden')).value;
+            this.starred = (await loadArrayState('starred')).value;
         },
 
         updateCounts() {
@@ -554,7 +537,6 @@ document.addEventListener('alpine:init', () => {
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true; // Re-enable loading state during sync
             await performFullSync();
-            await this.loadFeedItemsFromDB(); // Refresh feedItems cache after full sync
             // validateAndRegenerateCurrentDeck will update currentDeckGuids, triggering the $watch
             await validateAndRegenerateCurrentDeck(this);
             this.loading = false; // Disable loading state after sync

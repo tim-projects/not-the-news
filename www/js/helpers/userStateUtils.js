@@ -182,7 +182,6 @@ export async function pruneStaleHidden(feedItems, currentTS) {
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck() {
-    const db = await getDb();
     const {
         value: guids
     } = await loadArrayState('currentDeckGuids');
@@ -196,7 +195,6 @@ export async function loadCurrentDeck() {
  * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
-    const db = await getDb();
     await saveArrayState('currentDeckGuids', guids);
 
     console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
@@ -276,7 +274,6 @@ export async function saveShuffleState(count, resetDate, itemsClearedCount) { //
  * @param {string} mode - The filter mode to set (e.g., 'unread', 'starred').
  */
 export async function setFilterMode(app, mode) {
-    const db = await getDb();
     app.filterMode = mode;
     await saveSimpleState('filterMode', mode);
 
@@ -301,7 +298,6 @@ export async function setFilterMode(app, mode) {
  * @returns {Promise<string>} The current filter mode.
  */
 export async function loadFilterMode() {
-    const db = await getDb();
     const {
         value: mode
     } = await loadSimpleState('filterMode');

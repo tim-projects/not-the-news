@@ -123,11 +123,33 @@ export async function initScrollPosition(app) {
         const lastViewedItemIdResult = await loadSimpleState('lastViewedItemId');
         const lastViewedItemId = lastViewedItemIdResult.value;
 
-        if (lastViewedItemId) {
-            const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
-            if (targetEl) {
-                targetEl.scrollIntoView();
+        // Proceed only if a lastViewedItemId exists and app.entries has been populated
+        if (lastViewedItemId && app.entries && app.entries.length > 0) {
+            // For efficient lookup of hidden items
+            const hiddenGuids = new Set(app.hidden.map(item => item.id));
+
+            // Check if the target item exists in the current feed entries
+            const targetEntry = app.entries.find(entry => entry.guid === lastViewedItemId);
+
+            // If the item exists and is NOT hidden, attempt to scroll to it
+            if (targetEntry && !hiddenGuids.has(lastViewedItemId)) {
+                const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
+                if (targetEl) {
+                    // Scroll the found element into view, aligning its top with the viewport top
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    console.log(`Scrolled to last viewed item: ${lastViewedItemId}`);
+                } else {
+                    console.log(`Target element with GUID ${lastViewedItemId} not found in DOM.`);
+                }
+            } else {
+                if (!targetEntry) {
+                    console.log(`Last viewed item GUID ${lastViewedItemId} not found in app.entries.`);
+                } else { // targetEntry exists but is hidden
+                    console.log(`Last viewed item GUID ${lastViewedItemId} is hidden. Not scrolling.`);
+                }
             }
+        } else {
+            console.log("No lastViewedItemId found or app.entries is empty. Not attempting scroll to a specific item.");
         }
     });
 }

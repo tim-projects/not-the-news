@@ -3,18 +3,20 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 let _dbInstance = null;
 let _dbInitPromise = null;
 
 const OBJECT_STORES_SCHEMA = [
+[
     { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
-    { name: 'starredItems', keyPath: 'id' },
-    { name: 'hiddenItems', keyPath: 'id' },
+    { name: 'starredItems', options: { keyPath: 'id' } },
+    { name: 'hiddenItems', options: { keyPath: 'id' } },
     { name: 'currentDeckGuids', keyPath: 'id' },
     { name: 'userSettings', keyPath: 'key' },
     { name: 'pendingOperations', keyPath: 'id', options: { autoIncrement: true } }
+]
 ];
 
 export const USER_STATE_DEFS = {
@@ -27,16 +29,13 @@ export const USER_STATE_DEFS = {
     imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
     rssFeeds: { store: 'userSettings', type: 'simple', default: [] },
     keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] },
-    shuffleCount: { store: 'userSettings', type: 'simple', default: 0 },
+    shuffleCount: { store: 'userSettings', type: 'simple', default: 2 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
     lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
-    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
     lastStateSync: { store: 'userSettings', type: 'simple', default: null },
     theme: { store: 'userSettings', type: 'simple', default: 'light' },
     lastFeedSync: { store: 'userSettings', type: 'simple', default: null },
-    feedScrollY: { store: 'userSettings', type: 'simple', default: 0 }, // Assuming numerical scroll position
-    feedVisibleLink: { store: 'userSettings', type: 'simple', default: '' }, // Assuming string URL/ID for visible link
     itemsClearedCount: { store: 'userSettings', type: 'simple', default: 0 }, // New: Track items cleared for shuffle count
 };
 
@@ -700,4 +699,22 @@ export async function getLastViewedItemOffset() {
     const db = await getDb();
     const { value } = await loadSimpleState('lastViewedItemOffset');
     return value;
+}
+
+export async function getAllFeedItems() {
+    const db = await getDb();
+    const tx = db.transaction('feedItems', 'readonly');
+    const store = tx.objectStore('feedItems');
+    const items = await store.getAll();
+    await tx.done;
+    return items;
+}
+
+export async function getFeedItem(guid) {
+    const db = await getDb();
+    const tx = db.transaction('feedItems', 'readonly');
+    const store = tx.objectStore('feedItems');
+    const item = await store.get(guid);
+    await tx.done;
+    return item;
 }
