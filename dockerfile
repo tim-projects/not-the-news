@@ -44,14 +44,15 @@ ENV DOMAIN=${DOMAIN} \
 # 3. System deps
 RUN apk add --no-cache \
       bash procps python3 py3-pip py3-virtualenv ca-certificates \
-      # --- ADDED: curl and gnupg for gosu download and verification ---
       curl \
       gnupg \
     && update-ca-certificates \
-    # --- ADDED: Manually download and install gosu ---
+    # --- FIX START: Use apk --print-arch instead of dpkg --print-architecture ---
     && GOSU_VERSION="1.16" \
-    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-$(dpkg --print-architecture)" \
-    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-$(dpkg --print-architecture).asc" \
+    && ARCH="$(apk --print-arch)" \
+    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${ARCH}" \
+    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${ARCH}.asc" \
+    # --- FIX END ---
     # Verify signature
     && export GNUPGHOME="$(mktemp -d)" \
     && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
