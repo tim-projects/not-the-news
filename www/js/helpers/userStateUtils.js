@@ -120,8 +120,6 @@ export async function toggleHidden(app, guid) {
     // shuffleCount and lastShuffleResetDate are no longer managed within this function's scope,
     // so this call itself might be re-evaluated later in the app.js or deckManager.js context.
     // For now, removing itemsClearedCount as specified.
-    // If shuffleCount/lastShuffleResetDate are needed, they should be passed from app context.
-    // As per instruction, modified to exclude itemsClearedCount.
     // Note: The original values of shuffleCount and lastShuffleResetDate loaded at the beginning
     // were also removed, so these variables would be undefined here. This specific part of the
     // instruction requires careful re-evaluation of the overall app logic in other files.
@@ -210,6 +208,17 @@ export async function saveCurrentDeck(guids) {
 
     console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
 
+    // --- NEW/UPDATED: Register background sync if available ---
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('data-sync'); // Register the 'data-sync' tag
+            console.log('[UserState] Background sync registered for currentDeckGuids update.');
+        } catch (error) {
+            console.warn('[UserState] Background sync registration failed for currentDeckGuids:', error);
+        }
+    }
+
     // Add the operation to the pending operations buffer for server sync
     await addPendingOperation({
         type: 'simpleUpdate', // This type indicates it uses the generic /user-state POST
@@ -269,6 +278,17 @@ export async function saveShuffleState(count, resetDate) { // MODIFIED parameter
     //     value: itemsClearedCount
     // });
 
+    // --- NEW/UPDATED: Register background sync if available ---
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('data-sync'); // Register the 'data-sync' tag
+            console.log('[UserState] Background sync registered for shuffle state update.');
+        } catch (error) {
+            console.warn('[UserState] Background sync registration failed for shuffle state:', error);
+        }
+    }
+
     if (isOnline()) {
         try {
             await processPendingOperations();
@@ -293,6 +313,17 @@ export async function setFilterMode(app, mode) {
         key: 'filterMode',
         value: mode
     });
+
+    // --- NEW/UPDATED: Register background sync if available ---
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('data-sync'); // Register the 'data-sync' tag
+            console.log('[UserState] Background sync registered for filter mode update.');
+        } catch (error) {
+            console.warn('[UserState] Background sync registration failed for filter mode:', error);
+        }
+    }
 
     if (isOnline()) {
         try {

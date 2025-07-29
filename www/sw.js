@@ -1,3 +1,5 @@
+// www/sw.js
+
 const cacheName = 'not-the-news-v8'; // IMPORTANT: Incremented cacheName to v8 for new SW version!
 const cacheAssets = [
   '/', // Include the root path
@@ -28,6 +30,9 @@ const cacheAssets = [
   'js/libs/rss-parser.min.js',
   'manifest.json' // Added manifest.json to cache assets
 ];
+
+// --- NEW: Import database.js to access IndexedDB functions within the Service Worker ---
+importScripts('./js/data/database.js'); // This is CRUCIAL for processPendingOperations() to work in SW
 
 self.addEventListener('install', function(event) {
   console.log('[Service Worker] Installing Service Worker ...', event);
@@ -78,6 +83,14 @@ self.addEventListener('activate', function(event) {
         });
     })
   );
+});
+
+// --- NEW: Sync Event Listener for background data synchronization ---
+self.addEventListener('sync', function(event) {
+    console.log('[SW-SYNC] Sync event triggered:', event.tag);
+    if (event.tag === 'data-sync') { // This tag should match what you register on the client side
+        event.waitUntil(processPendingOperations()); // Calls the function imported from database.js
+    }
 });
 
 self.addEventListener('fetch', function(event) {

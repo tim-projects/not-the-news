@@ -1,4 +1,3 @@
-# www/api.py
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -28,25 +27,25 @@ os.makedirs(USER_STATE_DIR, exist_ok=True)
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
 
 USER_STATE_SERVER_DEFAULTS = {
+    # Client keys map directly to filenames
     'currentDeckGuids': {'type': 'array', 'default': []},
-    'lastShuffleResetDate': {'type': 'simple', 'default': None},
-    'shuffleCount': {'type': 'simple', 'default': 0},
+    'lastShuffleResetDate': {'type': 'simple', 'default': None}, # Renamed from 'last_reset_date' for internal consistency, mapping handled in user-state POST
+    'shuffleCount': {'type': 'simple', 'default': 2}, # Changed default from 0 to 2 as per generateNewDeck
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
     'starred': {'type': 'array', 'default': []},
     'hidden': {'type': 'array', 'default': []},
-    'filterMode': {'type': 'simple', 'default': 'all'},
+    'filterMode': {'type': 'simple', 'default': 'unread'}, # Changed default from 'all' to 'unread'
     'syncEnabled': {'type': 'simple', 'default': True},
     'imagesEnabled': {'type': 'simple', 'default': True},
     'lastStateSync': {'type': 'simple', 'default': None},
     'lastViewedItemId': {'type': 'simple', 'default': None},
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
-    # --- ADDED/UPDATED ---
-    'theme': {'type': 'simple', 'default': 'light'}, # Added default for theme
-    'lastFeedSync': {'type': 'simple', 'default': None}, # Added default for lastFeedSync
-    'feedScrollY': {'type': 'simple', 'default': 0}, # Added default for feedScrollY
-    'feedVisibleLink': {'type': 'simple', 'default': ''}, # Added default for feedVisibleLink
-    # --- /ADDED/UPDATED ---
-}
+    'theme': {'type': 'simple', 'default': 'light'},
+    'lastFeedSync': {'type': 'simple', 'default': None},
+    'shuffledOutGuids': {'type': 'array', 'default': []}, # This will be managed via the /user-state endpoint
+    'rssFeeds': {'type': 'array', 'default': []},
+    'keywordBlacklist': {'type': 'array', 'default': []},
+} 
 
 @app.route("/api/login", methods=["POST"])
 def login():
@@ -87,6 +86,7 @@ def _load_feed_items():
         return {}
 
     root = tree.getroot()
+    # Remove namespaces for easier parsing
     for elem in root.iter():
         if "}" in elem.tag:
             elem.tag = elem.tag.split("}", 1)[1]
@@ -101,68 +101,32 @@ def _load_feed_items():
         raw_date = it.findtext("pubDate") or ""
         try:
             dt = parsedate_to_datetime(raw_date)
+            # Ensure consistent ISO format with 'Z' for UTC
             pub_iso = dt.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         except Exception:
             pub_iso = raw_date
 
         data = {
-            "guid": guid,
+            "id": guid, # Changed 'guid' to 'id' for client-side consistency
             "title": it.findtext("title"),
             "link": it.findtext("link"),
             "pubDate": pub_iso,
-            "desc": it.findtext("description")
+            "description": it.findtext("description"), # Changed 'desc' to 'description'
         }
         items[guid] = data
     return items
 
-@app.route("/load-config", methods=["GET", "POST"])
-def load_config():
-    filename = request.args.get("filename")
-    if not filename:
-        abort(400, description="filename query parameter is required")
-    
-    filepath = os.path.join(CONFIG_DIR, filename)
-    if not os.path.exists(filepath):
-        app.logger.info(f"Config file not found: {filepath}")
-        abort(404, description="Config file not found")
-    
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            content = f.read()
-        app.logger.info(f"Loaded config file: {filename}")
-        return jsonify({"content": content}), 200
-    except Exception as e:
-        app.logger.exception(f"Error loading config file {filename}: {e}")
-        return jsonify({"error": str(e)}), 500
+# Removed old load-config and save-config routes as they are now handled by /user-state
 
-@app.route("/save-config", methods=["POST"])
-def save_config():
-    filename = request.args.get("filename")
-    if not filename:
-        abort(400, description="filename query parameter is required")
-    
-    data = request.get_json(silent=True)
-    content = data.get("content", "") if data else ""
-    
-    filepath = os.path.join(CONFIG_DIR, filename)
-    try:
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content)
-        app.logger.info(f"Saved config file: {filename}")
-        return jsonify({"status": "ok"}), 200
-    except Exception as e:
-        app.logger.exception(f"Error saving config file {filename}: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/time", methods=["GET"])
+@app.route("/api/time", methods=["GET"])
 def time():
     """Returns the current UTC time in ISO format."""
     now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     app.logger.debug(f"Time requested: {now}")
     return jsonify({"time": now}), 200
 
-# --- UPDATED: Feed GUIDs Endpoint with serverTime ---
-@app.route("/feed-guids", methods=["GET"])
+# --- UPDATED: Feed GUIDs Endpoint with serverTime (no functional change here from your provided code) ---
+@app.route("/api/feed-guids", methods=["GET"])
 def feed_guids():
     """Returns a list of all item GUIDs from the feed and the server's current time."""
     items = _load_feed_items()
@@ -170,29 +134,49 @@ def feed_guids():
     app.logger.info(f"Returning {len(items)} GUIDs with server time.")
     return jsonify({"guids": list(items.keys()), "serverTime": now}), 200
 
-# --- RENAMED & UPDATED: Feed Items Endpoint ---
-@app.route("/feed-items", methods=["GET", "POST"])
+# --- RENAMED & UPDATED: Feed Items Endpoint for GET with exclude_guids ---
+@app.route("/api/feed-items", methods=["GET", "POST"])
 def feed_items():
     """
-    Returns full item data for specified GUIDs.
-    GET: guids comma-separated in query param.
-    POST: JSON body with {"guids": ["guid1", "guid2"]}.
+    Returns full item data for specified GUIDs (POST) or all items excluding
+    certain GUIDs (GET with exclude_guids).
+    GET:
+        guids (comma-separated query param): Specific GUIDs to retrieve.
+        exclude_guids (comma-separated query param): GUIDs to exclude from the full feed.
+                       If exclude_guids is present, 'guids' param is ignored.
+    POST:
+        JSON body with {"guids": ["guid1", "guid2"]}.
     """
-    wanted = []
+    all_items = _load_feed_items()
+    result_items = []
+
     if request.method == "GET":
-        guids_param = request.args.get("guids", "")
-        wanted = guids_param.split(",") if guids_param else []
+        exclude_guids_param = request.args.get("exclude_guids", "")
+        if exclude_guids_param:
+            exclude_set = set(exclude_guids_param.split(","))
+            app.logger.info(f"GET /api/feed-items: Excluding {len(exclude_set)} GUIDs.")
+            result_items = [item for guid, item in all_items.items() if guid not in exclude_set]
+        else:
+            guids_param = request.args.get("guids", "")
+            wanted_guids = guids_param.split(",") if guids_param else []
+            app.logger.info(f"GET /api/feed-items: Fetching {len(wanted_guids)} specific GUIDs.")
+            result_items = [all_items[g] for g in wanted_guids if g in all_items]
+            
     elif request.method == "POST":
         data = request.get_json(silent=True)
-        wanted = data.get("guids", []) if data else []
+        wanted_guids = data.get("guids", []) if data else []
+        app.logger.info(f"POST /api/feed-items: Fetching {len(wanted_guids)} specific GUIDs.")
+        result_items = [all_items[g] for g in wanted_guids if g in all_items]
     
-    all_items = _load_feed_items()
-    result = {g: all_items[g] for g in wanted if g in all_items}
-    app.logger.info(f"Returning {len(result)} items for {len(wanted)} requested GUIDs.")
-    return jsonify(list(result.values())), 200 # Return list of item objects, not dict of items
+    app.logger.info(f"Returning {len(result_items)} items.")
+    return jsonify(result_items), 200
 
 def _user_state_path(key):
     """Constructs the full file path for a given user state key."""
+    # Handle the mapping of client-side keys to server-side file names if they differ
+    # For now, assumes client key == filename.
+    # If client sends 'lastShuffleResetDate', it will load/save 'lastShuffleResetDate.json'
+    # If client sends 'shuffledOutGuids', it will load/save 'shuffledOutGuids.json'
     return os.path.join(USER_STATE_DIR, f"{key}.json")
 
 def _load_state(key):
@@ -231,6 +215,7 @@ def _load_state(key):
             last_modified = data.get("lastModified")
             if last_modified:
                 try:
+                    # Handle potential non-ms precision from old saves
                     dt_obj = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
                     last_modified = dt_obj.astimezone(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
                 except ValueError:
@@ -263,25 +248,32 @@ def _save_state(key, value):
         app.logger.exception(f"Error saving user state for key '{key}' to '{path}': {e}")
         raise
 
-@app.route("/user-state/<key>", methods=["GET"])
+@app.route("/api/user-state/<key>", methods=["GET"])
 def get_single_user_state_key(key):
     """
     Returns the content of a single user state file.
     Supports If-None-Match header for caching using 'lastModified' timestamp.
     """
     if not key:
-        app.logger.warning("GET /user-state/<key>: Key is missing")
+        app.logger.warning("GET /api/user-state/<key>: Key is missing")
         abort(400, description="User state key is required")
 
+    # Map client-side 'lastShuffleResetDate' to server's 'last_reset_date' if needed,
+    # or ensure client sends 'lastShuffleResetDate' consistently.
+    # Given the client-side userStateUtils.js, it's sending 'lastShuffleResetDate'
+    # and expects it back, so keep filenames consistent for _load_state / _save_state.
+    # The 'last_reset_date' conversion will happen only for specific `simpleUpdate`
+    # types in the /api/user-state endpoint below if necessary.
+    
     state_data = _load_state(key)
     
     if state_data["value"] is None and state_data["lastModified"] is None:
-        app.logger.info(f"GET /user-state/{key}: File could not be loaded or initialized, returning 404.")
+        app.logger.info(f"GET /api/user-state/{key}: File could not be loaded or initialized, returning 404.")
         abort(404, description=f"User state key '{key}' not found or has no valid content after attempt to initialize.")
 
     if_none_match = request.headers.get("If-None-Match")
     if state_data["lastModified"] and if_none_match == state_data["lastModified"]:
-        app.logger.info(f"GET /user-state/{key}: Returning 304 Not Modified. ETag: {state_data['lastModified']}")
+        app.logger.info(f"GET /api/user-state/{key}: Returning 304 Not Modified. ETag: {state_data['lastModified']}")
         return make_response("", 304)
 
     resp_payload = {
@@ -294,117 +286,148 @@ def get_single_user_state_key(key):
         resp.headers["ETag"] = state_data["lastModified"]
     resp.headers["Content-Type"] = "application/json"
     
-    app.logger.info(f"GET /user-state/{key}: Returning 200 OK. ETag: {state_data.get('lastModified', 'None')}")
-    app.logger.debug(f"GET /user-state/{key}: Payload: {resp_payload}")
+    app.logger.info(f"GET /api/user-state/{key}: Returning 200 OK. ETag: {state_data.get('lastModified', 'None')}")
+    app.logger.debug(f"GET /api/user-state/{key}: Payload: {resp_payload}")
     return resp, 200
 
-@app.route("/user-state", methods=["POST"])
+@app.route("/api/user-state", methods=["POST"])
 def post_user_state():
     """
-    Receives and saves a single user state key's change.
-    Expected payload: {"key": "someKey", "value": "someValue"}
+    Receives and saves multiple user state key's changes.
+    Expected payload is a list of operations:
+    [
+        {"type": "simpleUpdate", "key": "shuffleCount", "value": 5},
+        {"type": "simpleUpdate", "key": "last_reset_date", "value": "2023-01-01T00:00:00.000Z"},
+        {"type": "simpleUpdate", "key": "shuffled_out_guids", "value": ["guid1", "guid2"]},
+        {"type": "starDelta", "data": {"id": "guid3", "action": "add", "starredAt": "..."}}
+        {"type": "hiddenDelta", "data": {"id": "guid4", "action": "remove"}}
+    ]
     """
-    data = request.get_json(silent=True)
-    if not data or "key" not in data or "value" not in data:
-        app.logger.warning("POST /user-state: Invalid or missing 'key' or 'value' in JSON body")
-        return jsonify({"error": "Invalid or missing 'key' or 'value' in JSON body"}), 400
+    operations = request.get_json(silent=True)
+    if not isinstance(operations, list):
+        app.logger.warning("POST /api/user-state: Invalid or missing JSON body (expected a list of operations).")
+        return jsonify({"error": "Invalid or missing JSON body (expected a list of operations)"}), 400
 
-    key = data["key"]
-    value = data["value"]
-    
-    try:
-        server_time = _save_state(key, value)
-        app.logger.info(f"POST /user-state: Successfully saved key '{key}'")
-        return jsonify({"serverTime": server_time, "status": "ok"}), 200
-    except Exception as e:
-        app.logger.exception(f"POST /user-state: Error saving user state key '{key}' with value '{value}': {e}")
-        return jsonify({"error": f"Failed to save state for {key}", "details": str(e)}), 500
+    results = []
+    server_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z' # Master timestamp for this sync batch
 
-@app.route("/user-state/hidden/delta", methods=["POST"])
-def hidden_delta():
-    """Adds or removes an item from the hidden list."""
-    data = request.get_json(silent=True)
-    if not data:
-        app.logger.warning("POST /user-state/hidden/delta: Missing JSON body")
-        abort(400, description="Missing JSON body")
+    for op in operations:
+        op_type = op.get("type")
+        
+        try:
+            if op_type == "simpleUpdate":
+                key = op.get("key")
+                value = op.get("value")
+                
+                # --- Specific mapping for keys ---
+                # Client sends 'lastShuffleResetDate', server uses 'lastShuffleResetDate' as filename
+                # If client *were* sending 'last_reset_date' as a key, you'd map it here.
+                # For now, client sends `lastShuffleResetDate` and `shuffledOutGuids` directly,
+                # which aligns with their filenames as per USER_STATE_SERVER_DEFAULTS.
+                # The _save_state function will use these keys directly.
 
-    state_content = _load_state("hidden") 
-    state = state_content["value"] or []
+                if key not in USER_STATE_SERVER_DEFAULTS:
+                    app.logger.warning(f"POST /api/user-state: Attempted to save unknown simpleUpdate key: {key}. Skipping.")
+                    results.append({"opType": op_type, "key": key, "status": "skipped", "reason": "Unknown key"})
+                    continue
 
-    action = data.get("action")
-    id_ = data.get("id")
-    
-    if not id_ or not action:
-        app.logger.warning(f"POST /user-state/hidden/delta: Missing ID or action. Data: {data}")
-        abort(400, description="ID and action are required")
+                if key == 'shuffleCount':
+                    # Load current count, apply max logic
+                    current_count_data = _load_state('shuffleCount')
+                    current_count = current_count_data['value'] if isinstance(current_count_data['value'], int) else 0
+                    
+                    if value == 0: # Client explicitly resetting
+                        new_count = 0
+                        app.logger.info("shuffleCount reset to 0 by client request.")
+                    else:
+                        new_count = max(current_count, value)
+                        app.logger.info(f"shuffleCount updated from {current_count} to {new_count} (max logic).")
+                    _save_state(key, new_count)
+                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value": new_count})
+                elif key in ['shuffledOutGuids', 'currentDeckGuids', 'starred', 'hidden']:
+                    # These are array types that client typically sends as full replacement
+                    # The delta handlers for starred/hidden exist, but if simpleUpdate is used for full array, allow it.
+                    if not isinstance(value, list) and value is not None:
+                         app.logger.warning(f"POST /api/user-state: Invalid value type for array key {key}. Expected list or None.")
+                         results.append({"opType": op_type, "key": key, "status": "failed", "reason": "Invalid value type"})
+                         continue
+                    _save_state(key, value if value is not None else [])
+                    app.logger.info(f"POST /api/user-state: Overwrote array key '{key}' with {len(value) if value else 0} items.")
+                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time})
+                else:
+                    # For other simple updates (lastShuffleResetDate, filterMode, etc.)
+                    _save_state(key, value)
+                    app.logger.info(f"POST /api/user-state: Saved simple update for key '{key}'.")
+                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time})
 
-    if action == "add":
-        entry = {"id": id_, "hiddenAt": data.get("hiddenAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'}
-        if not any(h["id"] == id_ for h in state):
-            state.append(entry)
-            app.logger.info(f"hidden_delta: Added ID {id_}")
-        else:
-            app.logger.info(f"hidden_delta: ID {id_} already exists, not adding.")
-    elif action == "remove":
-        original_len = len(state)
-        state = [h for h in state if h["id"] != id_]
-        if len(state) < original_len:
-            app.logger.info(f"hidden_delta: Removed ID {id_}")
-        else:
-            app.logger.info(f"hidden_delta: ID {id_} not found for removal.")
-    else:
-        app.logger.warning(f"POST /user-state/hidden/delta: Invalid action '{action}'")
-        abort(400, description="Invalid action")
-    
-    try:
-        server_time = _save_state("hidden", state)
-        return jsonify({"serverTime": server_time}), 200
-    except Exception as e:
-        app.logger.exception(f"Error in hidden_delta for ID {id_}, action {action}: {e}")
-        return jsonify({"error": f"Failed to save hidden state", "details": str(e)}), 500
+            elif op_type == "starDelta":
+                id_ = op["data"].get("id")
+                action = op["data"].get("action")
+                starred_at = op["data"].get("starredAt") # Use client timestamp if provided
 
-@app.route("/user-state/starred/delta", methods=["POST"])
-def starred_delta():
-    """Adds or removes an item from the starred list."""
-    data = request.get_json(silent=True)
-    if not data:
-        app.logger.warning("POST /user-state/starred/delta: Missing JSON body")
-        abort(400, description="Missing JSON body")
+                current_state_data = _load_state("starred")
+                current_starred = current_state_data['value'] or []
+                
+                if action == "add":
+                    entry = {"id": id_, "starredAt": starred_at or server_time}
+                    if not any(s["id"] == id_ for s in current_starred):
+                        current_starred.append(entry)
+                        app.logger.info(f"starDelta: Added ID {id_}")
+                    else:
+                        app.logger.info(f"starDelta: ID {id_} already exists, not adding.")
+                elif action == "remove":
+                    original_len = len(current_starred)
+                    current_starred = [s for s in current_starred if s["id"] != id_]
+                    if len(current_starred) < original_len:
+                        app.logger.info(f"starDelta: Removed ID {id_}")
+                    else:
+                        app.logger.info(f"starDelta: ID {id_} not found for removal.")
+                else:
+                    raise ValueError(f"Invalid starDelta action: {action}")
+                
+                _save_state("starred", current_starred)
+                results.append({"opType": op_type, "id": id_, "action": action, "status": "success", "serverTime": server_time})
 
-    state_content = _load_state("starred") 
-    state = state_content["value"] or []
+            elif op_type == "hiddenDelta":
+                id_ = op["data"].get("id")
+                action = op["data"].get("action")
+                hidden_at = op["data"].get("timestamp") # Use client timestamp if provided
 
-    action = data.get("action")
-    id_ = data.get("id")
+                current_state_data = _load_state("hidden")
+                current_hidden = current_state_data['value'] or []
 
-    if not id_ or not action:
-        app.logger.warning(f"POST /user-state/starred/delta: Missing ID or action. Data: {data}")
-        abort(400, description="ID and action are required")
+                if action == "add":
+                    entry = {"id": id_, "hiddenAt": hidden_at or server_time}
+                    if not any(h["id"] == id_ for h in current_hidden):
+                        current_hidden.append(entry)
+                        app.logger.info(f"hiddenDelta: Added ID {id_}")
+                    else:
+                        app.logger.info(f"hiddenDelta: ID {id_} already exists, not adding.")
+                elif action == "remove":
+                    original_len = len(current_hidden)
+                    current_hidden = [h for h in current_hidden if h["id"] != id_]
+                    if len(current_hidden) < original_len:
+                        app.logger.info(f"hiddenDelta: Removed ID {id_}")
+                    else:
+                        app.logger.info(f"hiddenDelta: ID {id_} not found for removal.")
+                else:
+                    raise ValueError(f"Invalid hiddenDelta action: {action}")
+                
+                _save_state("hidden", current_hidden)
+                results.append({"opType": op_type, "id": id_, "action": action, "status": "success", "serverTime": server_time})
 
-    if action == "add":
-        entry = {"id": id_, "starredAt": data.get("starredAt") or datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'}
-        if not any(s["id"] == id_ for s in state):
-            state.append(entry)
-            app.logger.info(f"starred_delta: Added ID {id_}")
-        else:
-            app.logger.info(f"starred_delta: ID {id_} already exists, not adding.")
-    elif action == "remove":
-        original_len = len(state)
-        state = [s for s in state if s["id"] != id_]
-        if len(state) < original_len:
-            app.logger.info(f"starred_delta: Removed ID {id_}")
-        else:
-            app.logger.info(f"starred_delta: ID {id_} not found for removal.")
-    else:
-        app.logger.warning(f"POST /user-state/starred/delta: Invalid action '{action}'")
-        abort(400, description="Invalid action")
-    
-    try:
-        server_time = _save_state("starred", state)
-        return jsonify({"serverTime": server_time}), 200
-    except Exception as e:
-        app.logger.exception(f"Error in starred_delta for ID {id_}, action {action}: {e}")
-        return jsonify({"error": f"Failed to save starred state", "details": str(e)}), 500
+            else:
+                app.logger.warning(f"POST /api/user-state: Unknown operation type: {op_type}. Skipping.")
+                results.append({"opType": op_type, "status": "skipped", "reason": "Unknown operation type"})
+        
+        except Exception as e:
+            app.logger.exception(f"Error processing operation {op_type} for data {op.get('data', op.get('key'))}: {e}")
+            results.append({"opType": op_type, "status": "failed", "reason": str(e)})
+
+    app.logger.info(f"POST /api/user-state: Processed {len(operations)} operations. Results: {results}")
+    return jsonify({"status": "ok", "serverTime": server_time, "results": results}), 200
+
+# Removed old hidden_delta and starred_delta routes as they are now handled by /user-state with type 'hiddenDelta' and 'starDelta'
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=4575, debug=True)

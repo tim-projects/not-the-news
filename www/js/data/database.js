@@ -3,7 +3,7 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 9; // Increment DB_VERSION
+const DB_VERSION = 10; // Increment DB_VERSION
 
 let _dbInstance = null;
 let _dbInitPromise = null;
@@ -197,7 +197,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
 
     let transaction;
     try {
-        transaction = tx || db.transaction([arrayStoreName, 'userSettings'], 'readwrite'); 
+        transaction = tx || db.transaction([arrayStoreName, 'userSettings', 'pendingOperations'], 'readwrite'); 
         const arrayObjectStore = transaction.objectStore(arrayStoreName);
         
         await arrayObjectStore.clear();
@@ -214,6 +214,19 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
         console.log(`[saveArrayState] Saved ${clonableArr.length} items for "${key}" to store "${arrayStoreName}".`);
 
         await saveSimpleState(key, null, serverTimestamp, transaction); // db param removed here
+
+        // --- NEW/UPDATED: Add to pending operations for specific array states that need server sync ---
+        // These keys are managed as full array replacements on the server
+        if (['shuffledOutGuids', 'currentDeckGuids', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
+            // Ensure the key sent to the server matches the Flask API expectation (case sensitive!)
+            let serverKey = key; // For these, client key matches server key by design
+
+            const op = { type: 'simpleUpdate', key: serverKey, value: Array.from(arr) };
+
+            // Add to pending operations store using the current transaction
+            await transaction.objectStore('pendingOperations').add(op);
+            console.log(`[DB] Buffered '${key}' update to pendingOperations for server sync.`);
+        }
 
     } catch (e) {
         console.error(`[saveArrayState] Error saving "${key}" to store "${arrayStoreName}":`, e);
@@ -291,7 +304,19 @@ export async function processPendingOperations() {
                 success = true;
 
             } else if (op.type === 'simpleUpdate') {
-                success = await pushUserState(op.key, op.value); // db param removed here
+                const response = await fetch(`${API_BASE_URL}/api/user-state`, { // Correct endpoint for unified user state
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify([op]) // Send as an array containing one operation
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} for simpleUpdate key ${op.key}.`);
+                }
+                const responseData = await response.json();
+                console.log(`[processPendingOperations] simpleUpdate for key ${op.key} synced. Server response:`, responseData);
+                success = true;
+
             } else {
                 console.warn(`[processPendingOperations] Unknown operation type: ${op.type}. Skipping.`);
                 success = true;
