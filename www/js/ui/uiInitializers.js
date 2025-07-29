@@ -197,15 +197,25 @@ export async function initShuffleCount(app) {
 export async function initConfigPanelListeners(app) {
     const rssBtn = getConfigureRssButton();
     rssBtn?.addEventListener('click', async () => {
-        const data = await loadConfigFile('feeds.txt');
+        const data = await loadSimpleState('rssFeeds');
         app.rssFeedsInput = data.content || "";
         app.modalView = 'rss';
     });
 
     const keywordsBtn = getConfigureKeywordsButton();
     keywordsBtn?.addEventListener('click', async () => {
-        const data = await loadConfigFile('filter_keywords.txt');
-        app.keywordBlacklistInput = (data.content || "").split(/\r?\n/).filter(Boolean).sort().join("\n");
+        const data = await loadSimpleState('keywordBlacklist');
+        // If data.value is an array, join it with newlines. If it's a string, use it directly.
+        // If it's null/undefined, default to an empty string.
+        let blacklistContent = "";
+        if (data.value) {
+            if (Array.isArray(data.value)) {
+                blacklistContent = data.value.filter(Boolean).sort().join("\n");
+            } else if (typeof data.value === 'string') {
+                blacklistContent = data.value.split(/\r?\n/).filter(Boolean).sort().join("\n");
+            }
+        }
+        app.keywordBlacklistInput = blacklistContent;
         app.modalView = 'keywords';
     });
 
@@ -216,9 +226,11 @@ export async function initConfigPanelListeners(app) {
     saveKeywordsBtn?.addEventListener("click", async () => {
         const kwArea = getKeywordsBlacklistTextarea();
         const content = kwArea?.value || app.keywordBlacklistInput;
+        // Convert the string content to an array of keywords, filtering out empty strings
+        const keywordsArray = content.split(/\r?\n/).map(keyword => keyword.trim()).filter(Boolean);
         try {
-            await saveConfigFile('filter_keywords.txt', content);
-            app.keywordBlacklistInput = content;
+            await saveSimpleState('keywordBlacklist', keywordsArray);
+            app.keywordBlacklistInput = keywordsArray.sort().join("\n"); // Update app state with sorted array
             createStatusBarMessage("Keywords saved.", 'success');
         } catch (err) {
                 console.error(err);
@@ -231,7 +243,7 @@ export async function initConfigPanelListeners(app) {
         const rssArea = getRssFeedsTextarea();
         const content = rssArea?.value || app.rssFeedsInput;
         try {
-            await saveConfigFile('feeds.txt', content);
+            await saveSimpleState('rssFeeds', content);
             app.rssFeedsInput = content;
             createStatusBarMessage("RSS feeds saved.", 'success');
         } catch (err) {

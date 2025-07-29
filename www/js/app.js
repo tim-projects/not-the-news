@@ -272,20 +272,8 @@ document.addEventListener('alpine:init', () => {
                     if (isOpen) {
                         this.modalView = 'main';
                         await manageSettingsPanelVisibility(this);
-                        try {
-                            // Corrected file path from rssFeeds.txt to feeds.txt
-                            this.rssFeedsInput = (await loadConfigFile('feeds.txt')).content || '';
-                        } catch (e) {
-                            console.warn("Failed to load feeds.txt from server, falling back to local storage:", e);
-                            this.rssFeedsInput = (await loadSimpleState('rssFeeds')).value || '';
-                        }
-                        try {
-                            // Corrected file path from keywordBlacklist.txt to filter_keywords.txt
-                            this.keywordBlacklistInput = (await loadConfigFile('filter_keywords.txt')).content || '';
-                        } catch (e) {
-                            console.warn("Failed to load filter_keywords.txt from server, falling back to local storage:", e);
-                            this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
-                        }
+                        this.rssFeedsInput = (await loadSimpleState('rssFeeds')).value || '';
+                        this.keywordBlacklistInput = (await loadSimpleState('keywordBlacklist')).value || '';
                     } else {
                         await saveCurrentScrollPosition();
                     }
@@ -533,19 +521,21 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveRssFeeds() {
-            await saveConfigFile('feeds.txt', this.rssFeedsInput); // Corrected to feeds.txt
+            await saveSimpleState('rssFeeds', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
-            this.loading = true; // Re-enable loading state during sync
-            await performFullSync();
-            // validateAndRegenerateCurrentDeck will update currentDeckGuids, triggering the $watch
-            await validateAndRegenerateCurrentDeck(this);
-            this.loading = false; // Disable loading state after sync
+            // Re-fetch feed items and validate deck after saving local RSS feeds.
+            // This ensures the UI reflects any changes to the feed source.
+            this.loading = true; // Re-enable loading state during data refresh
+            await performFullSync(this); // Perform a full sync to update feeds from server if online
+            await this.loadFeedItemsFromDB(); // Refresh feedItems cache after potential full sync
+            await validateAndRegenerateCurrentDeck(this); // Update deck based on new feeds
+            this.loading = false; // Disable loading state after refresh
         },
 
         async saveKeywordBlacklist() {
-            await saveConfigFile('filter_keywords.txt', this.keywordBlacklistInput); // Corrected to filter_keywords.txt
+            await saveSimpleState('keywordBlacklist', this.keywordBlacklistInput);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
-            // This does not directly affect the deck content, only filtering, so no loadAndDisplayDeck needed
+            // This affects filtering, so simply update counts and re-evaluate filteredEntries.
             this.updateCounts();
         }
     }));
