@@ -36,7 +36,6 @@ export const USER_STATE_DEFS = {
     lastStateSync: { store: 'userSettings', type: 'simple', default: null },
     theme: { store: 'userSettings', type: 'simple', default: 'light' },
     lastFeedSync: { store: 'userSettings', type: 'simple', default: null },
-    itemsClearedCount: { store: 'userSettings', type: 'simple', default: 0 }, // New: Track items cleared for shuffle count
 };
 
 export async function initDb() {
