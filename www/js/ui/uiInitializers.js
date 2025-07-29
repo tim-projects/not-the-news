@@ -154,46 +154,6 @@ export async function initScrollPosition(app) {
     });
 }
 
-export async function initShuffleCount(app) {
-    // Load the current state of all shuffle-related values
-    let { shuffleCount: currentShuffleCount, lastShuffleResetDate: lastResetDate, itemsClearedCount: currentItemsClearedCount } = await loadShuffleState();
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize 'today' to midnight for comparison
-
-    let newShuffleCount = currentShuffleCount;
-    let newItemsClearedCount = currentItemsClearedCount;
-
-    // Determine if a daily reset is needed
-    const isNewDay = !lastResetDate || new Date(lastResetDate).toDateString() !== today.toDateString();
-
-    if (isNewDay) {
-        newShuffleCount = 2; // Reset shuffleCount to 2 for a new day
-        newItemsClearedCount = 0; // Reset itemsClearedCount to 0 for a new day
-        // Log for debugging to confirm daily reset
-        console.log(`[initShuffleCount] New day detected (${today.toDateString()}). Resetting shuffleCount to ${newShuffleCount} and itemsClearedCount to ${newItemsClearedCount}.`);
-        await saveShuffleState(newShuffleCount, today, newItemsClearedCount); // Save the reset state
-    } else {
-        // If it's the same day, ensure shuffleCount is at least 2 if it's currently 0 (e.g., first load of the app ever)
-        // This catches the case where default 0 was loaded before daily reset logic runs for the very first time.
-        if (newShuffleCount === 0) {
-             newShuffleCount = 2;
-             await saveShuffleState(newShuffleCount, today, newItemsClearedCount); // Save to persist this initial adjustment
-             console.log(`[initShuffleCount] Initial load on same day, adjusted shuffleCount to ${newShuffleCount}.`);
-        }
-    }
-
-    // Update the Alpine.js app property
-    app.shuffleCount = newShuffleCount;
-
-    // Update the UI display element
-    const shuffleDisplay = getShuffleCountDisplay();
-    if (shuffleDisplay) {
-        shuffleDisplay.textContent = app.shuffleCount;
-        console.log(`[initShuffleCount] Display updated to: ${app.shuffleCount}`);
-    }
-}
-
 export async function initConfigPanelListeners(app) {
     const rssBtn = getConfigureRssButton();
     rssBtn?.addEventListener('click', async () => {

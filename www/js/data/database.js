@@ -3,26 +3,26 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 8;
+const DB_VERSION = 9; // Increment DB_VERSION
 
 let _dbInstance = null;
 let _dbInitPromise = null;
 
 const OBJECT_STORES_SCHEMA = [
-[
     { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
     { name: 'starredItems', options: { keyPath: 'id' } },
     { name: 'hiddenItems', options: { keyPath: 'id' } },
     { name: 'currentDeckGuids', keyPath: 'id' },
+    { name: 'shuffledOutGuids', keyPath: 'id' }, // Add shuffledOutGuids Object Store
     { name: 'userSettings', keyPath: 'key' },
     { name: 'pendingOperations', keyPath: 'id', options: { autoIncrement: true } }
-]
 ];
 
 export const USER_STATE_DEFS = {
     starred: { store: 'starredItems', type: 'array', default: [] },
     hidden: { store: 'hiddenItems', type: 'array', default: [] },
     currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
+    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', default: [] }, // Add shuffledOutGuids to USER_STATE_DEFS
 
     filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
     syncEnabled: { store: 'userSettings', type: 'simple', default: true },
@@ -206,7 +206,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
         const clonableArr = JSON.parse(JSON.stringify(arr));
         
         for (const item of clonableArr) {
-            const itemToStore = (key === 'currentDeckGuids' && typeof item === 'string') 
+            const itemToStore = (key === 'currentDeckGuids' || key === 'shuffledOutGuids') && typeof item === 'string' 
                                ? { id: item } 
                                : item;
             await arrayObjectStore.put(itemToStore);
@@ -643,6 +643,12 @@ export async function getHiddenItems() {
 export async function getCurrentDeckGuids() {
     const db = await getDb();
     const { value } = await loadArrayState('currentDeckGuids');
+    return value.map(item => item.id);
+}
+
+export async function getShuffledOutGuids() {
+    const db = await getDb();
+    const { value } = await loadArrayState('shuffledOutGuids');
     return value.map(item => item.id);
 }
 

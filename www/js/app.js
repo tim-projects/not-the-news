@@ -15,7 +15,7 @@ import {
 } from './data/database.js';
 import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
 // Removed 'displayCurrentDeck' from dataUtils.js imports as it will be removed/refactored there
-import { formatDate, mapRawItem, mapRawItems, validateAndRegenerateCurrentDeck, loadNextDeck, shuffleFeed } from './helpers/dataUtils.js';
+import { formatDate, mapRawItem, mapRawItems } from './helpers/dataUtils.js';
 import {
     loadCurrentDeck,
     saveCurrentDeck,
@@ -27,8 +27,9 @@ import {
     setFilterMode,
     loadFilterMode
 } from './helpers/userStateUtils.js';
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initShuffleCount, initConfigPanelListeners } from './ui/uiInitializers.js';
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js'
+import { manageDailyDeck, processShuffle } from './helpers/deckManager.js';
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -85,6 +86,7 @@ document.addEventListener('alpine:init', () => {
         hidden: [],
         starred: [],
         currentDeckGuids: [], // This Alpine property holds the array of GUID strings
+        shuffledOutGuids: [], // Array to hold GUIDs of items shuffled out
         errorMessage: '',
         isOnline: isOnline(),
         _lastFilterHash: '',
@@ -250,6 +252,8 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
+                // NEW: Orchestrate initial deck generation and daily reset
+                await manageDailyDeck(this); // Pass 'this' (app scope)
 
                 // Load currentDeckGuids and ensure they are always strings (GUIDs)
                 let storedGuidsResult = await loadCurrentDeck(); // loadCurrentDeck internally uses loadSimpleState
@@ -258,14 +262,10 @@ document.addEventListener('alpine:init', () => {
                     return typeof item === 'object' && item !== null && item.id ? item.id : String(item);
                 });
 
-                // validateAndRegenerateCurrentDeck will update this.currentDeckGuids, which triggers the $watch and then loadAndDisplayDeck()
-                await validateAndRegenerateCurrentDeck(this);
-
 
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
-                initShuffleCount(this);
                 initConfigPanelListeners(this);
 
                 this.$watch("openSettings", async (isOpen) => {
@@ -297,8 +297,8 @@ document.addEventListener('alpine:init', () => {
                     // This action will update `this.currentDeckGuids`, which in turn triggers its own
                     // `$watch` (defined elsewhere in initApp) to call `loadAndDisplayDeck()`.
                     if (newMode === 'unread') {
-                        console.log('Filter set to unread. Validating and regenerating current deck to populate this.deck.');
-                        await validateAndRegenerateCurrentDeck(this);
+                        console.log('Filter set to unread. Managing daily deck to populate this.deck.');
+                        await manageDailyDeck(this); // NEW CALL
                     } else {
                         // For 'all', 'hidden', or 'starred' modes, the `filteredEntries` computed property
                         // will automatically re-evaluate based on `this.entries` (the full item list).
@@ -327,7 +327,7 @@ document.addEventListener('alpine:init', () => {
                             // Re-load hidden/starred after pullUserState
                             await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                             this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                            await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
+                            await manageDailyDeck(this); // This will update currentDeckGuids, triggering the $watch
                             this.updateCounts();
                             console.log("Background partial sync completed.");
                         } catch (error) {
@@ -350,7 +350,7 @@ document.addEventListener('alpine:init', () => {
                         // Re-load hidden/starred after pullUserState
                         await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                        await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
+                        await manageDailyDeck(this); // This will update currentDeckGuids, triggering the $watch
                         this.updateCounts();
                         console.log("Online resync completed.");
                     }
@@ -382,7 +382,7 @@ document.addEventListener('alpine:init', () => {
                         await pullUserState();
                         await this.loadFeedItemsFromDB(); // Refresh feedItems cache
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                        await validateAndRegenerateCurrentDeck(this); // This will update currentDeckGuids, triggering the $watch
+                        await manageDailyDeck(this); // This will update currentDeckGuids, triggering the $watch
                         this.updateCounts();
                         console.log("Periodic background sync completed.");
                     } catch (error) {
@@ -504,20 +504,16 @@ document.addEventListener('alpine:init', () => {
         async toggleHidden(guid) {
             console.log("toggleHidden called with guid:", guid);
             await toggleHidden(this, guid);
-            // validateAndRegenerateCurrentDeck will update currentDeckGuids, triggering the $watch
-            await validateAndRegenerateCurrentDeck(this);
+            // The deck will be re-evaluated by manageDailyDeck if needed, no direct regeneration here.
+            await manageDailyDeck(this); // Trigger deck management to reflect hidden item
         },
         setFilter(mode) {
             this.filterMode = mode;
         },
-        async loadNextDeck() {
-            // loadNextDeck (from dataUtils) will update this.currentDeckGuids, triggering the $watch
-            await loadNextDeck(this);
-        },
-
-        async shuffleFeed() {
-            // shuffleFeed (from dataUtils) will update this.currentDeckGuids, triggering the $watch
-            await shuffleFeed(this);
+        async processShuffle() {
+            // processShuffle (from deckManager.js) will handle all the logic:
+            // decrementing shuffleCount, saving shuffledOutGuids, and updating currentDeckGuids.
+            await processShuffle(this); // Pass 'this' (app scope)
         },
 
         async saveRssFeeds() {
@@ -528,7 +524,7 @@ document.addEventListener('alpine:init', () => {
             this.loading = true; // Re-enable loading state during data refresh
             await performFullSync(this); // Perform a full sync to update feeds from server if online
             await this.loadFeedItemsFromDB(); // Refresh feedItems cache after potential full sync
-            await validateAndRegenerateCurrentDeck(this); // Update deck based on new feeds
+            await manageDailyDeck(this); // Update deck based on new feeds
             this.loading = false; // Disable loading state after refresh
         },
 

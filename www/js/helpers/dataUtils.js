@@ -1,7 +1,7 @@
 // www/js/helpers/dataUtils.js
 
 // Import necessary modules for deck functions
-import { saveSimpleState, getDb } from '../data/database.js';
+import { getDb } from '../data/database.js';
 import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState } from './userStateUtils.js';
 import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
 
@@ -83,62 +83,14 @@ export function mapRawItems(rawList, fmtFn) {
         .sort((a, b) => b.timestamp - a.timestamp);
 }
 
-/**
- * Validates the current deck and regenerates it if all items are hidden or no longer exist.
- * This method is intended to be called during app initialization and after data syncs.
- * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- */
-export async function validateAndRegenerateCurrentDeck(app) {
-    console.log("dataUtils.js: validateAndRegenerateCurrentDeck called");
-    // Ensure data is fresh before validation
-    await app.loadFeedItemsFromDB();
+export function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
+    const hiddenSet = new Set(hiddenGuids);
+    const shuffledOutSet = new Set(shuffledOutGuids);
+    const currentDeckSet = new Set(currentDeckItemGuids);
 
-    const hiddenSet = new Set(app.hidden.map(h => h.id));
-
-    // Filter out items from the current deck that are now hidden or no longer exist in entries
-    const validGuidsInDeck = app.currentDeckGuids.filter(guid => {
-        const entry = app.entries.find(e => e.id === guid);
-        return entry && !hiddenSet.has(guid);
-    });
-
-    // If the deck is empty or all items are invalid, generate a new deck
-    if (validGuidsInDeck.length === 0 && app.entries.length > 0) {
-        console.log("Current deck is empty/invalid. Loading next deck and increasing shuffle count.");
-        await loadNextDeck(app);
-
-        // Reward: ALWAYS increase shuffle count when deck becomes empty due to hiding
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        await saveShuffleState(app.shuffleCount, today);
-        // This message goes to the title bar, as confirmed in previous steps.
-        await displayTemporaryMessageInTitle('Shuffle count increased!');
-
-    } else if (validGuidsInDeck.length !== app.currentDeckGuids.length) {
-        // If some items were removed from the deck, update and save it
-        console.log("Current deck contained hidden/non-existent items. Updating the deck.");
-        app.currentDeckGuids = validGuidsInDeck;
-        await saveCurrentDeck(app.currentDeckGuids);
-        // app.js's $watch on app.currentDeckGuids will handle UI update
-    }
-    // No direct call to app.loadAndDisplayDeck() here.
-    // The $watch on app.currentDeckGuids will handle UI updates.
-    // If loadNextDeck was called, it handles updating app.currentDeckGuids and saving.
-}
-
-/**
- * Loads the next set of unread items into the current deck. This logic
- * is now shared by both 'Next Deck' button and 'Shuffle' button behavior,
- * and when the current deck becomes empty.
- * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- */
-export async function loadNextDeck(app) {
-    // Ensure entries is up-to-date and correctly mapped before filtering
-    await app.loadFeedItemsFromDB();
-
-    const hiddenSet = new Set(app.hidden.map(h => h.id));
-
-    // The full pool of unread items from which to draw
-    let unreadItems = app.entries.filter(item => !hiddenSet.has(item.id));
+    let unreadItems = allFeedItems.filter(item => 
+        !hiddenSet.has(item.id) && !shuffledOutSet.has(item.id) && !currentDeckSet.has(item.id)
+    );
 
     let nextDeck = [];
     const MAX_DECK_SIZE = 10;
@@ -229,6 +181,21 @@ export async function loadNextDeck(app) {
             if (nextDeck.length >= MAX_DECK_SIZE) break;
             tryAddItemToDeck(item);
         }
+        // Fallback: If deck is not full, add from shuffledOutGuids (prioritizing oldest)
+        if (nextDeck.length < MAX_DECK_SIZE) {
+            const resurfaceCandidates = allFeedItems.filter(item => 
+                shuffledOutSet.has(item.id) && !hiddenSet.has(item.id) && !selectedIds.has(item.id)
+            );
+            // Sort oldest first for resurfacing
+            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp); 
+
+            for (const item of resurfaceCandidates) {
+                if (nextDeck.length >= MAX_DECK_SIZE) break;
+                if (tryAddItemToDeck(item)) { 
+                    // No need to add to selectedIds as tryAddItemToDeck does that
+                }
+            }
+        }
 
     } else {
         // Offline fallback: (Prioritized items + specific filtering/unfiltering)
@@ -296,44 +263,6 @@ export async function loadNextDeck(app) {
     // --- NEW: Apply chronological sort to nextDeck for both online and offline paths ---
     nextDeck.sort((a, b) => b.timestamp - a.timestamp);
 
-    if (nextDeck.length > 0) {
-        app.currentDeckGuids = nextDeck.map(item => item.id);
-        await saveCurrentDeck(app.currentDeckGuids);
-    } else {
-        app.currentDeckGuids = [];
-        await saveCurrentDeck([]);
-        createStatusBarMessage('No more unread items to load!', 'info');
-    }
-
-    app.updateCounts();
-    // No direct call to app.loadAndDisplayDeck() here.
-    // The $watch on app.currentDeckGuids will handle UI updates.
-    app.isShuffled = false;
-}
-
-/**
- * Loads the next set of unread items into the current deck, and decrements the daily shuffle count.
- * This function now uses the same item selection logic as loadNextDeck.
- * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
- */
-export async function shuffleFeed(app) {
-    if (app.shuffleCount <= 0) {
-        createStatusBarMessage('No shuffles left for today!', 'error');
-        return;
-    }
-
-    console.log("Shuffle button pressed. Loading next deck and decrementing shuffle count.");
-    // loadNextDeck will handle updating app.currentDeckGuids and saving.
-    await loadNextDeck(app);
-
-    // After loadNextDeck completes, handle the shuffle count specific to shuffleFeed
-    app.shuffleCount--;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    await saveShuffleState(app.shuffleCount, today);
-
-    app.isShuffled = true;
-    await displayTemporaryMessageInTitle('Feed shuffled!');
-    // No direct call to app.loadAndDisplayDeck() here.
-    // The $watch on app.currentDeckGuids will handle UI updates.
+    // ... (remove saving logic)
+    return nextDeck.map(item => item.id);
 }
