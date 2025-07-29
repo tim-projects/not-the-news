@@ -9,6 +9,14 @@
     not header Cookie auth*
     not path /login.html
     not path /api/login*
+    # --- FIX START: Explicitly exclude all API endpoints from redirection ---
+    not path /user-state*
+    not path /load-config*
+    not path /save-config*
+    not path /time*
+    not path /feed-guids*
+    not path /feed-items*
+    # --- FIX END ---
     not path /js/libs/*
     not path /*.css
     not path /*.js
