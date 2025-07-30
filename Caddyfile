@@ -4,18 +4,18 @@
   acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
 
-{$DOMAIN} {
   @unauth {
     not header Cookie auth*
     not path /login.html
+    # EXCLUDE ALL API ENDPOINTS FROM REDIRECTION
     not path /api/login*
-    # Explicitly exclude all API endpoints from redirection
-    not path /user-state*
-    not path /load-config*
-    not path /save-config*
-    not path /time*
-    not path /feed-guids*
-    not path /feed-items*
+    not path /api/user-state*
+    not path /api/load-config*
+    not path /api/save-config*
+    not path /api/time*
+    not path /api/feed-guids*
+    not path /api/feed-items*
+    # Explicitly exclude common static assets and service worker from redirection
     not path /sw.js
     not path /js/libs/*
     not path /*.css
@@ -27,7 +27,7 @@
     not path /manifest.json
     not path /images/*
   }
-  redir @unauth /login.html 302 # <-- UNCOMMENT THIS LINE (if you commented it out)
+  redir @unauth /login.html 302
 
   handle /api/login* {
     reverse_proxy 127.0.0.1:4575 {
