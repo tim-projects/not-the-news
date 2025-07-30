@@ -87,23 +87,13 @@ COPY data/ /data/feed/
 # Create a dedicated non-root user for the Flask application
 # Add 'appuser' user and 'appgroup' group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
-# Ensure /data exists and is owned by the new user for persistence.
-# This assumes /data is a VOLUME and its content might be re-initialized.
-# If /data content is to be persistent across restarts, ensure its ownership
-# on the host is correct *before* Docker starts.
-# We set ownership inside the container to ensure the appuser can write.
-RUN mkdir -p /data/feed /data/user_state /data/config
-RUN chown -R appuser:appgroup /data
-
-# Set working directory ownership to the app user as well
-RUN chown -R appuser:appgroup /app /rss
-
 ##############################################################################
 # 6. Build entrypoint
 RUN mkdir -p /usr/local/bin && \
     echo '#!/usr/bin/env bash' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'mkdir -p /data/feed /data/user_state /data/config' >> /usr/local/bin/docker-entrypoint.sh && \ 
+    echo 'chown -R appuser:appgroup /data/user_state /data/feed /app /rss' >> /usr/local/bin/docker-entrypoint.sh && \
     # Redis setup
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
