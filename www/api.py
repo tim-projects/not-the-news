@@ -62,12 +62,6 @@ def login():
             return jsonify({"error": "Password required"}), 400
 
         app_password = os.environ.get("APP_PASSWORD")
-        # --- ADDED DEBUG LINES ---
-        app.logger.debug(f"DEBUG: In /api/login, raw APP_PASSWORD from os.environ.get: '{app_password}'")
-        app.logger.debug(f"DEBUG: Type of app_password: {type(app_password)}")
-        app.logger.debug(f"DEBUG: Length of app_password: {len(app_password) if app_password is not None else 'N/A'}")
-        app.logger.debug(f"DEBUG: Is app_password truthy? {bool(app_password)}")
-        # --- END ADDED DEBUG LINES ---
 
         if not app_password:
             app.logger.error("Login: Server misconfigured, APP_PASSWORD not set")
@@ -371,8 +365,28 @@ def post_user_state():
                         app.logger.info(f"shuffleCount updated from {current_count} to {new_count} (max logic).")
                     _save_state(key, new_count)
                     results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value": new_count})
+                # --- START FIX: Handle starred/hidden arrays when sent as simpleUpdate ---
+                elif key in ['starred', 'hidden']:
+                    # This branch handles the case where client's saveArrayState sends a 'simpleUpdate'
+                    # with just a list of GUIDs for 'starred' or 'hidden'.
+                    # We need to convert this list of GUIDs into the expected object format {guid, timestamp}.
+                    # For simplicity, we assign the current server_time as the timestamp for all items
+                    # in this full list update. More complex merging strategies are possible but not implemented here.
+                    if not isinstance(value, list):
+                        app.logger.warning(f"POST /api/user-state: Expected list of GUIDs for {key} simpleUpdate, got {type(value)}. Skipping.")
+                        results.append({"opType": op_type, "key": key, "status": "skipped", "reason": "Expected list of GUIDs"})
+                        continue
+
+                    timestamp_field = 'starredAt' if key == 'starred' else 'hiddenAt'
+                    new_full_list_of_objects = [{"guid": guid, timestamp_field: server_time} for guid in value]
+
+                    _save_state(key, new_full_list_of_objects)
+                    app.logger.info(f"POST /api/user-state: Saved full array update for key '{key}'. Number of items: {len(new_full_list_of_objects)}")
+                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value_count": len(new_full_list_of_objects)})
+                # --- END FIX ---
                 else:
-                    # For other simple updates (lastShuffleResetDate, filterMode, etc., and now including shuffledOutGuids, currentDeckGuids)
+                    # For other simple updates (lastShuffleResetDate, filterMode, etc.,
+                    # including currentDeckGuids, shuffledOutGuids, rssFeeds, keywordBlacklist)
                     _save_state(key, value)
                     app.logger.info(f"POST /api/user-state: Saved simple update for key '{key}'.")
                     results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time})
@@ -390,8 +404,9 @@ def post_user_state():
 
                 if action == "add":
                     # Store as {'guid': '...', 'starredAt': '...'}
-                    entry = {"guid": item_guid, "starredAt": server_time}
-                    if not any(s["guid"] == item_guid for s in current_starred): # Check 'guid'
+                    # Ensure it's not already there before adding
+                    if not any(s["guid"] == item_guid for s in current_starred):
+                        entry = {"guid": item_guid, "starredAt": server_time}
                         current_starred.append(entry)
                         app.logger.info(f"starDelta: Added GUID {item_guid}")
                     else:
@@ -422,8 +437,9 @@ def post_user_state():
 
                 if action == "add":
                     # Store as {'guid': '...', 'hiddenAt': '...'}
-                    entry = {"guid": item_guid, "hiddenAt": server_time}
-                    if not any(h["guid"] == item_guid for h in current_hidden): # Check 'guid'
+                    # Ensure it's not already there before adding
+                    if not any(h["guid"] == item_guid for h in current_hidden):
+                        entry = {"guid": item_guid, "hiddenAt": server_time}
                         current_hidden.append(entry)
                         app.logger.info(f"hiddenDelta: Added GUID {item_guid}")
                     else:
