@@ -4,11 +4,29 @@
   acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
 
-{$DOMAIN} { # <--- Ensure your domain is here
+{$DOMAIN} {
+  # Explicitly handle common static files first to ensure they are never redirected.
+  # Caddy will serve these directly and stop processing other rules for these paths.
+  handle /sw.js
+  handle /login.html
+  handle /js/*
+  handle /*.css
+  handle /*.js
+  handle /*.svg
+  handle /*.ttf
+  handle /*.woff
+  handle /*.woff2
+  handle /manifest.json
+  handle /images/* {
+    root * /app/www
+    file_server
+  }
+
   @unauth {
     not header Cookie auth*
-    not path /login.html
-    # EXCLUDE ALL API ENDPOINTS FROM REDIRECTION (NOW WITH /api/ PREFIX)
+    # Removed specific static file exclusions from here, as they are now handled
+    # by the dedicated `handle` blocks above for robustness.
+    # The API exclusions remain here.
     not path /api/login*
     not path /api/user-state*
     not path /api/load-config*
@@ -17,17 +35,6 @@
     not path /api/feed-guids*
     not path /api/feed-items*
     not path /api/user-state/shuffledOutGuids
-    # Explicitly exclude common static assets and service worker from redirection
-    not path /sw.js
-    not path /js/libs/*
-    not path /*.css
-    not path /*.js
-    not path /*.svg
-    not path /*.ttf
-    not path /*.woff
-    not path /*.woff2
-    not path /manifest.json
-    not path /images/*
   }
   redir @unauth /login.html 302
 
@@ -39,19 +46,19 @@
     }
   }
 
-  handle /api/user-state* { # <-- UPDATED
+  handle /api/user-state* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/load-config* { # <-- UPDATED (Consider removing if Flask no longer supports it)
+  handle /api/load-config* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/save-config* { # <-- UPDATED (Consider removing if Flask no longer supports it)
+  handle /api/save-config* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
@@ -77,6 +84,8 @@
     }
   }
 
+  # This `root` and `file_server` will act as a general fallback for any static files
+  # not explicitly handled by the `handle` blocks above.
   root * /app/www
   file_server
 
@@ -96,9 +105,9 @@
   }
 
   @api_nocache {
-    path /api/load-config* # <-- UPDATED
-    path /api/save-config* # <-- UPDATED
-    path /api/user-state* # <-- UPDATED
+    path /api/load-config*
+    path /api/save-config*
+    path /api/user-state*
   }
   header @api_nocache {
     Cache-Control "no-cache, no-store, must-revalidate"
