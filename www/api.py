@@ -62,6 +62,13 @@ def login():
             return jsonify({"error": "Password required"}), 400
 
         app_password = os.environ.get("APP_PASSWORD")
+        # --- ADDED DEBUG LINES ---
+        app.logger.debug(f"DEBUG: In /api/login, raw APP_PASSWORD from os.environ.get: '{app_password}'")
+        app.logger.debug(f"DEBUG: Type of app_password: {type(app_password)}")
+        app.logger.debug(f"DEBUG: Length of app_password: {len(app_password) if app_password is not None else 'N/A'}")
+        app.logger.debug(f"DEBUG: Is app_password truthy? {bool(app_password)}")
+        # --- END ADDED DEBUG LINES ---
+
         if not app_password:
             app.logger.error("Login: Server misconfigured, APP_PASSWORD not set")
             return jsonify({"error": "Server misconfigured"}), 500
@@ -72,7 +79,7 @@ def login():
 
         auth_token = secrets.token_urlsafe(32)
         resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httpy_only=True, secure=True, samesite="Strict", path="/")
+        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
         app.logger.info("Login: Successful authentication")
         return resp
     except Exception as e:
