@@ -1,0 +1,25 @@
+{
+  "name": "not-the-news",
+  "version": "1.0.0",
+  "description": "![image](screenshot.jpg)",
+  "main": "index.js",
+  "scripts": {
+    "build-sw": "parcel build www/sw.js --target worker --dist-dir www --out-file sw.bundled.js",
+    "dev": "parcel www/index.html --open",
+    "build": "parcel build www/index.html --dist-dir www"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tim-projects/not-the-news.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tim-projects/not-the-news/issues"
+  },
+  "homepage": "https://github.com/tim-projects/not-the-news#readme",
+  "devDependencies": {
+    "parcel": "^2.15.4"
+  }
+}
