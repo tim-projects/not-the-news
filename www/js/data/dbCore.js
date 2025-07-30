@@ -1,6 +1,6 @@
 // www/js/data/dbCore.js
 
-import { openDB } from '../../libs/idb.js';
+import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
 const DB_VERSION = 12;
