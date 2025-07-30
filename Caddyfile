@@ -9,14 +9,14 @@
     not header Cookie auth*
     not path /login.html
     not path /api/login*
-    # --- FIX START: Explicitly exclude all API endpoints from redirection ---
+    # Explicitly exclude all API endpoints from redirection
     not path /user-state*
     not path /load-config*
     not path /save-config*
     not path /time*
     not path /feed-guids*
     not path /feed-items*
-    # --- FIX END ---
+    not path /sw.js
     not path /js/libs/*
     not path /*.css
     not path /*.js
@@ -27,7 +27,7 @@
     not path /manifest.json
     not path /images/*
   }
-  redir @unauth /login.html 302
+  redir @unauth /login.html 302 # <-- UNCOMMENT THIS LINE (if you commented it out)
 
   handle /api/login* {
     reverse_proxy 127.0.0.1:4575 {
