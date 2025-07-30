@@ -59,11 +59,31 @@ fi
     BUILD_ARGS+=("--no-cache")
 }
 
-# Build process
+---
+
+## Build Process
+
+Here's the core change. This section now first performs the `npm` steps to get your `www/` folder ready, then proceeds with the Docker build.
+
+```bash
 echo "Starting build process..."
 (
     set -x  # Show git/docker commands
-    #git pull && \
+
+    # --- npm frontend build steps ---
+    echo "Cleaning up previous npm build artifacts..."
+    rm -rf node_modules package-lock.json www
+    
+    echo "Installing npm dependencies..."
+    npm install || { echo "npm install failed!" >&2; exit 1; }
+
+    echo "Building frontend assets with Parcel..."
+    npm run build || { echo "npm run build failed!" >&2; exit 1; }
+
+    echo "Frontend build complete in www/ directory."
+    # --- End npm frontend build steps ---
+
+    #git pull && \ # Uncomment if you want to pull latest code before building
     sudo docker rm -f ntn && \
     sudo docker container prune -f && \
     sudo docker buildx build "${BUILD_ARGS[@]}" -t not-the-news . && \

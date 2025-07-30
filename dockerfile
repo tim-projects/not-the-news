@@ -18,27 +18,8 @@ RUN apk add --no-cache \
     build-base \
   && xcaddy build \
       --with github.com/dunglas/caddy-cbrotli \
-      --with github.com/caddyserver/cache-handler@latest \
-      --with github.com/pberkel/caddy-storage-redis
-
-##############################################################################
-# NEW STAGE: Build the frontend with Parcel
-FROM node:20-slim AS frontend_builder
-
-WORKDIR /app
-
-# Copy package.json and package-lock.json for npm install
-COPY package.json package-lock.json ./
-
-# Install frontend dependencies
-RUN npm install
-
-# Copy your frontend source code from the 'src' directory
-COPY src/ ./src/
-
-# Run your Parcel build command.
-# This will output the bundled files to /app/www/ within this 'frontend_builder' stage.
-RUN npm run build
+      --with github.com.com/caddyserver/cache-handler@latest \
+      --with github.com.com/pberkel/caddy-storage-redis
 
 ##############################################################################
 # 1. Base image
@@ -102,9 +83,9 @@ RUN pip install \
 WORKDIR /app
 COPY rss/ /rss/
 
-# IMPORTANT CHANGE: Copy the *built* frontend files from the 'frontend_builder' stage
-# This copies the output of `npm run build` (which is in /app/www/ in the previous stage)
-COPY --from=frontend_builder /app/www/ /app/www/
+# IMPORTANT: This line now expects the 'www' folder to be pre-built on your host.
+# It will copy the contents of the 'www' folder from your host into '/app/www/' in the container.
+COPY www/ /app/www/
 
 COPY data/ /data/feed/
 
@@ -123,7 +104,7 @@ RUN mkdir -p /usr/local/bin && \
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'dir /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'save 900 1' >> /etc/redis.conf >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'save 900 1' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'save 300 10' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendonly yes' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendfsync always' >> /usr/local/bin/docker-entrypoint.sh && \
