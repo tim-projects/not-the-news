@@ -12,7 +12,9 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-app.logger.setLevel(logging.INFO)
+#app.logger.setLevel(logging.INFO)
+
+app.logger.setLevel(logging.DEBUG)
 
 DATA_DIR = "/data"
 FEED_DIR = os.path.join(DATA_DIR, "feed")
