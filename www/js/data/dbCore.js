@@ -25,21 +25,26 @@ export async function initDb() {
             OBJECT_STORES_SCHEMA.forEach(schema => {
                 if (!db.objectStoreNames.contains(schema.name)) {
                     db.createObjectStore(schema.name, { keyPath: schema.keyPath, ...schema.options });
+                    console.log(`[DB] Created store: ${schema.name}`); // Added logging
                 }
             });
             if (oldVersion < 7) {
                 if (!db.objectStoreNames.contains('pendingOperations')) {
                     db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
+                    console.log('[DB] Created store: pendingOperations'); // Added logging
                 }
             }
         },
         blocked() {
+            console.warn('[DB] Database upgrade blocked.'); // Added logging
             alert('Database update blocked. Please close all other tabs with this site open.');
         },
         blocking() {
+            console.warn('[DB] Database blocking other tabs.'); // Added logging
         }
     });
     _dbInstance = await _dbInitPromise;
+    console.log(`[DB] Opened '${DB_NAME}', version ${DB_VERSION}`); // Added logging
     return _dbInstance;
 }
 

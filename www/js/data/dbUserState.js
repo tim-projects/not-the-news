@@ -26,6 +26,7 @@ export async function loadSimpleState(key, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
     if (!def) {
+        console.error(`[DB] Invalid key: ${key}.`); // Added logging
         return { value: null, lastModified: null };
     }
     const storeName = 'userSettings';
@@ -37,12 +38,14 @@ export async function loadSimpleState(key, tx = null) {
             return { value: data.value, lastModified: data.lastModified || null };
         }
     } catch (e) {
+        console.error(`[DB] Error loading ${key}:`, e); // Added logging
     } finally {
         if (!tx && transaction) {
             try {
                 await transaction.done;
             } catch (e) {
                 if (e.name !== 'AbortError') {
+                    console.error(`[DB] Transaction error for ${key}:`, e); // Added logging
                 }
             }
         }
@@ -54,6 +57,7 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
     if (!def) {
+        console.error(`[DB] Invalid key: ${key}.`); // Added logging
         throw new Error(`Invalid or undefined state key: ${key}`);
     }
     const storeName = 'userSettings';
@@ -68,11 +72,13 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
             objToSave.lastModified = new Date().toISOString();
         }
         await objectStore.put(objToSave);
+        console.log(`[DB] Saved "${key}".`); // Added logging
         if (['filterMode', 'syncEnabled', 'imagesEnabled', 'shuffleCount', 'lastShuffleResetDate', 'openUrlsInNewTabEnabled', 'lastViewedItemId', 'lastViewedItemOffset', 'theme'].includes(key)) {
             const op = { type: 'simpleUpdate', key: key, value: value };
             await queueAndAttemptSyncOperation(op);
         }
     } catch (e) {
+        console.error(`[DB] Error saving "${key}":`, e); // Added logging
         throw e;
     } finally {
         if (!tx && transaction) {
@@ -80,6 +86,7 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
                 await transaction.done;
             } catch (e) {
                 if (e.name !== 'AbortError') {
+                    console.error(`[DB] Transaction error for ${key}:`, e); // Added logging
                 }
             }
         }
@@ -90,6 +97,7 @@ export async function loadArrayState(key, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
     if (!def || def.type !== 'array') {
+        console.error(`[DB] Invalid array key: ${key}`); // Added logging
         return { value: def ? def.default : [], lastModified: null };
     }
     const arrayStoreName = def.store;
@@ -101,12 +109,14 @@ export async function loadArrayState(key, tx = null) {
         const { lastModified: arrayTimestamp } = await loadSimpleState(key, transaction);
         return { value: allItems, lastModified: arrayTimestamp };
     } catch (e) {
+        console.error(`[DB] Error loading ${key}:`, e); // Added logging
     } finally {
         if (!tx && transaction) {
             try {
                 await transaction.done;
             } catch (e) {
                 if (e.name !== 'AbortError') {
+                    console.error(`[DB] Transaction error for ${key}:`, e); // Added logging
                 }
             }
         }
@@ -132,13 +142,14 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
                 ? { id: item }
                 : item;
             await arrayObjectStore.put(itemToStore);
+            console.log(`[DB] Put item for ${key}:`, itemToStore); // Added logging
         }
         await saveSimpleState(key, null, serverTimestamp, transaction);
-        if (['shuffledOutGuids', 'currentDeckGuids', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
-            const op = { type: 'simpleUpdate', key: key, value: Array.from(arr) };
-            await queueAndAttemptSyncOperation(op);
-        }
+        console.log(`[DB] Saved ${clonableArr.length} items for "${key}".`); // Added logging
+        // Removed the if (['shuffledOutGuids', 'currentDeckGuids', 'rssFeeds', 'keywordBlacklist'].includes(key)) { ... } block here
+        // as per instructions to fix duplicate queueing.
     } catch (e) {
+        console.error(`[DB] Error saving "${key}":`, e); // Added logging
         throw e;
     } finally {
         if (!tx && transaction) {
@@ -146,6 +157,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
                 await transaction.done;
             } catch (e) {
                 if (e.name !== 'AbortError') {
+                    console.error(`[DB] Transaction error for ${key}:`, e); // Added logging
                 }
             }
         }
@@ -247,9 +259,11 @@ export async function addStarredItem(itemGuid) {
         const tx = db.transaction('starredItems', 'readwrite');
         await tx.objectStore('starredItems').put(itemToStar);
         await tx.done;
+        console.log(`[DB] Starred ${itemGuid} locally.`); // Added logging
         const op = { type: 'starDelta', data: { id: itemGuid, action: 'add', starredAt: itemToStar.starredAt } };
         await queueAndAttemptSyncOperation(op);
     } catch (e) {
+        console.error(`[DB] Error starring ${itemGuid}:`, e); // Added logging
         throw e;
     }
 }
@@ -260,9 +274,11 @@ export async function removeStarredItem(itemGuid) {
         const tx = db.transaction('starredItems', 'readwrite');
         await tx.objectStore('starredItems').delete(itemGuid);
         await tx.done;
+        console.log(`[DB] Unstarred ${itemGuid} locally.`); // Added logging
         const op = { type: 'starDelta', data: { id: itemGuid, action: 'remove' } };
         await queueAndAttemptSyncOperation(op);
     } catch (e) {
+        console.error(`[DB] Error unstarring ${itemGuid}:`, e); // Added logging
         throw e;
     }
 }
@@ -273,9 +289,11 @@ export async function addHiddenItem(itemGuid) {
         const tx = db.transaction('hiddenItems', 'readwrite');
         await tx.objectStore('hiddenItems').put(itemToHide);
         await tx.done;
+        console.log(`[DB] Hidden ${itemGuid} locally.`); // Added logging
         const op = { type: 'hiddenDelta', data: { id: itemGuid, action: 'add', timestamp: itemToHide.hiddenAt } };
         await queueAndAttemptSyncOperation(op);
     } catch (e) {
+        console.error(`[DB] Error hiding ${itemGuid}:`, e); // Added logging
         throw e;
     }
 }
@@ -286,9 +304,11 @@ export async function removeHiddenItem(itemGuid) {
         const tx = db.transaction('hiddenItems', 'readwrite');
         await tx.objectStore('hiddenItems').delete(itemGuid);
         await tx.done;
+        console.log(`[DB] Unhidden ${itemGuid} locally.`); // Added logging
         const op = { type: 'hiddenDelta', data: { id: itemGuid, action: 'remove' } };
         await queueAndAttemptSyncOperation(op);
     } catch (e) {
+        console.error(`[DB] Error unhiding ${itemGuid}:`, e); // Added logging
         throw e;
     }
 }
