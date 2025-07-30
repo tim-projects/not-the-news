@@ -127,14 +127,53 @@ def time():
     app.logger.debug(f"Time requested: {now}")
     return jsonify({"time": now}), 200
 
-# --- UPDATED: Feed GUIDs Endpoint with serverTime (no functional change here from your provided code) ---
 @app.route("/api/feed-guids", methods=["GET"])
 def feed_guids():
-    """Returns a list of all item GUIDs from the feed and the server's current time."""
+    """
+    Returns a list of all item GUIDs from the feed and the server's current time.
+    Supports If-Modified-Since header to return 304 Not Modified if feed hasn't changed.
+    """
     items = _load_feed_items()
+
+    # Determine the latest pubDate from loaded items
+    latest_pub_date = None
+    for item in items.values():
+        pub_date_str = item.get('pubDate')
+        if pub_date_str:
+            try:
+                # Parse and convert to UTC for comparison
+                dt = datetime.fromisoformat(pub_date_str.replace('Z', '+00:00')).astimezone(timezone.utc)
+                if latest_pub_date is None or dt > latest_pub_date:
+                    latest_pub_date = dt
+            except ValueError:
+                app.logger.warning(f"Invalid pubDate format for item {item.get('id')}: {pub_date_str}")
+                continue
+
+    # Format latest_pub_date for Last-Modified header (RFC 1123 format)
+    last_modified_header = None
+    if latest_pub_date:
+        last_modified_header = latest_pub_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+    # Check If-Modified-Since header
+    if_modified_since = request.headers.get("If-Modified-Since")
+    if if_modified_since and last_modified_header:
+        try:
+            # Parse If-Modified-Since date
+            ims_dt = datetime.strptime(if_modified_since, "%a, %d %b %Y %H:%M:%S GMT").replace(tzinfo=timezone.utc)
+            if latest_pub_date and latest_pub_date <= ims_dt:
+                app.logger.info("Feed GUIDs: Returning 304 Not Modified (If-Modified-Since matched).")
+                return make_response("", 304)
+        except ValueError:
+            app.logger.warning(f"Invalid If-Modified-Since header format: {if_modified_since}")
+
     now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+    resp = jsonify({"guids": list(items.keys()), "serverTime": now})
+    if last_modified_header:
+        resp.headers["Last-Modified"] = last_modified_header
+
     app.logger.info(f"Returning {len(items)} GUIDs with server time.")
-    return jsonify({"guids": list(items.keys()), "serverTime": now}), 200
+    return resp, 200
 
 # --- RENAMED & UPDATED: Feed Items Endpoint for GET with exclude_guids ---
 @app.route("/api/feed-items", methods=["GET", "POST"])
@@ -346,18 +385,8 @@ def post_user_state():
                         app.logger.info(f"shuffleCount updated from {current_count} to {new_count} (max logic).")
                     _save_state(key, new_count)
                     results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value": new_count})
-                elif key in ['shuffledOutGuids', 'currentDeckGuids', 'starred', 'hidden']:
-                    # These are array types that client typically sends as full replacement
-                    # The delta handlers for starred/hidden exist, but if simpleUpdate is used for full array, allow it.
-                    if not isinstance(value, list) and value is not None:
-                         app.logger.warning(f"POST /api/user-state: Invalid value type for array key {key}. Expected list or None.")
-                         results.append({"opType": op_type, "key": key, "status": "failed", "reason": "Invalid value type"})
-                         continue
-                    _save_state(key, value if value is not None else [])
-                    app.logger.info(f"POST /api/user-state: Overwrote array key '{key}' with {len(value) if value else 0} items.")
-                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time})
                 else:
-                    # For other simple updates (lastShuffleResetDate, filterMode, etc.)
+                    # For other simple updates (lastShuffleResetDate, filterMode, etc., and now including shuffledOutGuids, currentDeckGuids)
                     _save_state(key, value)
                     app.logger.info(f"POST /api/user-state: Saved simple update for key '{key}'.")
                     results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time})
@@ -365,13 +394,12 @@ def post_user_state():
             elif op_type == "starDelta":
                 id_ = op["data"].get("id")
                 action = op["data"].get("action")
-                starred_at = op["data"].get("starredAt") # Use client timestamp if provided
 
                 current_state_data = _load_state("starred")
                 current_starred = current_state_data['value'] or []
                 
                 if action == "add":
-                    entry = {"id": id_, "starredAt": starred_at or server_time}
+                    entry = {"id": id_, "starredAt": server_time}
                     if not any(s["id"] == id_ for s in current_starred):
                         current_starred.append(entry)
                         app.logger.info(f"starDelta: Added ID {id_}")
@@ -393,13 +421,12 @@ def post_user_state():
             elif op_type == "hiddenDelta":
                 id_ = op["data"].get("id")
                 action = op["data"].get("action")
-                hidden_at = op["data"].get("timestamp") # Use client timestamp if provided
 
                 current_state_data = _load_state("hidden")
                 current_hidden = current_state_data['value'] or []
 
                 if action == "add":
-                    entry = {"id": id_, "hiddenAt": hidden_at or server_time}
+                    entry = {"id": id_, "hiddenAt": server_time}
                     if not any(h["id"] == id_ for h in current_hidden):
                         current_hidden.append(entry)
                         app.logger.info(f"hiddenDelta: Added ID {id_}")
