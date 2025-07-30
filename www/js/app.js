@@ -259,7 +259,7 @@ document.addEventListener('alpine:init', () => {
                 // Load currentDeckGuids and ensure they are always strings (GUIDs)
                 let storedGuidsResult = await loadCurrentDeck(); // loadCurrentDeck internally uses loadSimpleState
                 this.currentDeckGuids = (storedGuidsResult || []).map(item => {
-                    // If 'item' is an object with an 'id' property, use item.id, otherwise use the item itself (assuming it's already a string)
+                    // If 'item' is an object with an 'guid' property, use item.id, otherwise use the item itself (assuming it's already a string)
                     return typeof item === 'object' && item !== null && item.id ? item.id : String(item);
                 });
 

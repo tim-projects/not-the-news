@@ -3,7 +3,7 @@
 import { getDb, isOnline } from './dbCore.js';
 import { loadSimpleState, saveSimpleState, saveArrayState, USER_STATE_DEFS } from './dbUserState.js';
 
-// No longer strictly needed for primary key 'id' due to autoIncrement, but keep for other potential uses
+// No longer strictly needed for primary key 'guid' due to autoIncrement, but keep for other potential uses
 let _operationIdCounter = Date.now();
 
 export async function queueAndAttemptSyncOperation(operation) {
@@ -26,7 +26,7 @@ export async function queueAndAttemptSyncOperation(operation) {
         // we'll explicitly delete it so autoIncrement takes over for the primary key.
         // If the operation type implies it could be an update to an existing operation (not just buffering a new one),
         // then `store.put()` would be more appropriate for that case.
-        // For 'add' to work correctly with autoIncrement as primary key, 'id' must be undefined/null on insertion.
+        // For 'add' to work correctly with autoIncrement as primary key, 'guid' must be undefined/null on insertion.
         delete opToStore.id; // Ensure IndexedDB assigns the autoIncremented ID
 
         generatedId = await store.add(opToStore);
@@ -360,7 +360,7 @@ export async function performFeedSync(app) {
                     continue; // Skip to the next item in the batch
                 }
                 await feedStore.put(item);
-                console.log(`[DB] Stored item: ${item.guid}`);
+                //console.log(`[DB] Stored item: ${item.guid}`);
             }
             // --- ADDED CODE END ---
 

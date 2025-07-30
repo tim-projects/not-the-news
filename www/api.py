@@ -109,7 +109,7 @@ def _load_feed_items():
             pub_iso = raw_date
 
         data = {
-            "guid": guid, # FIX: Changed 'id' to 'guid' here to match client-side IndexedDB keyPath
+            "guid": guid,
             "title": it.findtext("title"),
             "link": it.findtext("link"),
             "pubDate": pub_iso,

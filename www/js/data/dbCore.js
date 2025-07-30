@@ -9,12 +9,12 @@ let _dbInitPromise = null;
 
 const OBJECT_STORES_SCHEMA = [
     { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
-    { name: 'starredItems', options: { keyPath: 'id' } },
-    { name: 'hiddenItems', options: { keyPath: 'id' } },
-    { name: 'currentDeckGuids', keyPath: 'id' },
-    { name: 'shuffledOutGuids', keyPath: 'id' },
+    { name: 'starredItems', options: { keyPath: 'guid' } },
+    { name: 'hiddenItems', options: { keyPath: 'guid' } },
+    { name: 'currentDeckGuids', keyPath: 'guid' },
+    { name: 'shuffledOutGuids', keyPath: 'guid' },
     { name: 'userSettings', keyPath: 'key' },
-    { name: 'pendingOperations', keyPath: 'id', options: { autoIncrement: true } }
+    { name: 'pendingOperations', keyPath: 'guid', options: { autoIncrement: true } }
 ];
 
 export async function initDb() {
@@ -30,7 +30,7 @@ export async function initDb() {
             });
             if (oldVersion < 7) {
                 if (!db.objectStoreNames.contains('pendingOperations')) {
-                    db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
+                    db.createObjectStore('pendingOperations', { keyPath: 'guid', autoIncrement: true });
                     console.log('[DB] Created store: pendingOperations'); // Added logging
                 }
             }
