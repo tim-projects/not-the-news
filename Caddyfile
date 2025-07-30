@@ -7,21 +7,20 @@
 {$DOMAIN} {
 
   # 1. Handle specific static files first.
-  # These files should always be served directly and never redirected.
-  handle /sw.js, /login.html, /manifest.json { # Corrected: Grouped matchers with commas
+  # CORRECTED: Use spaces instead of commas for multiple path matchers.
+  handle /sw.js /login.html /manifest.json {
     root * /app/www
     file_server
   }
 
   # 2. Handle common static asset directories/patterns.
-  # This ensures all your JS, CSS, images, etc. are served directly.
-  handle /js/*, /*.css, /*.js, /*.svg, /*.ttf, /*.woff, /*.woff2, /images/* { # Corrected: Grouped matchers with commas
+  # CORRECTED: Use spaces instead of commas for multiple path matchers.
+  handle /js/* /*.css /*.js /*.svg /*.ttf /*.woff /*.woff2 /images/* {
     root * /app/www
     file_server
   }
 
   # 3. Handle API endpoints.
-  # These will be reverse-proxied to your backend.
   handle /api/login* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
@@ -81,9 +80,6 @@
   }
 
   # 5. Catch-all handle block for all *other* requests.
-  # This is where your authentication redirect logic should now live.
-  # Any request that hasn't been handled by the specific `handle` blocks above
-  # will fall into this block.
   handle {
     @unauth {
       not header Cookie auth*
