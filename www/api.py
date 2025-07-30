@@ -109,11 +109,11 @@ def _load_feed_items():
             pub_iso = raw_date
 
         data = {
-            "id": guid, # Changed 'guid' to 'id' for client-side consistency
+            "guid": guid, # FIX: Changed 'id' to 'guid' here to match client-side IndexedDB keyPath
             "title": it.findtext("title"),
             "link": it.findtext("link"),
             "pubDate": pub_iso,
-            "description": it.findtext("description"), # Changed 'desc' to 'description'
+            "description": it.findtext("description"),
         }
         items[guid] = data
     return items
@@ -146,7 +146,7 @@ def feed_guids():
                 if latest_pub_date is None or dt > latest_pub_date:
                     latest_pub_date = dt
             except ValueError:
-                app.logger.warning(f"Invalid pubDate format for item {item.get('id')}: {pub_date_str}")
+                app.logger.warning(f"Invalid pubDate format for item {item.get('guid')}: {pub_date_str}") # Changed to 'guid'
                 continue
 
     # Format latest_pub_date for Last-Modified header (RFC 1123 format)
@@ -444,7 +444,7 @@ def post_user_state():
                     raise ValueError(f"Invalid hiddenDelta action: {action}")
                 
                 _save_state("hidden", current_hidden)
-                results.append({"opType": op_type, "id": id_, "action": action, "status": "success", "serverTime": server_time})
+                results.append({"opType": op_type, "id": id_, "action": action, "status": "success", "server_time": server_time})
 
             else:
                 app.logger.warning(f"POST /api/user-state: Unknown operation type: {op_type}. Skipping.")
