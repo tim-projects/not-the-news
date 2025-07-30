@@ -3,8 +3,21 @@
   "version": "1.0.0",
   "description": "![image](screenshot.jpg)",
   "main": "index.js",
+  "targets": {
+    "serviceWorker": {
+      "source": "www/sw.js",
+      "distDir": "www",
+      "publicUrl": "/",
+      "type": "service-worker"
+    },
+    "main": {
+      "source": "www/index.html",
+      "distDir": "www",
+      "publicUrl": "/"
+    }
+  },
   "scripts": {
-    "build-sw": "parcel build www/sw.js --target worker --dist-dir www",
+    "build-sw": "parcel build @serviceWorker",
     "dev": "parcel www/index.html --open",
     "build": "parcel build www/index.html --dist-dir www"
   },
