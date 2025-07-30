@@ -20,6 +20,26 @@ RUN apk add --no-cache \
       --with github.com/dunglas/caddy-cbrotli \
       --with github.com/caddyserver/cache-handler@latest \
       --with github.com/pberkel/caddy-storage-redis
+
+##############################################################################
+# NEW STAGE: Build the frontend with Parcel
+FROM node:20-slim AS frontend_builder
+
+WORKDIR /app
+
+# Copy package.json and package-lock.json for npm install
+COPY package.json package-lock.json ./
+
+# Install frontend dependencies
+RUN npm install
+
+# Copy your frontend source code from the 'src' directory
+COPY src/ ./src/
+
+# Run your Parcel build command.
+# This will output the bundled files to /app/www/ within this 'frontend_builder' stage.
+RUN npm run build
+
 ##############################################################################
 # 1. Base image
 FROM caddy:2-alpine
@@ -81,24 +101,29 @@ RUN pip install \
 # 5. Copy code & initial data
 WORKDIR /app
 COPY rss/ /rss/
-COPY www/ /app/www/
+
+# IMPORTANT CHANGE: Copy the *built* frontend files from the 'frontend_builder' stage
+# This copies the output of `npm run build` (which is in /app/www/ in the previous stage)
+COPY --from=frontend_builder /app/www/ /app/www/
+
 COPY data/ /data/feed/
 
 # Create a dedicated non-root user for the Flask application
 # Add 'appuser' user and 'appgroup' group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 ##############################################################################
 # 6. Build entrypoint
 RUN mkdir -p /usr/local/bin && \
     echo '#!/usr/bin/env bash' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'mkdir -p /data/feed /data/user_state /data/config' >> /usr/local/bin/docker-entrypoint.sh && \ 
+    echo 'mkdir -p /data/feed /data/user_state /data/config' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'chown -R appuser:appgroup /data/user_state /data/feed /app /rss' >> /usr/local/bin/docker-entrypoint.sh && \
     # Redis setup
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'dir /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'save 900 1' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'save 900 1' >> /etc/redis.conf >> /usr/local/bin/docker-entrypoint.sh && \ # Fixed duplicated EOF
     echo 'save 300 10' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendonly yes' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendfsync always' >> /usr/local/bin/docker-entrypoint.sh && \
@@ -107,7 +132,6 @@ RUN mkdir -p /usr/local/bin && \
     echo 'EOF' >> /usr/local/bin/docker-entrypoint.sh && \
     # Start background services
     echo 'redis-server /etc/redis.conf --daemonize yes &' >> /usr/local/bin/docker-entrypoint.sh && \
-    # Use gosu for Gunicorn and Python script
     echo 'gosu appuser /venv/bin/gunicorn --chdir /app/www --bind 127.0.0.1:4575 --workers 1 --threads 3 api:app &' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'gosu appuser python3 /rss/run.py --daemon &' >> /usr/local/bin/docker-entrypoint.sh && \
     # Single Caddy execution with fallback
@@ -117,6 +141,7 @@ RUN mkdir -p /usr/local/bin && \
     echo '  exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
     chmod +x /usr/local/bin/docker-entrypoint.sh
+
 ##############################################################################
 # 7. copy Caddyfile (persist to /data, allow ACME_CA override)
 COPY Caddyfile /etc/caddy/Caddyfile
@@ -124,6 +149,7 @@ COPY Caddyfile /etc/caddy/Caddyfile
 RUN sed -i "s|{\$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
     sed -i "s|{\$ACME_CA:[^}]*}|${ACME_CA}|g" /etc/caddy/Caddyfile && \
     sed -i "s|{\$DOMAIN}|${DOMAIN}|g" /etc/caddy/Caddyfile
+
 ##############################################################################
 # 8. Declare the data volume & expose ports
 VOLUME /data
