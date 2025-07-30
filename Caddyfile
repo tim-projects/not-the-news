@@ -4,10 +4,11 @@
   acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
 
+{$DOMAIN} { # <--- Ensure your domain is here
   @unauth {
     not header Cookie auth*
     not path /login.html
-    # EXCLUDE ALL API ENDPOINTS FROM REDIRECTION
+    # EXCLUDE ALL API ENDPOINTS FROM REDIRECTION (NOW WITH /api/ PREFIX)
     not path /api/login*
     not path /api/user-state*
     not path /api/load-config*
@@ -29,6 +30,7 @@
   }
   redir @unauth /login.html 302
 
+  # ALL 'handle' blocks for API endpoints must now include '/api/'
   handle /api/login* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
@@ -36,45 +38,43 @@
     }
   }
 
-  handle /user-state* {
+  handle /api/user-state* { # <-- UPDATED
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /load-config* {
+  handle /api/load-config* { # <-- UPDATED (Consider removing if Flask no longer supports it)
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /save-config* {
+  handle /api/save-config* { # <-- UPDATED (Consider removing if Flask no longer supports it)
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /time* {
+  handle /api/time* { # <-- UPDATED
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /feed-guids* {
+  handle /api/feed-guids* { # <-- UPDATED
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
 
-  # --- CRITICAL CHANGE: Proxy /feed-items directly to Flask ---
-  handle /feed-items* {
+  handle /api/feed-items* { # <-- UPDATED
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  # Removed the old `handle /items*` since Flask now uses `/feed-items`
 
   root * /app/www
   file_server
@@ -95,9 +95,9 @@
   }
 
   @api_nocache {
-    path /load-config*
-    path /save-config*
-    path /user-state*
+    path /api/load-config* # <-- UPDATED
+    path /api/save-config* # <-- UPDATED
+    path /api/user-state* # <-- UPDATED
   }
   header @api_nocache {
     Cache-Control "no-cache, no-store, must-revalidate"
