@@ -33,7 +33,7 @@ const MAX_DECK_SIZE = 10; // Define the maximum number of items in the deck
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
  */
 export async function manageDailyDeck(app) {
-    console.log("[DECK-MANAGER] manageDailyDeck called.");
+    console.log("[deckManager] manageDailyDeck called.");
 
     // Load current shuffle state and shuffled-out GUIDs
     let {
@@ -58,7 +58,7 @@ export async function manageDailyDeck(app) {
     const isNewDay = !lastResetDate || new Date(lastResetDate).toDateString() !== today.toDateString();
 
     if (isNewDay) {
-        console.log(`[DECK-MANAGER] New day detected (${today.toDateString()}). Resetting shuffle state.`);
+        console.log(`[deckManager] New day detected (${today.toDateString()}). Resetting shuffle state.`);
         // Crucially, clear user_state.shuffled_out_guids
         newShuffledOutGuids = [];
         // Reset user_state.shuffleCount
@@ -73,12 +73,12 @@ export async function manageDailyDeck(app) {
         // Update Alpine.js app state immediately
         app.shuffleCount = newShuffleCount;
         app.shuffledOutGuids = newShuffledOutGuids; // Sync Alpine state
-        console.log(`[DECK-MANAGER] Shuffle count reset to ${app.shuffleCount}, shuffled-out GUIDs cleared.`);
+        console.log(`[deckManager] Shuffle count reset to ${app.shuffleCount}, shuffled-out GUIDs cleared.`);
     } else {
         // If it's the same day, ensure Alpine app state reflects loaded values
         app.shuffleCount = newShuffleCount;
         app.shuffledOutGuids = newShuffledOutGuids;
-        console.log(`[DECK-MANAGER] Same day (${today.toDateString()}). Current shuffle count: ${app.shuffleCount}.`);
+        console.log(`[deckManager] Same day (${today.toDateString()}). Current shuffle count: ${app.shuffleCount}.`);
     }
 
     // --- Deck Generation Logic (applies to both new day and same day) ---
@@ -111,7 +111,7 @@ export async function manageDailyDeck(app) {
         shuffleDisplay.textContent = app.shuffleCount;
     }
 
-    console.log(`[DECK-MANAGER] Deck managed. New deck size: ${app.currentDeckGuids.length}.`);
+    console.log(`[deckManager] Deck managed. New deck size: ${app.currentDeckGuids.length}.`);
 }
 
 /**
@@ -121,7 +121,7 @@ export async function manageDailyDeck(app) {
  * @param {object} app The Alpine.js app scope (`this` from Alpine.data).
  */
 export async function processShuffle(app) {
-    console.log("[DECK-MANAGER] processShuffle called.");
+    console.log("[deckManager] processShuffle called.");
 
     // Check if shuffles are available
     if (app.shuffleCount <= 0) {
@@ -157,5 +157,5 @@ export async function processShuffle(app) {
     await manageDailyDeck(app);
 
     displayTemporaryMessageInTitle('Feed shuffled!');
-    console.log(`[DECK-MANAGER] Deck shuffled. Remaining shuffles: ${app.shuffleCount}.`);
+    console.log(`[deckManager] Deck shuffled. Remaining shuffles: ${app.shuffleCount}.`);
 }

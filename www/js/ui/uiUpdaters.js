@@ -11,7 +11,7 @@ import {
     getNtnTitleH2,
     getMessageContainer
 } from './uiElements.js';
-import { getDb, saveSimpleState } from '../data/database.js';
+import { getDb, saveSimpleState } from '../data/database.js'; // getDb isn't used in this file. saveSimpleState is.
 
 /**
  * Splits a message into two lines if it exceeds a certain character limit.
@@ -77,10 +77,11 @@ export async function displayTemporaryMessageInTitle(message) {
 
     // Step 2: Display second line if it exists
     if (lines.length > 1) {
-        titleH2.textContent = lines[0] + (lines[0] && lines[1] ? ' ' : '') + lines[1]; // Concatenate with space if both exist
+        // Concatenate with space if both lines exist and aren't empty
+        titleH2.textContent = [lines[0], lines[1]].filter(Boolean).join(' ');
         await new Promise(resolve => setTimeout(resolve, 1500)); // Display full message for 1.5 seconds
     } else if (lines.length === 1) {
-        // If only one line, ensure it stays for total 3 seconds
+        // If only one line, ensure it stays for total 3 seconds (1.5s + 1.5s)
         await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
@@ -127,14 +128,23 @@ export function createStatusBarMessage(message, type = 'info') {
  * @param {object} app - The Alpine.js app state object.
 */
 export function updateCounts(app) {
-    const hiddenSet = new Set(app.hidden.map(e => e.id));
-    const starredSet = new Set(app.starred.map(s => s.id));
+    // app.hidden and app.starred now contain objects like { guid: '...', hiddenAt: '...' }
+    // or { guid: '...', starredAt: '...' }.
+    // app.entries items have a 'guid' property.
+    // app.currentDeckGuids is an array of plain GUID strings.
+
+    const hiddenSet = new Set(app.hidden.map(e => e.guid)); // ***CHANGED: e.id to e.guid***
+    const starredSet = new Set(app.starred.map(s => s.guid)); // ***CHANGED: s.id to s.guid***
 
     const allC = app.entries.length;
-    const hiddenC = app.entries.filter(e => hiddenSet.has(e.id)).length;
-    const starredC = app.entries.filter(e => starredSet.has(e.id)).length;
+    // Filter app.entries using their 'guid' property against the sets
+    const hiddenC = app.entries.filter(e => hiddenSet.has(e.guid)).length; // ***CHANGED: e.id to e.guid***
+    const starredC = app.entries.filter(e => starredSet.has(e.guid)).length; // ***CHANGED: e.id to e.guid***
+
+    // app.currentDeckGuids is already an array of GUID strings
     const deckGuidsSet = new Set(app.currentDeckGuids);
-    const unreadInDeckC = app.entries.filter(e => deckGuidsSet.has(e.id) && !hiddenSet.has(e.id)).length;
+    // Unread items are those in the current deck that are NOT hidden.
+    const unreadInDeckC = app.entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length; // ***CHANGED: e.id to e.guid***
 
     const selector = getFilterSelector();
     if (!selector) return;
@@ -228,22 +238,27 @@ export function attachScrollToTopHandler(buttonId = "scroll-to-top") {
         scrollToTop();
     });
 }
+
 export async function saveCurrentScrollPosition() {
-    let lastViewedItemId = '';
+    let lastViewedItemId = ''; // This will store the GUID of the last viewed item.
+    let lastViewedItemOffset = 0; // This will store the scroll offset within that item.
 
     // Find the GUID of the first entry element whose top is at or above the viewport's top.
-    // This is typically considered the "last viewed" item when scrolling down.
     const entryElements = document.querySelectorAll('.entry[data-guid]');
     for (const entryElement of entryElements) {
         const rect = entryElement.getBoundingClientRect();
+
         // If the top of the entry is visible (at or above the viewport's top)
-        if (rect.top >= 0) {
+        // and at least partially visible (bottom is below top of viewport)
+        if (rect.top >= 0 && rect.bottom > 0) { // rect.bottom > 0 ensures it's not entirely off-screen above
             lastViewedItemId = entryElement.dataset.guid;
+            // Calculate offset from the top of the entry to the top of the viewport
+            lastViewedItemOffset = rect.top; // This is the scroll position *within* the item
             break; // Found the first visible item from the top, stop searching
         }
     }
 
-    // Save only the lastViewedItemId (GUID string) to IndexedDB.
-    // If no visible item is found (e.g., scrolled to bottom, empty feed), an empty string will be saved.
+    // Save both the lastViewedItemId (GUID string) and its scroll offset to IndexedDB.
     await saveSimpleState('lastViewedItemId', lastViewedItemId);
+    await saveSimpleState('lastViewedItemOffset', lastViewedItemOffset); // Save the offset
 }
