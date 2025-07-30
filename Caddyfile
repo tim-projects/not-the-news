@@ -5,10 +5,18 @@
 }
 
 {$DOMAIN} {
-  # Explicitly handle common static files first to ensure they are never redirected.
-  # Caddy will serve these directly and stop processing other rules for these paths.
+
+  # 1. Handle specific static files first.
+  # These files should always be served directly and never redirected.
   handle /sw.js
   handle /login.html
+  handle /manifest.json { # Added manifest.json for completeness, common for PWAs
+    root * /app/www
+    file_server
+  }
+
+  # 2. Handle common static asset directories/patterns.
+  # This ensures all your JS, CSS, images, etc. are served directly.
   handle /js/*
   handle /*.css
   handle /*.js
@@ -16,29 +24,13 @@
   handle /*.ttf
   handle /*.woff
   handle /*.woff2
-  handle /manifest.json
   handle /images/* {
     root * /app/www
     file_server
   }
 
-  @unauth {
-    not header Cookie auth*
-    # Removed specific static file exclusions from here, as they are now handled
-    # by the dedicated `handle` blocks above for robustness.
-    # The API exclusions remain here.
-    not path /api/login*
-    not path /api/user-state*
-    not path /api/load-config*
-    not path /api/save-config*
-    not path /api/time*
-    not path /api/feed-guids*
-    not path /api/feed-items*
-    not path /api/user-state/shuffledOutGuids
-  }
-  redir @unauth /login.html 302
-
-  # ALL 'handle' blocks for API endpoints must now include '/api/'
+  # 3. Handle API endpoints.
+  # These will be reverse-proxied to your backend.
   handle /api/login* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
@@ -84,11 +76,38 @@
     }
   }
 
-  # This `root` and `file_server` will act as a general fallback for any static files
-  # not explicitly handled by the `handle` blocks above.
-  root * /app/www
-  file_server
+  # 4. Handle feed.xml specifically.
+  @feed {
+    path /feed.xml
+  }
+  handle @feed {
+    root * /data/feed
+    header {
+      Access-Control-Allow-Origin   *
+      Access-Control-Expose-Headers ETag, Last-Modified
+    }
+    file_server
+  }
 
+  # 5. Catch-all handle block for all *other* requests.
+  # This is where your authentication redirect logic should now live.
+  # Any request that hasn't been handled by the specific `handle` blocks above
+  # will fall into this block.
+  handle {
+    @unauth {
+      not header Cookie auth*
+      # We no longer need path exclusions here, as all relevant static and API paths
+      # are handled by the explicit `handle` blocks *before* this one.
+      # This @unauth matcher now only needs to check the authentication cookie.
+    }
+    redir @unauth /login.html 302
+
+    # Serve the main application files as a fallback if no redirect happens.
+    root * /app/www
+    file_server
+  }
+
+  # Global directives outside of specific handle blocks (e.g., encoding)
   encode {
     br 11
     gzip 5
@@ -104,6 +123,7 @@
     minimum_length 512
   }
 
+  # API no-cache headers can remain here, or be integrated into the /api/* handle blocks.
   @api_nocache {
     path /api/load-config*
     path /api/save-config*
@@ -113,16 +133,5 @@
     Cache-Control "no-cache, no-store, must-revalidate"
     Pragma "no-cache"
     Expires "0"
-  }
-  @feed {
-    path /feed.xml
-  }
-  handle @feed {
-    root * /data/feed
-    header {
-      Access-Control-Allow-Origin   *
-      Access-Control-Expose-Headers ETag, Last-Modified
-    }
-    file_server
   }
 }
