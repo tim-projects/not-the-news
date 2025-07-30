@@ -32,10 +32,15 @@ export const USER_STATE_DEFS = {
 export async function loadSimpleState(key, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'simple') { // Added def.type check for clarity
-        console.error(`[DB] Invalid simple state key: ${key}.`);
+    // --- START FIX ---
+    // Allow loading if it's a simple type OR if it's one of the array types whose metadata is stored as a simple key in userSettings
+    const isAllowedMetadataKey = ['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key);
+
+    if (!def || (def.type !== 'simple' && !isAllowedMetadataKey)) {
+        console.error(`[DB] Invalid key for simple state load operation: ${key}. It must be a 'simple' type or an array metadata key.`);
         return { value: null, lastModified: null };
     }
+    // --- END FIX ---
     const storeName = 'userSettings'; // Simple states are stored in 'userSettings'
     let transaction = tx; // Use provided transaction or create a new one
 
@@ -66,10 +71,15 @@ export async function loadSimpleState(key, tx = null) {
 export async function saveSimpleState(key, value, serverTimestamp = null, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'simple') { // Added def.type check
-        console.error(`[DB] Invalid simple state key: ${key}.`);
+    // --- START FIX ---
+    // Allow saving if it's a simple type OR if it's one of the array types whose metadata is stored as a simple key in userSettings
+    const isAllowedMetadataKey = ['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key);
+
+    if (!def || (def.type !== 'simple' && !isAllowedMetadataKey)) {
+        console.error(`[DB] Invalid key for simple state save operation: ${key}. It must be a 'simple' type or an array metadata key.`);
         throw new Error(`Invalid or undefined simple state key: ${key}`);
     }
+    // --- END FIX ---
     const storeName = 'userSettings'; // Simple states are stored in 'userSettings'
     let transaction = tx; // Use provided transaction or create a new one
 
@@ -89,11 +99,10 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
 
         // These keys are managed as simple updates on the server.
         // `queueAndAttemptSyncOperation` will automatically remove 'guid' from the op if present.
+        // Array metadata keys (starred, hidden, etc.) are NOT queued from here,
+        // they are queued from saveArrayState's finally block if needed.
         if (['filterMode', 'syncEnabled', 'imagesEnabled', 'shuffleCount', 'lastShuffleResetDate', 'openUrlsInNewTabEnabled', 'lastViewedItemId', 'lastViewedItemOffset', 'theme', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
-            // Note: `lastViewedItemOffset` added to the list for server sync if it's a simpleUpdate.
             const op = { type: 'simpleUpdate', key: key, value: value };
-            // Pass the operation to queueAndAttemptSyncOperation.
-            // It will buffer it and potentially sync. It handles its own transaction.
             await queueAndAttemptSyncOperation(op);
         }
 
@@ -163,7 +172,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
     try {
         if (!transaction) {
             // Need 'readwrite' access to both the array store and 'userSettings' for metadata
-            transaction = db.transaction([arrayStoreName, 'userSettings'], 'readwrite'); // Removed 'pendingOperations' here as queueAndAttemptSyncOperation handles its own tx
+            transaction = db.transaction([arrayStoreName, 'userSettings'], 'readwrite');
         }
         const arrayObjectStore = transaction.objectStore(arrayStoreName);
         await arrayObjectStore.clear(); // Clear existing data in the specific array store
@@ -232,6 +241,12 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
                     // The server then reconciles.
                     // If your server supports delta updates for these, you'd send deltas here.
                     // Otherwise, send the full array state as a 'simpleUpdate' type operation.
+                    // NOTE: The `addStarredItem`/`removeStarredItem` functions handle `starDelta` types.
+                    // This `simpleUpdate` here would be a full sync of the list, potentially redundant
+                    // if deltas are also sent and handled correctly by the server.
+                    // However, if `pullUserState` is the primary sync mechanism for these arrays,
+                    // and this is meant to push the full list on *local* array changes, it's fine.
+                    // If not, consider if this `simpleUpdate` for arrays is truly needed or if delta logic is sufficient.
                     await queueAndAttemptSyncOperation({
                         type: 'simpleUpdate', // Generic update for the full array
                         key: key, // e.g., 'starred', 'hidden'
