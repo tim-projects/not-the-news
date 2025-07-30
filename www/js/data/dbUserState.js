@@ -172,7 +172,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
             }
 
             if (!skipItem) {
-                console.log(`[DB] Saving item to store "${arrayStoreName}". itemToStore:`, itemToStore);
+                //console.log(`[DB] Saving item to store "${arrayStoreName}". itemToStore:`, itemToStore);
                 await arrayObjectStore.put(itemToStore);
             } else {
                 console.warn(`[DB] Skipping put operation for problematic item in "${key}" store (Store: ${arrayStoreName}).`);
