@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "build-sw": "parcel build @serviceWorker",
+    "build-sw": "parcel build www/sw.js",
     "dev": "parcel www/index.html --open",
     "build": "parcel build www/index.html --dist-dir www"
   },
