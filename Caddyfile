@@ -7,59 +7,114 @@
 {$DOMAIN} {
 
   # 1. Handle specific static files first.
-  # CORRECTED: Use spaces instead of commas for multiple path matchers.
-  handle /sw.js /login.html /manifest.json {
+  # Each file now has its own handle block.
+  handle /sw.js
+  {
+    root * /app/www
+    file_server
+  }
+  handle /login.html
+  {
+    root * /app/www
+    file_server
+  }
+  handle /manifest.json
+  {
     root * /app/www
     file_server
   }
 
   # 2. Handle common static asset directories/patterns.
-  # CORRECTED: Use spaces instead of commas for multiple path matchers.
-  handle /js/* /*.css /*.js /*.svg /*.ttf /*.woff /*.woff2 /images/* {
+  # Each pattern now has its own handle block.
+  handle /js/*
+  {
+    root * /app/www
+    file_server
+  }
+  handle /*.css
+  {
+    root * /app/www
+    file_server
+  }
+  handle /*.js
+  {
+    root * /app/www
+    file_server
+  }
+  handle /*.svg
+  {
+    root * /app/www
+    file_server
+  }
+  handle /*.ttf
+  {
+    root * /app/www
+    file_server
+  }
+  handle /*.woff
+  {
+    root * /app/www
+    file_server
+  }
+  handle /*.woff2
+  {
+    root * /app/www
+    file_server
+  }
+  handle /images/*
+  {
     root * /app/www
     file_server
   }
 
   # 3. Handle API endpoints.
-  handle /api/login* {
+  # These were already separate.
+  handle /api/login*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
 
-  handle /api/user-state* {
+  handle /api/user-state*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/load-config* {
+  handle /api/load-config*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/save-config* {
+  handle /api/save-config*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/time* {
+  handle /api/time*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/feed-guids* {
+  handle /api/feed-guids*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
 
-  handle /api/feed-items* {
+  handle /api/feed-items*
+  {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
@@ -70,7 +125,8 @@
   @feed {
     path /feed.xml
   }
-  handle @feed {
+  handle @feed
+  {
     root * /data/feed
     header {
       Access-Control-Allow-Origin   *
@@ -80,7 +136,8 @@
   }
 
   # 5. Catch-all handle block for all *other* requests.
-  handle {
+  handle
+  {
     @unauth {
       not header Cookie auth*
     }
