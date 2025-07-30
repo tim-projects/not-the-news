@@ -3,27 +3,36 @@
 import { getDb, isOnline } from './dbCore.js';
 import { loadSimpleState, saveSimpleState, saveArrayState, USER_STATE_DEFS } from './dbUserState.js';
 
-let _operationIdCounter = Date.now(); // Simple counter for unique IDs if autoIncrement not sufficient
+// No longer strictly needed for primary key 'id' due to autoIncrement, but keep for other potential uses
+let _operationIdCounter = Date.now();
+
 export async function queueAndAttemptSyncOperation(operation) {
     const db = await getDb();
 
-    // Assign a unique client-side ID for tracking, especially crucial for ops without natural IDs
-    // and for reliable removal from pendingOperations store.
-    if (operation.id === undefined) { // autoIncrement will assign, but client-side tracking benefits from a known ID
-        operation.id = _operationIdCounter++; // Assign a temporary client-side ID
-    }
+    // The `pendingOperations` store has `autoIncrement: true` for `id`.
+    // To avoid `ConstraintError: Key already exists`, we should let IndexedDB
+    // assign the primary key `id` when using `add()`.
+    // If the intention is to update an existing operation, `put()` should be used.
+    // Assuming new operations are always added, we remove the `id` from the object
+    // passed to `store.add()` and then update the `operation` object with the generated ID.
 
     const tx = db.transaction('pendingOperations', 'readwrite');
     const store = tx.objectStore('pendingOperations');
     let generatedId = null;
 
     try {
-        // Add the operation to IndexedDB. If autoIncrement is used, this returns the key.
-        generatedId = await store.add(operation);
-        // If the operation initially had no ID, update it with the IndexedDB assigned ID
-        if (operation.id !== generatedId) {
-            operation.id = generatedId;
-        }
+        const opToStore = { ...operation }; // Create a copy for storage
+        // If an ID is already present (e.g., from _operationIdCounter previously, or a retry mechanism),
+        // we'll explicitly delete it so autoIncrement takes over for the primary key.
+        // If the operation type implies it could be an update to an existing operation (not just buffering a new one),
+        // then `store.put()` would be more appropriate for that case.
+        // For 'add' to work correctly with autoIncrement as primary key, 'id' must be undefined/null on insertion.
+        delete opToStore.id; // Ensure IndexedDB assigns the autoIncremented ID
+
+        generatedId = await store.add(opToStore);
+        // Update the original operation object's ID with the one assigned by IndexedDB
+        operation.id = generatedId;
+
         await tx.done;
         console.log(`[DB] Operation buffered with ID: ${operation.id}`, operation);
 
@@ -56,7 +65,7 @@ export async function queueAndAttemptSyncOperation(operation) {
                     // Optionally update lastStateSync if the serverTime is new
                     if (responseData.serverTime) {
                         const { value: currentLastStateSync } = await loadSimpleState('lastStateSync');
-                        if (!currentLastStateSync || responseData.serverTime > currentLastStateSync) {
+                        if (!currentLastLastSync || responseData.serverTime > currentLastLastSync) {
                             await saveSimpleState('lastStateSync', responseData.serverTime);
                             console.log(`[DB] Updated lastStateSync to: ${responseData.serverTime}`);
                         }
@@ -87,7 +96,12 @@ export async function addPendingOperation(operation) {
     const tx = db.transaction('pendingOperations', 'readwrite');
     const store = tx.objectStore('pendingOperations');
     try {
-        await store.add(operation);
+        const opToStore = { ...operation };
+        delete opToStore.id; // Ensure IndexedDB assigns the autoIncremented ID
+
+        let generatedId = await store.add(opToStore);
+        operation.id = generatedId; // Update the original object with the new ID
+
         await tx.done;
         console.log('[DB] Operation buffered:', operation);
     } catch (e) {
@@ -125,6 +139,7 @@ export async function processPendingOperations() {
         for (const op of operations) {
             // If an operation doesn't have an ID (e.g., older buffered ops or a bug), skip it for removal tracking
             // and just include it in the batch.
+            // Note: With the fix above for `queueAndAttemptSyncOperation`, ops should always have an `id` now.
             if (!op.id) {
                 console.warn('[DB] Found operation without an ID. It will be processed but cannot be individually tracked for removal:', op);
             }
@@ -336,17 +351,29 @@ export async function performFeedSync(app) {
             const newItems = await itemsResponse.json();
             const tx = db.transaction(['feedItems'], 'readwrite');
             const feedStore = tx.objectStore('feedItems');
+
+            // --- ADDED CODE START ---
             for (const item of newItems) {
+                if (!item.guid) {
+                    console.error("[DB] Item missing GUID, cannot store:", item);
+                    // Optionally, skip this item or assign a fallback unique ID if possible
+                    continue; // Skip to the next item in the batch
+                }
                 await feedStore.put(item);
                 console.log(`[DB] Stored item: ${item.guid}`);
             }
+            // --- ADDED CODE END ---
+
             for (const guidToDelete of guidsToDelete) {
+                // Ensure we only try to delete items that were not found in the *current* batch of new items
+                // This prevents deleting an item that was just added/updated in the same sync cycle.
+                // The current logic of checking `!new Set(newItems.map(i => i.guid)).has(guidToDelete)` is correct.
                 if (!new Set(newItems.map(i => i.guid)).has(guidToDelete)) {
                     await feedStore.delete(guidToDelete);
                     console.log(`[DB] Deleted item: ${guidToDelete}`);
                 }
             }
-            await tx.done;
+            await tx.done; // Commit the transaction for the current batch
         }
         if (serverTime) {
             await saveSimpleState('lastFeedSync', serverTime);
