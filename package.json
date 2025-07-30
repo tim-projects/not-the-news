@@ -8,7 +8,7 @@
       "source": "www/sw.js",
       "distDir": "www",
       "publicUrl": "/",
-      "type": "service-worker"
+      "context": "service-worker" // <--- CHANGED FROM "type" TO "context"
     },
     "main": {
       "source": "www/index.html",
