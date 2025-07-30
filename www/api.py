@@ -46,7 +46,7 @@ USER_STATE_SERVER_DEFAULTS = {
     'lastFeedSync': {'type': 'simple', 'default': None},
     'shuffledOutGuids': {'type': 'array', 'default': []}, # This will be managed via the /user-state endpoint
     'rssFeeds': {'type': 'array', 'default': []},
-    'keywordBlacklist': {'type': 'array', 'default': []},
+    'keywordBlacklist': {'type': 'array', 'default': []}, 
 } 
 
 @app.route("/api/login", methods=["POST"])
