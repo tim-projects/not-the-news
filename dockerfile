@@ -123,7 +123,7 @@ RUN mkdir -p /usr/local/bin && \
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'dir /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'save 900 1' >> /etc/redis.conf >> /usr/local/bin/docker-entrypoint.sh && \ # Fixed duplicated EOF
+    echo 'save 900 1' >> /etc/redis.conf >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'save 300 10' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendonly yes' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'appendfsync always' >> /usr/local/bin/docker-entrypoint.sh && \
