@@ -71,17 +71,9 @@ self.addEventListener('activate', function(event) {
     }).then(function() {
       // Ensure the new SW controls clients immediately
       return self.clients.claim();
-    }).then(function() {
-        // Force all open clients to reload to ensure they are controlled by the new SW.
-        self.clients.matchAll({ type: 'window' }).then(function (clients) {
-            clients.forEach(function (client) {
-                if (client.url && client.visibilityState === 'visible' && client.url.startsWith(self.location.origin) && !client.url.includes(self.location.origin + '/sw.js')) {
-                    console.log('[Service Worker] Forcing client reload for:', client.url);
-                    client.navigate(client.url); // Reloads the current page
-                }
-            });
-        });
     })
+    // Removed the aggressive client reload logic from here.
+    // Clients will now be controlled by the new SW on their next navigation or refresh.
   );
 });
 

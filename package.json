@@ -4,7 +4,7 @@
   "description": "![image](screenshot.jpg)",
   "main": "index.js",
   "scripts": {
-    "build-sw": "parcel build www/sw.js --target worker --dist-dir www --out-file sw.bundled.js",
+    "build-sw": "parcel build www/sw.js --target worker --dist-dir www",
     "dev": "parcel www/index.html --open",
     "build": "parcel build www/index.html --dist-dir www"
   },
@@ -22,4 +22,4 @@
   "devDependencies": {
     "parcel": "^2.15.4"
   }
-} 
+}
