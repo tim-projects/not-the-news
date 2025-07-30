@@ -53,24 +53,17 @@ if [ -n "$PASSWORD" ]; then
     ESCAPED_PWD=$(printf '%q' "$PASSWORD")
     BUILD_ARGS+=("--build-arg" "APP_PASSWORD=$ESCAPED_PWD")
 fi
-# Build arguments
 [ -n "$NO_CACHE" ] && {
     echo "Adding no-cache flag..."
     BUILD_ARGS+=("--no-cache")
 }
 
----
-
-## Build Process
-
-Here's the core change. This section now first performs the `npm` steps to get your `www/` folder ready, then proceeds with the Docker build.
-
-```bash
+# Build Process
 echo "Starting build process..."
 (
     set -x  # Show git/docker commands
 
-    # --- npm frontend build steps ---
+    # npm frontend build steps
     echo "Cleaning up previous npm build artifacts..."
     rm -rf node_modules package-lock.json www
     
@@ -81,7 +74,7 @@ echo "Starting build process..."
     npm run build || { echo "npm run build failed!" >&2; exit 1; }
 
     echo "Frontend build complete in www/ directory."
-    # --- End npm frontend build steps ---
+    # End npm frontend build steps
 
     #git pull && \ # Uncomment if you want to pull latest code before building
     sudo docker rm -f ntn && \
