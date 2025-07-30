@@ -8,23 +8,14 @@
 
   # 1. Handle specific static files first.
   # These files should always be served directly and never redirected.
-  handle /sw.js
-  handle /login.html
-  handle /manifest.json { # Added manifest.json for completeness, common for PWAs
+  handle /sw.js, /login.html, /manifest.json { # Corrected: Grouped matchers with commas
     root * /app/www
     file_server
   }
 
   # 2. Handle common static asset directories/patterns.
   # This ensures all your JS, CSS, images, etc. are served directly.
-  handle /js/*
-  handle /*.css
-  handle /*.js
-  handle /*.svg
-  handle /*.ttf
-  handle /*.woff
-  handle /*.woff2
-  handle /images/* {
+  handle /js/*, /*.css, /*.js, /*.svg, /*.ttf, /*.woff, /*.woff2, /images/* { # Corrected: Grouped matchers with commas
     root * /app/www
     file_server
   }
@@ -96,9 +87,6 @@
   handle {
     @unauth {
       not header Cookie auth*
-      # We no longer need path exclusions here, as all relevant static and API paths
-      # are handled by the explicit `handle` blocks *before* this one.
-      # This @unauth matcher now only needs to check the authentication cookie.
     }
     redir @unauth /login.html 302
 
