@@ -1,22 +1,15 @@
 // www/js/data/dbSyncOperations.js
 
 import { getDb, isOnline } from './dbCore.js';
-import { loadSimpleState, saveSimpleState, saveArrayState, USER_STATE_DEFS } from './dbUserState.js';
-
-// This counter is no longer needed since 'pendingOperations' uses autoIncrement on 'id'.
-// It's good to remove dead code.
-// let _operationIdCounter = Date.now(); // <-- ***REMOVED***
+// Import both loadArrayState and loadSimpleState
+import { loadSimpleState, saveSimpleState, saveArrayState, loadArrayState, USER_STATE_DEFS } from './dbUserState.js';
 
 export async function queueAndAttemptSyncOperation(operation) {
     const db = await getDb();
 
-    // The `pendingOperations` store now explicitly uses `id` as its primary key with `autoIncrement: true`.
-    // This means we should let IndexedDB assign the `id` when using `add()`.
-    // Operations going into 'pendingOperations' should *not* have a 'guid' property,
-    // as 'guid' is reserved for feed items.
-    if (operation.guid !== undefined) { // Check if 'guid' is present
+    if (operation.guid !== undefined) {
         console.warn("[DB] Operation destined for 'pendingOperations' has an unexpected 'guid' property. Removing it:", operation);
-        delete operation.guid; // <-- ***ADDED: Remove guid if present on user-state operations***
+        delete operation.guid;
     }
 
     const tx = db.transaction('pendingOperations', 'readwrite');
@@ -24,19 +17,15 @@ export async function queueAndAttemptSyncOperation(operation) {
     let generatedId = null;
 
     try {
-        const opToStore = { ...operation }; // Create a copy for storage
-        // Ensure the `id` property is not present on the object passed to `store.add()`
-        // so IndexedDB can assign a new autoIncremented ID.
-        delete opToStore.id; // Correctly ensures autoIncrement takes over for the primary key.
+        const opToStore = { ...operation };
+        delete opToStore.id;
 
         generatedId = await store.add(opToStore);
-        // Update the original `operation` object with the ID assigned by IndexedDB.
         operation.id = generatedId;
 
         await tx.done;
         console.log(`[DB] Operation buffered with ID: ${operation.id}`, operation);
 
-        // Immediate sync attempt for starDelta/hiddenDelta if online
         if ((operation.type === 'starDelta' || operation.type === 'hiddenDelta') && isOnline()) {
             console.log(`[DB] Attempting immediate sync for ${operation.type} (ID: ${operation.id}).`);
             const API_BASE_URL = window.location.origin;
@@ -45,7 +34,7 @@ export async function queueAndAttemptSyncOperation(operation) {
                 const response = await fetch(`${API_BASE_URL}/api/user-state`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify([operation]) // Send as an array containing one operation
+                    body: JSON.stringify([operation])
                 });
 
                 if (!response.ok) {
@@ -56,31 +45,24 @@ export async function queueAndAttemptSyncOperation(operation) {
                 const responseData = await response.json();
                 const result = responseData.results ? responseData.results[0] : null;
 
-                // Server response for successful ops should provide the original `id` for tracking.
-                // Assuming your server echoes back the `id` you sent.
                 if (result && result.status === 'success' && result.id !== undefined) {
-                    // If successfully synced, remove from pending operations by its `id`.
                     const deleteTx = db.transaction('pendingOperations', 'readwrite');
-                    await deleteTx.objectStore('pendingOperations').delete(operation.id); // Delete by `id`
+                    await deleteTx.objectStore('pendingOperations').delete(operation.id);
                     await deleteTx.done;
                     console.log(`[DB] Successfully synced and removed immediate operation ${operation.id} (${operation.type}) from buffer.`);
-                    // Optionally update lastStateSync if the serverTime is new
                     if (responseData.serverTime) {
                         const { value: currentLastStateSync } = await loadSimpleState('lastStateSync');
-                        // Corrected variable name from currentLastLastSync to currentLastStateSync
-                        if (!currentLastStateSync || responseData.serverTime > currentLastStateSync) { // <-- ***CHANGED***
+                        if (!currentLastStateSync || responseData.serverTime > currentLastStateSync) {
                             await saveSimpleState('lastStateSync', responseData.serverTime);
                             console.log(`[DB] Updated lastStateSync to: ${responseData.serverTime}`);
                         }
                     }
                 } else {
                     console.warn(`[DB] Immediate sync for ${operation.type} (ID: ${operation.id}) reported non-success by server:`, result);
-                    // Operation remains in buffer for batch sync
                 }
 
             } catch (networkError) {
                 console.error(`[DB] Network error during immediate sync for ${operation.type} (ID: ${operation.id}). Will retry with batch sync:`, networkError);
-                // Operation remains in buffer for batch sync
             }
         } else if (!isOnline() && (operation.type === 'starDelta' || operation.type === 'hiddenDelta')) {
             console.log(`[DB] Offline. Buffering ${operation.type} (ID: ${operation.id}) for later batch sync.`);
@@ -96,20 +78,19 @@ export async function queueAndAttemptSyncOperation(operation) {
 
 export async function addPendingOperation(operation) {
     const db = await getDb();
-    // Ensure 'guid' is not present if this is a user-state operation
     if (operation.guid !== undefined) {
         console.warn("[DB] Operation destined for 'pendingOperations' has an unexpected 'guid' property. Removing it:", operation);
-        delete operation.guid; // <-- ***ADDED***
+        delete operation.guid;
     }
 
     const tx = db.transaction('pendingOperations', 'readwrite');
     const store = tx.objectStore('pendingOperations');
     try {
         const opToStore = { ...operation };
-        delete opToStore.id; // Ensure IndexedDB assigns the autoIncremented ID
+        delete opToStore.id;
 
         let generatedId = await store.add(opToStore);
-        operation.id = generatedId; // Update the original object with the new ID
+        operation.id = generatedId;
 
         await tx.done;
         console.log('[DB] Operation buffered:', operation);
@@ -128,7 +109,6 @@ export async function processPendingOperations() {
     let operations;
     try {
         const fetchTx = db.transaction('pendingOperations', 'readonly');
-        // This will now correctly retrieve operations that were saved with an 'id' primary key.
         operations = await fetchTx.objectStore('pendingOperations').getAll();
         await fetchTx.done;
     } catch (e) {
@@ -143,27 +123,18 @@ export async function processPendingOperations() {
 
     try {
         const operationsToSync = [];
-        // `idsToRemove` variable is not strictly needed if we process results directly.
-        // const idsToRemove = []; // Removed this as it's not used downstream
-
-        // Filter operations: Only include simpleUpdates, or starDelta/hiddenDelta
         for (const op of operations) {
-            // The warning about missing `op.id` will now only appear for legacy data
-            // that was stored *before* the `dbCore.js` schema change and your
-            // `operation.id = generatedId` logic was consistently applied.
             if (!op.id) {
                 console.warn('[DB] Found operation without an ID (likely legacy data). It will be processed but cannot be individually tracked for removal from the client buffer by its ID:', op);
             }
 
             if (op.type === 'simpleUpdate' || op.type === 'starDelta' || op.type === 'hiddenDelta') {
-                // Ensure no 'guid' is sent for these user-state operations.
-                // It's already handled when queuing, but this is a final safeguard for batch sync.
                 const opForSync = { ...op };
                 if (opForSync.guid !== undefined) {
                     console.warn("[DB] Stripping unexpected 'guid' from user-state operation before sending to server:", opForSync);
-                    delete opForSync.guid; // <-- ***ADDED: Final strip for server payload***
+                    delete opForSync.guid;
                 }
-                operationsToSync.push(opForSync); // Push the cleaned copy
+                operationsToSync.push(opForSync);
             } else {
                 console.warn(`[DB] Unknown operation type found during batching: ${op.type}. Skipping from batch.`, op);
             }
@@ -179,7 +150,7 @@ export async function processPendingOperations() {
         const response = await fetch(`${API_BASE_URL}/api/user-state`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(operationsToSync) // Send the full array of operations
+            body: JSON.stringify(operationsToSync)
         });
 
         if (!response.ok) {
@@ -195,16 +166,14 @@ export async function processPendingOperations() {
             const store = tx.objectStore('pendingOperations');
 
             for (const result of responseData.results) {
-                // The server should respond with the `id` of the operation it successfully processed.
                 if (result.status === 'success' && result.id !== undefined) {
-                    await store.delete(result.id); // Delete by `id`
+                    await store.delete(result.id);
                     console.log(`[DB] Removed buffered operation ${result.id} (${result.opType})`);
                 } else if (result.status === 'failed' || result.status === 'skipped') {
-                    // Log the ID if available, otherwise indicate it was missing.
                     console.warn(`[DB] Operation ${result.id !== undefined ? result.id : 'ID missing'} (${result.opType}) ${result.status}: ${result.reason || 'No specific reason provided.'}`);
                 }
             }
-            await tx.done; // Commit the delete transaction
+            await tx.done;
         } else {
             console.warn('[DB] Server response did not contain a valid "results" array. Cannot clear buffered operations.');
         }
@@ -216,7 +185,6 @@ export async function processPendingOperations() {
 
     } catch (error) {
         console.error('[DB] Error during batch synchronization:', error);
-        // Operations will remain in IndexedDB to be retried on next sync attempt.
     }
 }
 
@@ -256,14 +224,22 @@ export async function pullUserState() {
     let newestOverallTimestamp = null;
 
     const fetchPromises = Object.entries(USER_STATE_DEFS).map(async ([key, def]) => {
-        // These keys are explicitly skipped for server pull, as they are client-managed or derived.
         if (key === 'lastStateSync' || key === 'lastFeedSync' || key === 'feedScrollY' || key === 'feedVisibleLink' || key === 'itemsClearedCount') {
             return { key, status: 'skipped' };
         }
         const url = `${API_BASE_URL}/api/user-state/${key}`;
         let localTimestamp = '';
-        const { lastModified } = await loadSimpleState(key);
-        localTimestamp = lastModified || '';
+        
+        // --- MODIFIED SECTION: Use correct loader for initial timestamp ---
+        let loadedState;
+        if (def.type === 'array') {
+            loadedState = await loadArrayState(key); // Use loadArrayState for array types
+        } else {
+            loadedState = await loadSimpleState(key); // Use loadSimpleState for simple types
+        }
+        localTimestamp = loadedState.lastModified || '';
+        // --- END MODIFIED SECTION ---
+
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (localTimestamp) {
@@ -379,17 +355,15 @@ export async function performFeedSync(app) {
                     continue;
                 }
                 await feedStore.put(item);
-                //console.log(`[DB] Stored item: ${item.guid}`);
             }
 
             for (const guidToDelete of guidsToDelete) {
-                // This logic is correct: only delete if the GUID is not in the current batch of new items.
                 if (!new Set(newItems.map(i => i.guid)).has(guidToDelete)) {
                     await feedStore.delete(guidToDelete);
                     console.log(`[DB] Deleted item: ${guidToDelete}`);
                 }
             }
-            await tx.done; // Commit the transaction for the current batch
+            await tx.done;
         }
         if (serverTime) {
             await saveSimpleState('lastFeedSync', serverTime);
