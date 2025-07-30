@@ -16,6 +16,7 @@
     not path /api/time*
     not path /api/feed-guids*
     not path /api/feed-items*
+    not path /api/user-state/shuffledOutGuids
     # Explicitly exclude common static assets and service worker from redirection
     not path /sw.js
     not path /js/libs/*
@@ -56,20 +57,20 @@
       header_up Host {host}
     }
   }
-  handle /api/time* { # <-- UPDATED
+  handle /api/time* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
-  handle /api/feed-guids* { # <-- UPDATED
+  handle /api/feed-guids* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
 
-  handle /api/feed-items* { # <-- UPDATED
+  handle /api/feed-items* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}

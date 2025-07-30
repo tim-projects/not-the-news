@@ -146,7 +146,7 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
                 ? { id: item }
                 : item;
             await arrayObjectStore.put(itemToStore);
-            console.log(`[DB] Put item for ${key}:`, itemToStore); // Added logging
+            //console.log(`[DB] Put item for ${key}:`, itemToStore); // Added logging
         }
         await saveSimpleState(key, null, serverTimestamp, transaction);
         console.log(`[DB] Saved ${clonableArr.length} items for "${key}".`); // Added logging

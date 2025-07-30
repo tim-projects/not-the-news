@@ -324,13 +324,13 @@ export async function performFeedSync(app) {
         const BATCH_SIZE = 50;
         for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
             const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
-            const itemsResponse = await fetch(`${API_BASE_URL}/feed-items`, {
+            const itemsResponse = await fetch(`${API_BASE_URL}/api/feed-items`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ guids: batch })
             });
             if (!itemsResponse.ok) {
-                console.error(`[DB] HTTP error! status: ${itemsResponse.status} for /feed-items batch.`);
+                console.error(`[DB] HTTP error! status: ${itemsResponse.status} for /api/feed-items batch.`);
                 continue;
             }
             const newItems = await itemsResponse.json();

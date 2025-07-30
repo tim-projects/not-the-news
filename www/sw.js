@@ -177,10 +177,10 @@ self.addEventListener('fetch', function(event) {
   // This ensures offline availability for user state and feed data that has been previously fetched.
   // It also ensures fresh data is fetched when online.
   const isApiGetRequest = requestMethod === 'GET' && (
-      requestUrl.pathname.startsWith('/user-state') ||
-      requestUrl.pathname.startsWith('/feed-guids') ||
-      requestUrl.pathname.startsWith('/feed-items') || // Assuming this is also a GET endpoint for items
-      requestUrl.pathname.startsWith('/config/') // For any dynamic config files
+      requestUrl.pathname.startsWith('/api/user-state') ||
+      requestUrl.pathname.startsWith('/api/feed-guids') ||
+      requestUrl.pathname.startsWith('/api/feed-items') || // Assuming this is also a GET endpoint for items
+      requestUrl.pathname.startsWith('/api/config/') // For any dynamic config files
   );
 
   if (requestMethod === 'GET') {
