@@ -132,7 +132,8 @@ RUN mkdir -p /usr/local/bin && \
 COPY Caddyfile /etc/caddy/Caddyfile
 # Replace {$EMAIL} and {$ACME_CA} in the Caddyfile
 RUN sed -i "s|{\$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
-    sed -i "s|{\$ACME_CA:[^}]*}|${ACME_CA}|g" /etc/caddy/Caddyfile
+    sed -i "s|{\$ACME_CA:[^}]*}|${ACME_CA}|g" /etc/caddy/Caddyfile \
+    sed -i "s|{\$DOMAIN}|${DOMAIN}|g" /etc/caddy/Caddyfile
 ##############################################################################
 # 8. Declare the data volume & expose ports
 VOLUME /data
