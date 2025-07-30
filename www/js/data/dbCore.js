@@ -3,7 +3,7 @@
 import { openDB } from '../../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 let _dbInstance = null;
 let _dbInitPromise = null;
 

@@ -73,10 +73,14 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
         }
         await objectStore.put(objToSave);
         console.log(`[DB] Saved "${key}".`); // Added logging
+
+        // --- NEW/UPDATED: Add to pending operations for specific simple states that need server sync ---
+        // These keys are managed as simple updates on the server
         if (['filterMode', 'syncEnabled', 'imagesEnabled', 'shuffleCount', 'lastShuffleResetDate', 'openUrlsInNewTabEnabled', 'lastViewedItemId', 'lastViewedItemOffset', 'theme'].includes(key)) {
             const op = { type: 'simpleUpdate', key: key, value: value };
-            await queueAndAttemptSyncOperation(op);
+            await queueAndAttemptSyncOperation(op); // Use the new unified queueing/sync function
         }
+
     } catch (e) {
         console.error(`[DB] Error saving "${key}":`, e); // Added logging
         throw e;
@@ -146,8 +150,14 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
         }
         await saveSimpleState(key, null, serverTimestamp, transaction);
         console.log(`[DB] Saved ${clonableArr.length} items for "${key}".`); // Added logging
-        // Removed the if (['shuffledOutGuids', 'currentDeckGuids', 'rssFeeds', 'keywordBlacklist'].includes(key)) { ... } block here
-        // as per instructions to fix duplicate queueing.
+
+        // --- NEW/UPDATED: Add to pending operations for specific array states that need server sync ---
+        // These keys are managed as full array replacements on the server
+        if (['shuffledOutGuids', 'currentDeckGuids', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
+            const op = { type: 'simpleUpdate', key: key, value: Array.from(arr) };
+            await queueAndAttemptSyncOperation(op); // Use the new unified queueing/sync function
+        }
+
     } catch (e) {
         console.error(`[DB] Error saving "${key}":`, e); // Added logging
         throw e;
@@ -259,11 +269,14 @@ export async function addStarredItem(itemGuid) {
         const tx = db.transaction('starredItems', 'readwrite');
         await tx.objectStore('starredItems').put(itemToStar);
         await tx.done;
-        console.log(`[DB] Starred ${itemGuid} locally.`); // Added logging
+        console.log(`[DB] Starred ${itemGuid} locally.`);
+
+        // Queue and attempt immediate sync
         const op = { type: 'starDelta', data: { id: itemGuid, action: 'add', starredAt: itemToStar.starredAt } };
         await queueAndAttemptSyncOperation(op);
+
     } catch (e) {
-        console.error(`[DB] Error starring ${itemGuid}:`, e); // Added logging
+        console.error(`[DB] Error starring ${itemGuid}:`, e);
         throw e;
     }
 }
@@ -274,11 +287,14 @@ export async function removeStarredItem(itemGuid) {
         const tx = db.transaction('starredItems', 'readwrite');
         await tx.objectStore('starredItems').delete(itemGuid);
         await tx.done;
-        console.log(`[DB] Unstarred ${itemGuid} locally.`); // Added logging
+        console.log(`[DB] Unstarred ${itemGuid} locally.`);
+
+        // Queue and attempt immediate sync
         const op = { type: 'starDelta', data: { id: itemGuid, action: 'remove' } };
         await queueAndAttemptSyncOperation(op);
+
     } catch (e) {
-        console.error(`[DB] Error unstarring ${itemGuid}:`, e); // Added logging
+        console.error(`[DB] Error unstarring ${itemGuid}:`, e);
         throw e;
     }
 }
@@ -289,11 +305,14 @@ export async function addHiddenItem(itemGuid) {
         const tx = db.transaction('hiddenItems', 'readwrite');
         await tx.objectStore('hiddenItems').put(itemToHide);
         await tx.done;
-        console.log(`[DB] Hidden ${itemGuid} locally.`); // Added logging
+        console.log(`[DB] Hidden ${itemGuid} locally.`);
+
+        // Queue and attempt immediate sync
         const op = { type: 'hiddenDelta', data: { id: itemGuid, action: 'add', timestamp: itemToHide.hiddenAt } };
         await queueAndAttemptSyncOperation(op);
+
     } catch (e) {
-        console.error(`[DB] Error hiding ${itemGuid}:`, e); // Added logging
+        console.error(`[DB] Error hiding ${itemGuid}:`, e);
         throw e;
     }
 }
@@ -304,11 +323,14 @@ export async function removeHiddenItem(itemGuid) {
         const tx = db.transaction('hiddenItems', 'readwrite');
         await tx.objectStore('hiddenItems').delete(itemGuid);
         await tx.done;
-        console.log(`[DB] Unhidden ${itemGuid} locally.`); // Added logging
+        console.log(`[DB] Unhidden ${itemGuid} locally.`);
+
+        // Queue and attempt immediate sync
         const op = { type: 'hiddenDelta', data: { id: itemGuid, action: 'remove' } };
         await queueAndAttemptSyncOperation(op);
+
     } catch (e) {
-        console.error(`[DB] Error unhiding ${itemGuid}:`, e); // Added logging
+        console.error(`[DB] Error unhiding ${itemGuid}:`, e);
         throw e;
     }
 }

@@ -385,6 +385,7 @@ def post_user_state():
                         app.logger.info(f"shuffleCount updated from {current_count} to {new_count} (max logic).")
                     _save_state(key, new_count)
                     results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value": new_count})
+                # Removed old elif block for 'shuffledOutGuids', 'currentDeckGuids', 'starred', 'hidden'
                 else:
                     # For other simple updates (lastShuffleResetDate, filterMode, etc., and now including shuffledOutGuids, currentDeckGuids)
                     _save_state(key, value)
