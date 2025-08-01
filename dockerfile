@@ -31,9 +31,9 @@ COPY . .
 # Run the Vite build command to generate the 'www' directory
 # This uses the `build` script we added to your package.json
 RUN npm run build
-RUN mv /app/www/src/index.html /app/www/ && \
-    mv /app/www/src/login.html /app/www/ && \
-    rm -r /app/www/src
+#RUN mv /app/www/src/index.html /app/www/ && \
+#    mv /app/www/src/login.html /app/www/ && \
+#    rm -r /app/www/src
 
 ##############################################################################
 # 1. Base image (now main Caddy stage)
