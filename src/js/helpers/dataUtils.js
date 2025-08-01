@@ -40,10 +40,6 @@ export function mapRawItem(item, fmtFn) {
         console.warn("mapRawItem received an undefined or null item. Returning null.");
         return null;
     }
-    // Corrected log message to use the correct key
-    console.log(`[DEBUG] Raw description for "${item.title}":`, item.description);
-
-    // Corrected to use the correct key
     const parser = new DOMParser();
     const doc = parser.parseFromString(item.description || "", "text/html");
 
