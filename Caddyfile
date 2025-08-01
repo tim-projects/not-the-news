@@ -6,55 +6,29 @@
 
 {$DOMAIN} {
 
-   # 1. Handle specific static files that should ALWAYS be accessible (no auth required)
-   handle /sw.js {
-     root * /app/www
-     file_server
+   # CRITICAL: Service worker must be first and accessible without any auth
+   @service_worker {
+     path_regexp ^/sw\.js$
    }
-   handle /login.html {
-     root * /app/www
-     file_server
-   }
-   handle /manifest.json {
+   handle @service_worker {
      root * /app/www
      file_server
    }
 
-   # 2. Handle common static asset directories/patterns (no auth required)
-   handle /js/* {
-     root * /app/www
-     file_server
+   # Other critical static files (no auth required)
+   @static_files {
+     path /login.html
+     path /manifest.json
+     path_regexp ^.*\.(css|js|svg|ttf|woff|woff2)$
+     path /js/*
+     path /images/*
    }
-   handle /*.css {
-     root * /app/www
-     file_server
-   }
-   handle /*.js {
-     root * /app/www
-     file_server
-   }
-   handle /*.svg {
-     root * /app/www
-     file_server
-   }
-   handle /*.ttf {
-     root * /app/www
-     file_server
-   }
-   handle /*.woff {
-     root * /app/www
-     file_server
-   }
-   handle /*.woff2 {
-     root * /app/www
-     file_server
-   }
-   handle /images/* {
+   handle @static_files {
      root * /app/www
      file_server
    }
 
-   # 3. Handle API endpoints (these should require auth)
+   # API endpoints with authentication
    handle /api/login* {
      reverse_proxy 127.0.0.1:4575 {
        header_up X-Forwarded-Proto https
@@ -62,59 +36,19 @@
      }
    }
 
-   handle /api/user-state* {
-     @unauth_api {
-       not header Cookie auth*
-     }
-     respond @unauth_api "Unauthorized" 401
-     
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
+   @protected_api {
+     path /api/user-state*
+     path /api/load-config*
+     path /api/save-config*
+     path /api/time*
+     path /api/feed-guids*
+     path /api/feed-items*
    }
-   
-   handle /api/load-config* {
-     @unauth_api {
+   handle @protected_api {
+     @unauth {
        not header Cookie auth*
      }
-     respond @unauth_api "Unauthorized" 401
-     
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
-   }
-   
-   handle /api/save-config* {
-     @unauth_api {
-       not header Cookie auth*
-     }
-     respond @unauth_api "Unauthorized" 401
-     
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
-   }
-   
-   handle /api/time* {
-     @unauth_api {
-       not header Cookie auth*
-     }
-     respond @unauth_api "Unauthorized" 401
-     
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
-   }
-   
-   handle /api/feed-guids* {
-     @unauth_api {
-       not header Cookie auth*
-     }
-     respond @unauth_api "Unauthorized" 401
+     respond @unauth "Unauthorized" 401
      
      reverse_proxy 127.0.0.1:4575 {
        header_up X-Forwarded-Proto https
@@ -122,19 +56,7 @@
      }
    }
 
-   handle /api/feed-items* {
-     @unauth_api {
-       not header Cookie auth*
-     }
-     respond @unauth_api "Unauthorized" 401
-     
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
-   }
-
-   # 4. Handle feed.xml specifically (probably should be accessible without auth)
+   # Handle feed.xml (accessible without auth)
    @feed {
      path /feed.xml
    }
@@ -147,26 +69,22 @@
      file_server
    }
 
-   # 5. Handle the main application (index.html) with auth redirect
-   handle / {
+   # Main application with auth redirect for everything else
+   handle {
      @unauth {
        not header Cookie auth*
+       not path /sw.js
+       not path /login.html
+       not path /manifest.json
+       not path_regexp ^.*\.(css|js|svg|ttf|woff|woff2)$
+       not path /js/*
+       not path /images/*
+       not path /feed.xml
      }
      redir @unauth /login.html 302
 
      root * /app/www
      try_files {path} /index.html
-     file_server
-   }
-
-   # 6. Catch-all for any other paths (with auth check)
-   handle {
-     @unauth {
-       not header Cookie auth*
-     }
-     redir @unauth /login.html 302
-
-     root * /app/www
      file_server
    }
 
