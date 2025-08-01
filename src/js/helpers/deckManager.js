@@ -26,7 +26,7 @@ const MAX_DECK_SIZE = 10;
 // This function manages the daily deck of news items.
 // It is called with the main application object as a parameter.
 // This ensures it has access to the most up-to-date state (like hidden and starred items).
-const manageDailyDeck = async (app) => {
+export const manageDailyDeck = async (app) => {
     // We are now using the app.hidden and app.starred arrays directly, which were
     // correctly populated by the loadAndManageData function.
     const allItems = await app.getFeedItemsFromDB();
