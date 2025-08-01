@@ -136,21 +136,22 @@ export function updateCounts(app) {
     
     // app.hidden and app.starred now contain objects like { guid: '...', hiddenAt: '...' }
     // or { guid: '...', starredAt: '...' }.
-    // app.entries items have a 'guid' property.
+    // app.entries items are mapped to have an 'id' property.
     // app.currentDeckGuids is an array of plain GUID strings.
 
     const hiddenSet = new Set(app.hidden.map(e => e.guid));
     const starredSet = new Set(app.starred.map(s => s.guid));
 
     const allC = app.entries.length;
-    // Filter app.entries using their 'guid' property against the sets
-    const hiddenC = app.entries.filter(e => hiddenSet.has(e.guid)).length;
-    const starredC = app.entries.filter(e => starredSet.has(e.guid)).length;
+    // FIX: Change e.guid to e.id to match the property on items in app.entries
+    const hiddenC = app.entries.filter(e => hiddenSet.has(e.id)).length;
+    // FIX: Change e.guid to e.id to match the property on items in app.entries
+    const starredC = app.entries.filter(e => starredSet.has(e.id)).length;
 
-    // app.currentDeckGuids is already an array of GUID strings
     const deckGuidsSet = new Set(app.currentDeckGuids);
     // Unread items are those in the current deck that are NOT hidden.
-    const unreadInDeckC = app.entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length;
+    // FIX: Change e.guid to e.id here as well
+    const unreadInDeckC = app.entries.filter(e => deckGuidsSet.has(e.id) && !hiddenSet.has(e.id)).length;
 
     const selector = getFilterSelector();
     if (!selector) return;
