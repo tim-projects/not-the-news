@@ -25,7 +25,7 @@ import {
     getBackButton,
     getRssFeedsTextarea,
     getKeywordsBlacklistTextarea,
-    getConfigureRssButton, // Corrected: This function was missing from the import list
+    getConfigureRssButton,
     getConfigureKeywordsButton,
     getSaveKeywordsButton,
     getSaveRssButton
@@ -119,7 +119,26 @@ export async function initSyncToggle(app) {
         if (enabled) {
             console.log("Sync enabled, triggering full sync from initSyncToggle.");
             await performFullSync(app);
-            // After a full sync, the data is updated, so we dispatch the event.
+
+            // --- FIX START ---
+            // After a full sync, check if the current deck is empty.
+            // If it is, regenerate it from all available items as a fallback.
+            if (!app.currentDeckGuids || app.currentDeckGuids.length === 0) {
+                console.log("Deck is empty after sync. Rebuilding deck from all available items.");
+                // Assuming app.entries holds the full list of feed items
+                if (app.entries && app.entries.length > 0) {
+                    app.currentDeckGuids = app.entries.map(item => item.guid);
+                    // Also save this newly created deck to the database
+                    await saveSimpleState('currentDeckGuids', app.currentDeckGuids);
+                    console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
+                } else {
+                    console.warn("Cannot rebuild deck, app.entries is empty.");
+                }
+            }
+            // --- FIX END ---
+
+            // Once the data is loaded AND the deck is guaranteed to be valid,
+            // we can safely dispatch the event to update the UI.
             dispatchAppDataReady();
         }
     });
@@ -164,7 +183,7 @@ export async function initTheme(app) {
 export async function initScrollPosition(app) {
     window.requestAnimationFrame(async () => {
         const lastViewedItemIdResult = await loadSimpleState('lastViewedItemId');
-        const lastViewedItemId = lastViewedItemIdResult.value;
+        const lastViewedItemId = lastViewedItemId.value;
 
         if (lastViewedItemId && app.entries && app.entries.length > 0 && app.hidden) {
             const hiddenGuids = new Set(app.hidden.map(item => item.guid));
