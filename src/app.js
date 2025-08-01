@@ -12,9 +12,9 @@ import {
     initDb,
     saveSimpleState,
     getAllFeedItems
-} from './data/database.js';
-import { loadConfigFile, saveConfigFile } from './helpers/apiUtils.js';
-import { formatDate, mapRawItem, mapRawItems } from './helpers/dataUtils.js';
+} from './js/data/database.js';
+import { loadConfigFile, saveConfigFile } from './js/helpers/apiUtils.js';
+import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.js';
 import {
     loadCurrentDeck,
     saveCurrentDeck,
@@ -25,10 +25,10 @@ import {
     loadShuffleState,
     setFilterMode,
     loadFilterMode
-} from './helpers/userStateUtils.js';
-import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js'
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
-import { manageDailyDeck, processShuffle } from './helpers/deckManager.js';
+} from './js/helpers/userStateUtils.js';
+import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './js/ui/uiUpdaters.js'
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './js/ui/uiInitializers.js';
+import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
 
 // The Alpine component function is now directly exported
 export function rssApp() {

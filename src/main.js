@@ -1,8 +1,8 @@
-// www/js/main.js
+// src/main.js
 
 import Alpine from './libs/alpine.3.x.x.js';
 import { rssApp } from './app.js';
-import '../css/style.css';
+import './css/style.css';
 
 // Set up the Service Worker
 if ('serviceWorker' in navigator) {
