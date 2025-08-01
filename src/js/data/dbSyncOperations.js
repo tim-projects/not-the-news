@@ -253,26 +253,18 @@ export async function pullUserState() {
         }
         const url = `${API_BASE_URL}/api/user-state/${key}`;
         let localTimestamp = '';
-
-        // --- MODIFIED SECTION: Check if the local store is empty before fetching ---
-        const tx = db.transaction(def.store, 'readonly');
-        const store = tx.objectStore(def.store);
-        const count = await store.count();
-        await tx.done;
         
-        if (count > 0) {
-            let loadedState;
-            if (def.type === 'array') {
-                loadedState = await loadArrayState(key);
-            } else {
-                loadedState = await loadSimpleState(key);
-            }
-            localTimestamp = loadedState.lastModified || '';
+        // --- MODIFIED SECTION: Use a more precise check for the item's existence ---
+        let loadedState;
+        if (def.type === 'array') {
+            loadedState = await loadArrayState(key);
+        } else {
+            loadedState = await loadSimpleState(key);
         }
-
-        // The logic below now correctly only adds the If-None-Match header
-        // if there are items in the local store and a lastModified timestamp exists.
-        // This ensures that an empty local store always triggers a full fetch.
+        
+        // Only use the If-None-Match header if a lastModified timestamp exists.
+        // This is a more accurate check than looking at the entire store's count.
+        localTimestamp = loadedState.lastModified || '';
         // --- END MODIFIED SECTION ---
 
         try {
