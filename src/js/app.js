@@ -100,8 +100,12 @@ document.addEventListener('alpine:init', () => {
             }
             await this.loadFeedItemsFromDB();
 
-            const guidsToDisplay = this.currentDeckGuids;
-
+            let guidsToDisplay = this.currentDeckGuids;
+            if (!Array.isArray(guidsToDisplay)) {
+                console.warn("currentDeckGuids is not a valid array, defaulting to an empty array.");
+                guidsToDisplay = [];
+            }
+            
             console.log("DEBUG app.js: loadAndDisplayDeck - type of guidsToDisplay:", typeof guidsToDisplay, "Array.isArray:", Array.isArray(guidsToDisplay));
             if (Array.isArray(guidsToDisplay)) {
                 console.log("DEBUG app.js: loadAndDisplayDeck - first 5 GUIDs:", guidsToDisplay.slice(0, 5));
@@ -113,34 +117,38 @@ document.addEventListener('alpine:init', () => {
             const starredSet = new Set(this.starred.map(s => s.guid));
             const seenGuidsForDeck = new Set();
 
-            if (guidsToDisplay && Array.isArray(guidsToDisplay)) {
-                for (const guid of guidsToDisplay) {
-                    if (typeof guid !== 'string') {
-                        console.warn(`Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck): ${JSON.stringify(guid)}. Skipping.`);
-                        continue;
-                    }
+            for (const guid of guidsToDisplay) {
+                if (typeof guid !== 'string') {
+                    console.warn(`Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck): ${JSON.stringify(guid)}. Skipping.`);
+                    continue;
+                }
 
-                    const item = this.feedItems[guid];
-                    if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
-                        const mappedItem = mapRawItem(item, formatDate);
-                        mappedItem.isHidden = hiddenSet.has(mappedItem.id);
-                        mappedItem.isStarred = starredSet.has(mappedItem.id);
-                        items.push(mappedItem);
-                        seenGuidsForDeck.add(mappedItem.id);
-                    } else if (item && item.guid && seenGuidsForDeck.has(item.guid)) {
-                        console.warn(`Duplicate item (GUID: ${item.guid}) already added to deck. Skipping.`);
-                    } else {
-                        console.warn(`Feed item with GUID ${guid} not found in feedItems cache or has invalid GUID. Skipping.`);
-                    }
+                const item = this.feedItems[guid];
+                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
+                    const mappedItem = mapRawItem(item, formatDate);
+                    mappedItem.isHidden = hiddenSet.has(mappedItem.id);
+                    mappedItem.isStarred = starredSet.has(mappedItem.id);
+                    items.push(mappedItem);
+                    seenGuidsForDeck.add(mappedItem.id);
+                } else if (item && item.guid && seenGuidsForDeck.has(item.guid)) {
+                    console.warn(`Duplicate item (GUID: ${item.guid}) already added to deck. Skipping.`);
+                } else {
+                    console.warn(`Feed item with GUID ${guid} not found in feedItems cache or has invalid GUID. Skipping.`);
                 }
             }
-
-            // A final defensive check to ensure this.deck is always an array
+            
+            // This is the primary fix: ensure `items` is an array and only then sort it.
             this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
             console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
         },
 
         get filteredEntries() {
+            // A defensive check to ensure this.deck is always an array before use
+            if (!Array.isArray(this.deck)) {
+                console.error("this.deck is not an array in filteredEntries getter. Resetting to empty array.");
+                this.deck = [];
+            }
+
             const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}-${this.deck.length}`;
 
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
