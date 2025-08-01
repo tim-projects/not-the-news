@@ -84,12 +84,19 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 export function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
-    const hiddenSet = new Set(hiddenGuids);
-    const shuffledOutSet = new Set(shuffledOutGuids);
-    const currentDeckSet = new Set(currentDeckItemGuids);
+    // Before filtering, create a master set of all available GUIDs to prune stale data
+    const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
 
-    let unreadItems = allFeedItems.filter(item => 
-        !hiddenSet.has(item.id) && !shuffledOutSet.has(item.id) && !currentDeckSet.has(item.id)
+    // Prune stale GUIDs from hidden and shuffledOut sets
+    // This is the key fix for the stale data issue.
+    const prunedHiddenGuids = new Set([...hiddenGuids].filter(guid => allFeedGuidsSet.has(guid)));
+    const prunedShuffledOutGuids = new Set([...shuffledOutGuids].filter(guid => allFeedGuidsSet.has(guid)));
+
+    // Now, use the pruned sets to find unread items
+    let unreadItems = allFeedItems.filter(item =>
+        !prunedHiddenGuids.has(item.id) &&
+        !prunedShuffledOutGuids.has(item.id) &&
+        !currentDeckItemGuids.has(item.id)
     );
 
     let nextDeck = [];
@@ -183,15 +190,15 @@ export function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, cur
         }
         // Fallback: If deck is not full, add from shuffledOutGuids (prioritizing oldest)
         if (nextDeck.length < MAX_DECK_SIZE) {
-            const resurfaceCandidates = allFeedItems.filter(item => 
-                shuffledOutSet.has(item.id) && !hiddenSet.has(item.id) && !selectedIds.has(item.id)
+            const resurfaceCandidates = allFeedItems.filter(item =>
+                prunedShuffledOutGuids.has(item.id) && !prunedHiddenGuids.has(item.id) && !selectedIds.has(item.id)
             );
             // Sort oldest first for resurfacing
-            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp); 
+            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
             for (const item of resurfaceCandidates) {
                 if (nextDeck.length >= MAX_DECK_SIZE) break;
-                if (tryAddItemToDeck(item)) { 
+                if (tryAddItemToDeck(item)) {
                     // No need to add to selectedIds as tryAddItemToDeck does that
                 }
             }
