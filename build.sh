@@ -53,30 +53,17 @@ if [ -n "$PASSWORD" ]; then
     ESCAPED_PWD=$(printf '%q' "$PASSWORD")
     BUILD_ARGS+=("--build-arg" "APP_PASSWORD=$ESCAPED_PWD")
 fi
+# Build arguments
 [ -n "$NO_CACHE" ] && {
     echo "Adding no-cache flag..."
     BUILD_ARGS+=("--no-cache")
 }
 
-# Build Process
+# Build process
 echo "Starting build process..."
 (
     set -x  # Show git/docker commands
-
-    # npm frontend build steps
-    echo "Cleaning up previous npm build artifacts..."
-    rm -rf node_modules package-lock.json www
-    
-    echo "Installing npm dependencies..."
-    npm install || { echo "npm install failed!" >&2; exit 1; }
-
-    echo "Building frontend assets with Parcel..."
-    npm run build || { echo "npm run build failed!" >&2; exit 1; }
-
-    echo "Frontend build complete in www/ directory."
-    # End npm frontend build steps
-
-    #git pull && \ # Uncomment if you want to pull latest code before building
+    #git pull && \
     sudo docker rm -f ntn && \
     sudo docker container prune -f && \
     sudo docker buildx build "${BUILD_ARGS[@]}" -t not-the-news . && \

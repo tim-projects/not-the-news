@@ -3,23 +3,8 @@
   "version": "1.0.0",
   "description": "![image](screenshot.jpg)",
   "main": "index.js",
-  "targets": {
-    "serviceWorker": {
-      "source": "src/sw.js",
-      "distDir": "www",
-      "publicUrl": "/",
-      "context": "service-worker"
-    },
-    "main": {
-      "source": "src/index.html",
-      "distDir": "www",
-      "publicUrl": "/"
-    }
-  },
   "scripts": {
-    "build-sw": "parcel build src/sw.js",
-    "dev": "parcel src/index.html --open",
-    "build": "parcel build src/index.html"
+    "build": "vite build"
   },
   "repository": {
     "type": "git",
@@ -33,6 +18,6 @@
   },
   "homepage": "https://github.com/tim-projects/not-the-news#readme",
   "devDependencies": {
-    "parcel": "^2.15.4"
+    "vite": "^5.3.3"
   }
 }

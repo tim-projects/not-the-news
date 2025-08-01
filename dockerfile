@@ -7,10 +7,6 @@ FROM caddy:builder-alpine AS caddy-builder
 ENV CGO_ENABLED=1
 
 # Install C toolchain, Brotli and redis plugin dependencies
-# - brotli-dev: C headers/libs
-# - pkgconfig: metadata for cgo to find Brotli
-# - git: fetch xcaddy modules
-# - build-base: gcc, musl-dev, make, etc.
 RUN apk add --no-cache \
     brotli-dev \
     pkgconfig \
@@ -18,11 +14,26 @@ RUN apk add --no-cache \
     build-base \
   && xcaddy build \
       --with github.com/dunglas/caddy-cbrotli \
-      --with github.com.com/caddyserver/cache-handler@latest \
-      --with github.com.com/pberkel/caddy-storage-redis
+      --with github.com/caddyserver/cache-handler@latest \
+      --with github.com/pberkel/caddy-storage-redis
 
 ##############################################################################
-# 1. Base image
+# Stage 0: Frontend Assets Builder with Vite
+# This stage builds your Vite assets (www folder)
+FROM node:20-slim as frontend-builder
+WORKDIR /app
+# Copy package.json and package-lock.json first to leverage Docker cache
+COPY package.json package-lock.json ./
+# Use npm ci for clean install if package-lock.json exists, otherwise npm install
+RUN npm ci || npm install
+# Copy all source files required for the build (e.g., src/, public/ if any)
+COPY . .
+# Run the Vite build command to generate the 'www' directory
+# This uses the `build` script we added to your package.json
+RUN npm run build
+
+##############################################################################
+# 1. Base image (now main Caddy stage)
 FROM caddy:2-alpine
 
 # Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
@@ -48,7 +59,6 @@ RUN apk add --no-cache \
       curl \
       gnupg \
     && update-ca-certificates \
-    # --- FIX START: Map Alpine architecture to gosu release architecture ---
     && GOSU_VERSION="1.16" \
     && ALPINE_ARCH="$(apk --print-arch)" \
     && case "${ALPINE_ARCH}" in \
@@ -59,13 +69,10 @@ RUN apk add --no-cache \
        esac \
     && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" \
     && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" \
-    # --- FIX END ---
-    # Verify signature
     && export GNUPGHOME="$(mktemp -d)" \
     && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
     && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
     && rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
-    # Make gosu executable
     && chmod +x /usr/local/bin/gosu
 
 ##############################################################################
@@ -83,14 +90,11 @@ RUN pip install \
 WORKDIR /app
 COPY rss/ /rss/
 
-# IMPORTANT: This line now expects the 'www' folder to be pre-built on your host.
-# It will copy the contents of the 'www' folder from your host into '/app/www/' in the container.
-COPY www/ /app/www/
+# IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
+COPY --from=frontend-builder /app/www/ /app/www/
 
 COPY data/ /data/feed/
 
-# Create a dedicated non-root user for the Flask application
-# Add 'appuser' user and 'appgroup' group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 ##############################################################################
@@ -100,22 +104,19 @@ RUN mkdir -p /usr/local/bin && \
     echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'mkdir -p /data/feed /data/user_state /data/config' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'chown -R appuser:appgroup /data/user_state /data/feed /app /rss' >> /usr/local/bin/docker-entrypoint.sh && \
-    # Redis setup
     echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'dir /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'save 900 1' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'save 300 10' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'appendonly yes' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'appendfsync always' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'appendfilename "appendonly.aof"' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'appenddirname "appendonlydir"' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'dir /data/redis' >> /etc/redis.conf && \
+    echo 'save 900 1' >> /etc/redis.conf && \
+    echo 'save 300 10' >> /etc/redis.conf && \
+    echo 'appendonly yes' >> /etc/redis.conf && \
+    echo 'appendfsync always' >> /etc/redis.conf && \
+    echo 'appendfilename "appendonly.aof"' >> /etc/redis.conf && \
+    echo 'appenddirname "appendonlydir"' >> /etc/redis.conf && \
     echo 'EOF' >> /usr/local/bin/docker-entrypoint.sh && \
-    # Start background services
     echo 'redis-server /etc/redis.conf --daemonize yes &' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'gosu appuser /venv/bin/gunicorn --chdir /app/www --bind 127.0.0.1:4575 --workers 1 --threads 3 api:app &' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'gosu appuser python3 /rss/run.py --daemon &' >> /usr/local/bin/docker-entrypoint.sh && \
-    # Single Caddy execution with fallback
     echo 'if ! caddy run --config /etc/caddy/Caddyfile --adapter caddyfile; then' >> /usr/local/bin/docker-entrypoint.sh && \
     echo '  echo "Falling back to Let''s Encrypt staging CA"' >> /usr/local/bin/docker-entrypoint.sh && \
     echo '  export ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory' >> /usr/local/bin/docker-entrypoint.sh && \
@@ -126,7 +127,6 @@ RUN mkdir -p /usr/local/bin && \
 ##############################################################################
 # 7. copy Caddyfile (persist to /data, allow ACME_CA override)
 COPY Caddyfile /etc/caddy/Caddyfile
-# Replace {$EMAIL} and {$ACME_CA} in the Caddyfile
 RUN sed -i "s|{\$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
     sed -i "s|{\$ACME_CA:[^}]*}|${ACME_CA}|g" /etc/caddy/Caddyfile && \
     sed -i "s|{\$DOMAIN}|${DOMAIN}|g" /etc/caddy/Caddyfile
