@@ -81,13 +81,13 @@ def login():
         return jsonify({"error": "Internal server error"}), 500
 
 def _load_feed_items():
-    """Loads RSS feed items from feed.xml and returns them as a dictionary."""
+    app.logger.debug("Attempting to parse feed.xml")
     try:
         tree = ET.parse(FEED_XML)
+        app.logger.debug("Successfully parsed feed.xml")
     except (FileNotFoundError, ET.ParseError) as e:
         app.logger.warning(f"Failed to load or parse feed.xml: {e}")
         return {}
-
     root = tree.getroot()
     # Remove namespaces for easier parsing
     for elem in root.iter():
