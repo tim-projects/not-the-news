@@ -81,6 +81,7 @@ export function mapRawItems(rawList, fmtFn) {
         .filter(item => item !== null)
         .sort((a, b) => b.timestamp - a.timestamp);
 }
+
 export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
     try {
         // ADD THIS DEBUG LOGGING
@@ -332,6 +333,12 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
             deckSize: finalDeckGuids.length,
             deckGuids: finalDeckGuids
         });
+        
+        // Extra safety check
+        if (!Array.isArray(finalDeckGuids)) {
+            console.error('[DEBUG] ERROR: finalDeckGuids is not an array!', typeof finalDeckGuids, finalDeckGuids);
+            return [];
+        }
         
         return finalDeckGuids;
     } catch (error) {
