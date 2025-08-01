@@ -216,6 +216,7 @@ document.addEventListener('alpine:init', () => {
                     if (newGuidsStr !== oldGuidsStr) {
                         console.log('currentDeckGuids changed. Triggering loadAndDisplayDeck.');
                         await this.loadAndDisplayDeck();
+                        // This updateCounts call is necessary here as the deck changes.
                         this.updateCounts(this);
                     } else {
                         console.log('currentDeckGuids changed, but content is identical. Skipping re-display.');
@@ -343,7 +344,8 @@ document.addEventListener('alpine:init', () => {
                         await this.loadFeedItemsFromDB();
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
                         await manageDailyDeck(this);
-                        this.updateCounts(this);
+                        // Trigger the reactive update after all data is loaded
+                        this.deckManaged = true;
                         console.log("Online resync completed.");
                     }
                 });
@@ -375,7 +377,8 @@ document.addEventListener('alpine:init', () => {
                         await this.loadFeedItemsFromDB();
                         this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
                         await manageDailyDeck(this);
-                        this.updateCounts(this);
+                        // Trigger the reactive update after all data is loaded
+                        this.deckManaged = true;
                         console.log("Periodic background sync completed.");
                     } catch (error) {
                         console.error("Periodic sync failed", error);
