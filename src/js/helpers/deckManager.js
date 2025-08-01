@@ -85,7 +85,6 @@ export async function manageDailyDeck(app) {
 
     // Get all items from local database
     const allItems = await getAllFeedItems();
-    console.log("[deckManager] Total items fetched from DB for new deck:", allItems.length);
     // Get current hidden and current deck GUIDs from Alpine app state (which should be up-to-date)
     const hiddenGuidsSet = new Set(app.hidden.map(h => h.id));
     const currentDeckGuidsSet = new Set(app.currentDeckGuids); // Items currently in the displayed deck
