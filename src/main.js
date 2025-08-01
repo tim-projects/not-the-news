@@ -2,7 +2,14 @@
 
 import Alpine from './js/libs/alpine.3.x.x.js';
 import { rssApp } from './app.js';
-import './css/style.css';
+// The 'find' command revealed multiple CSS files, so we import them all
+import './css/variables.css';
+import './css/buttons.css';
+import './css/content.css';
+import './css/forms.css';
+import './css/layout.css';
+import './css/modal.css';
+
 
 // Set up the Service Worker
 if ('serviceWorker' in navigator) {
