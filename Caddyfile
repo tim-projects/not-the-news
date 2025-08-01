@@ -8,13 +8,8 @@
 
    # 1. Handle specific static files first.
    handle /sw.js {
-     @no_redirect {
-       not path /login.html
-     }
-     # This serves the file if it's a GET request
-     file_server {
-       root * /app/www
-     }
+     root * /app/www
+     file_server
    }
    handle /login.html {
      root * /app/www
@@ -122,6 +117,7 @@
    handle {
      @unauth {
        not header Cookie auth*
+       not path /sw.js
      }
      redir @unauth /login.html 302
 
