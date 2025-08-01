@@ -253,30 +253,33 @@ export async function pullUserState() {
         }
         const url = `${API_BASE_URL}/api/user-state/${key}`;
         let localTimestamp = '';
-
-        // --- FIXED SECTION: Check for empty data before using the timestamp ---
+        
         let loadedState;
+        let isLocalStateEmpty = false;
+
         if (def.type === 'array') {
             loadedState = await loadArrayState(key);
-            // Only use the timestamp if the array is not empty
-            if (loadedState.value.length > 0) {
-                localTimestamp = loadedState.lastModified || '';
+            if (!loadedState.value || loadedState.value.length === 0) {
+                isLocalStateEmpty = true;
             } else {
-                console.log(`[DB] Local state for ${key} is empty. Forcing a full fetch.`);
-                localTimestamp = ''; // Ensure no ETag is sent
+                localTimestamp = loadedState.lastModified || '';
             }
         } else { // 'simple' type
             loadedState = await loadSimpleState(key);
-            // Only use the timestamp if the value is not null or undefined
-            if (loadedState.value !== null && loadedState.value !== undefined) {
-                localTimestamp = loadedState.lastModified || '';
+            if (loadedState.value === null || loadedState.value === undefined) {
+                isLocalStateEmpty = true;
             } else {
-                console.log(`[DB] Local state for ${key} is empty. Forcing a full fetch.`);
-                localTimestamp = ''; // Ensure no ETag is sent
+                localTimestamp = loadedState.lastModified || '';
             }
         }
-        // --- END FIXED SECTION ---
 
+        if (isLocalStateEmpty) {
+            console.log(`[DB] Local state for ${key} is empty. Forcing a full fetch, regardless of existing timestamp.`);
+            localTimestamp = ''; // Ensure no ETag is sent
+        } else {
+            console.log(`[DB] Local state for ${key} has data. Using If-None-Match header.`);
+        }
+        
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (localTimestamp) {
