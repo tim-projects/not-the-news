@@ -186,53 +186,39 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
         const arrayObjectStore = transaction.objectStore(arrayStoreName);
         await arrayObjectStore.clear(); // Clear existing data in the specific array store
 
-        // Deep clone to avoid mutation issues and ensure compatibility with IndexedDB.
-        // This is important if `arr` contains non-plain objects or circular references.
-        const clonableArr = JSON.parse(JSON.stringify(arr));
+        // --- START FIX: Filter and validate the array before processing ---
+        // Create a cleaned, validated array to avoid any invalid items.
+        const cleanedArr = (arr || []).filter(item => {
+            if (typeof item === 'string' && item.trim() !== '') {
+                return true;
+            }
+            if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid.trim() !== '') {
+                return true;
+            }
+            console.warn(`[DB] Filtering out an invalid item for key "${key}":`, item);
+            return false;
+        });
+        // --- END FIX ---
 
-        for (const item of clonableArr) {
+        for (const item of cleanedArr) {
             let itemToStore;
-            let skipItem = false;
-
-            // All array stores (`starredItems`, `hiddenItems`, `currentDeckGuids`, `shuffledOutGuids`)
-            // use 'guid' as keyPath in dbCore.js.
-            // Items must have a 'guid' property for `put` to work correctly.
 
             if (typeof item === 'string') {
-                // If the item is just a plain GUID string, wrap it in an object.
-                // This is common for `currentDeckGuids` and `shuffledOutGuids`.
                 itemToStore = { guid: item };
-            } else if (typeof item === 'object' && item !== null) {
-                // If it's an object, it MUST have a 'guid' property.
-                if (item.guid && typeof item.guid === 'string') {
-                    itemToStore = { ...item, guid: item.guid }; // Use existing 'guid' and spread other properties
-                } else {
-                    console.error(`[DB] Item for "${key}" is an object but has NO valid 'guid' property. Will skip this item. Original item:`, item);
-                    skipItem = true;
-                }
-            } else {
-                console.error(`[DB] Unexpected item type for "${key}". Expected string or object with 'guid', got "${typeof item}". Will skip this item. Original item:`, item);
-                skipItem = true;
+            } else { // It's a valid object from the filter above
+                itemToStore = { ...item, guid: item.guid };
             }
 
-            if (!skipItem) {
-                // `put` is used as it will add or update based on the 'guid' key.
-                await arrayObjectStore.put(itemToStore);
-            } else {
-                console.warn(`[DB] Skipping put operation for problematic item in "${key}" store (Store: ${arrayStoreName}).`);
-            }
+            // `put` is used as it will add or update based on the 'guid' key.
+            // This is the correct, single-argument put call.
+            await arrayObjectStore.put(itemToStore);
         }
 
         // Save metadata like lastModified for the array itself in userSettings.
         // Pass the current transaction to `saveSimpleState` so it's part of the same transaction.
         await saveSimpleState(key, null, serverTimestamp, transaction); // The 'value' for array states in userSettings is typically null or a marker.
 
-        const savedItemCount = clonableArr.filter(item => {
-            if (typeof item === 'string') return item.trim() !== '';
-            if (typeof item === 'object' && item !== null && typeof item.guid === 'string') return item.guid.trim() !== '';
-            return false;
-        }).length;
-        console.log(`[DB] Saved ${savedItemCount} items for "${key}" to store "${arrayStoreName}".`);
+        console.log(`[DB] Saved ${cleanedArr.length} items for "${key}" to store "${arrayStoreName}".`);
 
     } catch (e) {
         console.error(`[DB] Error saving array state "${key}" to store "${arrayStoreName}":`, e);
@@ -241,25 +227,12 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
         if (!tx && transaction) {
             try {
                 await transaction.done;
-                // Important: queueAndAttemptSyncOperation is called *after* transaction.done
-                // if it's not part of the same explicit transaction (which it isn't here).
-                // This is crucial for maintaining data consistency.
                 if (['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key)) {
-                    // For array types that represent server-synced collections, we need to
-                    // send the *entire* current state to the server, not just deltas from here.
-                    // The server then reconciles.
-                    // If your server supports delta updates for these, you'd send deltas here.
-                    // Otherwise, send the full array state as a 'simpleUpdate' type operation.
-                    // NOTE: The `addStarredItem`/`removeStarredItem` functions handle `starDelta` types.
-                    // This `simpleUpdate` here would be a full sync of the list, potentially redundant
-                    // if deltas are also sent and handled correctly by the server.
-                    // However, if `pullUserState` is the primary sync mechanism for these arrays,
-                    // and this is meant to push the full list on *local* array changes, it's fine.
-                    // If not, consider if this `simpleUpdate` for arrays is truly needed or if delta logic is sufficient.
+                    // Send array of GUIDs to server
                     await queueAndAttemptSyncOperation({
-                        type: 'simpleUpdate', // Generic update for the full array
-                        key: key, // e.g., 'starred', 'hidden'
-                        value: arr.map(item => typeof item === 'string' ? item : item.guid).filter(Boolean) // Send array of GUIDs to server
+                        type: 'simpleUpdate',
+                        key: key,
+                        value: cleanedArr.map(item => typeof item === 'string' ? item : item.guid)
                     });
                 }
             } catch (e) {
