@@ -13,8 +13,8 @@ import {
     saveShuffleState
 } from './userStateUtils.js';
 import {
-    generateNewDeck
-} from './dataUtils.js'; // The refactored loadNextDeck
+    generateDeckGuids
+} from './dataUtils.js';
 import {
     createStatusBarMessage,
     displayTemporaryMessageInTitle
@@ -91,7 +91,7 @@ export async function manageDailyDeck(app) {
     const shuffledOutGuidsSet = new Set(app.shuffledOutGuids); // Items recently shuffled out
 
     // Call the generic deck generation helper
-    const newDeckGuids = generateNewDeck(
+    const newDeckGuids = generateDeckGuids(
         allItems,
         hiddenGuidsSet,
         shuffledOutGuidsSet,
