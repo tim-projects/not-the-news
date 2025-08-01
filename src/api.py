@@ -7,6 +7,7 @@ import os
 import json
 import secrets
 import logging
+import html
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -88,18 +89,22 @@ def login():
 
 def _load_feed_items():
     app.logger.debug("Attempting to parse feed.xml")
-    # --- START OF CHANGES ---
-    # ADDED: Check if the file exists before attempting to parse.
+
     if not os.path.exists(FEED_XML):
         app.logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
         return {}
-    # --- END OF CHANGES ---
+
     try:
-        tree = ET.parse(FEED_XML)
+        with open(FEED_XML, 'r', encoding='utf-8') as f:
+            feed_content = f.read()
+            # Log the first 500 characters of the raw XML content
+            app.logger.debug(f"Full feed content read from disk (first 500 chars): {feed_content[:500]}...")
+        tree = ET.fromstring(feed_content)
         app.logger.debug("Successfully parsed feed.xml")
-    except (FileNotFoundError, ET.ParseError) as e:
+    except (FileNotFoundError, ET.ParseError, ET.ParseError) as e:
         app.logger.warning(f"Failed to load or parse feed.xml: {e}")
         return {}
+
     root = tree.getroot()
     # Remove namespaces for easier parsing
     for elem in root.iter():
@@ -121,12 +126,21 @@ def _load_feed_items():
         except Exception:
             pub_iso = raw_date
 
+        # Get the description and unescape HTML entities
+        description = it.findtext("description")
+        if description:
+            description = html.unescape(description)
+
+        # Log the raw description we just found
+        app.logger.debug(f"Processing item with GUID: {guid}")
+        app.logger.debug(f"Raw description: {description}")
+
         data = {
             "guid": guid,
             "title": it.findtext("title"),
             "link": it.findtext("link"),
             "pubDate": pub_iso,
-            "description": it.findtext("description"),
+            "description": description,
         }
         items[guid] = data
     return items
