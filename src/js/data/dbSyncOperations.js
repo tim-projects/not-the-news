@@ -4,6 +4,13 @@ import { getDb, isOnline } from './dbCore.js';
 // Import both loadArrayState and loadSimpleState
 import { loadSimpleState, saveSimpleState, saveArrayState, loadArrayState, USER_STATE_DEFS } from './dbUserState.js';
 
+/**
+ * Queues a user operation and attempts an immediate sync if online.
+ * For most operations, this is not used; `addPendingOperation` is called directly,
+ * and batch sync handles the rest. This function is for specific, high-priority
+ * operations that need a faster response.
+ * @param {object} operation - The operation object to queue and sync.
+ */
 export async function queueAndAttemptSyncOperation(operation) {
     const db = await getDb();
 
@@ -76,6 +83,10 @@ export async function queueAndAttemptSyncOperation(operation) {
     }
 }
 
+/**
+ * Adds a user operation to the pending operations buffer.
+ * @param {object} operation - The operation object to add.
+ */
 export async function addPendingOperation(operation) {
     const db = await getDb();
     if (operation.guid !== undefined) {
@@ -100,6 +111,9 @@ export async function addPendingOperation(operation) {
     }
 }
 
+/**
+ * Processes all pending operations in the buffer and syncs them with the server.
+ */
 export async function processPendingOperations() {
     const db = await getDb();
     if (!isOnline()) {
@@ -188,6 +202,10 @@ export async function processPendingOperations() {
     }
 }
 
+/**
+ * Gets the number of buffered changes waiting to be synced.
+ * @returns {Promise<number>} The count of pending operations.
+ */
 export async function getBufferedChangesCount() {
     const db = await getDb();
     try {
@@ -206,6 +224,12 @@ let _isPullingUserState = false;
 let _lastPullAttemptTime = 0;
 const PULL_DEBOUNCE_MS = 500;
 
+/**
+ * Pulls the user state from the server. This function has been updated
+ * to correctly fetch data for stores that are currently empty,
+ * preventing a 304 response from being treated as a successful sync
+ * for an empty local state.
+ */
 export async function pullUserState() {
     const db = await getDb();
     if (_isPullingUserState) {
@@ -229,15 +253,26 @@ export async function pullUserState() {
         }
         const url = `${API_BASE_URL}/api/user-state/${key}`;
         let localTimestamp = '';
+
+        // --- MODIFIED SECTION: Check if the local store is empty before fetching ---
+        const tx = db.transaction(def.store, 'readonly');
+        const store = tx.objectStore(def.store);
+        const count = await store.count();
+        await tx.done;
         
-        // --- MODIFIED SECTION: Use correct loader for initial timestamp ---
-        let loadedState;
-        if (def.type === 'array') {
-            loadedState = await loadArrayState(key); // Use loadArrayState for array types
-        } else {
-            loadedState = await loadSimpleState(key); // Use loadSimpleState for simple types
+        if (count > 0) {
+            let loadedState;
+            if (def.type === 'array') {
+                loadedState = await loadArrayState(key);
+            } else {
+                loadedState = await loadSimpleState(key);
+            }
+            localTimestamp = loadedState.lastModified || '';
         }
-        localTimestamp = loadedState.lastModified || '';
+
+        // The logic below now correctly only adds the If-None-Match header
+        // if there are items in the local store and a lastModified timestamp exists.
+        // This ensures that an empty local store always triggers a full fetch.
         // --- END MODIFIED SECTION ---
 
         try {
@@ -298,6 +333,10 @@ export async function pullUserState() {
     console.log('[DB] User state pull completed.');
 }
 
+/**
+ * Performs a feed synchronization, fetching new or updated items.
+ * @param {object} app - The main application state object.
+ */
 export async function performFeedSync(app) {
     const db = await getDb();
     if (!isOnline()) {
@@ -381,6 +420,10 @@ export async function performFeedSync(app) {
     }
 }
 
+/**
+ * Performs a full synchronization, pulling user state and feed items.
+ * @param {object} app - The main application state object.
+ */
 export async function performFullSync(app) {
     console.log('[DB] Full sync initiated.');
     try {
