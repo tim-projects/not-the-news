@@ -417,6 +417,11 @@ export async function performFeedSync(app) {
         }
         if (app && app.loadFeedItemsFromDB) {
             await app.loadFeedItemsFromDB();
+            // The deck needs to be re-evaluated and displayed after the feed is synced.
+            // This ensures the UI updates with the new items.
+            if (app.loadAndDisplayDeck) {
+                await app.loadAndDisplayDeck();
+            }
         }
         if (app && app.updateCounts) {
             app.updateCounts();
