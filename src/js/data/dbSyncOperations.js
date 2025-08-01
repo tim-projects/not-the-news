@@ -313,11 +313,26 @@ export async function pullUserState() {
                 transactionStores.push('userSettings');
             }
             const tx = db.transaction(transactionStores, 'readwrite');
+
             if (def.type === 'array') {
-                await saveArrayState(key, data.value || def.default, data.lastModified, tx);
+                // --- START FIX ---
+                // Filter the array to ensure only valid items are passed to the save function
+                const cleanArray = (data.value || def.default).filter(item => {
+                    if (typeof item === 'string' && item.trim() !== '') {
+                        return true;
+                    }
+                    if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid.trim() !== '') {
+                        return true;
+                    }
+                    console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
+                    return false;
+                });
+                await saveArrayState(key, cleanArray, data.lastModified, tx);
+                // --- END FIX ---
             } else {
                 await saveSimpleState(key, data.value, data.lastModified, tx);
             }
+
             await tx.done;
             if (data.lastModified && (!newestOverallTimestamp || data.lastModified > newestOverallTimestamp)) {
                 newestOverallTimestamp = data.lastModified;
@@ -339,7 +354,6 @@ export async function pullUserState() {
     _isPullingUserState = false;
     console.log('[DB] User state pull completed.');
 }
-
 /**
  * Performs a feed synchronization, fetching new or updated items.
  * @param {object} app - The main application state object.
