@@ -31,7 +31,6 @@ COPY . .
 # Run the Vite build command to generate the 'www' directory
 # This uses the `build` script we added to your package.json
 RUN npm run build
-RUN cp /app/www/assets/sw-*.js /app/www/sw.js
 RUN mv /app/www/src/index.html /app/www/ && \
     mv /app/www/src/login.html /app/www/ && \
     rm -r /app/www/src
