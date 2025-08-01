@@ -1,16 +1,25 @@
-{
-  email {$EMAIL}
-  storage file_system /data
-  acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
-}
-
 {$DOMAIN} {
-  # This sets the web root for all requests.
   root * /app/www
 
-  # A single handle block that processes requests in a precise order.
+  # 1. Allow sw.js before any redirect
+  @service_worker {
+    path /sw.js
+  }
+  handle @service_worker {
+    file_server
+  }
+
+  # 2. Redirect if not authenticated
+  @unauth {
+    not header Cookie auth*
+    not path /login.html
+    not path /sw.js
+  }
+  redir @unauth /login.html 302
+
+  # 3. Main request handler
   handle {
-    # 1. Handle API endpoints first
+    # Handle API
     @api {
       path /api/*
     }
@@ -21,7 +30,7 @@
       }
     }
 
-    # 2. Handle specific feed.xml
+    # Handle feed.xml
     handle_path /feed.xml {
       root * /data/feed
       header {
@@ -31,20 +40,11 @@
       file_server
     }
 
-    # 3. Handle the login redirect.
-    # This rule is now explicitly at the top of the request chain.
-    @unauth {
-      not header Cookie auth*
-      not path /login.html
-      not path /sw.js
-    }
-    redir @unauth /login.html 302
-
-    # 4. Serve all other files.
+    # Everything else
     file_server
   }
 
-  # Global directives for encoding and no-cache headers.
+  # Encoding rules
   encode {
     br 11
     gzip 5
