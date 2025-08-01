@@ -186,21 +186,34 @@ export function rssApp() {
 
                 // This is the combined function to ensure data is loaded before deck management
                 const loadAndManageData = async () => {
+                    // 1. Load the main feed items from the database.
                     await this.loadFeedItemsFromDB();
+
+                    // 2. Load hidden, starred, and other user settings from the database.
+                    // This is the key change: ensure these are awaited and assigned to the correct properties.
+                    const hiddenState = await loadArrayState('hidden');
+                    const starredState = await loadArrayState('starred');
+
+                    this.hidden = hiddenState.value || [];
+                    this.starred = starredState.value || [];
+    
+                    // We can't use this.hidden in this log because it will be updated right after
+                    // so we will create a new variable
+                    const hiddenLengthForLog = this.hidden.length
+                    const starredLengthForLog = this.starred.length
+
+                    console.log(`DEBUG: After loading from DB, app.hidden has ${hiddenLengthForLog} items and app.starred has ${starredLengthForLog} items.`);
+
+                    // 3. Get the last feed sync time to use for pruning old hidden items.
                     const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-                    
-                    // --- FIX BEGINS HERE ---
-                    // Load hidden and starred items once, then prune them
-                    // This prevents the state from being overwritten incorrectly.
-                    this.hidden = (await loadArrayState('hidden')).value;
-                    this.starred = (await loadArrayState('starred')).value;
-                    this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
 
-                    // Ensure manageDailyDeck is called only after all state is loaded
+                    // 4. Prune stale hidden items to keep the list from growing indefinitely.
+                    // The prune function should receive the current app entries and the hidden array.
+                    this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
+
+                    // 5. Call the main deck management function.
                     await manageDailyDeck(this);
-                    // --- FIX ENDS HERE ---
                 };
-
                 if (this.syncEnabled && this.isOnline) {
                     try {
                         console.log("Attempting early pull of user state (including current deck) from server...");
