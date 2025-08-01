@@ -77,24 +77,23 @@ export async function loadSimpleState(key, tx = null) {
 export async function saveSimpleState(key, value, serverTimestamp = null, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
-    // --- START FIX ---
-    // Allow saving if it's a simple type OR if it's one of the array types whose metadata is stored as a simple key in userSettings
     const isAllowedMetadataKey = ['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key);
 
     if (!def || (def.type !== 'simple' && !isAllowedMetadataKey)) {
         console.error(`[DB] Invalid key for simple state save operation: ${key}. It must be a 'simple' type or an array metadata key.`);
         throw new Error(`Invalid or undefined simple state key: ${key}`);
     }
-    // --- END FIX ---
-    const storeName = 'userSettings'; // Simple states are stored in 'userSettings'
-    let transaction = tx; // Use provided transaction or create a new one
+
+    const storeName = 'userSettings';
+    let transaction = tx;
+    let operationQueued = false;
 
     try {
-        if (!transaction) { // Only create if no transaction was passed
+        if (!transaction) {
             transaction = db.transaction(storeName, 'readwrite');
         }
         const objectStore = transaction.objectStore(storeName);
-        const objToSave = { key: key, value: value }; // 'userSettings' keyPath is 'key'
+        const objToSave = { key: key, value: value };
         if (serverTimestamp) {
             objToSave.lastModified = serverTimestamp;
         } else {
@@ -103,26 +102,30 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
         await objectStore.put(objToSave);
         console.log(`[DB] Saved "${key}" to userSettings.`);
 
-        // These keys are managed as simple updates on the server.
-        // `queueAndAttemptSyncOperation` will automatically remove 'guid' from the op if present.
-        // Array metadata keys (starred, hidden, etc.) are NOT queued from here,
-        // they are queued from saveArrayState's finally block if needed.
+        // Prepare the operation to be queued, but don't queue it yet.
         if (['filterMode', 'syncEnabled', 'imagesEnabled', 'shuffleCount', 'lastShuffleResetDate', 'openUrlsInNewTabEnabled', 'lastViewedItemId', 'lastViewedItemOffset', 'theme', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
-            const op = { type: 'simpleUpdate', key: key, value: value };
-            await queueAndAttemptSyncOperation(op);
+            operationQueued = true;
         }
-
     } catch (e) {
         console.error(`[DB] Error saving simple state "${key}":`, e);
         throw e;
     } finally {
-        if (!tx && transaction) { // Only complete if *this function* created the transaction
+        if (!tx && transaction) {
             try {
                 await transaction.done;
+                // Only queue the operation AFTER the transaction has successfully completed.
+                if (operationQueued) {
+                    const op = { type: 'simpleUpdate', key: key, value: value };
+                    await queueAndAttemptSyncOperation(op);
+                }
             } catch (e) {
                 if (e.name !== 'AbortError') {
-                    console.error(`[DB] Transaction completion error for simple state "${key}":`, e);
+                    console.error(`[DB] Transaction completion or sync queuing error for simple state "${key}":`, e);
                 }
+                if (e.name === 'DataError') {
+                    console.error(`[DB] Specific DataError on transaction completion. This could be due to a bug in queueAndAttemptSyncOperation.`);
+                }
+                throw e; // Re-throw the error to be caught by the caller
             }
         }
     }
