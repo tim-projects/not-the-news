@@ -21,8 +21,8 @@ export function formatDate(dateStr) {
 
     if (secs < 60) return "Just now";
     if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
-    if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s' : ""} ago`;
-    if (days < 7) return `${days} day${days !== 1 ? "s' : ""} ago`;
+    if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
+    if (days < 7) return `${days} day${days !== 1 ? "s" : ""} ago`;
 
     const weeks = Math.floor(days / 7);
     return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
