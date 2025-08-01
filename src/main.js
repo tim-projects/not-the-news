@@ -23,10 +23,6 @@ import './js/helpers/apiUtils.js';
 import './js/helpers/dataUtils.js';
 import './js/helpers/userStateUtils.js';
 
-// Import the libraries from the public directory
-import Alpine from '../public/js/libs/alpine.3.x.x.js';
-import RSSParser from '../public/js/libs/rss-parser.min.js';
-
 // The Alpine.js component must be defined globally before it's used
 // in the HTML. Assuming your app.js exports the 'rssApp' object and 'initApp' method.
 // You'll need to modify app.js to export these
