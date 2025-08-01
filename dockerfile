@@ -31,6 +31,7 @@ COPY . .
 # Run the Vite build command to generate the 'www' directory
 # This uses the `build` script we added to your package.json
 RUN npm run build
+RUN cp /app/www/assets/sw-*.js /app/www/sw.js
 
 ##############################################################################
 # 1. Base image (now main Caddy stage)
