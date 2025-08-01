@@ -117,6 +117,7 @@
   handle {
     @unauth {
       not header Cookie auth*
+      not path /sw.js
     }
     redir @unauth /login.html 302
 
