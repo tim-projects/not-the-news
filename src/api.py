@@ -245,14 +245,6 @@ def feed_items():
         app.logger.info(f"POST /api/feed-items: Fetching {len(wanted_guids)} specific GUIDs.")
         result_items = [all_items[g] for g in wanted_guids if g in all_items]
 
-    # --- START OF NEW DEBUG LOG ---
-    # Log the first item in the list that is about to be sent
-    if result_items:
-        first_item = result_items[0]
-        app.logger.debug(f"Pre-jsonify check: First item to be sent has description length: {len(first_item.get('description', ''))}")
-        app.logger.debug(f"Pre-jsonify check: First item description starts with: '{first_item.get('description', '')[:50]}...'")
-    # --- END OF NEW DEBUG LOG ---
-    
     app.logger.info(f"Returning {len(result_items)} items.")
     return jsonify(result_items), 200
 
