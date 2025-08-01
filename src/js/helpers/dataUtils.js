@@ -27,6 +27,7 @@ export function formatDate(dateStr) {
     const weeks = Math.floor(days / 7);
     return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
 }
+
 export function shuffleArray(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -81,11 +82,10 @@ export function mapRawItems(rawList, fmtFn) {
         .sort((a, b) => b.timestamp - a.timestamp);
 }
 
-export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
+export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
     try {
         let nextDeck = [];
         const MAX_DECK_SIZE = 10;
-        let selectedIds = new Set();
         
         const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
         
@@ -100,15 +100,43 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
 
         const prunedShuffledOutGuids = new Set([...shuffledOutGuids].filter(guid => allFeedGuidsSet.has(guid)));
 
-        let unreadItems = allFeedItems.filter(item =>
-            !prunedHiddenGuids.has(item.id) &&
-            !prunedShuffledOutGuids.has(item.id) &&
-            !currentDeckItemGuids.has(item.id)
-        );
+        // Filter allFeedItems based on the selected filterMode
+        let filteredItems = [];
+        switch (filterMode) {
+            case 'hidden':
+                filteredItems = allFeedItems.filter(item => prunedHiddenGuids.has(item.id));
+                break;
+            case 'starred':
+                // Assuming `starredGuids` is a Set of GUIDs, similar to `hiddenGuids`
+                const starredGuidsSet = new Set(starredGuids);
+                filteredItems = allFeedItems.filter(item => starredGuidsSet.has(item.id));
+                break;
+            case 'unread':
+            default:
+                // This is the original logic for generating the 'unread' deck
+                filteredItems = allFeedItems.filter(item =>
+                    !prunedHiddenGuids.has(item.id) &&
+                    !prunedShuffledOutGuids.has(item.id) &&
+                    !currentDeckItemGuids.has(item.id)
+                );
+                break;
+        }
 
+        // For `hidden` and `starred` modes, simply return the filtered list,
+        // as they are a static view of the user's lists and not a dynamic deck.
+        if (filterMode === 'hidden' || filterMode === 'starred') {
+            // Sort by timestamp to ensure consistent order
+            filteredItems.sort((a, b) => b.timestamp - a.timestamp);
+            return filteredItems.map(item => item.id);
+        }
+
+        // If not a static list, continue with the complex deck generation logic for 'unread'
+        let nextDeckItems = [];
+        let selectedIds = new Set();
+        
         const tryAddItemToDeck = (item) => {
-            if (nextDeck.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
-                nextDeck.push(item);
+            if (nextDeckItems.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
+                nextDeckItems.push(item);
                 selectedIds.add(item.id);
                 return true;
             }
@@ -118,7 +146,7 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
         const addItemsFromCategory = (categoryItems, limit) => {
             let count = 0;
             for (const item of categoryItems) {
-                if (count >= limit || nextDeck.length >= MAX_DECK_SIZE) {
+                if (count >= limit || nextDeckItems.length >= MAX_DECK_SIZE) {
                     break;
                 }
                 if (tryAddItemToDeck(item)) {
@@ -129,7 +157,6 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
 
         if (navigator.onLine) {
             const now = Date.now();
-
             const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
             const hasQuestionMarkInTitle = (item) => item.title.includes('?');
             const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
@@ -141,57 +168,52 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
             const isLongItem = (item) => item.description.length >= 750;
             const isShortItem = (item) => item.description.length < 750;
 
-            const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+            const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
             addItemsFromCategory(recentItems, 2);
 
-            const itemsWithLinks = unreadItems.filter(hasHyperlink);
+            const itemsWithLinks = filteredItems.filter(hasHyperlink);
             addItemsFromCategory(itemsWithLinks, 1);
 
-            const itemsWithQuestionTitle = unreadItems.filter(hasQuestionMarkInTitle);
+            const itemsWithQuestionTitle = filteredItems.filter(hasQuestionMarkInTitle);
             addItemsFromCategory(itemsWithQuestionTitle, 1);
 
-            const itemsWithQuestionFirst150 = unreadItems.filter(hasQuestionMarkInDescriptionFirst150);
+            const itemsWithQuestionFirst150 = filteredItems.filter(hasQuestionMarkInDescriptionFirst150);
             addItemsFromCategory(itemsWithQuestionFirst150, 1);
 
-            const itemsWithQuestionLast150 = unreadItems.filter(hasQuestionMarkInDescriptionLast150);
+            const itemsWithQuestionLast150 = filteredItems.filter(hasQuestionMarkInDescriptionLast150);
             addItemsFromCategory(itemsWithQuestionLast150, 1);
 
-            const itemsWithImages = unreadItems.filter(hasImage);
+            const itemsWithImages = filteredItems.filter(hasImage);
             addItemsFromCategory(itemsWithImages, 1);
 
-            const longItems = unreadItems.filter(isLongItem);
+            const longItems = filteredItems.filter(isLongItem);
             addItemsFromCategory(longItems, 1);
-            const shortItems = unreadItems.filter(isShortItem);
+            const shortItems = filteredItems.filter(isShortItem);
             addItemsFromCategory(shortItems, 1);
 
-            const trulyRemainingItems = unreadItems.filter(item => !selectedIds.has(item.id));
+            const trulyRemainingItems = filteredItems.filter(item => !selectedIds.has(item.id));
             const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
 
             for (const item of shuffledRemaining) {
-                if (nextDeck.length >= MAX_DECK_SIZE) break;
-                tryAddItemToDeck(item);
-            }
-
-            for (const item of unreadItems) {
-                if (nextDeck.length >= MAX_DECK_SIZE) break;
+                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
                 tryAddItemToDeck(item);
             }
             
-            if (nextDeck.length < MAX_DECK_SIZE) {
+            if (nextDeckItems.length < MAX_DECK_SIZE) {
                 const resurfaceCandidates = allFeedItems.filter(item =>
                     prunedShuffledOutGuids.has(item.id) && !prunedHiddenGuids.has(item.id) && !selectedIds.has(item.id)
                 );
                 resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
                 for (const item of resurfaceCandidates) {
-                    if (nextDeck.length >= MAX_DECK_SIZE) break;
+                    if (nextDeckItems.length >= MAX_DECK_SIZE) break;
                     tryAddItemToDeck(item);
                 }
             }
 
         } else {
             // Offline fallback
-            let filteredItems = [...unreadItems];
+            let offlineFilteredItems = [...filteredItems];
 
             const hasQuestionMarkInTitle = (item) => item.title.includes('?');
             const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
@@ -202,14 +224,14 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
             const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
             const hasImage = (item) => item.image !== "";
 
-            filteredItems = filteredItems.filter(item => !hasQuestionMarkInTitle(item));
-            filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionFirst150(item)));
-            filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionLast150(item)));
-            filteredItems = filteredItems.filter(item => !hasHyperlink(item));
-            filteredItems = filteredItems.filter(item => !hasImage(item));
+            offlineFilteredItems = offlineFilteredItems.filter(item => !hasQuestionMarkInTitle(item));
+            offlineFilteredItems = offlineFilteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionFirst150(item)));
+            offlineFilteredItems = offlineFilteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionLast150(item)));
+            offlineFilteredItems = offlineFilteredItems.filter(item => !hasHyperlink(item));
+            offlineFilteredItems = offlineFilteredItems.filter(item => !hasImage(item));
 
-            if (filteredItems.length < 10) {
-                let itemsToRestore = unreadItems.filter(item => !filteredItems.includes(item));
+            if (offlineFilteredItems.length < 10) {
+                let itemsToRestore = filteredItems.filter(item => !offlineFilteredItems.includes(item));
 
                 const restoreOrder = [
                     (item) => hasImage(item),
@@ -220,47 +242,37 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
                 ];
 
                 for (const criterion of restoreOrder) {
-                    while (filteredItems.length < 10) {
+                    while (offlineFilteredItems.length < 10) {
                         const itemToMove = itemsToRestore.find(criterion);
                         if (itemToMove) {
-                            filteredItems.push(itemToMove);
+                            offlineFilteredItems.push(itemToMove);
                             itemsToRestore = itemsToRestore.filter(i => i !== itemToMove);
                         } else {
                             break;
                         }
                     }
-                    if (filteredItems.length >= 10) break;
+                    if (offlineFilteredItems.length >= 10) break;
                 }
 
-                while (filteredItems.length < 10 && itemsToRestore.length > 0) {
-                    filteredItems.push(itemsToRestore.shift());
+                while (offlineFilteredItems.length < 10 && itemsToRestore.length > 0) {
+                    offlineFilteredItems.push(itemsToRestore.shift());
                 }
             }
 
             const now = Date.now();
-            const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
-            nextDeck = recentItems.slice(0, 2);
+            const recentItems = offlineFilteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+            nextDeckItems = recentItems.slice(0, 2);
 
-            const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
-            nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
+            const remainingItems = offlineFilteredItems.filter(item => !nextDeckItems.includes(item));
+            nextDeckItems = nextDeckItems.concat(remainingItems.slice(0, 10 - nextDeckItems.length));
         }
-        
-        // This is the crucial fix: Ensure the function always returns a valid array.
-        // It handles cases where an error might occur or the deck generation logic
-        // fails to produce a valid array.
-        if (!Array.isArray(nextDeck)) {
-            console.error("nextDeck became a non-array value. This should not happen. Resetting to an empty array.");
-            return [];
-        }
-        
+
         // Final safety sort
-        nextDeck.sort((a, b) => b.timestamp - a.timestamp);
+        nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
         
-        return nextDeck.map(item => item.id);
+        return nextDeckItems.map(item => item.id);
     } catch (error) {
         console.error("An error occurred during deck generation:", error);
-        // This is the definitive safety return.
-        // It ensures the function will NEVER return an undefined value.
         return [];
     }
 }
