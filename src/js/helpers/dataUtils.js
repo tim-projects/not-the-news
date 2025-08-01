@@ -83,176 +83,182 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
-    let nextDeck = [];
-    const MAX_DECK_SIZE = 10;
-    let selectedIds = new Set();
-    
-    const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
-    
-    const hiddenItemsArray = [...hiddenGuids];
-    const prunedHiddenItemsArray = hiddenItemsArray.filter(guid => allFeedGuidsSet.has(guid));
-    const prunedHiddenGuids = new Set(prunedHiddenItemsArray);
-
-    if (prunedHiddenItemsArray.length !== hiddenItemsArray.length) {
-        await setUserSetting('hidden', prunedHiddenItemsArray);
-        console.log(`[DATA] Pruned hidden items. Removed ${hiddenItemsArray.length - prunedHiddenItemsArray.length} stale items.`);
-    }
-
-    const prunedShuffledOutGuids = new Set([...shuffledOutGuids].filter(guid => allFeedGuidsSet.has(guid)));
-
-    let unreadItems = allFeedItems.filter(item =>
-        !prunedHiddenGuids.has(item.id) &&
-        !prunedShuffledOutGuids.has(item.id) &&
-        !currentDeckItemGuids.has(item.id)
-    );
-
-    const tryAddItemToDeck = (item) => {
-        if (nextDeck.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
-            nextDeck.push(item);
-            selectedIds.add(item.id);
-            return true;
-        }
-        return false;
-    };
-
-    const addItemsFromCategory = (categoryItems, limit) => {
-        let count = 0;
-        for (const item of categoryItems) {
-            if (count >= limit || nextDeck.length >= MAX_DECK_SIZE) {
-                break;
-            }
-            if (tryAddItemToDeck(item)) {
-                count++;
-            }
-        }
-    };
-
-    if (navigator.onLine) {
-        const now = Date.now();
-
-        const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
-        const hasQuestionMarkInTitle = (item) => item.title.includes('?');
-        const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
-        const hasQuestionMarkInDescriptionLast150 = (item) => {
-            const desc = item.description;
-            return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
-        };
-        const hasImage = (item) => item.image !== "";
-        const isLongItem = (item) => item.description.length >= 750;
-        const isShortItem = (item) => item.description.length < 750;
-
-        const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
-        addItemsFromCategory(recentItems, 2);
-
-        const itemsWithLinks = unreadItems.filter(hasHyperlink);
-        addItemsFromCategory(itemsWithLinks, 1);
-
-        const itemsWithQuestionTitle = unreadItems.filter(hasQuestionMarkInTitle);
-        addItemsFromCategory(itemsWithQuestionTitle, 1);
-
-        const itemsWithQuestionFirst150 = unreadItems.filter(hasQuestionMarkInDescriptionFirst150);
-        addItemsFromCategory(itemsWithQuestionFirst150, 1);
-
-        const itemsWithQuestionLast150 = unreadItems.filter(hasQuestionMarkInDescriptionLast150);
-        addItemsFromCategory(itemsWithQuestionLast150, 1);
-
-        const itemsWithImages = unreadItems.filter(hasImage);
-        addItemsFromCategory(itemsWithImages, 1);
-
-        const longItems = unreadItems.filter(isLongItem);
-        addItemsFromCategory(longItems, 1);
-        const shortItems = unreadItems.filter(isShortItem);
-        addItemsFromCategory(shortItems, 1);
-
-        const trulyRemainingItems = unreadItems.filter(item => !selectedIds.has(item.id));
-        const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
-
-        for (const item of shuffledRemaining) {
-            if (nextDeck.length >= MAX_DECK_SIZE) break;
-            tryAddItemToDeck(item);
-        }
-
-        for (const item of unreadItems) {
-            if (nextDeck.length >= MAX_DECK_SIZE) break;
-            tryAddItemToDeck(item);
-        }
+    try {
+        let nextDeck = [];
+        const MAX_DECK_SIZE = 10;
+        let selectedIds = new Set();
         
-        if (nextDeck.length < MAX_DECK_SIZE) {
-            const resurfaceCandidates = allFeedItems.filter(item =>
-                prunedShuffledOutGuids.has(item.id) && !prunedHiddenGuids.has(item.id) && !selectedIds.has(item.id)
-            );
-            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
+        const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
+        
+        const hiddenItemsArray = [...hiddenGuids];
+        const prunedHiddenItemsArray = hiddenItemsArray.filter(guid => allFeedGuidsSet.has(guid));
+        const prunedHiddenGuids = new Set(prunedHiddenItemsArray);
 
-            for (const item of resurfaceCandidates) {
+        if (prunedHiddenItemsArray.length !== hiddenItemsArray.length) {
+            await setUserSetting('hidden', prunedHiddenItemsArray);
+            console.log(`[DATA] Pruned hidden items. Removed ${hiddenItemsArray.length - prunedHiddenItemsArray.length} stale items.`);
+        }
+
+        const prunedShuffledOutGuids = new Set([...shuffledOutGuids].filter(guid => allFeedGuidsSet.has(guid)));
+
+        let unreadItems = allFeedItems.filter(item =>
+            !prunedHiddenGuids.has(item.id) &&
+            !prunedShuffledOutGuids.has(item.id) &&
+            !currentDeckItemGuids.has(item.id)
+        );
+
+        const tryAddItemToDeck = (item) => {
+            if (nextDeck.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
+                nextDeck.push(item);
+                selectedIds.add(item.id);
+                return true;
+            }
+            return false;
+        };
+
+        const addItemsFromCategory = (categoryItems, limit) => {
+            let count = 0;
+            for (const item of categoryItems) {
+                if (count >= limit || nextDeck.length >= MAX_DECK_SIZE) {
+                    break;
+                }
+                if (tryAddItemToDeck(item)) {
+                    count++;
+                }
+            }
+        };
+
+        if (navigator.onLine) {
+            const now = Date.now();
+
+            const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
+            const hasQuestionMarkInTitle = (item) => item.title.includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInDescriptionLast150 = (item) => {
+                const desc = item.description;
+                return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
+            };
+            const hasImage = (item) => item.image !== "";
+            const isLongItem = (item) => item.description.length >= 750;
+            const isShortItem = (item) => item.description.length < 750;
+
+            const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+            addItemsFromCategory(recentItems, 2);
+
+            const itemsWithLinks = unreadItems.filter(hasHyperlink);
+            addItemsFromCategory(itemsWithLinks, 1);
+
+            const itemsWithQuestionTitle = unreadItems.filter(hasQuestionMarkInTitle);
+            addItemsFromCategory(itemsWithQuestionTitle, 1);
+
+            const itemsWithQuestionFirst150 = unreadItems.filter(hasQuestionMarkInDescriptionFirst150);
+            addItemsFromCategory(itemsWithQuestionFirst150, 1);
+
+            const itemsWithQuestionLast150 = unreadItems.filter(hasQuestionMarkInDescriptionLast150);
+            addItemsFromCategory(itemsWithQuestionLast150, 1);
+
+            const itemsWithImages = unreadItems.filter(hasImage);
+            addItemsFromCategory(itemsWithImages, 1);
+
+            const longItems = unreadItems.filter(isLongItem);
+            addItemsFromCategory(longItems, 1);
+            const shortItems = unreadItems.filter(isShortItem);
+            addItemsFromCategory(shortItems, 1);
+
+            const trulyRemainingItems = unreadItems.filter(item => !selectedIds.has(item.id));
+            const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
+
+            for (const item of shuffledRemaining) {
                 if (nextDeck.length >= MAX_DECK_SIZE) break;
                 tryAddItemToDeck(item);
             }
-        }
 
-    } else {
-        // Offline fallback
-        let filteredItems = [...unreadItems];
+            for (const item of unreadItems) {
+                if (nextDeck.length >= MAX_DECK_SIZE) break;
+                tryAddItemToDeck(item);
+            }
+            
+            if (nextDeck.length < MAX_DECK_SIZE) {
+                const resurfaceCandidates = allFeedItems.filter(item =>
+                    prunedShuffledOutGuids.has(item.id) && !prunedHiddenGuids.has(item.id) && !selectedIds.has(item.id)
+                );
+                resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
-        const hasQuestionMarkInTitle = (item) => item.title.includes('?');
-        const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
-        const hasQuestionMarkInDescriptionLast150 = (item) => {
-            const desc = item.description;
-            return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
-        };
-        const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
-        const hasImage = (item) => item.image !== "";
-
-        filteredItems = filteredItems.filter(item => !hasQuestionMarkInTitle(item));
-        filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionFirst150(item)));
-        filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionLast150(item)));
-        filteredItems = filteredItems.filter(item => !hasHyperlink(item));
-        filteredItems = filteredItems.filter(item => !hasImage(item));
-
-        if (filteredItems.length < 10) {
-            let itemsToRestore = unreadItems.filter(item => !filteredItems.includes(item));
-
-            const restoreOrder = [
-                (item) => hasImage(item),
-                (item) => hasHyperlink(item),
-                (item) => (item.description && hasQuestionMarkInDescriptionLast150(item)),
-                (item) => (item.description && hasQuestionMarkInDescriptionFirst150(item)),
-                (item) => hasQuestionMarkInTitle(item)
-            ];
-
-            for (const criterion of restoreOrder) {
-                while (filteredItems.length < 10) {
-                    const itemToMove = itemsToRestore.find(criterion);
-                    if (itemToMove) {
-                        filteredItems.push(itemToMove);
-                        itemsToRestore = itemsToRestore.filter(i => i !== itemToMove);
-                    } else {
-                        break;
-                    }
+                for (const item of resurfaceCandidates) {
+                    if (nextDeck.length >= MAX_DECK_SIZE) break;
+                    tryAddItemToDeck(item);
                 }
-                if (filteredItems.length >= 10) break;
             }
 
-            while (filteredItems.length < 10 && itemsToRestore.length > 0) {
-                filteredItems.push(itemsToRestore.shift());
+        } else {
+            // Offline fallback
+            let filteredItems = [...unreadItems];
+
+            const hasQuestionMarkInTitle = (item) => item.title.includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInDescriptionLast150 = (item) => {
+                const desc = item.description;
+                return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
+            };
+            const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
+            const hasImage = (item) => item.image !== "";
+
+            filteredItems = filteredItems.filter(item => !hasQuestionMarkInTitle(item));
+            filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionFirst150(item)));
+            filteredItems = filteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionLast150(item)));
+            filteredItems = filteredItems.filter(item => !hasHyperlink(item));
+            filteredItems = filteredItems.filter(item => !hasImage(item));
+
+            if (filteredItems.length < 10) {
+                let itemsToRestore = unreadItems.filter(item => !filteredItems.includes(item));
+
+                const restoreOrder = [
+                    (item) => hasImage(item),
+                    (item) => hasHyperlink(item),
+                    (item) => (item.description && hasQuestionMarkInDescriptionLast150(item)),
+                    (item) => (item.description && hasQuestionMarkInDescriptionFirst150(item)),
+                    (item) => hasQuestionMarkInTitle(item)
+                ];
+
+                for (const criterion of restoreOrder) {
+                    while (filteredItems.length < 10) {
+                        const itemToMove = itemsToRestore.find(criterion);
+                        if (itemToMove) {
+                            filteredItems.push(itemToMove);
+                            itemsToRestore = itemsToRestore.filter(i => i !== itemToMove);
+                        } else {
+                            break;
+                        }
+                    }
+                    if (filteredItems.length >= 10) break;
+                }
+
+                while (filteredItems.length < 10 && itemsToRestore.length > 0) {
+                    filteredItems.push(itemsToRestore.shift());
+                }
             }
+
+            const now = Date.now();
+            const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
+            nextDeck = recentItems.slice(0, 2);
+
+            const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
+            nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
         }
 
-        const now = Date.now();
-        const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
-        nextDeck = recentItems.slice(0, 2);
-
-        const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
-        nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
-    }
-
-    // Sort the final deck by timestamp, if it's a valid array.
-    if (Array.isArray(nextDeck)) {
+        // Final safety check and sort
+        if (!Array.isArray(nextDeck)) {
+            console.error("nextDeck became a non-array value. This should not happen. Resetting to an empty array.");
+            return [];
+        }
+        
         nextDeck.sort((a, b) => b.timestamp - a.timestamp);
-    } else {
-        // Fallback in case of an unexpected non-array value.
-        console.error("nextDeck is not a valid array. Returning an empty deck to prevent errors.");
-        nextDeck = [];
+        
+        return nextDeck.map(item => item.id);
+    } catch (error) {
+        console.error("An error occurred during deck generation:", error);
+        // This is the definitive safety return.
+        // It ensures the function will NEVER return an undefined value.
+        return [];
     }
-
-    return nextDeck.map(item => item.id);
 }
