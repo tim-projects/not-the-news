@@ -88,6 +88,7 @@ def login():
 
 def _load_feed_items():
     app.logger.debug("Attempting to parse feed.xml")
+
     if not os.path.exists(FEED_XML):
         app.logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
         return {}
@@ -97,8 +98,7 @@ def _load_feed_items():
             feed_content = f.read()
             app.logger.debug(f"Full feed content read from disk (first 500 chars): {feed_content[:500]}...")
 
-        # CORRECTION: ET.fromstring returns the root Element directly.
-        # It does not return an ElementTree object, so getroot() is not needed.
+        # ET.fromstring returns the root Element directly.
         root = ET.fromstring(feed_content)
         app.logger.debug("Successfully parsed feed.xml")
     except (FileNotFoundError, ET.ParseError) as e:
@@ -124,23 +124,35 @@ def _load_feed_items():
         except Exception:
             pub_iso = raw_date
 
+        # CORRECTION: Get the full inner XML content of the description tag,
+        # including all child elements. This is the most reliable way to get
+        # the HTML content that is not directly in the element's text field.
         description_element = it.find("description")
-        description = None
-        if description_element is not None and description_element.text:
-            description = html.unescape(description_element.text)
-        else:
-            description = "" # Use an empty string if no text is found
+        description_content = ""
+        if description_element is not None:
+            # We get the raw XML string of all content inside the <description> tag
+            description_content = "".join(
+                ET.tostring(child, encoding='unicode') for child in description_element
+            )
+            # Add any direct text of the description tag itself (if any)
+            if description_element.text:
+                description_content = description_element.text + description_content
+        
+        # Log the raw HTML before unescaping
+        app.logger.debug(f"Raw HTML content of description for GUID {guid}: {description_content[:100]}...")
 
-        # Log the raw description we just found
-        app.logger.debug(f"Processing item with GUID: {guid}")
-        app.logger.debug(f"Raw description: {description}")
+        # Now we unescape the HTML entities
+        unescaped_description = html.unescape(description_content)
+
+        # Log the unescaped content
+        app.logger.debug(f"Unescaped description for GUID {guid}: {unescaped_description[:100]}...")
 
         data = {
             "guid": guid,
             "title": it.findtext("title"),
             "link": it.findtext("link"),
             "pubDate": pub_iso,
-            "description": description,
+            "description": unescaped_description,
         }
         items[guid] = data
     return items
