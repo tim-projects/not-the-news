@@ -83,6 +83,11 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
+    // --- CHANGE: Explicitly initialize nextDeck as an empty array to prevent the sort error. ---
+    let nextDeck = [];
+    const MAX_DECK_SIZE = 10;
+    let selectedIds = new Set(); // Keep track of IDs already added to nextDeck
+    
     // Before filtering, create a master set of all available GUIDs to prune stale data
     const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
     
@@ -106,10 +111,6 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
         !prunedShuffledOutGuids.has(item.id) &&
         !currentDeckItemGuids.has(item.id)
     );
-
-    let nextDeck = [];
-    const MAX_DECK_SIZE = 10;
-    let selectedIds = new Set(); // Keep track of IDs already added to nextDeck
 
     // Helper to add items to the deck without duplicates and respecting max size
     const tryAddItemToDeck = (item) => {
