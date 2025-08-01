@@ -1,6 +1,6 @@
 // src/main.js
 
-import Alpine from './libs/alpine.3.x.x.js';
+import Alpine from './js/libs/alpine.3.x.x.js';
 import { rssApp } from './app.js';
 import './css/style.css';
 

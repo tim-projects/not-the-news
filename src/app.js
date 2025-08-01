@@ -1,4 +1,4 @@
-// www/js/app.js
+// src/app.js
 
 import {
     getDb,
