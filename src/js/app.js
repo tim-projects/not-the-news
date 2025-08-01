@@ -26,8 +26,8 @@ import {
     setFilterMode,
     loadFilterMode
 } from './helpers/userStateUtils.js';
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './ui/uiUpdaters.js'
+import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { manageDailyDeck, processShuffle } from './helpers/deckManager.js';
 
 if ('serviceWorker' in navigator) {
@@ -298,17 +298,19 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
 
                 if (this.syncEnabled && this.isOnline) {
+                    // Capture the 'this' context in a variable to avoid timing issues in the async callback.
+                    const app = this;
                     setTimeout(async () => {
                         try {
                             console.log("Initiating background partial sync...");
-                            await performFeedSync(this);
+                            await performFeedSync(app);
                             const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
 
                             await pullUserState();
-                            await this.loadFeedItemsFromDB();
-                            this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                            await manageDailyDeck(this);
-                            this.updateCounts(this);
+                            await app.loadFeedItemsFromDB();
+                            app.hidden = await pruneStaleHidden(app.entries, currentFeedServerTime);
+                            await manageDailyDeck(app);
+                            app.updateCounts(app);
                             console.log("Background partial sync completed.");
                         } catch (error) {
                             console.error('Background partial sync failed', error);
