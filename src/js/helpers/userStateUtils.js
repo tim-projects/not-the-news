@@ -13,6 +13,33 @@ import {
 
 import { createStatusBarMessage } from '../ui/uiUpdaters.js';
 
+/**
+ * Gets a single user setting from the userSettings store.
+ * @param {string} key The key of the setting to get.
+ * @returns {Promise<any>} The value of the setting.
+ */
+export async function getUserSetting(key) {
+    const db = await getDb();
+    const tx = db.transaction('userSettings', 'readonly');
+    const store = tx.objectStore('userSettings');
+    const value = await store.get(key);
+    await tx.done;
+    return value;
+}
+
+/**
+ * Sets a single user setting in the userSettings store.
+ * @param {string} key The key of the setting to set.
+ * @param {any} value The value to set for the key.
+ * @returns {Promise<void>}
+ */
+export async function setUserSetting(key, value) {
+    const db = await getDb();
+    const tx = db.transaction('userSettings', 'readwrite');
+    const store = tx.objectStore('userSettings');
+    await store.put(value, key);
+    await tx.done;
+}
 
 /**
  * Toggles the starred status of an item and manages synchronization.
@@ -174,18 +201,6 @@ export async function saveCurrentDeck(guids) {
 
     console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
 
-    // --- REMOVED: Unnecessary and error-prone background sync registration. ---
-    // The following block has been removed:
-    // if ('serviceWorker' in navigator && 'SyncManager' in window) {
-    //     try {
-    //         const registration = await navigator.serviceWorker.ready;
-    //         await registration.sync.register('data-sync');
-    //         console.log('[UserState] Background sync registered for currentDeckGuids update.');
-    //     } catch (error) {
-    //         console.warn('[UserState] Background sync registration failed for currentDeckGuids:', error);
-    //     }
-    // }
-
     await addPendingOperation({
         type: 'simpleUpdate',
         key: 'currentDeckGuids',
@@ -234,18 +249,6 @@ export async function saveShuffleState(count, resetDate) {
         value: resetDate ? resetDate.toISOString() : null
     });
 
-    // --- REMOVED: Unnecessary and error-prone background sync registration. ---
-    // The following block has been removed:
-    // if ('serviceWorker' in navigator && 'SyncManager' in window) {
-    //     try {
-    //         const registration = await navigator.serviceWorker.ready;
-    //         await registration.sync.register('data-sync');
-    //         console.log('[UserState] Background sync registered for shuffle state update.');
-    //     } catch (error) {
-    //         console.warn('[UserState] Background sync registration failed for shuffle state:', error);
-    //     }
-    // }
-
     if (isOnline()) {
         try {
             await processPendingOperations();
@@ -269,18 +272,6 @@ export async function setFilterMode(app, mode) {
         key: 'filterMode',
         value: mode
     });
-
-    // --- REMOVED: Unnecessary and error-prone background sync registration. ---
-    // The following block has been removed:
-    // if ('serviceWorker' in navigator && 'SyncManager' in window) {
-    //     try {
-    //         const registration = await navigator.serviceWorker.ready;
-    //         await registration.sync.register('data-sync');
-    //         console.log('[UserState] Background sync registered for filter mode update.');
-    //     } catch (error) {
-    //         console.warn('[UserState] Background sync registration failed for filter mode:', error);
-    //     }
-    // }
 
     if (isOnline()) {
         try {
