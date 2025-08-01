@@ -6,8 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import json
 import secrets
-import logging
-import html
+import logging, html
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -89,7 +88,6 @@ def login():
 
 def _load_feed_items():
     app.logger.debug("Attempting to parse feed.xml")
-
     if not os.path.exists(FEED_XML):
         app.logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
         return {}
@@ -97,15 +95,16 @@ def _load_feed_items():
     try:
         with open(FEED_XML, 'r', encoding='utf-8') as f:
             feed_content = f.read()
-            # Log the first 500 characters of the raw XML content
             app.logger.debug(f"Full feed content read from disk (first 500 chars): {feed_content[:500]}...")
-        tree = ET.fromstring(feed_content)
+
+        # CORRECTION: ET.fromstring returns the root Element directly.
+        # It does not return an ElementTree object, so getroot() is not needed.
+        root = ET.fromstring(feed_content)
         app.logger.debug("Successfully parsed feed.xml")
-    except (FileNotFoundError, ET.ParseError, ET.ParseError) as e:
+    except (FileNotFoundError, ET.ParseError) as e:
         app.logger.warning(f"Failed to load or parse feed.xml: {e}")
         return {}
 
-    root = tree.getroot()
     # Remove namespaces for easier parsing
     for elem in root.iter():
         if "}" in elem.tag:
@@ -121,15 +120,16 @@ def _load_feed_items():
         raw_date = it.findtext("pubDate") or ""
         try:
             dt = parsedate_to_datetime(raw_date)
-            # Ensure consistent ISO format with 'Z' for UTC
             pub_iso = dt.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         except Exception:
             pub_iso = raw_date
 
-        # Get the description and unescape HTML entities
-        description = it.findtext("description")
-        if description:
-            description = html.unescape(description)
+        description_element = it.find("description")
+        description = None
+        if description_element is not None and description_element.text:
+            description = html.unescape(description_element.text)
+        else:
+            description = "" # Use an empty string if no text is found
 
         # Log the raw description we just found
         app.logger.debug(f"Processing item with GUID: {guid}")
