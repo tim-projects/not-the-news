@@ -52,8 +52,8 @@ export const manageDailyDeck = async (app) => {
         // For now, let's just use the filtered deck.
         app.deck = deck;
 
-        // Save the new deck to the database.
-        await saveCurrentDeck(app.deck);
+        // Save the GUIDs of the new deck to the database.
+        await saveCurrentDeck(app.deck.map(item => item.guid));
     }
 
     console.log(`[deckManager] Deck managed. New deck size: ${app.deck.length}.`);
@@ -72,8 +72,6 @@ export async function processShuffle(app) {
     }
 
     // Get GUIDs of currently visible items in the deck
-    // NOTE: The previous code used item.id, but the logs show item.guid.
-    // I've updated this to use item.guid for consistency with the rest of the code.
     const visibleGuids = app.deck.map(item => item.guid);
 
     // Add these GUIDs to the shuffled_out_guids array in app state
