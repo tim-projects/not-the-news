@@ -183,36 +183,21 @@ export function rssApp() {
                 this.openUrlsInNewTabEnabled = (await loadSimpleState('openUrlsInNewTabEnabled')).value ?? true;
                 this.filterMode = (await loadFilterMode());
                 this.isOnline = isOnline();
-                await this.loadFeedItemsFromDB();
 
-                this.$watch('currentDeckGuids', async (newGuids, oldGuids) => {
-                    const newGuidsStr = JSON.stringify(newGuids.sort());
-                    const oldGuidsStr = JSON.stringify(oldGuids.sort());
-                    if (newGuidsStr !== oldGuidsStr) {
-                        console.log('currentDeckGuids changed. Triggering loadAndDisplayDeck.');
-                        await this.loadAndDisplayDeck();
-                        // This updateCounts call is necessary here as the deck changes.
-                        this.updateCounts(this);
-                    } else {
-                        console.log('currentDeckGuids changed, but content is identical. Skipping re-display.');
-                    }
-                });
-
-                // New $watch listener for the deckManaged flag
-                this.$watch('deckManaged', (isManaged) => {
-                    if (isManaged) {
-                        this.updateCounts(this);
-                        console.log("Background sync-triggered deck update completed.");
-                        this.deckManaged = false; // Reset the flag for the next update
-                    }
-                });
+                // This is the combined function to ensure data is loaded before deck management
+                const loadAndManageData = async () => {
+                    await this.loadFeedItemsFromDB();
+                    const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
+                    this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
+                    await manageDailyDeck(this);
+                };
 
                 if (this.syncEnabled && this.isOnline) {
                     try {
                         console.log("Attempting early pull of user state (including current deck) from server...");
                         await pullUserState();
                         console.log("Early user state pull completed.");
-                        await this.loadFeedItemsFromDB();
+                        await loadAndManageData();
                     } catch (error) {
                         console.warn("Early pullUserState failed, proceeding with local state. Error:", error);
                         if (error instanceof SyntaxError && error.message.includes('Unexpected end of JSON input')) {
@@ -222,19 +207,14 @@ export function rssApp() {
                 }
 
                 const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
-                let lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-
                 if (itemsCount === 0 && this.isOnline) {
                     createStatusBarMessage("No feed items found locally. Performing initial sync...", "info");
                     await performFullSync(this);
-                    lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-                    await this.loadFeedItemsFromDB();
                     createStatusBarMessage("Initial sync complete!", "success");
                 }
-
-                this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
-
-                await manageDailyDeck(this);
+                
+                // Ensure data is loaded and deck is managed after any potential full sync
+                await loadAndManageData();
 
                 initTheme(this);
                 initSyncToggle(this);
@@ -291,12 +271,8 @@ export function rssApp() {
                         try {
                             console.log("Initiating background partial sync...");
                             await performFeedSync(app);
-                            const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-
                             await pullUserState();
-                            await app.loadFeedItemsFromDB();
-                            app.hidden = await pruneStaleHidden(app.entries, currentFeedServerTime);
-                            await manageDailyDeck(app);
+                            await loadAndManageData();
                             // Set the flag to trigger the reactive update in the $watch listener
                             app.deckManaged = true;
                         } catch (error) {
@@ -313,12 +289,8 @@ export function rssApp() {
                         console.log("Online detected. Processing pending operations and resyncing.");
                         await processPendingOperations();
                         await performFeedSync(this);
-                        const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-
                         await pullUserState();
-                        await this.loadFeedItemsFromDB();
-                        this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                        await manageDailyDeck(this);
+                        await loadAndManageData();
                         // Trigger the reactive update after all data is loaded
                         this.deckManaged = true;
                         console.log("Online resync completed.");
@@ -346,12 +318,8 @@ export function rssApp() {
                     try {
                         console.log("Performing periodic background sync...");
                         await performFeedSync(this);
-                        const currentFeedServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-
                         await pullUserState();
-                        await this.loadFeedItemsFromDB();
-                        this.hidden = await pruneStaleHidden(this.entries, currentFeedServerTime);
-                        await manageDailyDeck(this);
+                        await loadAndManageData();
                         // Trigger the reactive update after all data is loaded
                         this.deckManaged = true;
                         console.log("Periodic background sync completed.");
