@@ -253,19 +253,29 @@ export async function pullUserState() {
         }
         const url = `${API_BASE_URL}/api/user-state/${key}`;
         let localTimestamp = '';
-        
-        // --- MODIFIED SECTION: Use a more precise check for the item's existence ---
+
+        // --- FIXED SECTION: Check for empty data before using the timestamp ---
         let loadedState;
         if (def.type === 'array') {
             loadedState = await loadArrayState(key);
-        } else {
+            // Only use the timestamp if the array is not empty
+            if (loadedState.value.length > 0) {
+                localTimestamp = loadedState.lastModified || '';
+            } else {
+                console.log(`[DB] Local state for ${key} is empty. Forcing a full fetch.`);
+                localTimestamp = ''; // Ensure no ETag is sent
+            }
+        } else { // 'simple' type
             loadedState = await loadSimpleState(key);
+            // Only use the timestamp if the value is not null or undefined
+            if (loadedState.value !== null && loadedState.value !== undefined) {
+                localTimestamp = loadedState.lastModified || '';
+            } else {
+                console.log(`[DB] Local state for ${key} is empty. Forcing a full fetch.`);
+                localTimestamp = ''; // Ensure no ETag is sent
+            }
         }
-        
-        // Only use the If-None-Match header if a lastModified timestamp exists.
-        // This is a more accurate check than looking at the entire store's count.
-        localTimestamp = loadedState.lastModified || '';
-        // --- END MODIFIED SECTION ---
+        // --- END FIXED SECTION ---
 
         try {
             const headers = { 'Content-Type': 'application/json' };
