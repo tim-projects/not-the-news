@@ -30,44 +30,9 @@ import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollT
 import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './ui/uiInitializers.js';
 import { manageDailyDeck, processShuffle } from './helpers/deckManager.js';
 
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { type: 'module', scope: '/' })
-            .then(reg => {
-                console.log('Service Worker registered:', reg.scope);
-
-                reg.addEventListener('updatefound', () => {
-                    const newWorker = reg.installing;
-                    if (newWorker) {
-                        newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
-                                console.log('New Service Worker activated, but not yet controlling. Reloading...');
-                                window.location.reload();
-                            }
-                        });
-                    }
-                });
-            })
-            .catch(error => console.warn('Service Worker registration failed:', error));
-    });
-}
-
-document.addEventListener("load", e => {
-    if (e.target?.tagName?.toLowerCase() === "img") {
-        e.target.classList.add("loaded");
-    }
-}, true);
-
-document.addEventListener('alpine:init', () => {
-    if (typeof window.Alpine === 'undefined') {
-        console.error("CRITICAL ERROR: window.Alpine is undefined inside alpine:init event listener. Alpine.js might not have loaded correctly.");
-        document.getElementById('loading-screen').textContent = 'Error: Alpine.js failed to load.';
-        document.getElementById('loading-screen').style.display = 'block';
-        return;
-    }
-    console.log("'alpine:init' event fired. Defining 'rssApp' component.");
-
-    window.Alpine.data('rssApp', () => ({
+// The Alpine component function is now directly exported
+export function rssApp() {
+    return {
         loading: true,
         deck: [],
         feedItems: {},
@@ -208,6 +173,7 @@ document.addEventListener('alpine:init', () => {
             return filtered;
         },
 
+        // Export this function to be called from main.js or other modules
         async initApp() {
             try {
                 this.db = await initDb();
@@ -527,5 +493,13 @@ document.addEventListener('alpine:init', () => {
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             this.updateCounts(this);
         }
-    }));
-});
+    };
+}
+
+// Your main.js file should now look something like this to properly consume this module:
+// import Alpine from 'alpinejs';
+// import { rssApp } from './js/app.js';
+// import './css/style.css'; // Make sure your main.js still imports your CSS.
+//
+// Alpine.data('rssApp', rssApp);
+// Alpine.start();
