@@ -188,8 +188,17 @@ export function rssApp() {
                 const loadAndManageData = async () => {
                     await this.loadFeedItemsFromDB();
                     const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
+                    
+                    // --- FIX BEGINS HERE ---
+                    // Load hidden and starred items once, then prune them
+                    // This prevents the state from being overwritten incorrectly.
+                    this.hidden = (await loadArrayState('hidden')).value;
+                    this.starred = (await loadArrayState('starred')).value;
                     this.hidden = await pruneStaleHidden(this.entries, lastFeedSyncServerTime);
+
+                    // Ensure manageDailyDeck is called only after all state is loaded
                     await manageDailyDeck(this);
+                    // --- FIX ENDS HERE ---
                 };
 
                 if (this.syncEnabled && this.isOnline) {
@@ -413,8 +422,6 @@ export function rssApp() {
             });
 
             this.entries = mapRawItems(uniqueEntries, formatDate);
-            this.hidden = (await loadArrayState('hidden')).value;
-            this.starred = (await loadArrayState('starred')).value;
         },
 
         updateCounts(app) {
