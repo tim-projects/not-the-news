@@ -245,13 +245,16 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
             const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
             nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
         }
-
-        // Final safety check and sort
+        
+        // This is the crucial fix: Ensure the function always returns a valid array.
+        // It handles cases where an error might occur or the deck generation logic
+        // fails to produce a valid array.
         if (!Array.isArray(nextDeck)) {
             console.error("nextDeck became a non-array value. This should not happen. Resetting to an empty array.");
             return [];
         }
         
+        // Final safety sort
         nextDeck.sort((a, b) => b.timestamp - a.timestamp);
         
         return nextDeck.map(item => item.id);
