@@ -25,15 +25,15 @@ const MAX_DECK_SIZE = 10;
 
 // This function manages the daily deck of news items.
 // It is called with the main application object as a parameter.
-// This ensures it has access to the most up-to-date state (like hidden and starred items).
+// It uses the items already loaded into the app object's state.
 export const manageDailyDeck = async (app) => {
-    // We are now using the app.hidden and app.starred arrays directly, which were
-    // correctly populated by the loadAndManageData function.
-    const allItems = await app.getFeedItemsFromDB();
+    // We are now directly using the `app.entries` array, which should have been
+    // populated by the feed sync process before this function is called.
+    const allItems = app.entries;
     const hiddenGuids = app.hidden;
     const starredGuids = app.starred;
     const shuffledOutGuids = app.shuffledOutGuids;
-    
+
     // Log the correct counts to verify the fix
     console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
     console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuids.length}`);
@@ -41,12 +41,10 @@ export const manageDailyDeck = async (app) => {
     console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuids.length}`);
 
     // If it's a new day or the user has reshuffled, create a new deck.
-    // The previous error occurred because this function was not using the correct hidden/starred counts.
     const lastResetDate = app.lastShuffleResetDate;
     const today = new Date().toDateString();
 
     if (lastResetDate !== today || app.shuffleCount > 0) {
-        // ... rest of your deck generation logic here ...
         // Filter out hidden and shuffled items from the main feed.
         const deck = allItems.filter(item => !hiddenGuids.includes(item.guid) && !shuffledOutGuids.includes(item.guid));
 
@@ -60,31 +58,46 @@ export const manageDailyDeck = async (app) => {
 
     console.log(`[deckManager] Deck managed. New deck size: ${app.deck.length}.`);
 };
+
+// This function processes a shuffle request from the user.
+// It adds the current deck's items to a "shuffled out" list,
+// decrements the shuffle count, and triggers a new deck to be built.
 export async function processShuffle(app) {
-    // ... (rest of the function is unchanged)
     console.log("[deckManager] processShuffle called.");
 
+    // Check if shuffles are available
     if (app.shuffleCount <= 0) {
         createStatusBarMessage('No shuffles left for today!', 'error');
         return;
     }
 
-    const visibleGuids = app.deck.map(item => item.id);
+    // Get GUIDs of currently visible items in the deck
+    // NOTE: The previous code used item.id, but the logs show item.guid.
+    // I've updated this to use item.guid for consistency with the rest of the code.
+    const visibleGuids = app.deck.map(item => item.guid);
+
+    // Add these GUIDs to the shuffled_out_guids array in app state
+    // Ensure uniqueness and that we're not adding hidden items back to shuffled-out list
     const updatedShuffledOutGuids = new Set([...app.shuffledOutGuids, ...visibleGuids]);
     app.shuffledOutGuids = Array.from(updatedShuffledOutGuids);
 
+    // Decrement shuffleCount
     app.shuffleCount--;
 
+    // Save the updated shuffled-out GUIDs and shuffle count to IndexedDB
     await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    await saveShuffleState(app.shuffleCount, today);
+    today.setHours(0, 0, 0, 0); // Normalize for saving lastShuffleResetDate
+    await saveShuffleState(app.shuffleCount, today); // Save current shuffle count and reset date
 
+    // Update the UI display for shuffle count immediately
     const shuffleDisplay = getShuffleCountDisplay();
     if (shuffleDisplay) {
         shuffleDisplay.textContent = app.shuffleCount;
     }
 
+    // Trigger a re-evaluation of the deck by calling manageDailyDeck
+    // This will generate a new deck excluding the newly shuffled-out items.
     await manageDailyDeck(app);
 
     displayTemporaryMessageInTitle('Feed shuffled!');
