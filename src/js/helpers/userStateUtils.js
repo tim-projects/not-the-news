@@ -185,34 +185,60 @@ export async function loadCurrentDeck() {
 }
 
 /**
- * Saves the current deck of GUIDs.
- * @param {Array<string>} guids - The array of GUIDs to save as the current deck.
+ * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store
+ * and queues a corresponding sync operation.
+ *
+ * @param {string[]} guids An array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
-    const db = await getDb();
-    const tx = db.transaction('currentDeckGuids', 'readwrite');
-    const store = tx.objectStore('currentDeckGuids');
+    // Note: Assuming getDb(), addPendingOperation(), processPendingOperations(), and isOnline()
+    // are imported or available in the scope.
 
-    await store.clear();
-    for (const guid of guids) {
-        await store.put({ guid: guid });
-    }
-    await tx.done;
-
-    console.log(`[saveCurrentDeck] Saved ${guids.length} GUIDs to currentDeckGuids store.`);
-
-    await addPendingOperation({
-        type: 'simpleUpdate',
-        key: 'currentDeckGuids',
-        value: Array.from(guids)
-    });
-
-    if (isOnline()) {
-        try {
-            await processPendingOperations();
-        } catch (syncErr) {
-            console.error("Failed to immediately sync currentDeckGuids change, operation remains buffered:", syncErr);
+    try {
+        // 1. Validate input upfront.
+        if (!Array.isArray(guids)) {
+            console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs.");
+            return;
         }
+
+        const db = await getDb();
+        const tx = db.transaction('currentDeckGuids', 'readwrite');
+        const store = tx.objectStore('currentDeckGuids');
+
+        await store.clear();
+
+        let savedCount = 0;
+        for (const guid of guids) {
+            // 2. Ensure each GUID is a valid string before attempting to save.
+            if (typeof guid === 'string' && guid.trim() !== '') {
+                // The correct single-argument put() call for an inline key store.
+                await store.put({ guid: guid });
+                savedCount++;
+            } else {
+                console.warn("[saveCurrentDeck] Skipping invalid or empty GUID:", guid);
+            }
+        }
+
+        await tx.done; // Wait for the transaction to complete successfully.
+
+        console.log(`[saveCurrentDeck] Saved ${savedCount} GUIDs to currentDeckGuids store.`);
+
+        // 3. Queue the sync operation. This will only run after a successful transaction.
+        await addPendingOperation({
+            type: 'simpleUpdate',
+            key: 'currentDeckGuids',
+            value: guids // Send the original array for server reconciliation
+        });
+
+        // 4. If online, attempt to process the buffered operation immediately.
+        if (isOnline()) {
+            await processPendingOperations();
+        }
+
+    } catch (e) {
+        // 5. Catch any errors that occur during the transaction or sync attempt.
+        console.error("[saveCurrentDeck] An error occurred:", e);
+        throw e; // Re-throw to inform the caller that the operation failed.
     }
 }
 
