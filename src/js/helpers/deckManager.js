@@ -85,18 +85,21 @@ export async function manageDailyDeck(app) {
 
     // Get all items from local database
     const allItems = await getAllFeedItems();
-    // Get current hidden and current deck GUIDs from Alpine app state (which should be up-to-date)
+    // Get current hidden, starred and current deck GUIDs from Alpine app state (which should be up-to-date)
     const hiddenGuidsSet = new Set(app.hidden.map(h => h.id));
+    const starredGuidsSet = new Set(app.starred.map(s => s.id));
     const currentDeckGuidsSet = new Set(app.currentDeckGuids); // Items currently in the displayed deck
     const shuffledOutGuidsSet = new Set(app.shuffledOutGuids); // Items recently shuffled out
 
-    // Call the generic deck generation helper
+    // Pass the current filter mode to the deck generation helper
     const newDeckGuids = await generateNewDeck(
         allItems,
         hiddenGuidsSet,
+        starredGuidsSet, // Pass the starred GUIDs to the deck generation function
         shuffledOutGuidsSet,
         currentDeckGuidsSet,
-        MAX_DECK_SIZE
+        MAX_DECK_SIZE,
+        app.filterMode // Pass the filter mode here
     );
 
     // Update the Alpine.js app's currentDeckGuids, which will trigger its $watch
