@@ -40,10 +40,12 @@ export function mapRawItem(item, fmtFn) {
         console.warn("mapRawItem received an undefined or null item. Returning null.");
         return null;
     }
-    console.log(`[DEBUG] Raw description for "${item.title}":`, item.desc);
+    // Corrected log message to use the correct key
+    console.log(`[DEBUG] Raw description for "${item.title}":`, item.description);
 
+    // Corrected to use the correct key
     const parser = new DOMParser();
-    const doc = parser.parseFromString(item.desc || "", "text/html");
+    const doc = parser.parseFromString(item.description || "", "text/html");
 
     const imgEl = doc.querySelector("img");
     const imgSrc = imgEl?.src || "";
