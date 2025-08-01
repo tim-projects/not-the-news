@@ -26,7 +26,13 @@ os.makedirs(FEED_DIR, exist_ok=True)
 os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(USER_STATE_DIR, exist_ok=True)
 
+# --- START OF CHANGES ---
+# CORRECTED: Changed the path to point to the file inside the feed directory.
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
+
+# This is the original path you were using, which caused the problem.
+# FEED_XML = "/data/feed.xml"
+# --- END OF CHANGES ---
 
 USER_STATE_SERVER_DEFAULTS = {
     # Client keys map directly to filenames
@@ -82,6 +88,12 @@ def login():
 
 def _load_feed_items():
     app.logger.debug("Attempting to parse feed.xml")
+    # --- START OF CHANGES ---
+    # ADDED: Check if the file exists before attempting to parse.
+    if not os.path.exists(FEED_XML):
+        app.logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
+        return {}
+    # --- END OF CHANGES ---
     try:
         tree = ET.parse(FEED_XML)
         app.logger.debug("Successfully parsed feed.xml")
