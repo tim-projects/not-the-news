@@ -178,12 +178,32 @@ export async function pruneStaleHidden(feedItems, currentTS) {
  */
 export async function loadCurrentDeck() {
     const { value: storedItems } = await loadArrayState('currentDeckGuids');
+    
+    console.log("[loadCurrentDeck] Raw stored items:", storedItems);
+    
     if (Array.isArray(storedItems)) {
-        return storedItems.map(item => item.guid).filter(Boolean);
+        // Check if items are already strings (new format) or objects (old format)
+        if (storedItems.length > 0) {
+            const firstItem = storedItems[0];
+            
+            if (typeof firstItem === 'string') {
+                // New format: items are already GUID strings
+                console.log("[loadCurrentDeck] Loading new format (direct strings)");
+                return storedItems.filter(Boolean);
+            } else if (firstItem && typeof firstItem === 'object' && firstItem.guid) {
+                // Old format: items are objects with .guid property
+                console.log("[loadCurrentDeck] Loading old format (objects with .guid)");
+                return storedItems.map(item => item.guid).filter(Boolean);
+            }
+        }
+        
+        // Empty array or unknown format
+        return [];
     }
+    
+    console.log("[loadCurrentDeck] No stored items found, returning empty array");
     return [];
 }
-
 /**
  * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store
  * and queues a corresponding sync operation.
@@ -191,15 +211,14 @@ export async function loadCurrentDeck() {
  * @param {string[]} guids An array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
-    // Note: Assuming getDb(), addPendingOperation(), processPendingOperations(), and isOnline()
-    // are imported or available in the scope.
-
     try {
         // 1. Validate input upfront.
         if (!Array.isArray(guids)) {
-            console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs.");
+            console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs, got:", typeof guids, guids);
             return;
         }
+
+        console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs to store");
 
         const db = await getDb();
         const tx = db.transaction('currentDeckGuids', 'readwrite');
@@ -211,8 +230,8 @@ export async function saveCurrentDeck(guids) {
         for (const guid of guids) {
             // 2. Ensure each GUID is a valid string before attempting to save.
             if (typeof guid === 'string' && guid.trim() !== '') {
-                // The correct single-argument put() call for an inline key store.
-                await store.put({ guid: guid });
+                // FIXED: Save the GUID string directly, not wrapped in an object
+                await store.put(guid); // ✅ CORRECT
                 savedCount++;
             } else {
                 console.warn("[saveCurrentDeck] Skipping invalid or empty GUID:", guid);
@@ -241,7 +260,6 @@ export async function saveCurrentDeck(guids) {
         throw e; // Re-throw to inform the caller that the operation failed.
     }
 }
-
 /**
  * Loads the shuffle state, including shuffle count, last reset date.
  * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
