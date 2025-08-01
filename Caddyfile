@@ -19,9 +19,10 @@
    @static_files {
      path /login.html
      path /manifest.json
-     path_regexp ^.*\.(css|js|svg|ttf|woff|woff2)$
+     path_regexp ^.*\.(css|js|svg|ttf|woff|woff2|png|jpg|jpeg|gif|ico|webp)$
      path /js/*
      path /images/*
+     path /assets/*
    }
    handle @static_files {
      root * /app/www
@@ -76,9 +77,10 @@
        not path /sw.js
        not path /login.html
        not path /manifest.json
-       not path_regexp ^.*\.(css|js|svg|ttf|woff|woff2)$
+       not path_regexp ^.*\.(css|js|svg|ttf|woff|woff2|png|jpg|jpeg|gif|ico|webp)$
        not path /js/*
        not path /images/*
+       not path /assets/*
        not path /feed.xml
      }
      redir @unauth /login.html 302
