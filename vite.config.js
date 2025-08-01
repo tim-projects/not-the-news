@@ -2,9 +2,19 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
+  // Set the root to the 'src' directory
+  root: 'src',
+
+  // Configure the public directory to be the one at the same level as src/
+  publicDir: '../public',
+
   build: {
-    outDir: 'www',
+    // Output everything to the 'www' directory, which is outside the 'src' folder
+    outDir: '../www',
+
+    // Clear the output directory on each build
     emptyOutDir: true,
+
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'src/index.html'),
