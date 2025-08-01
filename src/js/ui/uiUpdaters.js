@@ -128,23 +128,29 @@ export function createStatusBarMessage(message, type = 'info') {
  * @param {object} app - The Alpine.js app state object.
 */
 export function updateCounts(app) {
+    // CRITICAL FIX: Add a defensive check to ensure the 'app' object is valid
+    if (!app || typeof app.entries === 'undefined' || typeof app.hidden === 'undefined' || typeof app.starred === 'undefined') {
+        console.warn("Attempted to update counts with an invalid app object. Skipping to prevent errors.");
+        return;
+    }
+    
     // app.hidden and app.starred now contain objects like { guid: '...', hiddenAt: '...' }
     // or { guid: '...', starredAt: '...' }.
     // app.entries items have a 'guid' property.
     // app.currentDeckGuids is an array of plain GUID strings.
 
-    const hiddenSet = new Set(app.hidden.map(e => e.guid)); // ***CHANGED: e.id to e.guid***
-    const starredSet = new Set(app.starred.map(s => s.guid)); // ***CHANGED: s.id to s.guid***
+    const hiddenSet = new Set(app.hidden.map(e => e.guid));
+    const starredSet = new Set(app.starred.map(s => s.guid));
 
     const allC = app.entries.length;
     // Filter app.entries using their 'guid' property against the sets
-    const hiddenC = app.entries.filter(e => hiddenSet.has(e.guid)).length; // ***CHANGED: e.id to e.guid***
-    const starredC = app.entries.filter(e => starredSet.has(e.guid)).length; // ***CHANGED: e.id to e.guid***
+    const hiddenC = app.entries.filter(e => hiddenSet.has(e.guid)).length;
+    const starredC = app.entries.filter(e => starredSet.has(e.guid)).length;
 
     // app.currentDeckGuids is already an array of GUID strings
     const deckGuidsSet = new Set(app.currentDeckGuids);
     // Unread items are those in the current deck that are NOT hidden.
-    const unreadInDeckC = app.entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length; // ***CHANGED: e.id to e.guid***
+    const unreadInDeckC = app.entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length;
 
     const selector = getFilterSelector();
     if (!selector) return;

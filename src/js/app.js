@@ -482,10 +482,6 @@ document.addEventListener('alpine:init', () => {
             await manageDailyDeck(this);
             this.updateCounts(this);
         },
-        // Removed the redundant setFilter method
-        // setFilter(mode) {
-        //     this.filterMode = mode;
-        // },
         async processShuffle() {
             await processShuffle(this);
             this.updateCounts(this);
