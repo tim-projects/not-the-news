@@ -1,3 +1,9 @@
+/**
+ * dbUserState.js
+ * Manages the client-side IndexedDB for user state, including settings and cached content.
+ * This version includes a more robust data loading mechanism to handle potential data corruption.
+ */
+
 // www/js/data/dbUserState.js
 
 import { getDb } from './dbCore.js';

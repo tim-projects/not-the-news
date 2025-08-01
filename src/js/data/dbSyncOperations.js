@@ -1,14 +1,13 @@
-// www/js/data/dbSyncOperations.js
+/**
+ * dbSyncOperations.js
+ * Handles all synchronization operations between the client-side IndexedDB and the server API.
+ */
 
 import { getDb, isOnline } from './dbCore.js';
-// Import both loadArrayState and loadSimpleState
 import { loadSimpleState, saveSimpleState, saveArrayState, loadArrayState, USER_STATE_DEFS } from './dbUserState.js';
 
 /**
  * Queues a user operation and attempts an immediate sync if online.
- * For most operations, this is not used; `addPendingOperation` is called directly,
- * and batch sync handles the rest. This function is for specific, high-priority
- * operations that need a faster response.
  * @param {object} operation - The operation object to queue and sync.
  */
 export async function queueAndAttemptSyncOperation(operation) {
@@ -226,9 +225,9 @@ const PULL_DEBOUNCE_MS = 500;
 
 /**
  * Pulls the user state from the server. This function has been updated
- * to correctly fetch data for stores that are currently empty,
- * preventing a 304 response from being treated as a successful sync
- * for an empty local state.
+ * to correctly fetch data for stores that are empty, or when the data
+ * is present but invalid, preventing a 304 response from being treated
+ * as a successful sync for an empty local state.
  */
 export async function pullUserState() {
     const db = await getDb();
@@ -253,16 +252,19 @@ export async function pullUserState() {
         }
         const url = `${API_BASE_URL}/api/user-state/${key}`;
         let localTimestamp = '';
+        let isLocalStateEmpty = false;
         
         let loadedState;
-        let isLocalStateEmpty = false;
-
         if (def.type === 'array') {
             loadedState = await loadArrayState(key);
-            if (!loadedState.value || loadedState.value.length === 0) {
-                isLocalStateEmpty = true;
-            } else {
+            console.log(`[DB] DEBUG: Loaded state for array key '${key}' is:`, loadedState);
+            const hasValidData = loadedState.value && loadedState.value.length > 0 && loadedState.value.every(item => item !== null && item !== undefined);
+            
+            if (hasValidData) {
                 localTimestamp = loadedState.lastModified || '';
+                isLocalStateEmpty = false;
+            } else {
+                isLocalStateEmpty = true;
             }
         } else { // 'simple' type
             loadedState = await loadSimpleState(key);
@@ -274,7 +276,7 @@ export async function pullUserState() {
         }
 
         if (isLocalStateEmpty) {
-            console.log(`[DB] Local state for ${key} is empty. Forcing a full fetch, regardless of existing timestamp.`);
+            console.log(`[DB] Local state for ${key} is empty or invalid. Forcing a full fetch.`);
             localTimestamp = ''; // Ensure no ETag is sent
         } else {
             console.log(`[DB] Local state for ${key} has data. Using If-None-Match header.`);
@@ -284,13 +286,13 @@ export async function pullUserState() {
             const headers = { 'Content-Type': 'application/json' };
             if (localTimestamp) {
                 headers['If-None-Match'] = localTimestamp;
-                console.log(`[DB] Fetching ${key} with If-None-Match.`);
+                console.log(`[DB] Fetching ${key} with If-None-Match header: ${localTimestamp}.`);
             } else {
-                console.log(`[DB] Fetching ${key} (no ETag).`);
+                console.log(`[DB] Fetching ${key} with no ETag.`);
             }
             const response = await fetch(url, { method: 'GET', headers: headers });
             if (response.status === 304) {
-                console.log(`[DB] State for ${key}: 304 Not Modified.`);
+                console.log(`[DB] State for ${key}: 304 Not Modified. Local data is up-to-date.`);
                 if (localTimestamp && (!newestOverallTimestamp || localTimestamp > newestOverallTimestamp)) {
                     newestOverallTimestamp = localTimestamp;
                 }
@@ -305,7 +307,7 @@ export async function pullUserState() {
                 throw new Error(`HTTP error! status: ${response.status} for ${key}`);
             }
             const data = await response.json();
-            console.log(`[DB] New data for ${key}.`);
+            console.log(`[DB] New data received for ${key}.`);
             const transactionStores = [def.store];
             if (def.store !== 'userSettings') {
                 transactionStores.push('userSettings');
