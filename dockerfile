@@ -96,6 +96,7 @@ COPY rss/ /rss/
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
+COPY src/api.py /app/www/api.py
 
 COPY data/ /data/feed/
 
