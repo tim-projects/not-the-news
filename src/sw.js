@@ -55,10 +55,12 @@ self.addEventListener('activate', function(event) {
 // to communicate with the main thread.
 
 self.addEventListener('fetch', function(event) {
-  const requestUrl = new URL(event.request.url);
+  // Check the request method. If it's not a GET, let it go to the network directly.
+  if (event.request.method !== 'GET') {
+    return;
+  }
 
-  // Strategy: Cache First for all requests.
-  // This is a simpler, more robust strategy for a Progressive Web App (PWA).
+  // Use respondWith for caching GET requests
   event.respondWith(
     caches.match(event.request).then(function(response) {
       // If we have a cached response, return it.
@@ -76,14 +78,13 @@ self.addEventListener('fetch', function(event) {
         // Clone the response to put in the cache.
         const responseToCache = networkResponse.clone();
         caches.open(cacheName).then(function(cache) {
+          // This call only happens for GET requests now.
           cache.put(event.request, responseToCache);
         });
 
         return networkResponse;
       }).catch(function() {
-        // If both cache and network fail, this catch block is executed.
-        // For navigation requests, a fallback to 'index.html' would be useful here,
-        // but for other requests, it's correct to let it fail.
+        // Fallback for failed network requests
         return caches.match('index.html');
       });
     })
