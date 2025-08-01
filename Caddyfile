@@ -5,102 +5,27 @@
 }
 
 {$DOMAIN} {
+  # This sets the web root for all requests that are not handled by a specific rule.
+  root * /app/www
 
-  # 1. Handle specific static files first.
-  handle /sw.js {
-    root * /app/www
-    file_server
-  }
-  handle /login.html {
-    root * /app/www
-    file_server
-  }
-  handle /manifest.json {
-    root * /app/www
-    file_server
-  }
-
-  # 2. Handle common static asset directories/patterns.
-  handle /js/* {
-    root * /app/www
-    file_server
-  }
-  handle /*.css {
-    root * /app/www
-    file_server
-  }
-  handle /*.js {
-    root * /app/www
-    file_server
-  }
-  handle /*.svg {
-    root * /app/www
-    file_server
-  }
-  handle /*.ttf {
-    root * /app/www
-    file_server
-  }
-  handle /*.woff {
-    root * /app/www
-    file_server
-  }
-  handle /*.woff2 {
-    root * /app/www
-    file_server
-  }
-  handle /images/* {
-    root * /app/www
-    file_server
-  }
-
-  # 3. Handle API endpoints.
-  handle /api/login* {
+  # 1. Handle all API endpoints.
+  handle_path /api/* {
     reverse_proxy 127.0.0.1:4575 {
       header_up X-Forwarded-Proto https
       header_up Host {host}
     }
   }
 
-  handle /api/user-state* {
-    reverse_proxy 127.0.0.1:4575 {
-      header_up X-Forwarded-Proto https
-      header_up Host {host}
-    }
+  # 2. Redirect unauthenticated users to the login page.
+  # This rule is now explicitly at the top of the request chain.
+  @unauth {
+    not header Cookie auth*
+    not path /login.html
+    not path /sw.js
   }
-  handle /api/load-config* {
-    reverse_proxy 127.0.0.1:4575 {
-      header_up X-Forwarded-Proto https
-      header_up Host {host}
-    }
-  }
-  handle /api/save-config* {
-    reverse_proxy 127.0.0.1:4575 {
-      header_up X-Forwarded-Proto https
-      header_up Host {host}
-    }
-  }
-  handle /api/time* {
-    reverse_proxy 127.0.0.1:4575 {
-      header_up X-Forwarded-Proto https
-      header_up Host {host}
-    }
-  }
-  handle /api/feed-guids* {
-    reverse_proxy 127.0.0.1:4575 {
-      header_up X-Forwarded-Proto https
-      header_up Host {host}
-    }
-  }
+  redir @unauth /login.html 302
 
-  handle /api/feed-items* {
-    reverse_proxy 127.0.0.1:4575 {
-      header_up X-Forwarded-Proto https
-      header_up Host {host}
-    }
-  }
-
-  # 4. Handle feed.xml specifically.
+  # 3. Handle the feed.xml file.
   @feed {
     path /feed.xml
   }
@@ -113,20 +38,11 @@
     file_server
   }
 
-  # 5. Catch-all handle block for all *other* requests.
-  handle {
-    @unauth {
-      not header Cookie auth*
-      not path /sw.js
-    }
-    redir @unauth /login.html 302
+  # 4. Handle all other files as a catch-all.
+  # This is a general file server that handles all your CSS, JS, images, etc.
+  file_server
 
-    # Serve the main application files as a fallback if no redirect happens.
-    root * /app/www
-    file_server
-  }
-
-  # Global directives outside of specific handle blocks (e.g., encoding)
+  # Global headers (you can remove this if you don't need them)
   encode {
     br 11
     gzip 5
@@ -142,7 +58,6 @@
     minimum_length 512
   }
 
-  # API no-cache headers can remain here, or be integrated into the /api/* handle blocks.
   @api_nocache {
     path /api/load-config*
     path /api/save-config*
