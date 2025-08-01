@@ -85,33 +85,27 @@ export function mapRawItems(rawList, fmtFn) {
 export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
     let nextDeck = [];
     const MAX_DECK_SIZE = 10;
-    let selectedIds = new Set(); // Keep track of IDs already added to nextDeck
+    let selectedIds = new Set();
     
-    // Before filtering, create a master set of all available GUIDs to prune stale data
     const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
     
-    // Check if the hiddenGuids list has stale items and prune it.
     const hiddenItemsArray = [...hiddenGuids];
     const prunedHiddenItemsArray = hiddenItemsArray.filter(guid => allFeedGuidsSet.has(guid));
     const prunedHiddenGuids = new Set(prunedHiddenItemsArray);
 
-    // If the list of hidden items has changed, update the database to persist the change.
     if (prunedHiddenItemsArray.length !== hiddenItemsArray.length) {
         await setUserSetting('hidden', prunedHiddenItemsArray);
         console.log(`[DATA] Pruned hidden items. Removed ${hiddenItemsArray.length - prunedHiddenItemsArray.length} stale items.`);
     }
 
-    // Prune stale GUIDs from shuffledOut sets
     const prunedShuffledOutGuids = new Set([...shuffledOutGuids].filter(guid => allFeedGuidsSet.has(guid)));
 
-    // Now, use the pruned sets to find unread items
     let unreadItems = allFeedItems.filter(item =>
         !prunedHiddenGuids.has(item.id) &&
         !prunedShuffledOutGuids.has(item.id) &&
         !currentDeckItemGuids.has(item.id)
     );
 
-    // Helper to add items to the deck without duplicates and respecting max size
     const tryAddItemToDeck = (item) => {
         if (nextDeck.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
             nextDeck.push(item);
@@ -121,10 +115,8 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
         return false;
     };
 
-    // Helper to add multiple items from a filtered list, respecting a category limit
     const addItemsFromCategory = (categoryItems, limit) => {
         let count = 0;
-        // Iterate over categoryItems, add if not already in deck, and respect limit and MAX_DECK_SIZE
         for (const item of categoryItems) {
             if (count >= limit || nextDeck.length >= MAX_DECK_SIZE) {
                 break;
@@ -138,7 +130,6 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
     if (navigator.onLine) {
         const now = Date.now();
 
-        // Define helper checks for prioritization
         const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
         const hasQuestionMarkInTitle = (item) => item.title.includes('?');
         const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
@@ -150,38 +141,29 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
         const isLongItem = (item) => item.description.length >= 750;
         const isShortItem = (item) => item.description.length < 750;
 
-        // 1. Prioritize Recent Items (up to 2)
         const recentItems = unreadItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
         addItemsFromCategory(recentItems, 2);
 
-        // 2. Prioritize Items with Links (up to 1)
         const itemsWithLinks = unreadItems.filter(hasHyperlink);
         addItemsFromCategory(itemsWithLinks, 1);
 
-        // 3. Prioritize Items with Questions in Title (up to 1)
         const itemsWithQuestionTitle = unreadItems.filter(hasQuestionMarkInTitle);
         addItemsFromCategory(itemsWithQuestionTitle, 1);
 
-        // 4. Prioritize Items with Questions in First 150 Chars (up to 1)
         const itemsWithQuestionFirst150 = unreadItems.filter(hasQuestionMarkInDescriptionFirst150);
         addItemsFromCategory(itemsWithQuestionFirst150, 1);
 
-        // 5. Prioritize Items with Questions in Last 150 Chars (up to 1)
         const itemsWithQuestionLast150 = unreadItems.filter(hasQuestionMarkInDescriptionLast150);
         addItemsFromCategory(itemsWithQuestionLast150, 1);
 
-        // 6. Prioritize Items with Images (up to 1)
         const itemsWithImages = unreadItems.filter(hasImage);
         addItemsFromCategory(itemsWithImages, 1);
 
-        // 7. Prioritize Long or Short Items (up to 1 of each)
         const longItems = unreadItems.filter(isLongItem);
         addItemsFromCategory(longItems, 1);
         const shortItems = unreadItems.filter(isShortItem);
         addItemsFromCategory(shortItems, 1);
 
-        // 8. Fill with Random Remaining
-        // Get items not yet selected from the original unreadItems pool, then shuffle
         const trulyRemainingItems = unreadItems.filter(item => !selectedIds.has(item.id));
         const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
 
@@ -190,34 +172,27 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
             tryAddItemToDeck(item);
         }
 
-        // 9. Ensure Full Deck (final fill from any remaining unread, sequential if needed)
-        // This ensures the deck is full if there are enough unread items left.
         for (const item of unreadItems) {
             if (nextDeck.length >= MAX_DECK_SIZE) break;
             tryAddItemToDeck(item);
         }
-        // Fallback: If deck is not full, add from shuffledOutGuids (prioritizing oldest)
+        
         if (nextDeck.length < MAX_DECK_SIZE) {
             const resurfaceCandidates = allFeedItems.filter(item =>
                 prunedShuffledOutGuids.has(item.id) && !prunedHiddenGuids.has(item.id) && !selectedIds.has(item.id)
             );
-            // Sort oldest first for resurfacing
             resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
             for (const item of resurfaceCandidates) {
                 if (nextDeck.length >= MAX_DECK_SIZE) break;
-                if (tryAddItemToDeck(item)) {
-                    // No need to add to selectedIds as tryAddItemToDeck does that
-                }
+                tryAddItemToDeck(item);
             }
         }
 
     } else {
-        // Offline fallback: (Prioritized items + specific filtering/unfiltering)
-
+        // Offline fallback
         let filteredItems = [...unreadItems];
 
-        // Initial filters (remove items with specific patterns)
         const hasQuestionMarkInTitle = (item) => item.title.includes('?');
         const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
         const hasQuestionMarkInDescriptionLast150 = (item) => {
@@ -233,11 +208,9 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
         filteredItems = filteredItems.filter(item => !hasHyperlink(item));
         filteredItems = filteredItems.filter(item => !hasImage(item));
 
-        // Undo filters in reverse priority until we have 10 items
         if (filteredItems.length < 10) {
             let itemsToRestore = unreadItems.filter(item => !filteredItems.includes(item));
 
-            // Restore logic based on priority (reverse of filter application) - UPDATED ORDER
             const restoreOrder = [
                 (item) => hasImage(item),
                 (item) => hasHyperlink(item),
@@ -253,37 +226,33 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
                         filteredItems.push(itemToMove);
                         itemsToRestore = itemsToRestore.filter(i => i !== itemToMove);
                     } else {
-                        break; // No more items matching this criterion
+                        break;
                     }
                 }
                 if (filteredItems.length >= 10) break;
             }
 
-            // Fill with any remaining items if still not 10
             while (filteredItems.length < 10 && itemsToRestore.length > 0) {
                 filteredItems.push(itemsToRestore.shift());
             }
         }
 
-        // Prioritize 2 items from the last 24 hours
         const now = Date.now();
         const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
         nextDeck = recentItems.slice(0, 2);
 
-        // Fill the rest of the deck with remaining items from filteredItems
         const remainingItems = filteredItems.filter(item => !nextDeck.includes(item));
         nextDeck = nextDeck.concat(remainingItems.slice(0, 10 - nextDeck.length));
     }
 
-    // --- NEW: Apply chronological sort to nextDeck for both online and offline paths ---
-    // Safety check: ensure nextDeck is an array before sorting
+    // Sort the final deck by timestamp, if it's a valid array.
     if (Array.isArray(nextDeck)) {
         nextDeck.sort((a, b) => b.timestamp - a.timestamp);
     } else {
-        console.error("nextDeck is not an array, cannot sort. Resetting to an empty array.");
+        // Fallback in case of an unexpected non-array value.
+        console.error("nextDeck is not a valid array. Returning an empty deck to prevent errors.");
         nextDeck = [];
     }
 
-    // This ensures an array is always returned, even if it's empty.
     return nextDeck.map(item => item.id);
 }
