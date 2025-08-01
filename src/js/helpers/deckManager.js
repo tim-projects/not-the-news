@@ -47,7 +47,6 @@ export async function manageDailyDeck(app) {
     // Ensure shuffledOutGuidsArray is an array, default to empty if not
     shuffledOutGuidsArray = Array.isArray(shuffledOutGuidsArray) ? shuffledOutGuidsArray : [];
 
-
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize 'today' to midnight for comparison
 
