@@ -13,6 +13,19 @@ import { loadSimpleState, saveSimpleState, saveArrayState, loadArrayState, USER_
 export async function queueAndAttemptSyncOperation(operation) {
     const db = await getDb();
 
+    // Defensive check to ensure the operation object is valid
+    if (!operation || typeof operation.type !== 'string') {
+        console.error("[DB] Invalid operation object received:", operation);
+        return;
+    }
+    
+    // Check for a null or undefined 'value' in simpleUpdate operations,
+    // as this could be the source of the DataError in the pendingOperations store.
+    if (operation.type === 'simpleUpdate' && (operation.value === null || operation.value === undefined)) {
+        console.warn(`[DB] Skipping queuing 'simpleUpdate' for key '${operation.key}' due to a null or undefined value.`, operation);
+        return;
+    }
+
     if (operation.guid !== undefined) {
         console.warn("[DB] Operation destined for 'pendingOperations' has an unexpected 'guid' property. Removing it:", operation);
         delete operation.guid;
@@ -24,7 +37,9 @@ export async function queueAndAttemptSyncOperation(operation) {
 
     try {
         const opToStore = { ...operation };
-        delete opToStore.id;
+        // The 'pendingOperations' store likely has a keyPath that is auto-incrementing
+        // or has a key that is manually provided. Let's assume it's auto-incrementing.
+        delete opToStore.id; // Ensure we are not trying to provide an 'id' for an auto-incrementing store.
 
         generatedId = await store.add(opToStore);
         operation.id = generatedId;
