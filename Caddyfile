@@ -1,3 +1,9 @@
+{
+  email {$EMAIL}
+  storage file_system /data
+  acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+}
+
 {$DOMAIN} {
   root * /app/www
 
