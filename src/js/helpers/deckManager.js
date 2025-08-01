@@ -92,7 +92,7 @@ export async function manageDailyDeck(app) {
     const shuffledOutGuidsSet = new Set(app.shuffledOutGuids); // Items recently shuffled out
 
     // Pass the current filter mode to the deck generation helper
-    const newDeckGuids = await generateNewDeck(
+    let newDeckGuids = await generateNewDeck(
         allItems,
         hiddenGuidsSet,
         starredGuidsSet, // Pass the starred GUIDs to the deck generation function
@@ -101,6 +101,11 @@ export async function manageDailyDeck(app) {
         MAX_DECK_SIZE,
         app.filterMode // Pass the filter mode here
     );
+
+    // --- FIX: Filter out any invalid items before saving ---
+    // This line ensures that only valid GUIDs are saved to the deck.
+    newDeckGuids = newDeckGuids.filter(guid => typeof guid === 'string' && guid.trim() !== '');
+    // --- END FIX ---
 
     // Update the Alpine.js app's currentDeckGuids, which will trigger its $watch
     // and subsequently call app.loadAndDisplayDeck() to update the UI.
@@ -116,6 +121,7 @@ export async function manageDailyDeck(app) {
 
     console.log(`[deckManager] Deck managed. New deck size: ${app.currentDeckGuids.length}.`);
 }
+
 
 /**
  * Handles the logic when the shuffle button is pressed.
