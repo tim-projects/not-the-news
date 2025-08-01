@@ -1,79 +1,200 @@
 {
-  email {$EMAIL}
-  storage file_system /data
-  acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+   email {$EMAIL}
+   storage file_system /data
+   acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
 
 {$DOMAIN} {
-  root * /app/www
 
-  # 1. Allow sw.js before any redirect
-  @service_worker {
-    path /sw.js
-  }
-  handle @service_worker {
-    file_server
-  }
+   # 1. Handle specific static files that should ALWAYS be accessible (no auth required)
+   handle /sw.js {
+     root * /app/www
+     file_server
+   }
+   handle /login.html {
+     root * /app/www
+     file_server
+   }
+   handle /manifest.json {
+     root * /app/www
+     file_server
+   }
 
-  # 2. Redirect if not authenticated
-  @unauth {
-    not header Cookie auth*
-    not path /login.html
-    not path /sw.js
-  }
-  redir @unauth /login.html 302
+   # 2. Handle common static asset directories/patterns (no auth required)
+   handle /js/* {
+     root * /app/www
+     file_server
+   }
+   handle /*.css {
+     root * /app/www
+     file_server
+   }
+   handle /*.js {
+     root * /app/www
+     file_server
+   }
+   handle /*.svg {
+     root * /app/www
+     file_server
+   }
+   handle /*.ttf {
+     root * /app/www
+     file_server
+   }
+   handle /*.woff {
+     root * /app/www
+     file_server
+   }
+   handle /*.woff2 {
+     root * /app/www
+     file_server
+   }
+   handle /images/* {
+     root * /app/www
+     file_server
+   }
 
-  # 3. Main request handler
-  handle {
-    # Handle API
-    @api {
-      path /api/*
-    }
-    handle @api {
-      reverse_proxy 127.0.0.1:4575 {
-        header_up X-Forwarded-Proto https
-        header_up Host {host}
-      }
-    }
+   # 3. Handle API endpoints (these should require auth)
+   handle /api/login* {
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
 
-    # Handle feed.xml
-    handle_path /feed.xml {
-      root * /data/feed
-      header {
-        Access-Control-Allow-Origin *
-        Access-Control-Expose-Headers ETag, Last-Modified
-      }
-      file_server
-    }
+   handle /api/user-state* {
+     @unauth_api {
+       not header Cookie auth*
+     }
+     respond @unauth_api "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
+   
+   handle /api/load-config* {
+     @unauth_api {
+       not header Cookie auth*
+     }
+     respond @unauth_api "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
+   
+   handle /api/save-config* {
+     @unauth_api {
+       not header Cookie auth*
+     }
+     respond @unauth_api "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
+   
+   handle /api/time* {
+     @unauth_api {
+       not header Cookie auth*
+     }
+     respond @unauth_api "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
+   
+   handle /api/feed-guids* {
+     @unauth_api {
+       not header Cookie auth*
+     }
+     respond @unauth_api "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
 
-    # Everything else
-    file_server
-  }
+   handle /api/feed-items* {
+     @unauth_api {
+       not header Cookie auth*
+     }
+     respond @unauth_api "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575 {
+       header_up X-Forwarded-Proto https
+       header_up Host {host}
+     }
+   }
 
-  # Encoding rules
-  encode {
-    br 11
-    gzip 5
-    match {
-      header Content-Type text/html
-      header Content-Type text/css
-      header Content-Type application/javascript
-      header Content-Type application/rss+xml
-      header Content-Type application/xml
-      header Content-Type text/xml
-      header Content-Type application/json
-    }
-    minimum_length 512
-  }
+   # 4. Handle feed.xml specifically (probably should be accessible without auth)
+   @feed {
+     path /feed.xml
+   }
+   handle @feed {
+     root * /data/feed
+     header {
+       Access-Control-Allow-Origin   *
+       Access-Control-Expose-Headers ETag, Last-Modified
+     }
+     file_server
+   }
 
-  @api_nocache {
-    path /api/load-config*
-    path /api/save-config*
-    path /api/user-state*
-  }
-  header @api_nocache {
-    Cache-Control "no-cache, no-store, must-revalidate"
-    Pragma "no-cache"
-    Expires "0"
-  }
+   # 5. Handle the main application (index.html) with auth redirect
+   handle / {
+     @unauth {
+       not header Cookie auth*
+     }
+     redir @unauth /login.html 302
+
+     root * /app/www
+     try_files {path} /index.html
+     file_server
+   }
+
+   # 6. Catch-all for any other paths (with auth check)
+   handle {
+     @unauth {
+       not header Cookie auth*
+     }
+     redir @unauth /login.html 302
+
+     root * /app/www
+     file_server
+   }
+
+   # Global encoding directive
+   encode {
+     br 11
+     gzip 5
+     match {
+       header Content-Type text/html
+       header Content-Type text/css
+       header Content-Type application/javascript
+       header Content-Type application/rss+xml
+       header Content-Type application/xml
+       header Content-Type text/xml
+       header Content-Type application/json
+     }
+     minimum_length 512
+   }
+
+   # API no-cache headers
+   @api_nocache {
+     path /api/load-config*
+     path /api/save-config*
+     path /api/user-state*
+   }
+   header @api_nocache {
+     Cache-Control "no-cache, no-store, must-revalidate"
+     Pragma "no-cache"
+     Expires "0"
+   }
 }
