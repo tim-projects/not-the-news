@@ -81,7 +81,7 @@ export function mapRawItems(rawList, fmtFn) {
         .sort((a, b) => b.timestamp - a.timestamp);
 }
 
-export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
+export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
     try {
         let nextDeck = [];
         const MAX_DECK_SIZE = 10;
