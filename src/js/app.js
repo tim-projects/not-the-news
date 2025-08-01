@@ -135,7 +135,8 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            this.deck = items.sort((a, b) => b.timestamp - a.timestamp);
+            // A final defensive check to ensure this.deck is always an array
+            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
             console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
         },
 
