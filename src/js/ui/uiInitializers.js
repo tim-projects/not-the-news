@@ -25,6 +25,8 @@ import {
     getBackButton,
     getRssFeedsTextarea,
     getKeywordsBlacklistTextarea,
+    getConfigureRssButton, // Corrected: This function was missing from the import list
+    getConfigureKeywordsButton,
     getSaveKeywordsButton,
     getSaveRssButton
 } from './uiElements.js';
