@@ -1,6 +1,8 @@
 // src/main.js
 
-import Alpine from './js/libs/alpine.3.x.x.js';
+// Removed the import statement for Alpine.js.
+// It is expected to be loaded via a <script> tag in index.html,
+// making the 'Alpine' object globally available.
 import { rssApp } from './app.js';
 // The 'find' command revealed multiple CSS files, so we import them all
 import './css/variables.css';
@@ -43,6 +45,7 @@ document.addEventListener("load", e => {
 
 
 // IMPORTANT: Define the Alpine component and then start Alpine
+// This relies on the globally available Alpine object.
 Alpine.data('rssApp', rssApp);
 
 // Initialize Alpine.js
