@@ -1,43 +1,42 @@
-// src/main.js
+// www/js/main.js
 
-// Import all your CSS files
-import './css/variables.css';
-import './css/buttons.css';
-import './css/forms.css';
-import './css/layout.css';
-import './css/content.css';
-import './css/modal.css';
+import Alpine from './libs/alpine.3.x.x.js';
+import { rssApp } from './app.js';
+import '../css/style.css';
 
-// Import your application's logic
-import './js/app.js';
-import './js/libs/idb.js';
-import './js/data/dbCore.js';
-import './js/data/dbSyncOperations.js';
-import './js/data/dbUserState.js';
-import './js/data/database.js';
-import './js/ui/uiInitializers.js';
-import './js/ui/uiElements.js';
-import './js/ui/uiUpdaters.js';
-import './js/helpers/deckManager.js';
-import './js/helpers/apiUtils.js';
-import './js/helpers/dataUtils.js';
-import './js/helpers/userStateUtils.js';
+// Set up the Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { type: 'module', scope: '/' })
+            .then(reg => {
+                console.log('Service Worker registered:', reg.scope);
 
-// The Alpine.js component must be defined globally before it's used
-// in the HTML. Assuming your app.js exports the 'rssApp' object and 'initApp' method.
-// You'll need to modify app.js to export these
-import { rssApp, initApp } from './js/app.js';
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
+                                console.log('New Service Worker activated, but not yet controlling. Reloading...');
+                                window.location.reload();
+                            }
+                        });
+                    }
+                });
+            })
+            .catch(error => console.warn('Service Worker registration failed:', error));
+    });
+}
+
+// Add event listener for lazy-loaded images (moved from app.js)
+document.addEventListener("load", e => {
+    if (e.target?.tagName?.toLowerCase() === "img") {
+        e.target.classList.add("loaded");
+    }
+}, true);
+
+
+// IMPORTANT: Define the Alpine component and then start Alpine
+Alpine.data('rssApp', rssApp);
 
 // Initialize Alpine.js
-window.Alpine = Alpine;
-document.addEventListener('alpine:init', () => {
-    Alpine.data('rssApp', rssApp);
-    // You can also define global functions if needed
-    // Alpine.store('app', {
-    //     initApp: initApp
-    // });
-});
 Alpine.start();
-
-// Make RSSParser globally available if other scripts need it
-window.RSSParser = RSSParser;
