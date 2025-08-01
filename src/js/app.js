@@ -90,6 +90,8 @@ document.addEventListener('alpine:init', () => {
         isOnline: isOnline(),
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
+        // New state variable to trigger a reactive update
+        deckManaged: false,
 
         async loadAndDisplayDeck() {
             console.log("Loading current deck and populating display (app.js:loadAndDisplayDeck)...");
@@ -220,6 +222,15 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
 
+                // New $watch listener for the deckManaged flag
+                this.$watch('deckManaged', (isManaged) => {
+                    if (isManaged) {
+                        this.updateCounts(this);
+                        console.log("Background sync-triggered deck update completed.");
+                        this.deckManaged = false; // Reset the flag for the next update
+                    }
+                });
+
                 if (this.syncEnabled && this.isOnline) {
                     try {
                         console.log("Attempting early pull of user state (including current deck) from server...");
@@ -310,8 +321,8 @@ document.addEventListener('alpine:init', () => {
                             await app.loadFeedItemsFromDB();
                             app.hidden = await pruneStaleHidden(app.entries, currentFeedServerTime);
                             await manageDailyDeck(app);
-                            app.updateCounts(app);
-                            console.log("Background partial sync completed.");
+                            // Set the flag to trigger the reactive update in the $watch listener
+                            app.deckManaged = true;
                         } catch (error) {
                             console.error('Background partial sync failed', error);
                         }
