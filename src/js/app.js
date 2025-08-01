@@ -173,7 +173,7 @@ export function rssApp() {
             return filtered;
         },
 
-        // Export this function to be called from main.js or other modules
+        // This function will be called by x-init="initApp()" in the HTML
         async initApp() {
             try {
                 this.db = await initDb();
@@ -495,11 +495,3 @@ export function rssApp() {
         }
     };
 }
-
-// Your main.js file should now look something like this to properly consume this module:
-// import Alpine from 'alpinejs';
-// import { rssApp } from './js/app.js';
-// import './css/style.css'; // Make sure your main.js still imports your CSS.
-//
-// Alpine.data('rssApp', rssApp);
-// Alpine.start();
