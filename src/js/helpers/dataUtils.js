@@ -83,7 +83,6 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuids, currentDeckItemGuids, count) {
-    // --- CHANGE: Explicitly initialize nextDeck as an empty array to prevent the sort error. ---
     let nextDeck = [];
     const MAX_DECK_SIZE = 10;
     let selectedIds = new Set(); // Keep track of IDs already added to nextDeck
@@ -277,8 +276,14 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, shuffledOutGuid
     }
 
     // --- NEW: Apply chronological sort to nextDeck for both online and offline paths ---
-    nextDeck.sort((a, b) => b.timestamp - a.timestamp);
+    // Safety check: ensure nextDeck is an array before sorting
+    if (Array.isArray(nextDeck)) {
+        nextDeck.sort((a, b) => b.timestamp - a.timestamp);
+    } else {
+        console.error("nextDeck is not an array, cannot sort. Resetting to an empty array.");
+        nextDeck = [];
+    }
 
-    // ... (remove saving logic)
+    // This ensures an array is always returned, even if it's empty.
     return nextDeck.map(item => item.id);
 }
