@@ -199,18 +199,13 @@ export function rssApp() {
                         loadArrayState('currentDeckGuids')
                     ]);
 
+                    // Ensure all state variables are arrays, even if loadArrayState returns null or undefined
                     this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
                     this.starred = Array.isArray(starredState.value) ? starredState.value : [];
                     this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
                     this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
 
-                    const isValidDeck = Array.isArray(this.currentDeckGuids) && this.currentDeckGuids.every(guid => typeof guid === 'string' && guid.length > 0);
-                    if (!isValidDeck) {
-                        console.warn("Invalid or empty deck GUIDs detected. Resetting the current deck to be regenerated.");
-                        this.currentDeckGuids = [];
-                        await saveCurrentDeck([]);
-                    }
-                    
+                    // Explicitly check and handle the entries array, since the errors point to it.
                     if (!Array.isArray(this.entries)) {
                          console.error("this.entries is not an array. Resetting to an empty array to prevent further errors.");
                          this.entries = [];
