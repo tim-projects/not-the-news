@@ -190,6 +190,14 @@ export function rssApp() {
                 this.db = await initDb();
 
                 const loadAndManageData = async () => {
+                    // Ensure all critical variables are initialized as empty arrays
+                    // before proceeding. This is the key fix for the TypeError.
+                    this.entries = [];
+                    this.hidden = [];
+                    this.starred = [];
+                    this.shuffledOutGuids = [];
+                    this.currentDeckGuids = [];
+
                     await this.loadFeedItemsFromDB();
                     
                     const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
@@ -199,17 +207,11 @@ export function rssApp() {
                         loadArrayState('currentDeckGuids')
                     ]);
 
-                    // Ensure all state variables are arrays, even if loadArrayState returns null or undefined
+                    // Assign the loaded data, but default to an empty array if the value is invalid.
                     this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
                     this.starred = Array.isArray(starredState.value) ? starredState.value : [];
                     this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
                     this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
-
-                    // Explicitly check and handle the entries array, since the errors point to it.
-                    if (!Array.isArray(this.entries)) {
-                         console.error("this.entries is not an array. Resetting to an empty array to prevent further errors.");
-                         this.entries = [];
-                    }
 
                     const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
                     this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
