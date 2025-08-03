@@ -110,50 +110,87 @@ export function rssApp() {
                 this.loading = false;
             }
         },
-        loadAndDisplayDeck: async function() {
-    // Don't reload from DB - we should already have feedItems populated
-    // await this.loadFeedItemsFromDB(); // Remove this line!
-
-    let guidsToDisplay = this.currentDeckGuids;
-    if (!Array.isArray(guidsToDisplay)) {
-        guidsToDisplay = [];
-    }
-
-    console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
-    console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
-
-    const items = [];
-    const hiddenSet = new Set(this.hidden.map(h => h.guid));
-    const starredSet = new Set(this.starred.map(s => s.guid));
-    const seenGuidsForDeck = new Set();
-
-    let foundCount = 0;
-    let missingCount = 0;
-
-    for (const guid of guidsToDisplay) {
-        if (typeof guid !== 'string' || !guid) continue;
-        
-        const item = this.feedItems[guid];
-        if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
-            const mappedItem = mapRawItem(item, formatDate);
-            mappedItem.isHidden = hiddenSet.has(mappedItem.id);
-            mappedItem.isStarred = starredSet.has(mappedItem.id);
-            items.push(mappedItem);
-            seenGuidsForDeck.add(mappedItem.id);
-            foundCount++;
-        } else {
-            missingCount++;
-            if (missingCount <= 3) { // Only log first few missing items
-                console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
+        loadAndDisplayDeck() {
+            let guidsToDisplay = this.currentDeckGuids;
+            if (!Array.isArray(guidsToDisplay)) {
+                guidsToDisplay = [];
             }
-        }
-    }
 
-    console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
+            console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
+            console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
 
-    this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
-    console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
-},
+            // DEBUG: Log first few GUIDs and check if they exist
+            if (guidsToDisplay.length > 0) {
+                console.log(`[loadAndDisplayDeck] First 3 GUIDs to display:`, guidsToDisplay.slice(0, 3));
+        
+                for (let i = 0; i < Math.min(3, guidsToDisplay.length); i++) {
+                    const guid = guidsToDisplay[i];
+                    const item = this.feedItems[guid];
+                    console.log(`[loadAndDisplayDeck] GUID ${i}: ${guid}`);
+                    console.log(`[loadAndDisplayDeck] Item found:`, !!item);
+                    if (item) {
+                        console.log(`[loadAndDisplayDeck] Item has guid property:`, !!item.guid);
+                        console.log(`[loadAndDisplayDeck] Item.guid value:`, item.guid);
+                        console.log(`[loadAndDisplayDeck] GUIDs match:`, item.guid === guid);
+                        console.log(`[loadAndDisplayDeck] Item keys:`, Object.keys(item));
+                    }
+                }
+            }
+
+            const items = [];
+            const hiddenSet = new Set(this.hidden.map(h => h.guid));
+            const starredSet = new Set(this.starred.map(s => s.guid));
+            const seenGuidsForDeck = new Set();
+
+            let foundCount = 0;
+            let missingCount = 0;
+            let conditionFailCount = 0;
+
+            for (const guid of guidsToDisplay) {
+                if (typeof guid !== 'string' || !guid) {
+                    console.log(`[loadAndDisplayDeck] Skipping invalid GUID:`, guid);
+                    continue;
+                }
+        
+                const item = this.feedItems[guid];
+        
+                if (!item) {
+                    missingCount++;
+                    if (missingCount <= 3) {
+                        console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
+                    }
+                    continue;
+                }
+
+                // Check each condition separately
+                const hasGuid = !!item.guid;
+                const notSeenBefore = !seenGuidsForDeck.has(item.guid);
+        
+                console.log(`[loadAndDisplayDeck] Item analysis for ${guid}:`);
+                console.log(`  - Item exists: true`);
+                console.log(`  - Has guid property: ${hasGuid}`);
+                console.log(`  - Item.guid value: ${item.guid}`);
+                console.log(`  - Not seen before: ${notSeenBefore}`);
+        
+                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
+                    const mappedItem = mapRawItem(item, formatDate);
+                    mappedItem.isHidden = hiddenSet.has(mappedItem.id);
+                    mappedItem.isStarred = starredSet.has(mappedItem.id);
+                    items.push(mappedItem);
+                    seenGuidsForDeck.add(mappedItem.id);
+                    foundCount++;
+                    console.log(`  - ADDED to deck (mapped ID: ${mappedItem.id})`);
+                } else {
+                    conditionFailCount++;
+                    console.log(`  - REJECTED from deck`);
+                }
+            }
+
+            console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items, Condition failed ${conditionFailCount} items`);
+
+            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
+            console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
+        },
 
         loadFeedItemsFromDB: async function() {
             if (!this.db) {
