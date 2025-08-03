@@ -11,7 +11,6 @@ import {
     processPendingOperations,
     loadSimpleState,
     loadArrayState,
-    isOnline,
     initDb,
     saveSimpleState,
     getAllFeedItems
@@ -21,8 +20,7 @@ import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.js';
 import {
     loadCurrentDeck,
     saveCurrentDeck,
-    toggleStar,
-    toggleHidden,
+    toggleItemStateAndSync, // <-- New, consolidated function
     pruneStaleHidden,
     saveShuffleState,
     loadShuffleState,
@@ -36,7 +34,7 @@ import {
     attachScrollToTopHandler,
     saveCurrentScrollPosition,
     createStatusBarMessage
-} from './js/ui/uiUpdaters.js'
+} from './js/ui/uiUpdaters.js';
 import {
     initSyncToggle,
     initImagesToggle,
@@ -45,6 +43,7 @@ import {
     initConfigPanelListeners
 } from './js/ui/uiInitializers.js';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
+import { isOnline } from './js/utils/connectivity.js'; // <-- Corrected import
 
 export function rssApp() {
     return {
@@ -84,7 +83,7 @@ export function rssApp() {
                 console.warn("currentDeckGuids is not a valid array, defaulting to an empty array.");
                 guidsToDisplay = [];
             }
-            
+
             console.log("DEBUG app.js: loadAndDisplayDeck - type of guidsToDisplay:", typeof guidsToDisplay, "Array.isArray:", Array.isArray(guidsToDisplay));
             if (Array.isArray(guidsToDisplay)) {
                 console.log("DEBUG app.js: loadAndDisplayDeck - first 5 GUIDs:", guidsToDisplay.slice(0, 5));
@@ -115,7 +114,7 @@ export function rssApp() {
                     console.warn(`Feed item with GUID ${guid} not found in feedItems cache or has invalid GUID. Skipping.`);
                 }
             }
-            
+
             this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
             console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
         },
@@ -149,21 +148,21 @@ export function rssApp() {
                     break;
                 case "hidden":
                     filtered = this.entries.filter(e => hiddenMap.has(e.id))
-                                           .map(e => ({
-                                                ...e,
-                                                isHidden: true,
-                                                isStarred: starredMap.has(e.id)
-                                           }))
-                                           .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+                        .map(e => ({
+                            ...e,
+                            isHidden: true,
+                            isStarred: starredMap.has(e.id)
+                        }))
+                        .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
                     break;
                 case "starred":
                     filtered = this.entries.filter(e => starredMap.has(e.id))
-                                           .map(e => ({
-                                                ...e,
-                                                isHidden: hiddenMap.has(e.id),
-                                                isStarred: true
-                                           }))
-                                           .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
+                        .map(e => ({
+                            ...e,
+                            isHidden: hiddenMap.has(e.id),
+                            isStarred: true
+                        }))
+                        .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
                     break;
                 default:
                     console.warn(`Unknown filterMode: ${this.filterMode}. Defaulting to 'unread'.`);
@@ -190,7 +189,6 @@ export function rssApp() {
                 this.db = await initDb();
 
                 const loadAndManageData = async () => {
-                    // Explicitly initialize all critical arrays to ensure they are valid.
                     this.entries = [];
                     this.hidden = [];
                     this.starred = [];
@@ -198,7 +196,7 @@ export function rssApp() {
                     this.currentDeckGuids = [];
 
                     await this.loadFeedItemsFromDB();
-                    
+
                     const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
                         loadArrayState('hidden'),
                         loadArrayState('starred'),
@@ -206,7 +204,6 @@ export function rssApp() {
                         loadArrayState('currentDeckGuids')
                     ]);
 
-                    // Assign the loaded data, defaulting to an empty array if the value is invalid.
                     this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
                     this.starred = Array.isArray(starredState.value) ? starredState.value : [];
                     this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
@@ -240,14 +237,14 @@ export function rssApp() {
                     await performFullSync(this);
                     createStatusBarMessage("Initial sync complete!", "success");
                 }
-                
+
                 await loadAndManageData();
 
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
                 initConfigPanelListeners(this);
-                
+
                 attachScrollToTopHandler();
                 await initScrollPosition(this);
 
@@ -321,7 +318,9 @@ export function rssApp() {
                 });
 
                 let lastActivityTimestamp = Date.now();
-                const recordActivity = () => { lastActivityTimestamp = Date.now(); };
+                const recordActivity = () => {
+                    lastActivityTimestamp = Date.now();
+                };
                 ["mousemove", "mousedown", "keydown", "scroll", "click"].forEach(event => document.addEventListener(event, recordActivity, true));
                 document.addEventListener("visibilitychange", recordActivity, true);
                 window.addEventListener("focus", recordActivity, true);
@@ -387,7 +386,10 @@ export function rssApp() {
                 observeElements();
             });
 
-            mutationObserver.observe(feedContainer, { childList: true, subtree: true });
+            mutationObserver.observe(feedContainer, {
+                childList: true,
+                subtree: true
+            });
 
             this.scrollObserver = observer;
         },
@@ -455,15 +457,15 @@ export function rssApp() {
         },
 
         async toggleStar(guid) {
-            await toggleStar(this, guid);
-            this.updateCounts(this);
+            // Refactored to use the new, consolidated helper function
+            await toggleItemStateAndSync(this, guid, 'starred');
         },
 
         async toggleHidden(guid) {
+            // Refactored to use the new, consolidated helper function
             console.log("toggleHidden called with guid:", guid);
-            await toggleHidden(this, guid);
+            await toggleItemStateAndSync(this, guid, 'hidden');
             await manageDailyDeck(this);
-            this.updateCounts(this);
         },
 
         async processShuffle() {
