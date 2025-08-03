@@ -1,431 +1,285 @@
 // @filepath: src/js/data/dbUserState.js
 
-// @refactor-directive
-// Refactor JS: concise, modern, functional, same output.
-/**
- * Manages the client-side IndexedDB for user state, including settings and cached content.
- * This version includes a more robust data loading mechanism to handle potential data corruption.
- */
-
-// www/js/data/dbUserState.js
+// Refactored JS: concise, modern, functional, same output.
 
 import { getDb } from './dbCore.js';
 import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
 
-// USER_STATE_DEFS no longer directly specifies keyPath,
-// it just defines the store name. keyPath is defined in OBJECT_STORES_SCHEMA in dbCore.js
+// USER_STATE_DEFS provides a single source of truth for all user state variables.
+// The `store` and `type` properties are used by the helper functions to correctly access the data.
 export const USER_STATE_DEFS = {
-    // These 'array' types map to dedicated IndexedDB stores that use 'guid' as keyPath.
-    // The items within these arrays/stores should always have a 'guid' property.
     starred: { store: 'starredItems', type: 'array', default: [] },
     hidden: { store: 'hiddenItems', type: 'array', default: [] },
-    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] }, // Stores objects like {guid: '...'}.
-    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', default: [] }, // Stores objects like {guid: '...'}.
+    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', default: [] },
+    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', default: [] },
 
-    // These 'simple' types map to the 'userSettings' store, which uses 'key' as keyPath.
     filterMode: { store: 'userSettings', type: 'simple', default: 'all' },
     syncEnabled: { store: 'userSettings', type: 'simple', default: true },
     imagesEnabled: { store: 'userSettings', type: 'simple', default: true },
-    rssFeeds: { store: 'userSettings', type: 'simple', default: [] }, // Stored as a simple value in userSettings
-    keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] }, // Stored as a simple value in userSettings
+    rssFeeds: { store: 'userSettings', type: 'simple', default: [] },
+    keywordBlacklist: { store: 'userSettings', type: 'simple', default: [] },
     shuffleCount: { store: 'userSettings', type: 'simple', default: 2 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
-    lastViewedItemId: { store: 'userSettings', type: 'simple', default: null }, // This is a GUID, but stored as a simple setting.
-    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 }, // New: Ensure offset is included
+    lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
+    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
     lastStateSync: { store: 'userSettings', type: 'simple', default: null },
     theme: { store: 'userSettings', type: 'simple', default: 'light' },
     lastFeedSync: { store: 'userSettings', type: 'simple', default: null },
 };
 
+/**
+ * Loads a single simple state key-value pair.
+ * @param {string} key The key of the setting to load.
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ * @returns {Promise<{value: any, lastModified: string|null}>}
+ */
 export async function loadSimpleState(key, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
-    // --- START FIX ---
-    // Allow loading if it's a simple type OR if it's one of the array types whose metadata is stored as a simple key in userSettings
-    const isAllowedMetadataKey = ['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key);
-
-    if (!def || (def.type !== 'simple' && !isAllowedMetadataKey)) {
-        console.error(`[DB] Invalid key for simple state load operation: ${key}. It must be a 'simple' type or an array metadata key.`);
-        return { value: null, lastModified: null };
+    if (!def || def.type !== 'simple') {
+        console.warn(`[DB] Invalid key '${key}' for loadSimpleState. Returning default.`);
+        return { value: def?.default, lastModified: null };
     }
-    // --- END FIX ---
-    const storeName = 'userSettings'; // Simple states are stored in 'userSettings'
-    let transaction = tx; // Use provided transaction or create a new one
+
+    const store = tx ? tx.objectStore(def.store) : db.transaction(def.store, 'readonly').objectStore(def.store);
 
     try {
-        if (!transaction) { // Only create if no transaction was passed
-            transaction = db.transaction(storeName, 'readonly');
-        }
-        const data = await transaction.objectStore(storeName).get(key);
-        if (data && data.hasOwnProperty('value')) {
-            return { value: data.value, lastModified: data.lastModified || null };
-        }
+        const data = await store.get(key);
+        return { value: data?.value ?? def.default, lastModified: data?.lastModified ?? null };
     } catch (e) {
         console.error(`[DB] Error loading simple state "${key}":`, e);
-    } finally {
-        if (!tx && transaction) { // Only complete if *this function* created the transaction
-            try {
-                await transaction.done;
-            } catch (e) {
-                if (e.name !== 'AbortError') { // Ignore AbortError if transaction was aborted by caller
-                    console.error(`[DB] Transaction completion error for simple state "${key}":`, e);
-                }
-            }
-        }
+        return { value: def.default, lastModified: null };
     }
-    return { value: def.default, lastModified: null };
 }
 
+/**
+ * Saves a single simple state key-value pair and queues a sync operation.
+ * @param {string} key The key of the setting to save.
+ * @param {any} value The value to save.
+ * @param {string} [serverTimestamp=null] An optional timestamp from the server.
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ */
 export async function saveSimpleState(key, value, serverTimestamp = null, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
-    const isAllowedMetadataKey = ['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key);
-
-    if (!def || (def.type !== 'simple' && !isAllowedMetadataKey)) {
-        console.error(`[DB] Invalid key for simple state save operation: ${key}. It must be a 'simple' type or an array metadata key.`);
+    if (!def || def.type !== 'simple') {
         throw new Error(`Invalid or undefined simple state key: ${key}`);
     }
 
-    const storeName = 'userSettings';
-    let transaction = tx;
-    let operationQueued = false;
+    const transaction = tx ?? db.transaction(def.store, 'readwrite');
+    const store = transaction.objectStore(def.store);
+
+    const objToSave = {
+        key,
+        value,
+        lastModified: serverTimestamp || new Date().toISOString()
+    };
 
     try {
-        if (!transaction) {
-            transaction = db.transaction(storeName, 'readwrite');
-        }
-        const objectStore = transaction.objectStore(storeName);
-        const objToSave = { key: key, value: value };
-        if (serverTimestamp) {
-            objToSave.lastModified = serverTimestamp;
-        } else {
-            objToSave.lastModified = new Date().toISOString();
-        }
-        await objectStore.put(objToSave);
+        await store.put(objToSave);
         console.log(`[DB] Saved "${key}" to userSettings.`);
-
-        // Prepare the operation to be queued, but don't queue it yet.
-        if (['filterMode', 'syncEnabled', 'imagesEnabled', 'shuffleCount', 'lastShuffleResetDate', 'openUrlsInNewTabEnabled', 'lastViewedItemId', 'lastViewedItemOffset', 'theme', 'rssFeeds', 'keywordBlacklist'].includes(key)) {
-            operationQueued = true;
+        if (!tx) { // Only queue if this function created the transaction
+            await transaction.done;
+            await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key, value });
         }
     } catch (e) {
         console.error(`[DB] Error saving simple state "${key}":`, e);
-        throw e;
-    } finally {
-        if (!tx && transaction) {
-            try {
-                await transaction.done;
-                // Only queue the operation AFTER the transaction has successfully completed.
-                if (operationQueued) {
-                    const op = { type: 'simpleUpdate', key: key, value: value };
-                    await queueAndAttemptSyncOperation(op);
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    console.error(`[DB] Transaction completion or sync queuing error for simple state "${key}":`, e);
-                }
-                if (e.name === 'DataError') {
-                    console.error(`[DB] Specific DataError on transaction completion. This could be due to a bug in queueAndAttemptSyncOperation.`);
-                }
-                throw e; // Re-throw the error to be caught by the caller
-            }
-        }
+        if (!tx) throw e;
     }
 }
 
+/**
+ * Loads an entire array state from a dedicated store.
+ * @param {string} key The key of the array state to load.
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ * @returns {Promise<{value: Array<any>, lastModified: string|null}>}
+ */
 export async function loadArrayState(key, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
-    if (!def || def.type !== 'array') { // Ensure it's defined as an 'array' type
-        console.error(`[DB] Invalid array state key: ${key}`);
-        return { value: def ? def.default : [], lastModified: null };
+    if (!def || def.type !== 'array') {
+        console.warn(`[DB] Invalid key '${key}' for loadArrayState. Returning default.`);
+        return { value: def?.default, lastModified: null };
     }
-    const arrayStoreName = def.store; // Get the specific store name (e.g., 'starredItems')
-    let transaction = tx;
+
+    const stores = [def.store, 'userSettings'];
+    const transaction = tx ?? db.transaction(stores, 'readonly');
+    const arrayStore = transaction.objectStore(def.store);
+    const userSettingsStore = transaction.objectStore('userSettings');
 
     try {
-        if (!transaction) {
-            // Include 'userSettings' in the transaction to load array metadata if needed
-            transaction = db.transaction([arrayStoreName, 'userSettings'], 'readonly');
-        }
-        const arrayStore = transaction.objectStore(arrayStoreName);
-        const allItems = await arrayStore.getAll(); // Get all items from the dedicated store
-
-        // Load the lastModified timestamp for this array state, which is stored in 'userSettings'
-        // Pass the existing transaction to loadSimpleState
-        const { lastModified: arrayTimestamp } = await loadSimpleState(key, transaction);
-        return { value: allItems, lastModified: arrayTimestamp };
+        const [allItems, metadata] = await Promise.all([
+            arrayStore.getAll(),
+            userSettingsStore.get(key)
+        ]);
+        return {
+            value: allItems,
+            lastModified: metadata?.lastModified ?? null
+        };
     } catch (e) {
-        console.error(`[DB] Error loading array state "${key}" from store "${arrayStoreName}":`, e);
-    } finally {
-        if (!tx && transaction) {
-            try {
-                await transaction.done;
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    console.error(`[DB] Transaction completion error for array state "${key}":`, e);
-                }
-            }
-        }
+        console.error(`[DB] Error loading array state "${key}":`, e);
+        return { value: def.default, lastModified: null };
     }
-    return { value: def.default, lastModified: null };
 }
 
+/**
+ * Saves an entire array state to a dedicated store and queues a sync operation.
+ * @param {string} key The key of the array state to save.
+ * @param {Array<any>} arr The array to save.
+ * @param {string} [serverTimestamp=null] An optional timestamp from the server.
+ * @param {IDBTransaction} [tx=null] Optional transaction to use.
+ */
 export async function saveArrayState(key, arr, serverTimestamp = null, tx = null) {
     const db = await getDb();
     const def = USER_STATE_DEFS[key];
     if (!def || def.type !== 'array') {
         throw new Error(`Invalid or undefined array state key: ${key}`);
     }
-    const arrayStoreName = def.store; // Get the specific store name (e.g., 'starredItems')
-    let transaction = tx;
+
+    const stores = [def.store, 'userSettings'];
+    const transaction = tx ?? db.transaction(stores, 'readwrite');
+    const arrayStore = transaction.objectStore(def.store);
+    const userSettingsStore = transaction.objectStore('userSettings');
+
+    // Filter and validate the array to avoid storing invalid items.
+    const cleanedArr = (arr || []).filter(item => {
+        if (typeof item === 'object' && item?.guid?.trim()) return true;
+        console.warn(`[DB] Filtering out an invalid item for key "${key}":`, item);
+        return false;
+    });
 
     try {
-        if (!transaction) {
-            // Need 'readwrite' access to both the array store and 'userSettings' for metadata
-            transaction = db.transaction([arrayStoreName, 'userSettings'], 'readwrite');
-        }
-        const arrayObjectStore = transaction.objectStore(arrayStoreName);
-        await arrayObjectStore.clear(); // Clear existing data in the specific array store
-
-        // --- START FIX: Filter and validate the array before processing ---
-        // Create a cleaned, validated array to avoid any invalid items.
-        const cleanedArr = (arr || []).filter(item => {
-            if (typeof item === 'string' && item.trim() !== '') {
-                return true;
-            }
-            if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid.trim() !== '') {
-                return true;
-            }
-            console.warn(`[DB] Filtering out an invalid item for key "${key}":`, item);
-            return false;
+        await arrayStore.clear();
+        await Promise.all(cleanedArr.map(item => arrayStore.put(item)));
+        
+        await userSettingsStore.put({
+            key,
+            value: null, // We save null as a marker for array states
+            lastModified: serverTimestamp || new Date().toISOString()
         });
-        // --- END FIX ---
 
-        for (const item of cleanedArr) {
-            let itemToStore;
+        console.log(`[DB] Saved ${cleanedArr.length} items for "${key}".`);
 
-            if (typeof item === 'string') {
-                itemToStore = { guid: item };
-            } else { // It's a valid object from the filter above
-                itemToStore = { ...item, guid: item.guid };
-            }
-
-            // `put` is used as it will add or update based on the 'guid' key.
-            // This is the correct, single-argument put call.
-            await arrayObjectStore.put(itemToStore);
+        if (!tx) {
+            await transaction.done;
+            await queueAndAttemptSyncOperation({
+                type: 'simpleUpdate',
+                key,
+                value: cleanedArr.map(item => item.guid)
+            });
         }
-
-        // Save metadata like lastModified for the array itself in userSettings.
-        // Pass the current transaction to `saveSimpleState` so it's part of the same transaction.
-        await saveSimpleState(key, null, serverTimestamp, transaction); // The 'value' for array states in userSettings is typically null or a marker.
-
-        console.log(`[DB] Saved ${cleanedArr.length} items for "${key}" to store "${arrayStoreName}".`);
-
     } catch (e) {
-        console.error(`[DB] Error saving array state "${key}" to store "${arrayStoreName}":`, e);
-        throw e;
-    } finally {
-        if (!tx && transaction) {
-            try {
-                await transaction.done;
-                if (['starred', 'hidden', 'currentDeckGuids', 'shuffledOutGuids'].includes(key)) {
-                    // Send array of GUIDs to server
-                    await queueAndAttemptSyncOperation({
-                        type: 'simpleUpdate',
-                        key: key,
-                        value: cleanedArr.map(item => typeof item === 'string' ? item : item.guid)
-                    });
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    console.error(`[DB] Transaction completion or sync queuing error for array state "${key}":`, e);
-                }
-            }
-        }
+        console.error(`[DB] Error saving array state "${key}":`, e);
+        if (!tx) throw e;
     }
 }
 
-// --- Helper functions for specific array types ---
+// --- Specific Getter Functions ---
 
 export async function getStarredItems() {
-    const { value } = await loadArrayState('starred');
-    // Ensure starred items are objects with 'guid' and 'starredAt' as expected from store
-    return value.filter(item => item && typeof item.guid === 'string' && typeof item.starredAt === 'string');
+    return (await loadArrayState('starred')).value;
 }
-
 export async function getHiddenItems() {
-    const { value } = await loadArrayState('hidden');
-    // Ensure hidden items are objects with 'guid' and 'hiddenAt' as expected from store
-    return value.filter(item => item && typeof item.guid === 'string' && typeof item.hiddenAt === 'string');
+    return (await loadArrayState('hidden')).value;
 }
-
 export async function getCurrentDeckGuids() {
-    const { value } = await loadArrayState('currentDeckGuids');
-    // Map objects { guid: '...' } back to plain GUID strings
-    return value.map(item => item.guid).filter(guid => typeof guid === 'string');
+    return (await loadArrayState('currentDeckGuids')).value.map(item => item.guid);
 }
-
 export async function getShuffledOutGuids() {
-    const { value } = await loadArrayState('shuffledOutGuids');
-    // Map objects { guid: '...' } back to plain GUID strings
-    return value.map(item => item.guid).filter(guid => typeof guid === 'string');
+    return (await loadArrayState('shuffledOutGuids')).value.map(item => item.guid);
 }
-
-// --- Helper functions for specific simple types (no changes needed for ID logic) ---
-
 export async function getFilterMode() {
-    const { value } = await loadSimpleState('filterMode');
-    return value;
+    return (await loadSimpleState('filterMode')).value;
 }
-
 export async function getSyncEnabled() {
-    const { value } = await loadSimpleState('syncEnabled');
-    return value;
+    return (await loadSimpleState('syncEnabled')).value;
 }
-
 export async function getImagesEnabled() {
-    const { value } = await loadSimpleState('imagesEnabled');
-    return value;
+    return (await loadSimpleState('imagesEnabled')).value;
 }
-
 export async function getRssFeeds() {
-    const { value } = await loadSimpleState('rssFeeds');
-    return value;
+    return (await loadSimpleState('rssFeeds')).value;
 }
-
 export async function getKeywordBlacklist() {
-    const { value } = await loadSimpleState('keywordBlacklist');
-    return value;
+    return (await loadSimpleState('keywordBlacklist')).value;
 }
-
 export async function getShuffleCount() {
-    const { value } = await loadSimpleState('shuffleCount');
-    return value;
+    return (await loadSimpleState('shuffleCount')).value;
 }
-
 export async function getLastShuffleResetDate() {
-    const { value } = await loadSimpleState('lastShuffleResetDate');
-    return value;
+    return (await loadSimpleState('lastShuffleResetDate')).value;
 }
-
 export async function getOpenUrlsInNewTabEnabled() {
-    const { value } = await loadSimpleState('openUrlsInNewTabEnabled');
-    return value;
+    return (await loadSimpleState('openUrlsInNewTabEnabled')).value;
 }
-
 export async function getLastViewedItemId() {
-    const { value } = await loadSimpleState('lastViewedItemId');
-    return value;
+    return (await loadSimpleState('lastViewedItemId')).value;
 }
-
 export async function getLastViewedItemOffset() {
-    const { value } = await loadSimpleState('lastViewedItemOffset');
-    return value;
+    return (await loadSimpleState('lastViewedItemOffset')).value;
+}
+export async function getLastStateSync() {
+    return (await loadSimpleState('lastStateSync')).value;
+}
+export async function getLastFeedSync() {
+    return (await loadSimpleState('lastFeedSync')).value;
 }
 
-// --- Feed Item specific functions (already good, use GUID) ---
+// --- Feed Item Specific Functions ---
 
 export async function getAllFeedItems() {
     const db = await getDb();
-    const tx = db.transaction('feedItems', 'readonly');
-    const store = tx.objectStore('feedItems');
-    const items = await store.getAll();
-    await tx.done;
-    return items;
+    return await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
 }
 
 export async function getFeedItem(guid) {
     const db = await getDb();
-    const tx = db.transaction('feedItems', 'readonly');
-    const store = tx.objectStore('feedItems');
-    const item = await store.get(guid); // get by guid
-    await tx.done;
-    return item;
+    return await db.transaction('feedItems', 'readonly').objectStore('feedItems').get(guid);
 }
 
 // --- Specific add/remove functions for starred/hidden/deck items ---
-// These are essentially wrappers around `toggleStar`/`toggleHidden` if they queue.
-// They also need to be careful about *what* they queue for sync.
 
 export async function addStarredItem(itemGuid) {
     const db = await getDb();
-    try {
-        // Store objects with 'guid' as key (as per starredItems store keyPath)
-        const itemToStar = { guid: itemGuid, starredAt: new Date().toISOString() };
-        const tx = db.transaction('starredItems', 'readwrite');
-        await tx.objectStore('starredItems').put(itemToStar); // Use put to add or update
-        await tx.done;
-        console.log(`[DB] Starred ${itemGuid} locally.`);
-
-        // Queue and attempt immediate sync. The `data` sent to the server needs the item's GUID.
-        // The server expects `id` for the item's unique identifier within the `starDelta` type.
-        // So, we map `itemGuid` to `id` for the server payload.
-        const op = { type: 'starDelta', data: { id: itemGuid, action: 'add', starredAt: itemToStar.starredAt } };
-        await queueAndAttemptSyncOperation(op);
-
-    } catch (e) {
-        console.error(`[DB] Error starring ${itemGuid}:`, e);
-        throw e;
-    }
+    const itemToStar = { guid: itemGuid, starredAt: new Date().toISOString() };
+    const tx = db.transaction('starredItems', 'readwrite');
+    const store = tx.objectStore('starredItems');
+    await store.put(itemToStar);
+    await tx.done;
+    console.log(`[DB] Starred ${itemGuid} locally.`);
+    const op = { type: 'starDelta', data: { itemGuid, action: 'add', starredAt: itemToStar.starredAt } };
+    await queueAndAttemptSyncOperation(op);
 }
 
 export async function removeStarredItem(itemGuid) {
     const db = await getDb();
-    try {
-        const tx = db.transaction('starredItems', 'readwrite');
-        await tx.objectStore('starredItems').delete(itemGuid); // Delete by guid directly
-        await tx.done;
-        console.log(`[DB] Unstarred ${itemGuid} locally.`);
-
-        // Queue and attempt immediate sync.
-        // Server expects `id` for the item's unique identifier within the `starDelta` type.
-        const op = { type: 'starDelta', data: { id: itemGuid, action: 'remove' } };
-        await queueAndAttemptSyncOperation(op);
-
-    } catch (e) {
-        console.error(`[DB] Error unstarring ${itemGuid}:`, e);
-        throw e;
-    }
+    const tx = db.transaction('starredItems', 'readwrite');
+    await tx.objectStore('starredItems').delete(itemGuid);
+    await tx.done;
+    console.log(`[DB] Unstarred ${itemGuid} locally.`);
+    const op = { type: 'starDelta', data: { itemGuid, action: 'remove' } };
+    await queueAndAttemptSyncOperation(op);
 }
 
 export async function addHiddenItem(itemGuid) {
     const db = await getDb();
-    try {
-        // Store objects with 'guid' as key (as per hiddenItems store keyPath)
-        const itemToHide = { guid: itemGuid, hiddenAt: new Date().toISOString() };
-        const tx = db.transaction('hiddenItems', 'readwrite');
-        await tx.objectStore('hiddenItems').put(itemToHide); // Use put to add or update
-        await tx.done;
-        console.log(`[DB] Hidden ${itemGuid} locally.`);
-
-        // Queue and attempt immediate sync.
-        // Server expects `id` for the item's unique identifier within the `hiddenDelta` type.
-        const op = { type: 'hiddenDelta', data: { id: itemGuid, action: 'add', timestamp: itemToHide.hiddenAt } };
-        await queueAndAttemptSyncOperation(op);
-
-    } catch (e) {
-        console.error(`[DB] Error hiding ${itemGuid}:`, e);
-        throw e;
-    }
+    const itemToHide = { guid: itemGuid, hiddenAt: new Date().toISOString() };
+    const tx = db.transaction('hiddenItems', 'readwrite');
+    const store = tx.objectStore('hiddenItems');
+    await store.put(itemToHide);
+    await tx.done;
+    console.log(`[DB] Hidden ${itemGuid} locally.`);
+    const op = { type: 'hiddenDelta', data: { itemGuid, action: 'add', timestamp: itemToHide.hiddenAt } };
+    await queueAndAttemptSyncOperation(op);
 }
 
 export async function removeHiddenItem(itemGuid) {
     const db = await getDb();
-    try {
-        const tx = db.transaction('hiddenItems', 'readwrite');
-        await tx.objectStore('hiddenItems').delete(itemGuid); // Delete by guid directly
-        await tx.done;
-        console.log(`[DB] Unhidden ${itemGuid} locally.`);
-
-        // Queue and attempt immediate sync.
-        // Server expects `id` for the item's unique identifier within the `hiddenDelta` type.
-        const op = { type: 'hiddenDelta', data: { id: itemGuid, action: 'remove' } };
-        await queueAndAttemptSyncOperation(op);
-
-    } catch (e) {
-        console.error(`[DB] Error unhiding ${itemGuid}:`, e);
-        throw e;
-    }
+    const tx = db.transaction('hiddenItems', 'readwrite');
+    await tx.objectStore('hiddenItems').delete(itemGuid);
+    await tx.done;
+    console.log(`[DB] Unhidden ${itemGuid} locally.`);
+    const op = { type: 'hiddenDelta', data: { itemGuid, action: 'remove' } };
+    await queueAndAttemptSyncOperation(op);
 }

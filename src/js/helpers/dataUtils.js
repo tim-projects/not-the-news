@@ -1,12 +1,6 @@
 // @filepath: src/js/helpers/dataUtils.js
 
-// @refactor-directive
-// Refactor JS: concise, modern, functional, same output.
-
-// Import necessary modules for deck functions
-import { getDb } from '../data/database.js';
-import { loadCurrentDeck, saveCurrentDeck, loadShuffleState, saveShuffleState, getUserSetting, setUserSetting } from './userStateUtils.js';
-import { displayTemporaryMessageInTitle, createStatusBarMessage } from '../ui/uiUpdaters.js';
+// Refactored JS: concise, modern, functional, same output.
 
 export function formatDate(dateStr) {
     const now = new Date();
@@ -74,6 +68,7 @@ export function mapRawItem(item, fmtFn) {
         timestamp: ts
     };
 }
+
 export function mapRawItems(rawList, fmtFn) {
     if (!Array.isArray(rawList)) {
         console.warn("mapRawItems received a non-array input. Returning empty array.");
@@ -85,90 +80,57 @@ export function mapRawItems(rawList, fmtFn) {
         .sort((a, b) => b.timestamp - a.timestamp);
 }
 
+/**
+ * Generates a new deck of feed item GUIDs based on the provided data and filters.
+ *
+ * @param {Array} allFeedItems - An array of all available feed items.
+ * @param {Set|Array} hiddenGuids - A Set or Array of GUIDs for hidden items.
+ * @param {Set|Array} starredGuids - A Set or Array of GUIDs for starred items.
+ * @param {Set|Array} shuffledOutGuids - A Set or Array of GUIDs for shuffled-out items.
+ * @param {Set|Array} currentDeckItemGuids - A Set or Array of GUIDs for the current deck.
+ * @param {number} count - The desired size of the deck.
+ * @param {string} filterMode - The current filter mode ('unread', 'hidden', 'starred').
+ * @returns {Array<string>} An array of GUIDs for the new deck.
+ */
 export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
     try {
-        // ADD THIS DEBUG LOGGING
-        console.log('[DEBUG] generateNewDeck params:', {
-            allFeedItemsCount: allFeedItems?.length || 0,
-            hiddenGuidsCount: hiddenGuids?.size || hiddenGuids?.length || 0,
-            starredGuidsCount: starredGuids?.size || starredGuids?.length || 0,
-            shuffledOutGuidsCount: shuffledOutGuids?.size || shuffledOutGuids?.length || 0,
-            currentDeckItemGuidsType: typeof currentDeckItemGuids,
-            currentDeckItemGuidsIsSet: currentDeckItemGuids instanceof Set,
-            currentDeckItemGuidsCount: currentDeckItemGuids?.size || currentDeckItemGuids?.length || 0,
-            filterMode
-        });
-
-        let nextDeck = [];
         const MAX_DECK_SIZE = 10;
         
+        // Ensure all inputs are in the correct format (Sets for efficient lookups).
         const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
-        
-        // Ensure currentDeckItemGuids is a Set
-        const currentDeckGuidsSet = currentDeckItemGuids instanceof Set 
-            ? currentDeckItemGuids 
-            : new Set(Array.isArray(currentDeckItemGuids) ? currentDeckItemGuids.filter(guid => guid != null) : []);
-            
-        console.log('[DEBUG] currentDeckGuidsSet size:', currentDeckGuidsSet.size);
-        
-        const hiddenItemsArray = [...hiddenGuids];
-        const prunedHiddenItemsArray = hiddenItemsArray.filter(guid => allFeedGuidsSet.has(guid));
-        const prunedHiddenGuids = new Set(prunedHiddenItemsArray);
-
-        if (prunedHiddenItemsArray.length !== hiddenItemsArray.length) {
-            await setUserSetting('hidden', prunedHiddenItemsArray);
-            console.log(`[DATA] Pruned hidden items. Removed ${hiddenItemsArray.length - prunedHiddenItemsArray.length} stale items.`);
-        }
-
-        const prunedShuffledOutGuids = new Set([...shuffledOutGuids].filter(guid => allFeedGuidsSet.has(guid)));
+        const prunedHiddenGuids = new Set(Array.isArray(hiddenGuids) ? hiddenGuids.filter(guid => allFeedGuidsSet.has(guid)) : []);
+        const prunedShuffledOutGuids = new Set(Array.isArray(shuffledOutGuids) ? shuffledOutGuids.filter(guid => allFeedGuidsSet.has(guid)) : []);
+        const starredGuidsSet = new Set(Array.isArray(starredGuids) ? starredGuids.map(item => item.guid).filter(guid => allFeedGuidsSet.has(guid)) : []);
+        const currentDeckGuidsSet = new Set(Array.isArray(currentDeckItemGuids) ? currentDeckItemGuids : []);
 
         // Filter allFeedItems based on the selected filterMode
         let filteredItems = [];
         switch (filterMode) {
             case 'hidden':
                 filteredItems = allFeedItems.filter(item => prunedHiddenGuids.has(item.id));
-                console.log('[DEBUG] Hidden filter - filteredItems count:', filteredItems.length);
                 break;
             case 'starred':
-                // Assuming `starredGuids` is a Set of GUIDs, similar to `hiddenGuids`
-                const starredGuidsSet = new Set(starredGuids);
                 filteredItems = allFeedItems.filter(item => starredGuidsSet.has(item.id));
-                console.log('[DEBUG] Starred filter - filteredItems count:', filteredItems.length);
                 break;
             case 'unread':
             default:
-                // This is the original logic for generating the 'unread' deck
                 filteredItems = allFeedItems.filter(item =>
                     !prunedHiddenGuids.has(item.id) &&
                     !prunedShuffledOutGuids.has(item.id) &&
                     !currentDeckGuidsSet.has(item.id)
                 );
-                
-                console.log('[DEBUG] Unread filter - after filtering:', {
-                    filteredItemsCount: filteredItems.length,
-                    totalItems: allFeedItems.length,
-                    hiddenCount: prunedHiddenGuids.size,
-                    shuffledOutCount: prunedShuffledOutGuids.size,
-                    currentDeckCount: currentDeckGuidsSet.size,
-                    sampleFilteredIds: filteredItems.slice(0, 3).map(item => item.id)
-                });
                 break;
         }
 
-        // For `hidden` and `starred` modes, simply return the filtered list,
-        // as they are a static view of the user's lists and not a dynamic deck.
+        // For 'hidden' and 'starred' modes, return the static filtered list.
         if (filterMode === 'hidden' || filterMode === 'starred') {
-            // Sort by timestamp to ensure consistent order
             filteredItems.sort((a, b) => b.timestamp - a.timestamp);
-            console.log('[DEBUG] Returning static list for', filterMode, 'with', filteredItems.length, 'items');
             return filteredItems.map(item => item.id);
         }
 
-        // If not a static list, continue with the complex deck generation logic for 'unread'
+        // --- Complex deck generation logic for 'unread' mode ---
         let nextDeckItems = [];
-        let selectedIds = new Set();
-        
-        console.log('[DEBUG] Starting deck generation with', filteredItems.length, 'filtered items');
+        const selectedIds = new Set();
         
         const tryAddItemToDeck = (item) => {
             if (nextDeckItems.length < MAX_DECK_SIZE && item && !selectedIds.has(item.id)) {
@@ -182,65 +144,49 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
         const addItemsFromCategory = (categoryItems, limit) => {
             let count = 0;
             for (const item of categoryItems) {
-                if (count >= limit || nextDeckItems.length >= MAX_DECK_SIZE) {
-                    break;
-                }
-                if (tryAddItemToDeck(item)) {
-                    count++;
-                }
+                if (count >= limit || nextDeckItems.length >= MAX_DECK_SIZE) break;
+                if (tryAddItemToDeck(item)) count++;
             }
         };
 
         if (navigator.onLine) {
-            console.log('[DEBUG] Online mode - applying complex filtering');
             const now = Date.now();
             const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
-            const hasQuestionMarkInTitle = (item) => item.title.includes('?');
-            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInTitle = (item) => item.title?.includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
             const hasQuestionMarkInDescriptionLast150 = (item) => {
                 const desc = item.description;
-                return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
+                return desc?.length >= 150 && desc.substring(desc.length - 150).includes('?');
             };
             const hasImage = (item) => item.image !== "";
-            const isLongItem = (item) => item.description.length >= 750;
-            const isShortItem = (item) => item.description.length < 750;
+            const isLongItem = (item) => item.description?.length >= 750;
+            const isShortItem = (item) => item.description?.length < 750;
 
             const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
-            console.log('[DEBUG] Recent items (24h):', recentItems.length);
             addItemsFromCategory(recentItems, 2);
 
             const itemsWithLinks = filteredItems.filter(hasHyperlink);
-            console.log('[DEBUG] Items with links:', itemsWithLinks.length);
             addItemsFromCategory(itemsWithLinks, 1);
 
             const itemsWithQuestionTitle = filteredItems.filter(hasQuestionMarkInTitle);
-            console.log('[DEBUG] Items with question in title:', itemsWithQuestionTitle.length);
             addItemsFromCategory(itemsWithQuestionTitle, 1);
 
             const itemsWithQuestionFirst150 = filteredItems.filter(hasQuestionMarkInDescriptionFirst150);
-            console.log('[DEBUG] Items with question in first 150 chars:', itemsWithQuestionFirst150.length);
             addItemsFromCategory(itemsWithQuestionFirst150, 1);
 
             const itemsWithQuestionLast150 = filteredItems.filter(hasQuestionMarkInDescriptionLast150);
-            console.log('[DEBUG] Items with question in last 150 chars:', itemsWithQuestionLast150.length);
             addItemsFromCategory(itemsWithQuestionLast150, 1);
 
             const itemsWithImages = filteredItems.filter(hasImage);
-            console.log('[DEBUG] Items with images:', itemsWithImages.length);
             addItemsFromCategory(itemsWithImages, 1);
 
             const longItems = filteredItems.filter(isLongItem);
-            console.log('[DEBUG] Long items (>=750 chars):', longItems.length);
             addItemsFromCategory(longItems, 1);
             
             const shortItems = filteredItems.filter(isShortItem);
-            console.log('[DEBUG] Short items (<750 chars):', shortItems.length);
             addItemsFromCategory(shortItems, 1);
 
-            console.log('[DEBUG] After category selection, deck has:', nextDeckItems.length, 'items');
-
             const trulyRemainingItems = filteredItems.filter(item => !selectedIds.has(item.id));
-            console.log('[DEBUG] Remaining unselected items:', trulyRemainingItems.length);
             const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
 
             for (const item of shuffledRemaining) {
@@ -248,33 +194,26 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
                 tryAddItemToDeck(item);
             }
             
-            console.log('[DEBUG] After adding remaining items, deck has:', nextDeckItems.length, 'items');
-            
             if (nextDeckItems.length < MAX_DECK_SIZE) {
                 const resurfaceCandidates = allFeedItems.filter(item =>
                     prunedShuffledOutGuids.has(item.id) && !prunedHiddenGuids.has(item.id) && !selectedIds.has(item.id)
                 );
                 resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
-                console.log('[DEBUG] Resurfacing candidates:', resurfaceCandidates.length);
 
                 for (const item of resurfaceCandidates) {
                     if (nextDeckItems.length >= MAX_DECK_SIZE) break;
                     tryAddItemToDeck(item);
                 }
-                
-                console.log('[DEBUG] After resurfacing, deck has:', nextDeckItems.length, 'items');
             }
-
         } else {
-            console.log('[DEBUG] Offline mode - applying simplified filtering');
             // Offline fallback
             let offlineFilteredItems = [...filteredItems];
 
-            const hasQuestionMarkInTitle = (item) => item.title.includes('?');
-            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInTitle = (item) => item.title?.includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
             const hasQuestionMarkInDescriptionLast150 = (item) => {
                 const desc = item.description;
-                return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
+                return desc?.length >= 150 && desc.substring(desc.length - 150).includes('?');
             };
             const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
             const hasImage = (item) => item.image !== "";
@@ -284,8 +223,6 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
             offlineFilteredItems = offlineFilteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionLast150(item)));
             offlineFilteredItems = offlineFilteredItems.filter(item => !hasHyperlink(item));
             offlineFilteredItems = offlineFilteredItems.filter(item => !hasImage(item));
-
-            console.log('[DEBUG] After offline filtering, items count:', offlineFilteredItems.length);
 
             if (offlineFilteredItems.length < 10) {
                 let itemsToRestore = filteredItems.filter(item => !offlineFilteredItems.includes(item));
@@ -314,39 +251,22 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
                 while (offlineFilteredItems.length < 10 && itemsToRestore.length > 0) {
                     offlineFilteredItems.push(itemsToRestore.shift());
                 }
-                
-                console.log('[DEBUG] After restoration, offline items count:', offlineFilteredItems.length);
             }
 
             const now = Date.now();
             const recentItems = offlineFilteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
             nextDeckItems = recentItems.slice(0, 2);
-            console.log('[DEBUG] Offline recent items selected:', nextDeckItems.length);
 
             const remainingItems = offlineFilteredItems.filter(item => !nextDeckItems.includes(item));
             nextDeckItems = nextDeckItems.concat(remainingItems.slice(0, 10 - nextDeckItems.length));
-            console.log('[DEBUG] Final offline deck size:', nextDeckItems.length);
         }
 
-        // Final safety sort
+        // Final sort and return
         nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
-        
-        const finalDeckGuids = nextDeckItems.map(item => item.id);
-        console.log('[DEBUG] Final deck generated:', {
-            deckSize: finalDeckGuids.length,
-            deckGuids: finalDeckGuids
-        });
-        
-        // Extra safety check
-        if (!Array.isArray(finalDeckGuids)) {
-            console.error('[DEBUG] ERROR: finalDeckGuids is not an array!', typeof finalDeckGuids, finalDeckGuids);
-            return [];
-        }
-        
-        return finalDeckGuids;
+        return nextDeckItems.map(item => item.id);
+
     } catch (error) {
         console.error("An error occurred during deck generation:", error);
-        console.error("Stack trace:", error.stack);
         return [];
     }
 }

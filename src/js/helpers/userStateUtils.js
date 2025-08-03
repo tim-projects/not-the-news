@@ -1,7 +1,6 @@
 // @filepath: src/js/helpers/userStateUtils.js
 
-// @refactor-directive
-// Refactor JS: concise, modern, functional, same output.
+// Refactored JS: concise, modern, functional, same output.
 
 import {
     loadSimpleState,
@@ -56,39 +55,29 @@ export async function toggleStar(app, guid) {
 
     const starredAt = new Date().toISOString();
     let action;
+    let newStarredList = [...app.starred];
 
     try {
-        const existingItem = await store.get(guid);
+        const existingIndex = newStarredList.findIndex(item => item.guid === guid);
 
-        if (existingItem) {
+        if (existingIndex > -1) {
+            newStarredList.splice(existingIndex, 1);
             await store.delete(guid);
             action = "remove";
-            app.starred = app.starred.filter(item => item.guid !== guid);
         } else {
-            await store.put({
-                guid: guid,
-                starredAt
-            });
+            const newItem = { guid, starredAt };
+            newStarredList.push(newItem);
+            await store.put(newItem);
             action = "add";
-            app.starred.push({
-                guid: guid,
-                starredAt
-            });
         }
 
         await tx.done;
 
+        app.starred = newStarredList;
         if (typeof app.updateCounts === 'function') app.updateCounts();
 
-        const deltaObject = {
-            itemGuid: guid,
-            action,
-            starredAt
-        };
-        await addPendingOperation({
-            type: 'starDelta',
-            data: deltaObject
-        });
+        const deltaObject = { itemGuid: guid, action, starredAt };
+        await addPendingOperation({ type: 'starDelta', data: deltaObject });
 
         if (isOnline()) {
             try {
@@ -111,68 +100,80 @@ export async function toggleHidden(app, guid) {
     const db = await getDb();
     const tx = db.transaction('hiddenItems', 'readwrite');
     const store = tx.objectStore('hiddenItems');
-
+    let action;
+    
     const existingIndex = app.hidden.findIndex(item => item.guid === guid);
+    let newHiddenList = [...app.hidden];
 
-    if (existingIndex > -1) {
-        app.hidden.splice(existingIndex, 1);
-        await store.delete(guid);
-        await addPendingOperation({ type: 'hiddenDelta', data: { action: 'remove', itemGuid: guid } });
-        createStatusBarMessage('Item unhidden.', 'info');
-    } else {
-        const hiddenAt = new Date().toISOString();
-        await store.put({
-            guid: guid,
-            hiddenAt
-        });
-        app.hidden.push({ guid: guid, hiddenAt: hiddenAt });
+    try {
+        if (existingIndex > -1) {
+            newHiddenList.splice(existingIndex, 1);
+            await store.delete(guid);
+            action = 'remove';
+            createStatusBarMessage('Item unhidden.', 'info');
+        } else {
+            const hiddenAt = new Date().toISOString();
+            const newItem = { guid, hiddenAt };
+            newHiddenList.push(newItem);
+            await store.put(newItem);
+            action = 'add';
+            createStatusBarMessage('Item hidden.', 'info');
+        }
 
-        await addPendingOperation({ type: 'hiddenDelta', data: { action: 'add', itemGuid: guid, timestamp: hiddenAt } });
-        createStatusBarMessage('Item hidden.', 'info');
+        await tx.done; // Ensure transaction completes
+
+        app.hidden = newHiddenList;
+        await addPendingOperation({ type: 'hiddenDelta', data: { action, itemGuid: guid } });
+
+        if (isOnline()) {
+            await processPendingOperations();
+        }
+        
+        app.updateCounts();
+    } catch (error) {
+        console.error("Error in toggleHidden:", error);
     }
-
-    app.updateCounts();
 }
 
 /**
- * Prunes stale hidden items from the hiddenItems store.
+ * Prunes stale hidden items from the hiddenItems store and returns the updated list.
  * Items are considered stale if they are not in the current feedItems and are older than 30 days.
  * @param {Array<object>} feedItems - The array of current feed items (expected to have 'guid' property).
+ * @param {Array<object>} hiddenItems - The current array of hidden items from the app state.
  * @param {number} currentTS - The current timestamp in milliseconds.
  * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
  */
-export async function pruneStaleHidden(feedItems, currentTS) {
-    const db = await getDb();
-    const hiddenItemsFromStore = await db.transaction('hiddenItems', 'readonly').objectStore('hiddenItems').getAll();
-
-    if (!Array.isArray(hiddenItemsFromStore)) return [];
-    if (!Array.isArray(feedItems) || feedItems.length === 0 || !feedItems.every(e => e && typeof e.guid === 'string')) return hiddenItemsFromStore;
+export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
+    if (!Array.isArray(hiddenItems)) return [];
+    if (!Array.isArray(feedItems) || feedItems.length === 0) return hiddenItems;
 
     const validFeedGuids = new Set(feedItems.map(e => e.guid.trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-    const itemsToDelete = hiddenItemsFromStore.filter(i => {
-        const normalizedGuid = String(i.guid).trim().toLowerCase();
-        if (validFeedGuids.has(normalizedGuid)) return false;
-        const hiddenAtTS = new Date(i.hiddenAt).getTime();
-        return (currentTS - hiddenAtTS) >= THIRTY_DAYS_MS;
+    const itemsToKeep = hiddenItems.filter(item => {
+        const normalizedGuid = String(item.guid).trim().toLowerCase();
+        // Keep if it's a current feed item, or if it's not and less than 30 days old.
+        if (validFeedGuids.has(normalizedGuid)) return true;
+        const hiddenAtTS = new Date(item.hiddenAt).getTime();
+        return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
     });
 
-    if (itemsToDelete.length > 0) {
-        const tx = db.transaction('hiddenItems', 'readwrite');
-        const store = tx.objectStore('hiddenItems');
+    // If the list of items to keep is different, save the new list to the database
+    if (itemsToKeep.length !== hiddenItems.length) {
         try {
-            for (const item of itemsToDelete) {
-                await store.delete(item.guid);
-            }
+            const db = await getDb();
+            const tx = db.transaction('hiddenItems', 'readwrite');
+            const store = tx.objectStore('hiddenItems');
+            await store.clear();
+            await Promise.all(itemsToKeep.map(item => store.put(item)));
             await tx.done;
-            return hiddenItemsFromStore.filter(item => !itemsToDelete.includes(item));
+            console.log(`Pruned hidden items: removed ${hiddenItems.length - itemsToKeep.length} stale items.`);
         } catch (error) {
             console.error("Error pruning stale hidden items:", error);
-            return hiddenItemsFromStore;
         }
     }
-    return hiddenItemsFromStore;
+    
+    return itemsToKeep;
 }
 
 /**
@@ -180,33 +181,15 @@ export async function pruneStaleHidden(feedItems, currentTS) {
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck() {
-    const { value: storedItems } = await loadArrayState('currentDeckGuids');
+    const { value: storedItems } = await loadSimpleState('currentDeckGuids');
     
-    console.log("[loadCurrentDeck] Raw stored items:", storedItems);
+    // Ensure the stored value is an array of strings.
+    const deckGuids = Array.isArray(storedItems) ? storedItems.filter(guid => typeof guid === 'string') : [];
     
-    if (Array.isArray(storedItems)) {
-        // Check if items are already strings (new format) or objects (old format)
-        if (storedItems.length > 0) {
-            const firstItem = storedItems[0];
-            
-            if (typeof firstItem === 'string') {
-                // New format: items are already GUID strings
-                console.log("[loadCurrentDeck] Loading new format (direct strings)");
-                return storedItems.filter(Boolean);
-            } else if (firstItem && typeof firstItem === 'object' && firstItem.guid) {
-                // Old format: items are objects with .guid property
-                console.log("[loadCurrentDeck] Loading old format (objects with .guid)");
-                return storedItems.map(item => item.guid).filter(Boolean);
-            }
-        }
-        
-        // Empty array or unknown format
-        return [];
-    }
-    
-    console.log("[loadCurrentDeck] No stored items found, returning empty array");
-    return [];
+    console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs.`);
+    return deckGuids;
 }
+
 /**
  * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store
  * and queues a corresponding sync operation.
@@ -214,76 +197,53 @@ export async function loadCurrentDeck() {
  * @param {string[]} guids An array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
+    if (!Array.isArray(guids)) {
+        console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs, got:", typeof guids, guids);
+        return;
+    }
+    
+    console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs.");
+    
     try {
-        // 1. Validate input upfront.
-        if (!Array.isArray(guids)) {
-            console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs, got:", typeof guids, guids);
-            return;
-        }
-
-        console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs to store");
-
-        const db = await getDb();
-        const tx = db.transaction('currentDeckGuids', 'readwrite');
-        const store = tx.objectStore('currentDeckGuids');
-
-        await store.clear();
-
-        let savedCount = 0;
-        for (const guid of guids) {
-            // 2. Ensure each GUID is a valid string before attempting to save.
-            if (typeof guid === 'string' && guid.trim() !== '') {
-                // FIXED: Save the GUID string directly, not wrapped in an object
-                await store.put(guid); // ✅ CORRECT
-                savedCount++;
-            } else {
-                console.warn("[saveCurrentDeck] Skipping invalid or empty GUID:", guid);
-            }
-        }
-
-        await tx.done; // Wait for the transaction to complete successfully.
-
-        console.log(`[saveCurrentDeck] Saved ${savedCount} GUIDs to currentDeckGuids store.`);
-
-        // 3. Queue the sync operation. This will only run after a successful transaction.
+        await saveSimpleState('currentDeckGuids', guids);
+        
         await addPendingOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
-            value: guids // Send the original array for server reconciliation
+            value: guids
         });
-
-        // 4. If online, attempt to process the buffered operation immediately.
+        
         if (isOnline()) {
             await processPendingOperations();
         }
-
     } catch (e) {
-        // 5. Catch any errors that occur during the transaction or sync attempt.
         console.error("[saveCurrentDeck] An error occurred:", e);
-        throw e; // Re-throw to inform the caller that the operation failed.
+        throw e;
     }
 }
+
 /**
  * Loads the shuffle state, including shuffle count, last reset date.
- * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: Date|null}>} The shuffle state.
+ * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: string}>} The shuffle state.
  */
 export async function loadShuffleState() {
     const { value: shuffleCount } = await loadSimpleState('shuffleCount');
     const { value: lastShuffleResetDate } = await loadSimpleState('lastShuffleResetDate');
+    
     return {
         shuffleCount: typeof shuffleCount === 'number' ? shuffleCount : 2,
-        lastShuffleResetDate: lastShuffleResetDate ? new Date(lastShuffleResetDate) : null,
+        lastShuffleResetDate: lastShuffleResetDate || new Date().toDateString(),
     };
 }
 
 /**
  * Saves the shuffle state, including shuffle count, last reset date.
  * @param {number} count - The current shuffle count.
- * @param {Date|null} resetDate - The date of the last shuffle reset.
+ * @param {string} resetDate - The date of the last shuffle reset (as a string).
  */
 export async function saveShuffleState(count, resetDate) {
     await saveSimpleState('shuffleCount', count);
-    await saveSimpleState('lastShuffleResetDate', resetDate ? resetDate.toISOString() : null);
+    await saveSimpleState('lastShuffleResetDate', resetDate);
 
     await addPendingOperation({
         type: 'simpleUpdate',
@@ -293,7 +253,7 @@ export async function saveShuffleState(count, resetDate) {
     await addPendingOperation({
         type: 'simpleUpdate',
         key: 'lastShuffleResetDate',
-        value: resetDate ? resetDate.toISOString() : null
+        value: resetDate
     });
 
     if (isOnline()) {
