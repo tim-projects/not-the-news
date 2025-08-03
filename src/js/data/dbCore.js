@@ -5,7 +5,7 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 16; // FIX: Incrementing the version to handle schema name changes
+const DB_VERSION = 17; // FIX: Incrementing the version to ensure a new migration runs.
 
 let _dbInstance = null;
 let _dbInitPromise = null;
@@ -65,6 +65,14 @@ export async function getDb() {
                 }
                 if (db.objectStoreNames.contains('hiddenItems')) {
                     db.deleteObjectStore('hiddenItems');
+                }
+            }
+            if (oldVersion < 14) {
+                 if (db.objectStoreNames.contains('currentDeckGuids')) {
+                    db.deleteObjectStore('currentDeckGuids');
+                }
+                if (db.objectStoreNames.contains('shuffledOutGuids')) {
+                    db.deleteObjectStore('shuffledOutGuids');
                 }
             }
 
