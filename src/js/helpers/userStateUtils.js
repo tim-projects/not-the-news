@@ -115,7 +115,14 @@ export async function loadAndPruneHiddenItems(feedItems) {
  */
 export async function loadCurrentDeck() {
     const { value: storedItems } = await loadArrayState('currentDeckGuids');
-    const deckGuids = storedItems?.map(item => item.guid).filter(Boolean) || [];
+    // FIX: The load function should expect an array of strings, as that is the correct format.
+    // However, it's good practice to handle the old, incorrect format as a fallback.
+    // If the data is an array of objects, map it to strings. Otherwise, use the data directly.
+    const deckGuids = storedItems?.map(item => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item.guid === 'string') return item.guid;
+        return null;
+    }).filter(Boolean) || [];
     console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs.`);
     return deckGuids;
 }
@@ -133,10 +140,8 @@ export async function saveCurrentDeck(guids) {
     console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs.");
 
     try {
-        const guidsAsObjects = guids.map(guid => ({
-            guid
-        }));
-        await saveArrayState('currentDeckGuids', guidsAsObjects);
+        // FIX: The save function should save the GUIDs array directly, not an array of objects.
+        await saveArrayState('currentDeckGuids', guids);
 
         // FIX: Deep clone the array before sending to the database.
         // This prevents a DataCloneError if the array is an Alpine.js proxy.
