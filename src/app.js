@@ -190,8 +190,7 @@ export function rssApp() {
                 this.db = await initDb();
 
                 const loadAndManageData = async () => {
-                    // Ensure all critical variables are initialized as empty arrays
-                    // before proceeding. This is the key fix for the TypeError.
+                    // Explicitly initialize all critical arrays to ensure they are valid.
                     this.entries = [];
                     this.hidden = [];
                     this.starred = [];
@@ -207,7 +206,7 @@ export function rssApp() {
                         loadArrayState('currentDeckGuids')
                     ]);
 
-                    // Assign the loaded data, but default to an empty array if the value is invalid.
+                    // Assign the loaded data, defaulting to an empty array if the value is invalid.
                     this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
                     this.starred = Array.isArray(starredState.value) ? starredState.value : [];
                     this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
