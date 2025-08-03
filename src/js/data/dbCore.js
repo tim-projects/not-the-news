@@ -5,13 +5,12 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 17; // FIX: Incrementing the version to ensure a new migration runs.
+const DB_VERSION = 19; // FIX: Incrementing the version to force a new migration run.
 
 let _dbInstance = null;
 let _dbInitPromise = null;
 
-// FIX: A consistent and declarative schema definition.
-// Store names are now simplified and match the rest of the application's logic.
+// A consistent and declarative schema definition.
 const OBJECT_STORES_SCHEMA = [{
     name: 'feedItems',
     keyPath: 'guid',
@@ -19,10 +18,10 @@ const OBJECT_STORES_SCHEMA = [{
         unique: true
     }
 }, {
-    name: 'starred', // FIX: Renamed from 'starredItems'
+    name: 'starred',
     keyPath: 'guid'
 }, {
-    name: 'hidden', // FIX: Renamed from 'hiddenItems'
+    name: 'hidden',
     keyPath: 'guid'
 }, {
     name: 'currentDeckGuids',
@@ -58,25 +57,21 @@ export async function getDb() {
         upgrade(db, oldVersion) {
             console.log(`[DB] Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
 
-            // Migration logic to fix schema naming
-            if (oldVersion < 16) {
-                if (db.objectStoreNames.contains('starredItems')) {
-                    db.deleteObjectStore('starredItems');
-                }
-                if (db.objectStoreNames.contains('hiddenItems')) {
-                    db.deleteObjectStore('hiddenItems');
-                }
+            // Migration logic: First, delete any stores with old or incorrect names.
+            if (db.objectStoreNames.contains('starredItems')) {
+                db.deleteObjectStore('starredItems');
             }
-            if (oldVersion < 14) {
-                 if (db.objectStoreNames.contains('currentDeckGuids')) {
-                    db.deleteObjectStore('currentDeckGuids');
-                }
-                if (db.objectStoreNames.contains('shuffledOutGuids')) {
-                    db.deleteObjectStore('shuffledOutGuids');
-                }
+            if (db.objectStoreNames.contains('hiddenItems')) {
+                db.deleteObjectStore('hiddenItems');
+            }
+            if (db.objectStoreNames.contains('currentDeckGuids') && oldVersion < 14) {
+                db.deleteObjectStore('currentDeckGuids');
+            }
+            if (db.objectStoreNames.contains('shuffledOutGuids') && oldVersion < 14) {
+                db.deleteObjectStore('shuffledOutGuids');
             }
 
-            // Create or update all stores based on the new schema
+            // Then, ensure all stores from the current schema exist.
             OBJECT_STORES_SCHEMA.forEach(schema => {
                 if (!db.objectStoreNames.contains(schema.name)) {
                     db.createObjectStore(schema.name, {
