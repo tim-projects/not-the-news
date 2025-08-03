@@ -435,12 +435,10 @@ export function rssApp() {
                 }
             });
 
-            // Ensure entries is always a valid array before assigning
             this.entries = mapRawItems(uniqueEntries, formatDate) || [];
         },
 
         updateCounts(app) {
-            // A defensive check to prevent the "Attempted to update counts with an invalid app object" error.
             if (app && typeof app.updateCounts === 'function') {
                 updateCounts(app);
             } else {
