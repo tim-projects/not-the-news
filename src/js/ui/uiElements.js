@@ -1,4 +1,7 @@
-//www/js/ui/uiElements.js
+// @filepath: src/js/ui/uiElements.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 // Centralized DOM element access for reuse
 

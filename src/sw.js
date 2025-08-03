@@ -1,4 +1,7 @@
-// www/sw.js
+// @filepath: src/sw.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 const cacheName = 'not-the-news-v9'; // Incremented cacheName to v9 for this change.
 const cacheAssets = [

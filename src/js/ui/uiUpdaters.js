@@ -1,4 +1,7 @@
-// www/js/ui/uiUpdaters.js
+// @filepath: src/js/ui/uiUpdaters.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 import {
     getMainSettingsBlock,

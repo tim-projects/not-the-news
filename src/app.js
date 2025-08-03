@@ -1,4 +1,7 @@
-// src/app.js
+// @filepath: src/app.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 import {
     getDb,

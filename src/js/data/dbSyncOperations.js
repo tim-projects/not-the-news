@@ -1,5 +1,8 @@
+// @filepath: src/js/data/dbSyncOperations.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 /**
- * dbSyncOperations.js
  * Handles all synchronization operations between the client-side IndexedDB and the server API.
  */
 

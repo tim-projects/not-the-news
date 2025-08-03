@@ -1,5 +1,8 @@
+// @filepath: src/js/data/dbUserState.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 /**
- * dbUserState.js
  * Manages the client-side IndexedDB for user state, including settings and cached content.
  * This version includes a more robust data loading mechanism to handle potential data corruption.
  */

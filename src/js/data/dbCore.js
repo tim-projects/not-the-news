@@ -1,4 +1,7 @@
-// www/js/data/dbCore.js
+// @filepath: src/js/data/dbCore.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 import { openDB } from '../libs/idb.js';
 

@@ -1,4 +1,7 @@
-// www/js/helpers/dataUtils.js
+// @filepath: src/js/helpers/dataUtils.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 // Import necessary modules for deck functions
 import { getDb } from '../data/database.js';

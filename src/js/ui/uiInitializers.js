@@ -1,4 +1,7 @@
-// www/js/ui/uiInitializers.js
+// @filepath: src/js/ui/uiInitializers.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 import {
     loadSimpleState,

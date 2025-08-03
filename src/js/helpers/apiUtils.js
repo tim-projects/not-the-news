@@ -1,3 +1,7 @@
+// @filepath: src/js/helpers/apiUtils.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 /**
  * @file API utility functions for interacting with server-side configuration endpoints.
  * @module apiUtils

@@ -1,4 +1,7 @@
-// src/main.js
+// @filepath: src/main.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 
 // IMPORTANT: This import is necessary to use Alpine.js with a modular build system like Vite.
 // It ensures that the 'Alpine' object is available to this file.

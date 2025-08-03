@@ -1,3 +1,7 @@
+// @filepath: src/js/helpers/deckManager.js
+
+// @refactor-directive
+// Refactor JS: concise, modern, functional, same output.
 import {
     loadSimpleState,
     saveSimpleState,
