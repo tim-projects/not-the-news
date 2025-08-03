@@ -1,3 +1,5 @@
+# @filepath: app.py
+
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -384,10 +386,11 @@ def post_user_state():
             if op_type == "simpleUpdate":
                 key = op.get("key")
                 value = op.get("value")
+                op_id = op.get("id") # Client-side operation ID
 
                 if key not in USER_STATE_SERVER_DEFAULTS:
                     app.logger.warning(f"POST /api/user-state: Attempted to save unknown simpleUpdate key: {key}. Skipping.")
-                    results.append({"opType": op_type, "key": key, "status": "skipped", "reason": "Unknown key"})
+                    results.append({"opType": op_type, "id": op_id, "status": "skipped", "reason": "Unknown key"})
                     continue
 
                 if key == 'shuffleCount':
@@ -402,7 +405,7 @@ def post_user_state():
                         new_count = max(current_count, value)
                         app.logger.info(f"shuffleCount updated from {current_count} to {new_count} (max logic).")
                     _save_state(key, new_count)
-                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value": new_count})
+                    results.append({"opType": op_type, "id": op_id, "key": key, "status": "success", "serverTime": server_time, "value": new_count})
                 # --- START FIX: Handle starred/hidden arrays when sent as simpleUpdate ---
                 elif key in ['starred', 'hidden']:
                     # This branch handles the case where client's saveArrayState sends a 'simpleUpdate'
@@ -412,7 +415,7 @@ def post_user_state():
                     # in this full list update. More complex merging strategies are possible but not implemented here.
                     if not isinstance(value, list):
                         app.logger.warning(f"POST /api/user-state: Expected list of GUIDs for {key} simpleUpdate, got {type(value)}. Skipping.")
-                        results.append({"opType": op_type, "key": key, "status": "skipped", "reason": "Expected list of GUIDs"})
+                        results.append({"opType": op_type, "id": op_id, "key": key, "status": "skipped", "reason": "Expected list of GUIDs"})
                         continue
 
                     timestamp_field = 'starredAt' if key == 'starred' else 'hiddenAt'
@@ -420,22 +423,22 @@ def post_user_state():
 
                     _save_state(key, new_full_list_of_objects)
                     app.logger.info(f"POST /api/user-state: Saved full array update for key '{key}'. Number of items: {len(new_full_list_of_objects)}")
-                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time, "value_count": len(new_full_list_of_objects)})
+                    results.append({"opType": op_type, "id": op_id, "key": key, "status": "success", "serverTime": server_time, "value_count": len(new_full_list_of_objects)})
                 # --- END FIX ---
                 else:
                     # For other simple updates (lastShuffleResetDate, filterMode, etc.,
                     # including currentDeckGuids, shuffledOutGuids, rssFeeds, keywordBlacklist)
                     _save_state(key, value)
                     app.logger.info(f"POST /api/user-state: Saved simple update for key '{key}'.")
-                    results.append({"opType": op_type, "key": key, "status": "success", "serverTime": server_time})
+                    results.append({"opType": op_type, "id": op_id, "key": key, "status": "success", "serverTime": server_time})
 
             elif op_type == "starDelta":
-                # The client sends 'id', which is the GUID. Rename for clarity in backend.
-                item_guid = op["data"].get("id")
+                op_id = op.get("id") # Client-side operation ID
+                item_guid = op["data"].get("itemGuid") # FIX: Use 'itemGuid' as sent by client
                 action = op["data"].get("action")
 
                 if not item_guid:
-                    raise ValueError("Missing 'id' (GUID) for starDelta operation.")
+                    raise ValueError("Missing 'itemGuid' for starDelta operation.")
 
                 current_state_data = _load_state("starred")
                 current_starred = current_state_data['value'] or []
@@ -460,15 +463,15 @@ def post_user_state():
                     raise ValueError(f"Invalid starDelta action: {action}")
 
                 _save_state("starred", current_starred)
-                results.append({"opType": op_type, "id": item_guid, "action": action, "status": "success", "serverTime": server_time})
+                results.append({"opType": op_type, "id": op_id, "status": "success", "serverTime": server_time})
 
             elif op_type == "hiddenDelta":
-                # The client sends 'id', which is the GUID. Rename for clarity in backend.
-                item_guid = op["data"].get("id")
+                op_id = op.get("id") # Client-side operation ID
+                item_guid = op["data"].get("itemGuid") # FIX: Use 'itemGuid' as sent by client
                 action = op["data"].get("action")
 
                 if not item_guid:
-                    raise ValueError("Missing 'id' (GUID) for hiddenDelta operation.")
+                    raise ValueError("Missing 'itemGuid' for hiddenDelta operation.")
 
                 current_state_data = _load_state("hidden")
                 current_hidden = current_state_data['value'] or []
@@ -493,15 +496,16 @@ def post_user_state():
                     raise ValueError(f"Invalid hiddenDelta action: {action}")
 
                 _save_state("hidden", current_hidden)
-                results.append({"opType": op_type, "id": item_guid, "action": action, "status": "success", "server_time": server_time})
+                results.append({"opType": op_type, "id": op_id, "status": "success", "serverTime": server_time})
 
             else:
+                op_id = op.get("id")
                 app.logger.warning(f"POST /api/user-state: Unknown operation type: {op_type}. Skipping.")
-                results.append({"opType": op_type, "status": "skipped", "reason": "Unknown operation type"})
+                results.append({"opType": op_type, "id": op_id, "status": "skipped", "reason": "Unknown operation type"})
 
         except Exception as e:
             app.logger.exception(f"Error processing operation {op_type} for data {op.get('data', op.get('key'))}: {e}")
-            results.append({"opType": op_type, "status": "failed", "reason": str(e)})
+            results.append({"opType": op_type, "id": op.get("id"), "status": "failed", "reason": str(e)})
 
     app.logger.info(f"POST /api/user-state: Processed {len(operations)} operations. Results: {results}")
     return jsonify({"status": "ok", "serverTime": server_time, "results": results}), 200
