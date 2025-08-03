@@ -1,8 +1,8 @@
 // @filepath: src/js/data/dbSyncOperations.js
 
-// Refactored JS: concise, modern, functional, same output.
+// This file contains the logic for synchronizing local data with a remote server.
 
-import { getDb } from './dbCore.js';
+import { withDb } from './dbCore.js';
 import { isOnline } from '../utils/connectivity.js';
 import {
     loadSimpleState,
@@ -20,20 +20,20 @@ const API_BASE_URL = window.location.origin;
  * @returns {Promise<number>} The ID of the buffered operation.
  */
 async function _addPendingOperationToBuffer(operation) {
-    const db = await getDb();
-    const opToStore = { ...operation };
-    if (opToStore.id) delete opToStore.id;
-
-    const tx = db.transaction('pendingOperations', 'readwrite');
-    const store = tx.objectStore('pendingOperations');
-    try {
-        const id = await store.add(opToStore);
-        await tx.done;
-        return id;
-    } catch (e) {
-        console.error('[DB] Error buffering operation:', e);
-        throw e;
-    }
+    return withDb(async (db) => {
+        const opToStore = { ...operation };
+        if (opToStore.id) delete opToStore.id;
+        try {
+            const tx = db.transaction('pendingOperations', 'readwrite');
+            const store = tx.objectStore('pendingOperations');
+            const id = await store.add(opToStore);
+            await tx.done;
+            return id;
+        } catch (e) {
+            console.error('[DB] Error buffering operation:', e);
+            throw e;
+        }
+    });
 }
 
 /**
@@ -68,10 +68,11 @@ export async function queueAndAttemptSyncOperation(operation) {
             const result = responseData.results?.find(res => res.id === generatedId);
 
             if (result?.status === 'success') {
-                const db = await getDb();
-                const tx = db.transaction('pendingOperations', 'readwrite');
-                await tx.objectStore('pendingOperations').delete(generatedId);
-                await tx.done;
+                await withDb(async (db) => {
+                    const tx = db.transaction('pendingOperations', 'readwrite');
+                    await tx.objectStore('pendingOperations').delete(generatedId);
+                    await tx.done;
+                });
                 console.log(`[DB] Successfully synced and removed immediate operation ${generatedId} (${operation.type}).`);
                 if (responseData.serverTime) await saveSimpleState('lastStateSync', responseData.serverTime);
             } else {
@@ -86,19 +87,6 @@ export async function queueAndAttemptSyncOperation(operation) {
 }
 
 /**
- * Adds a user operation to the pending operations buffer.
- * @param {object} operation The operation object to add.
- */
-export async function addPendingOperation(operation) {
-    try {
-        const generatedId = await _addPendingOperationToBuffer(operation);
-        console.log('[DB] Operation buffered:', { ...operation, id: generatedId });
-    } catch (e) {
-        console.error('[DB] Error buffering operation:', e);
-    }
-}
-
-/**
  * Processes all pending operations in the buffer and syncs them with the server.
  */
 export async function processPendingOperations() {
@@ -107,10 +95,11 @@ export async function processPendingOperations() {
         return;
     }
     
-    const db = await getDb();
     let operations;
     try {
-        operations = await db.transaction('pendingOperations', 'readonly').objectStore('pendingOperations').getAll();
+        operations = await withDb(async (db) => {
+            return db.getAll('pendingOperations');
+        });
     } catch (e) {
         console.error('[DB] Error fetching pending operations:', e);
         return;
@@ -139,17 +128,19 @@ export async function processPendingOperations() {
         console.log('[DB] Batch sync successful. Server response:', responseData);
 
         if (responseData.results && Array.isArray(responseData.results)) {
-            const tx = db.transaction('pendingOperations', 'readwrite');
-            const store = tx.objectStore('pendingOperations');
-            for (const result of responseData.results) {
-                if (result.status === 'success' && result.id !== undefined) {
-                    await store.delete(result.id);
-                    console.log(`[DB] Removed buffered operation ${result.id} (${result.opType})`);
-                } else {
-                    console.warn(`[DB] Operation ${result.id ?? 'ID missing'} (${result.opType}) ${result.status}: ${result.reason || 'No specific reason provided.'}`);
+            await withDb(async (db) => {
+                const tx = db.transaction('pendingOperations', 'readwrite');
+                const store = tx.objectStore('pendingOperations');
+                for (const result of responseData.results) {
+                    if (result.status === 'success' && result.id !== undefined) {
+                        await store.delete(result.id);
+                        console.log(`[DB] Removed buffered operation ${result.id} (${result.opType})`);
+                    } else {
+                        console.warn(`[DB] Operation ${result.id ?? 'ID missing'} (${result.opType}) ${result.status}: ${result.reason || 'No specific reason provided.'}`);
+                    }
                 }
-            }
-            await tx.done;
+                await tx.done;
+            });
         } else {
             console.warn('[DB] Server response did not contain a valid "results" array. Cannot clear buffered operations.');
         }
@@ -172,53 +163,34 @@ const PULL_DEBOUNCE_MS = 500;
  * @returns {Promise<object>} The result of the pull operation.
  */
 async function _pullSingleStateKey(key, def) {
-    const db = await getDb();
-    const url = `${API_BASE_URL}/api/user-state/${key}`;
     let localTimestamp = '';
     let isLocalStateEmpty = false;
 
     // Use a single transaction for loading state.
-    const loadTx = db.transaction([def.store], 'readonly');
-    if (def.type === 'array') {
-        const loadedState = await loadArrayState(key, loadTx);
-        const hasValidData = loadedState.value?.length > 0 && loadedState.value.every(item => item);
-        isLocalStateEmpty = !hasValidData;
-        if (hasValidData) localTimestamp = loadedState.lastModified || '';
-    } else { // 'simple' type
-        const loadedState = await loadSimpleState(key, loadTx);
-        isLocalStateEmpty = loadedState.value === null || loadedState.value === undefined;
-        if (!isLocalStateEmpty) localTimestamp = loadedState.lastModified || '';
-    }
-    await loadTx.done; // Ensure the load transaction is complete.
-
+    const { value, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store);
+    const hasValidData = Array.isArray(value) ? value.length > 0 && value.every(item => item) : (value !== null && value !== undefined);
+    isLocalStateEmpty = !hasValidData;
+    if (hasValidData) localTimestamp = lastModified || '';
+    
     const headers = { 'Content-Type': 'application/json' };
     if (!isLocalStateEmpty && localTimestamp) headers['If-None-Match'] = localTimestamp;
 
     try {
-        const response = await fetch(url, {
+        const response = await fetch(`${API_BASE_URL}/api/user-state/${key}`, {
             method: 'GET',
             headers
         });
         if (response.status === 304) {
             console.log(`[DB] State for ${key}: 304 Not Modified.`);
-            return {
-                key,
-                status: 304,
-                timestamp: localTimestamp
-            };
+            return { key, status: 304, timestamp: localTimestamp };
         }
         if (!response.ok) {
             console.error(`[DB] HTTP error for ${key}: ${response.status}`);
-            return {
-                key,
-                status: response.status
-            };
+            return { key, status: response.status };
         }
         const data = await response.json();
         console.log(`[DB] New data received for ${key}.`);
-
-        // Use a new transaction for saving data.
-        const saveTx = db.transaction([def.store], 'readwrite');
+        
         if (def.type === 'array') {
             const cleanArray = (data.value || def.default || []).filter(item => {
                 if (typeof item === 'string' && item.trim()) return true;
@@ -226,23 +198,15 @@ async function _pullSingleStateKey(key, def) {
                 console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
                 return false;
             });
-            await saveArrayState(key, cleanArray, data.lastModified, saveTx);
+            await saveArrayState(def.store, cleanArray);
         } else {
-            await saveSimpleState(key, data.value, data.lastModified, saveTx);
+            await saveSimpleState(key, data.value);
         }
-        await saveTx.done;
-
-        return {
-            key,
-            status: 200,
-            timestamp: data.lastModified
-        };
+        
+        return { key, status: 200, timestamp: data.lastModified };
     } catch (error) {
         console.error(`[DB] Failed to pull ${key}:`, error);
-        return {
-            key,
-            status: 'error'
-        };
+        return { key, status: 'error' };
     }
 }
 
@@ -261,8 +225,13 @@ export async function pullUserState() {
 
     const keysToPull = Object.entries(USER_STATE_DEFS).filter(([key, def]) => !def.localOnly);
 
-    const results = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def)));
-
+    // Await for each pull in series to prevent race conditions.
+    const results = [];
+    for (const [key, def] of keysToPull) {
+        const result = await _pullSingleStateKey(key, def);
+        results.push(result);
+    }
+    
     for (const result of results) {
         if (result.timestamp && (!newestOverallTimestamp || result.timestamp > newestOverallTimestamp)) {
             newestOverallTimestamp = result.timestamp;
@@ -273,6 +242,22 @@ export async function pullUserState() {
 
     _isPullingUserState = false;
     console.log('[DB] User state pull completed.');
+}
+
+/**
+ * Retrieves all items from the feedItems store.
+ * @returns {Promise<Array<any>>} An array of all feed items.
+ */
+export async function getAllFeedItems() {
+    return withDb(async (db) => {
+        try {
+            const items = await db.getAll('feedItems');
+            return items;
+        } catch (e) {
+            console.error('Failed to get all feed items:', e);
+            return [];
+        }
+    });
 }
 
 /**
@@ -294,9 +279,9 @@ export async function performFeedSync(app) {
         const serverGuids = new Set(guidsData.guids);
         const serverTime = guidsData.serverTime;
 
-        const db = await getDb();
-        const localItems = await db.transaction('feedItems', 'readonly').objectStore('feedItems').getAll();
-        const localGuids = new Set(localItems.map(item => item.guid));
+        let localGuids = new Set();
+        const localItems = await getAllFeedItems();
+        localGuids = new Set(localItems.map(item => item.guid));
 
         const guidsToFetch = [...serverGuids].filter(guid => !localGuids.has(guid));
         const guidsToDelete = [...localGuids].filter(guid => !serverGuids.has(guid));
@@ -306,7 +291,7 @@ export async function performFeedSync(app) {
         const BATCH_SIZE = 50;
         const newItems = [];
 
-        // FIX: Perform all network requests outside the database transaction.
+        // Perform all network requests outside the database transaction.
         for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
             const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
             const itemsResponse = await fetch(`${API_BASE_URL}/api/feed-items`, {
@@ -325,22 +310,24 @@ export async function performFeedSync(app) {
             newItems.push(...items);
         }
 
-        // FIX: Open a single transaction for all database operations.
-        const tx = db.transaction(['feedItems'], 'readwrite');
-        const feedStore = tx.objectStore('feedItems');
+        // Open a single transaction for all database operations.
+        await withDb(async (db) => {
+            const tx = db.transaction(['feedItems'], 'readwrite');
+            const feedStore = tx.objectStore('feedItems');
 
-        // Handle deletions first
-        for (const guidToDelete of guidsToDelete) {
-            await feedStore.delete(guidToDelete);
-            console.log(`[DB] Deleted item: ${guidToDelete}`);
-        }
+            // Handle deletions first
+            for (const guidToDelete of guidsToDelete) {
+                await feedStore.delete(guidToDelete);
+                console.log(`[DB] Deleted item: ${guidToDelete}`);
+            }
 
-        // Handle new/updated items
-        for (const item of newItems) {
-            if (item.guid) await feedStore.put(item);
-            else console.error("[DB] Item missing GUID, cannot store:", item);
-        }
-        await tx.done;
+            // Handle new/updated items
+            for (const item of newItems) {
+                if (item.guid) await feedStore.put(item);
+                else console.error("[DB] Item missing GUID, cannot store:", item);
+            }
+            await tx.done;
+        });
 
         if (serverTime) await saveSimpleState('lastFeedSync', serverTime);
 

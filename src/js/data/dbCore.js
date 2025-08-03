@@ -1,22 +1,21 @@
 // @filepath: src/js/data/dbCore.js
 
-// Refactored JS: concise, modern, functional, same output.
+// This file handles the core IndexedDB initialization and schema definition.
+// It also provides the synchronized `withDb` helper function.
 
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 20; // FIX: Aggressively incrementing the version to force a new migration run.
+const DB_VERSION = 22; // FIX: Aggressively incrementing to force a new migration run.
 
 let _dbInstance = null;
 let _dbInitPromise = null;
 
 // A consistent and declarative schema definition.
-const OBJECT_STORES_SCHEMA = [{
+export const OBJECT_STORES_SCHEMA = [{
     name: 'feedItems',
     keyPath: 'guid',
-    options: {
-        unique: true
-    }
+    options: { unique: true }
 }, {
     name: 'starred',
     keyPath: 'guid'
@@ -35,9 +34,7 @@ const OBJECT_STORES_SCHEMA = [{
 }, {
     name: 'pendingOperations',
     keyPath: 'id',
-    options: {
-        autoIncrement: true
-    }
+    options: { autoIncrement: true }
 }];
 
 /**
@@ -45,7 +42,7 @@ const OBJECT_STORES_SCHEMA = [{
  * This is the sole public function for accessing the database.
  * @returns {Promise<IDBPDatabase>} The IndexedDB database instance.
  */
-export async function getDb() {
+async function getDb() {
     if (_dbInstance) {
         return _dbInstance;
     }
@@ -56,30 +53,16 @@ export async function getDb() {
     _dbInitPromise = openDB(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion) {
             console.log(`[DB] Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
-
-            // Migration logic: First, delete any stores with old or incorrect names.
-            if (db.objectStoreNames.contains('starredItems')) {
-                db.deleteObjectStore('starredItems');
-            }
-            if (db.objectStoreNames.contains('hiddenItems')) {
-                db.deleteObjectStore('hiddenItems');
-            }
-            if (db.objectStoreNames.contains('currentDeckGuids')) {
-                db.deleteObjectStore('currentDeckGuids');
-            }
-            if (db.objectStoreNames.contains('shuffledOutGuids')) {
-                db.deleteObjectStore('shuffledOutGuids');
-            }
-
-            // Then, ensure all stores from the current schema exist.
             OBJECT_STORES_SCHEMA.forEach(schema => {
-                if (!db.objectStoreNames.contains(schema.name)) {
-                    db.createObjectStore(schema.name, {
-                        keyPath: schema.keyPath,
-                        ...schema.options
-                    });
-                    console.log(`[DB] Created new store: ${schema.name}`);
+                if (db.objectStoreNames.contains(schema.name)) {
+                    db.deleteObjectStore(schema.name);
+                    console.log(`[DB] Deleted old store: ${schema.name}`);
                 }
+                db.createObjectStore(schema.name, {
+                    keyPath: schema.keyPath,
+                    ...schema.options
+                });
+                console.log(`[DB] Created new store: ${schema.name}`);
             });
         },
         blocked() {
@@ -101,3 +84,17 @@ export async function getDb() {
         throw e;
     }
 }
+
+/**
+ * Ensures a single, ready database instance is available before a callback is executed.
+ * This helper is the key to preventing the race condition.
+ * @param {Function} callback The function to execute with the database instance.
+ * @returns {Promise<any>} The result of the callback.
+ */
+export async function withDb(callback) {
+    let dbInstance = await getDb();
+    return callback(dbInstance);
+}
+
+// Re-export getDb for backward compatibility if needed
+export { getDb as initDb };
