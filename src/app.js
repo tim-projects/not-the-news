@@ -76,14 +76,17 @@ export function rssApp() {
         // --- Core Methods ---
         async initApp() {
             try {
-                // Step 1: Initialize the database first and wait for it.
-                // This is the single most important step to prevent the NotFoundError.
                 this.db = await initDb();
                 
-                // Step 2: Now that the database is ready, safely load all data.
+                // --- FIX: Re-ordered the startup sequence. ---
+                // Load basic state and trigger initial sync first.
                 await this._loadInitialState();
-                await this._loadAndManageAllData();
                 await this._runInitialSync();
+                
+                // Now, with a stable and potentially updated data set,
+                // load the remaining data and manage the deck once.
+                await this._loadAndManageAllData();
+                // --- END FIX ---
 
                 initTheme(this);
                 initSyncToggle(this);
@@ -91,8 +94,6 @@ export function rssApp() {
                 initConfigPanelListeners(this);
                 attachScrollToTopHandler();
                 await initScrollPosition(this);
-                
-                // Moved updateCounts to _loadAndManageAllData where the data is actually loaded.
                 
                 this._setupWatchers();
                 this._setupEventListeners();
@@ -287,16 +288,20 @@ export function rssApp() {
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
 
             // Load other states. They are not prone to the same data issues.
-            const [starredState, shuffledOutState, currentDeckState] = await Promise.all([
+            const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
-                loadArrayState('currentDeckGuids')
+                loadArrayState('currentDeckGuids'),
+                loadShuffleState()
             ]);
             
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
             this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
+            this.shuffleCount = shuffleState.shuffleCount;
+            this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
+            // This is the single, authoritative call to manage the deck.
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
 
