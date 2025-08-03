@@ -1,7 +1,6 @@
 // @filepath: src/js/helpers/deckManager.js
 
-// @refactor-directive
-// Refactor JS: concise, modern, functional, same output.
+// Refactored JS: concise, modern, functional, same output.
 import {
     loadSimpleState,
     saveSimpleState,
@@ -16,7 +15,7 @@ import {
 } from './userStateUtils.js';
 import {
     generateNewDeck
-} from './dataUtils.js';
+} from './dataUtils.js'; // This is now being used
 import {
     createStatusBarMessage,
     displayTemporaryMessageInTitle
@@ -27,70 +26,98 @@ import {
 
 const MAX_DECK_SIZE = 10;
 
-// This function manages the daily deck of news items.
-// It is called with the main application object as a parameter.
-// It uses the items already loaded into the app object's state.
+/**
+ * Manages the daily deck of news items.
+ * @param {object} app The main application object.
+ */
 export const manageDailyDeck = async (app) => {
-    // We are now directly using the `app.entries` array, which should have been
-    // populated by the feed sync process before this function is called.
+    // We expect app.entries to be populated by the feed sync process.
     const allItems = app.entries;
-    const hiddenGuids = app.hidden;
-    const starredGuids = app.starred;
-    const shuffledOutGuids = app.shuffledOutGuids;
+    
+    // Create Sets for efficient lookups of hidden and shuffled-out GUIDs.
+    const hiddenGuids = new Set(app.hidden.map(item => item.guid));
+    const shuffledOutGuids = new Set(app.shuffledOutGuids);
 
-    // Log the correct counts to verify the fix
     console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
-    console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuids.length}`);
-    console.log(`[deckManager] DEBUG: starredGuids count: ${starredGuids.length}`);
-    console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuids.length}`);
-
-    // If it's a new day or the user has reshuffled, create a new deck.
-    const lastResetDate = app.lastShuffleResetDate;
+    console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuids.size}`);
+    console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuids.size}`);
+    
+    // Check if the current deck needs to be generated or regenerated.
     const today = new Date().toDateString();
+    const isNewDay = app.lastShuffleResetDate !== today;
+    const isDeckEmpty = app.currentDeckGuids.length === 0;
 
-    if (lastResetDate !== today || app.shuffleCount > 0) {
+    // The condition for generating a new deck has been corrected and simplified.
+    // A new deck is generated if it's a new day, or if the current deck is empty.
+    if (isNewDay || isDeckEmpty) {
+        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}) or Empty Deck (${isDeckEmpty}).`);
+        
         // Filter out hidden and shuffled items from the main feed.
-        const deck = allItems.filter(item => !hiddenGuids.includes(item.guid) && !shuffledOutGuids.includes(item.guid));
+        const availableItems = allItems.filter(item => 
+            !hiddenGuids.has(item.id) && !shuffledOutGuids.has(item.id)
+        );
+        
+        // Use the imported helper function to generate a new deck.
+        const newDeck = generateNewDeck(availableItems, MAX_DECK_SIZE);
 
-        // Sort items (if needed) and slice to a manageable size.
-        // For now, let's just use the filtered deck.
-        app.deck = deck;
-
-        // Save the GUIDs of the new deck to the database.
-        await saveCurrentDeck(app.deck.map(item => item.guid));
+        // Update the app state with the new deck and its GUIDs.
+        app.deck = newDeck;
+        app.currentDeckGuids = newDeck.map(item => item.id);
+        
+        // Save the new deck GUIDs to the database.
+        await saveCurrentDeck(app.currentDeckGuids);
+        
+        // Reset shuffled-out items and shuffle count for the new day.
+        if (isNewDay) {
+            app.shuffledOutGuids = [];
+            await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
+            
+            // Set a new lastShuffleResetDate
+            app.lastShuffleResetDate = today;
+            await saveSimpleState('lastShuffleResetDate', today);
+        }
+        
+    } else {
+        // If it's not a new day and the deck isn't empty, just load the existing deck.
+        console.log(`[deckManager] Retaining existing deck. Deck size: ${app.currentDeckGuids.length}.`);
+        app.deck = allItems
+            .filter(item => app.currentDeckGuids.includes(item.id))
+            .map(item => ({
+                ...item,
+                isHidden: hiddenGuids.has(item.id),
+                isStarred: starredGuids.has(item.id)
+            }));
     }
 
-    console.log(`[deckManager] Deck managed. New deck size: ${app.deck.length}.`);
+    console.log(`[deckManager] Deck management complete. Final deck size: ${app.deck.length}.`);
 };
 
-// This function processes a shuffle request from the user.
-// It adds the current deck's items to a "shuffled out" list,
-// decrements the shuffle count, and triggers a new deck to be built.
+/**
+ * Processes a shuffle request from the user.
+ * @param {object} app The main application object.
+ */
 export async function processShuffle(app) {
     console.log("[deckManager] processShuffle called.");
 
-    // Check if shuffles are available
     if (app.shuffleCount <= 0) {
         createStatusBarMessage('No shuffles left for today!', 'error');
         return;
     }
 
     // Get GUIDs of currently visible items in the deck
-    const visibleGuids = app.deck.map(item => item.guid);
+    const visibleGuids = app.deck.map(item => item.id);
 
-    // Add these GUIDs to the shuffled_out_guids array in app state
-    // Ensure uniqueness and that we're not adding hidden items back to shuffled-out list
+    // Add these GUIDs to the shuffled-out list, ensuring uniqueness.
     const updatedShuffledOutGuids = new Set([...app.shuffledOutGuids, ...visibleGuids]);
     app.shuffledOutGuids = Array.from(updatedShuffledOutGuids);
 
-    // Decrement shuffleCount
     app.shuffleCount--;
 
     // Save the updated shuffled-out GUIDs and shuffle count to IndexedDB
     await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize for saving lastShuffleResetDate
-    await saveShuffleState(app.shuffleCount, today); // Save current shuffle count and reset date
+    
+    // Save current shuffle count and reset date
+    await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate);
 
     // Update the UI display for shuffle count immediately
     const shuffleDisplay = getShuffleCountDisplay();
@@ -99,7 +126,6 @@ export async function processShuffle(app) {
     }
 
     // Trigger a re-evaluation of the deck by calling manageDailyDeck
-    // This will generate a new deck excluding the newly shuffled-out items.
     await manageDailyDeck(app);
 
     displayTemporaryMessageInTitle('Feed shuffled!');
