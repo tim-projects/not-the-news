@@ -49,9 +49,11 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     }
     app[stateKey] = newList;
     
-    // The database schema for 'starred' and 'hidden' expects an array of objects
-    // with a 'guid' keyPath. Saving 'newList' directly is the correct approach.
-    await saveArrayState(stateKey, newList);
+    // --- FIX: Map the array to new, plain objects to avoid the DataCloneError. ---
+    // This is the most reliable way to strip the Proxy wrapper used by Alpine.js.
+    const cleanedList = newList.map(item => ({ ...item }));
+    await saveArrayState(stateKey, cleanedList);
+    // --- END FIX ---
 
     if (stateKey === 'hidden') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
