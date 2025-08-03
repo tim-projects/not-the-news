@@ -50,7 +50,9 @@ export const manageDailyDeck = async (app) => {
     const isNewDay = app.lastShuffleResetDate !== today;
     const isDeckEmpty = currentDeckGuids.length === 0;
 
-    if (isNewDay || isDeckEmpty || app.filterMode !== 'unread') {
+    // --- FIX: Added allItems.length === 0 to force a reset if data is missing. ---
+    if (isNewDay || isDeckEmpty || app.filterMode !== 'unread' || allItems.length === 0) {
+    // --- END FIX ---
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Empty Deck (${isDeckEmpty}), or Filter Mode Changed (${app.filterMode}).`);
 
         // Now, we pass all the required data to generateNewDeck.
@@ -81,10 +83,8 @@ export const manageDailyDeck = async (app) => {
             app.shuffledOutGuids = [];
             await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
             
-            // --- FIX: Reset shuffleCount and save it ---
             app.shuffleCount = DAILY_SHUFFLE_LIMIT; // Reset the count
             await saveShuffleState(app.shuffleCount, today); // Save the new count and date
-            // --- END FIX ---
 
             app.lastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
