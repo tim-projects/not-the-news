@@ -20,7 +20,8 @@ import {
     loadCurrentDeck,
     saveCurrentDeck,
     toggleItemStateAndSync,
-    pruneStaleHidden,
+    pruneStaleHidden, // This function is now a pure utility.
+    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
     saveShuffleState,
     loadShuffleState,
     setFilterMode,
@@ -280,19 +281,21 @@ export function rssApp() {
         async _loadAndManageAllData() {
             await this.loadFeedItemsFromDB();
             
-            // FIX: Loading state sequentially to avoid a race condition with the database upgrade.
-            const hiddenState = await loadArrayState('hidden');
-            const starredState = await loadArrayState('starred');
-            const shuffledOutState = await loadArrayState('shuffledOutGuids');
-            const currentDeckState = await loadArrayState('currentDeckGuids');
+            // Replaced the manual loading and pruning of hidden items
+            // with the new, single, robust function.
+            this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
+
+            // Load other states. They are not prone to the same data issues.
+            const [starredState, shuffledOutState, currentDeckState] = await Promise.all([
+                loadArrayState('starred'),
+                loadArrayState('shuffledOutGuids'),
+                loadArrayState('currentDeckGuids')
+            ]);
             
-            this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
             this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
-            
-            const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-            this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
+
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
         },

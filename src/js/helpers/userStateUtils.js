@@ -60,8 +60,9 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
 }
 
 /**
- * Prunes stale hidden items from the hiddenItems store and returns the updated list.
+ * A pure function to prune stale hidden items from the hiddenItems list.
  * Items are considered stale if they are not in the current feedItems and are older than 30 days.
+ * This function does NOT modify the database.
  * @param {Array<object>} feedItems - The array of current feed items (expected to have 'guid' property).
  * @param {Array<object>} hiddenItems - The current array of hidden items from the app state.
  * @param {number} currentTS - The current timestamp in milliseconds.
@@ -71,7 +72,6 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     if (!Array.isArray(hiddenItems)) return [];
     if (!Array.isArray(feedItems) || feedItems.length === 0) return hiddenItems;
 
-    // FIX: Add a null/undefined check to prevent TypeError when accessing 'guid'
     const validFeedGuids = new Set(feedItems.filter(e => e && e.guid).map(e => e.guid.trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -83,16 +83,30 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
         return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
     });
 
-    if (itemsToKeep.length !== hiddenItems.length) {
+    return itemsToKeep;
+}
+
+/**
+ * Loads the current list of hidden items, prunes the stale ones,
+ * saves the changes to the database, and returns the final list.
+ * This function should be called during app startup to ensure a clean state.
+ * @param {Array<object>} feedItems - The array of current feed items.
+ * @returns {Promise<Array<object>>} The updated list of hidden items.
+ */
+export async function loadAndPruneHiddenItems(feedItems) {
+    const { value: hiddenItems } = await loadArrayState('hidden');
+    const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItems, Date.now());
+
+    if (prunedHiddenItems.length !== hiddenItems.length) {
         try {
-            await saveArrayState('hidden', itemsToKeep);
-            console.log(`Pruned hidden items: removed ${hiddenItems.length - itemsToKeep.length} stale items.`);
+            await saveArrayState('hidden', prunedHiddenItems);
+            console.log(`Pruned hidden items: removed ${hiddenItems.length - prunedHiddenItems.length} stale items.`);
         } catch (error) {
             console.error("Error pruning stale hidden items:", error);
         }
     }
 
-    return itemsToKeep;
+    return prunedHiddenItems;
 }
 
 /**
