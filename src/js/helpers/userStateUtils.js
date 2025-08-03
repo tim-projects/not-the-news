@@ -123,7 +123,7 @@ export async function loadCurrentDeck() {
         if (item && typeof item.guid === 'string') return item.guid;
         return null;
     }).filter(Boolean) || [];
-    console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs.`);
+    console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs:`, deckGuids);
     return deckGuids;
 }
 
@@ -137,7 +137,7 @@ export async function saveCurrentDeck(guids) {
         console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs, got:", typeof guids, guids);
         return;
     }
-    console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs.");
+    console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs:", guids);
 
     try {
         // FIX: The save function should save the GUIDs array directly, not an array of objects.
