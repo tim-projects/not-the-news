@@ -20,8 +20,8 @@ import {
     loadCurrentDeck,
     saveCurrentDeck,
     toggleItemStateAndSync,
-    pruneStaleHidden, // This function is now a pure utility.
-    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
+    pruneStaleHidden,
+    loadAndPruneHiddenItems,
     saveShuffleState,
     loadShuffleState,
     setFilterMode,
@@ -49,7 +49,7 @@ export function rssApp() {
     return {
         // --- State Properties ---
         loading: true,
-        progressMessage: 'Initializing...', // <-- ADDED
+        progressMessage: 'Initializing...',
         deck: [],
         feedItems: {},
         filterMode: 'unread',
@@ -77,25 +77,20 @@ export function rssApp() {
         // --- Core Methods ---
         initApp: async function() {
             try {
-                this.progressMessage = 'Connecting to database...'; // <-- UPDATED
+                this.progressMessage = 'Connecting to database...';
                 this.db = await initDb();
                 
-                // 1. Load basic configuration and settings first.
-                this.progressMessage = 'Loading settings...'; // <-- ADDED
+                this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 
-                // 2. Perform a full data sync from the server. This is the critical step.
-                // It ensures feed items and user state are fully up-to-date before
-                // any deck management or display logic runs.
                 if (this.isOnline) {
                     await this._fullInitialSync();
                 }
 
-                // 3. Load all data, including the deck, from the now-fresh database.
-                this.progressMessage = 'Loading feed data from storage...'; // <-- ADDED
+                this.progressMessage = 'Loading feed data from storage...';
                 await this._loadAndManageAllData();
 
-                this.progressMessage = 'Applying user preferences...'; // <-- ADDED
+                this.progressMessage = 'Applying user preferences...';
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
@@ -103,25 +98,23 @@ export function rssApp() {
                 attachScrollToTopHandler();
                 await initScrollPosition(this);
                 
-                this.progressMessage = 'Setting up app watchers...'; // <-- ADDED
+                this.progressMessage = 'Setting up app watchers...';
                 this._setupWatchers();
                 this._setupEventListeners();
                 this._startPeriodicSync();
                 this._initScrollObserver();
 
-                this.progressMessage = ''; // <-- ADDED
+                this.progressMessage = '';
                 this.loading = false;
             } catch (error) {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
-                this.progressMessage = `Error: ${error.message}`; // <-- ADDED
+                this.progressMessage = `Error: ${error.message}`;
                 this.loading = false;
             }
         },
+        
         loadAndDisplayDeck: async function() {
-            // Don't reload from DB - we should already have feedItems populated
-            // await this.loadFeedItemsFromDB(); // Remove this line!
-
             let guidsToDisplay = this.currentDeckGuids;
             if (!Array.isArray(guidsToDisplay)) {
                 guidsToDisplay = [];
@@ -144,14 +137,22 @@ export function rssApp() {
                 const item = this.feedItems[guid];
                 if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
                     const mappedItem = mapRawItem(item, formatDate);
-                    mappedItem.isHidden = hiddenSet.has(mappedItem.id);
-                    mappedItem.isStarred = starredSet.has(mappedItem.id);
+                    
+                    // --- FIX: Use mappedItem.guid instead of mappedItem.id ---
+                    mappedItem.isHidden = hiddenSet.has(mappedItem.guid);
+                    mappedItem.isStarred = starredSet.has(mappedItem.guid);
+                    // --- END FIX ---
+                    
                     items.push(mappedItem);
-                    seenGuidsForDeck.add(mappedItem.id);
+                    
+                    // --- FIX: Use mappedItem.guid instead of mappedItem.id ---
+                    seenGuidsForDeck.add(mappedItem.guid);
+                    // --- END FIX ---
+                    
                     foundCount++;
                 } else {
                     missingCount++;
-                    if (missingCount <= 3) { // Only log first few missing items
+                    if (missingCount <= 3) {
                         console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
                     }
                 }
@@ -199,26 +200,31 @@ export function rssApp() {
 
             switch (this.filterMode) {
                 case "unread":
-                    filtered = this.deck.filter(item => !hiddenMap.has(item.id));
+                    // --- FIX: Use item.guid instead of item.id ---
+                    filtered = this.deck.filter(item => !hiddenMap.has(item.guid));
                     break;
                 case "all":
                     filtered = this.entries;
                     break;
                 case "hidden":
-                    filtered = this.entries.filter(e => hiddenMap.has(e.id))
-                        .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
+                    // --- FIX: Use e.guid instead of e.id ---
+                    filtered = this.entries.filter(e => hiddenMap.has(e.guid))
+                        .sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime());
                     break;
                 case "starred":
-                    filtered = this.entries.filter(e => starredMap.has(e.id))
-                        .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
+                    // --- FIX: Use e.guid instead of e.id ---
+                    filtered = this.entries.filter(e => starredMap.has(e.guid))
+                        .sort((a, b) => new Date(starredMap.get(b.guid)).getTime() - new Date(starredMap.get(a.guid)).getTime());
                     break;
             }
 
+            // --- FIX: Use e.guid instead of e.id ---
             filtered = filtered.map(e => ({
                 ...e,
-                isHidden: hiddenMap.has(e.id),
-                isStarred: starredMap.has(e.id)
+                isHidden: hiddenMap.has(e.guid),
+                isStarred: starredMap.has(e.guid)
             }));
+            // --- END FIX ---
 
             const keywordBlacklist = (this.keywordBlacklistInput ?? '')
                 .split(/\r?\n/)
@@ -249,9 +255,6 @@ export function rssApp() {
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            // CRITICAL FIX: Reload the entire data set and manage the deck after a state change.
-            // This ensures the app's state is fully refreshed from the database,
-            // reflecting the synced change immediately.
             await this._loadAndManageAllData();
         },
         processShuffle: async function() {
@@ -262,11 +265,11 @@ export function rssApp() {
             await saveSimpleState('rssFeeds', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
-            this.progressMessage = 'Saving feeds and performing full sync...'; // <-- ADDED
+            this.progressMessage = 'Saving feeds and performing full sync...';
             await performFullSync(this);
             await this.loadFeedItemsFromDB();
             await manageDailyDeck(this);
-            this.progressMessage = ''; // <-- ADDED
+            this.progressMessage = '';
             this.loading = false;
         },
         saveKeywordBlacklist: async function() {
@@ -300,63 +303,54 @@ export function rssApp() {
         _fullInitialSync: async function() {
             if (!this.syncEnabled) return;
             try {
-                // First, pull all user state to get the latest deck GUIDs.
-                this.progressMessage = 'Pulling user state from server...'; // <-- UPDATED
+                this.progressMessage = 'Pulling user state from server...';
                 await pullUserState();
-                // Then, sync the feed to ensure we have all feed items locally.
-                this.progressMessage = 'Fetching new feed items...'; // <-- UPDATED
+                this.progressMessage = 'Fetching new feed items...';
                 await performFullSync(this);
-                // CRITICAL: Reload app state with newly synced items.
-                this.progressMessage = 'Reloading data into app state...'; // <-- UPDATED
+                this.progressMessage = 'Reloading data into app state...';
                 await this.loadFeedItemsFromDB();
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
                 console.error("Initial sync failed:", error);
                 this.errorMessage = `Initial sync failed: ${error.message}`;
-                // Avoid creating a status bar message if the container doesn't exist
                 if (document.querySelector('.status-bar-container')) {
                     createStatusBarMessage(`Initial sync failed: ${error.message}`, "error");
                 }
             }
         },
         _loadAndManageAllData: async function() {
-            // CRITICAL FIX: Load all feed items from the DB into the app state first.
             await this.loadFeedItemsFromDB();
             console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
 
-            // Now, with a complete list of feed items, load and process other states.
-            this.progressMessage = 'Loading user state from storage...'; // <-- ADDED
+            this.progressMessage = 'Loading user state from storage...';
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
-                loadCurrentDeck(), // FIX: Use the fixed loadCurrentDeck function instead of loadArrayState
+                loadCurrentDeck(),
                 loadShuffleState()
             ]);
     
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
     
-            // FIX: currentDeckState is now already processed by loadCurrentDeck, so use it directly
             this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
             console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
     
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            // With all data loaded, it is now safe to prune and manage the deck.
-            this.progressMessage = 'Pruning hidden items...'; // <-- ADDED
+            this.progressMessage = 'Pruning hidden items...';
+            // The `Object.values(this.feedItems)` call passes a list of objects with the 'guid' property, which `loadAndPruneHiddenItems` expects.
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             console.log("[deckManager] Starting deck management with all data loaded.");
 
-            this.progressMessage = 'Managing today\'s deck...'; // <-- ADDED
+            this.progressMessage = 'Managing today\'s deck...';
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
 
-            // After all data is loaded and managed, update the UI once.
             this.updateAllUI();
         },
 
-        // New method to consolidate all UI updates after data loading
         updateAllUI: function() {
             this.updateCounts();
         },
@@ -391,11 +385,9 @@ export function rssApp() {
                 if (newMode === 'unread') {
                     await manageDailyDeck(this);
                 }
-                // The new watcher on the data will handle the counts update
                 this.scrollToTop();
             });
             
-            // New watchers to automatically update counts when data changes
             this.$watch('entries', () => this.updateCounts());
             this.$watch('hidden', () => this.updateCounts());
             this.$watch('starred', () => this.updateCounts());
@@ -405,12 +397,12 @@ export function rssApp() {
         _setupEventListeners: function() {
             const backgroundSync = async () => {
                 if (!this.syncEnabled || !this.isOnline) return;
-                console.log('Performing periodic background sync...'); // <-- ADDED console.log
+                console.log('Performing periodic background sync...');
                 await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
                 this.deckManaged = true;
-                console.log('Background sync complete.'); // <-- ADDED console.log
+                console.log('Background sync complete.');
             };
 
             window.addEventListener('online', async () => {
@@ -443,12 +435,12 @@ export function rssApp() {
                 if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
                     return;
                 }
-                console.log('Starting scheduled background sync...'); // <-- ADDED console.log
+                console.log('Starting scheduled background sync...');
                 await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
                 this.deckManaged = true;
-                console.log('Scheduled sync complete.'); // <-- ADDED console.log
+                console.log('Scheduled sync complete.');
             }, SYNC_INTERVAL_MS);
         },
 

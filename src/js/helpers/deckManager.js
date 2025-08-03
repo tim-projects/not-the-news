@@ -33,12 +33,10 @@ export const manageDailyDeck = async (app) => {
     // act as a final safety net before critical operations.
     const allItems = Array.isArray(app.entries) ? app.entries : [];
 
-    // --- FIX: If allItems is empty, return early to prevent the deck from being cleared prematurely. ---
     if (allItems.length === 0) {
         console.log('[deckManager] Skipping deck management: allItems is empty.');
         return;
     }
-    // --- END FIX ---
     
     const hiddenItems = Array.isArray(app.hidden) ? app.hidden : [];
     const starredItems = Array.isArray(app.starred) ? app.starred : [];
@@ -76,13 +74,14 @@ export const manageDailyDeck = async (app) => {
         // Update the app state with the new deck and its GUIDs.
         app.currentDeckGuids = newDeckGuids;
         app.deck = allItems
-            .filter(item => newDeckGuids.includes(item.id))
+            .filter(item => newDeckGuids.includes(item.guid))
             .map(item => ({
                 ...item,
-                isHidden: hiddenGuidsSet.has(item.id),
-                isStarred: starredGuidsSet.has(item.id)
+                isHidden: hiddenGuidsSet.has(item.guid),
+                isStarred: starredGuidsSet.has(item.guid)
             }));
         
+        // --- FIX: saveCurrentDeck now correctly receives an array of GUIDs. ---
         await saveCurrentDeck(app.currentDeckGuids);
         
         if (isNewDay) {
@@ -100,17 +99,17 @@ export const manageDailyDeck = async (app) => {
         
         // DEBUG: Add detailed logging to understand the mismatch
         console.log(`[deckManager] DEBUG: currentDeckGuids:`, currentDeckGuids.slice(0, 3)); // First 3 GUIDs
-        console.log(`[deckManager] DEBUG: sample allItems IDs:`, allItems.slice(0, 3).map(item => item.id)); // First 3 item IDs
+        console.log(`[deckManager] DEBUG: sample allItems GUIDs:`, allItems.slice(0, 3).map(item => item.guid)); // First 3 item GUIDs
         console.log(`[deckManager] DEBUG: allItems[0] full object:`, allItems[0]); // See the structure
         
         // Check if any currentDeckGuids match any allItems IDs
-        const matchingItems = allItems.filter(item => currentDeckGuids.includes(item.id));
+        const matchingItems = allItems.filter(item => currentDeckGuids.includes(item.guid));
         console.log(`[deckManager] DEBUG: Found ${matchingItems.length} matching items out of ${currentDeckGuids.length} deck GUIDs`);
         
         if (matchingItems.length === 0 && currentDeckGuids.length > 0) {
             console.log(`[deckManager] ERROR: No matching items found! This suggests a GUID mismatch.`);
             console.log(`[deckManager] DEBUG: First deck GUID: "${currentDeckGuids[0]}" (type: ${typeof currentDeckGuids[0]})`);
-            console.log(`[deckManager] DEBUG: First item ID: "${allItems[0]?.id}" (type: ${typeof allItems[0]?.id})`);
+            console.log(`[deckManager] DEBUG: First item GUID: "${allItems[0]?.guid}" (type: ${typeof allItems[0]?.guid})`);
             
             // Try to find the item by checking if GUIDs exist as keys in feedItems
             if (app.feedItems && app.feedItems[currentDeckGuids[0]]) {
@@ -121,11 +120,11 @@ export const manageDailyDeck = async (app) => {
         }
         
         app.deck = allItems
-            .filter(item => currentDeckGuids.includes(item.id))
+            .filter(item => currentDeckGuids.includes(item.guid))
             .map(item => ({
                 ...item,
-                isHidden: hiddenGuidsSet.has(item.id),
-                isStarred: starredGuidsSet.has(item.id)
+                isHidden: hiddenGuidsSet.has(item.guid),
+                isStarred: starredGuidsSet.has(item.guid)
             }));
     }
 
@@ -144,7 +143,7 @@ export async function processShuffle(app) {
         return;
     }
 
-    const visibleGuids = app.deck.map(item => item.id);
+    const visibleGuids = app.deck.map(item => item.guid);
     const updatedShuffledOutGuids = new Set([...app.shuffledOutGuids, ...visibleGuids]);
     app.shuffledOutGuids = Array.from(updatedShuffledOutGuids);
 
