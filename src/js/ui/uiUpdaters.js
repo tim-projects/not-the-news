@@ -117,9 +117,11 @@ export function updateCounts(app) {
     const entries = app.entries;
 
     const allC = entries.length;
-    const hiddenC = entries.filter(e => hiddenSet.has(e.id)).length;
-    const starredC = entries.filter(e => starredSet.has(e.id)).length;
-    const unreadInDeckC = entries.filter(e => deckGuidsSet.has(e.id) && !hiddenSet.has(e.id)).length;
+    // --- FIX: Change 'e.id' to 'e.guid' for all filters ---
+    const hiddenC = entries.filter(e => hiddenSet.has(e.guid)).length;
+    const starredC = entries.filter(e => starredSet.has(e.guid)).length;
+    const unreadInDeckC = entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length;
+    // --- END FIX ---
 
     const selector = getFilterSelector();
     if (!selector) return;

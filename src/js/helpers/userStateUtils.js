@@ -113,39 +113,15 @@ export async function loadAndPruneHiddenItems(feedItems) {
  * Loads the current deck of GUIDs.
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
-/**
- * Loads the current deck of GUIDs.
- * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
- */
 export async function loadCurrentDeck() {
-    const { value: storedItems } = await loadArrayState('currentDeckGuids');
-    
-    console.log(`[loadCurrentDeck] Raw stored data:`, storedItems);
-    console.log(`[loadCurrentDeck] First item structure:`, storedItems?.[0]);
-    
-    // FIX: The load function should expect an array of strings, as that is the correct format.
-    // However, it's good practice to handle the old, incorrect format as a fallback.
-    // If the data is an array of objects, map it to strings. Otherwise, use the data directly.
-    const deckGuids = storedItems?.map(item => {
-        if (typeof item === 'string') {
-            return item;
-        }
-        if (item && typeof item === 'object') {
-            // Handle various object formats that might contain the GUID
-            if (typeof item.guid === 'string') return item.guid;
-            if (typeof item.id === 'string') return item.id;
-            // If it's a proxy object, try to extract the underlying value
-            if (item.valueOf && typeof item.valueOf() === 'string') return item.valueOf();
-            // Try to convert to string as last resort
-            const stringified = String(item);
-            if (stringified !== '[object Object]') return stringified;
-        }
-        console.warn(`[loadCurrentDeck] Invalid GUID format:`, item, typeof item);
-        return null;
-    }).filter(guid => guid && typeof guid === 'string') || [];
-    
-    console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs:`, deckGuids.slice(0, 3));
+    // --- FIX: Remove the messy fallback logic.
+    // Now that the data is consistently saved as an array of strings, we can
+    // simply load it and filter out any invalid entries.
+    const { value: storedGuids } = await loadArrayState('currentDeckGuids');
+    const deckGuids = storedGuids?.filter(guid => typeof guid === 'string' && guid) || [];
+    console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs.`);
     return deckGuids;
+    // --- END FIX ---
 }
 
 /**
@@ -154,18 +130,17 @@ export async function loadCurrentDeck() {
  * @param {string[]} guids An array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
-    if (!Array.isArray(guids)) {
-        console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs, got:", typeof guids, guids);
+    if (!Array.isArray(guids) || !guids.every(g => typeof g === 'string' && g)) {
+        console.error("[saveCurrentDeck] Invalid input: expected an array of non-empty GUID strings.");
         return;
     }
-    console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs:", guids);
+    console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs:", guids.slice(0, 3));
 
     try {
-        // FIX: The save function should save the GUIDs array directly, not an array of objects.
+        // The saveArrayState function now expects an array of strings.
         await saveArrayState('currentDeckGuids', guids);
 
-        // FIX: Deep clone the array before sending to the database.
-        // This prevents a DataCloneError if the array is an Alpine.js proxy.
+        // Deep clone the array before sending to the database.
         const clonedGuids = JSON.parse(JSON.stringify(guids));
 
         await queueAndAttemptSyncOperation({

@@ -97,9 +97,11 @@ export async function initSyncToggle(app) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
                 if (app.entries?.length) {
                     app.currentDeckGuids = app.entries.map(item => item.guid);
-                    // FIX: This line was causing the error. It's now correctly saving
-                    // an array of objects to the `currentDeckGuids` store.
-                    await saveArrayState('currentDeckGuids', app.currentDeckGuids.map(guid => ({ guid })));
+                    
+                    // --- FIX: Correctly save the array of GUID strings. ---
+                    await saveArrayState('currentDeckGuids', app.currentDeckGuids);
+                    // --- END FIX ---
+
                     console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
                 } else {
                     console.warn("Cannot rebuild deck, app.entries is empty.");

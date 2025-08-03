@@ -20,8 +20,8 @@ import {
     loadCurrentDeck,
     saveCurrentDeck,
     toggleItemStateAndSync,
-    pruneStaleHidden,
-    loadAndPruneHiddenItems,
+    pruneStaleHidden, // This function is now a pure utility.
+    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
     saveShuffleState,
     loadShuffleState,
     setFilterMode,
@@ -113,7 +113,6 @@ export function rssApp() {
                 this.loading = false;
             }
         },
-        
         loadAndDisplayDeck: async function() {
             let guidsToDisplay = this.currentDeckGuids;
             if (!Array.isArray(guidsToDisplay)) {
@@ -141,11 +140,7 @@ export function rssApp() {
                     // --- FIX: Use mappedItem.guid instead of mappedItem.id ---
                     mappedItem.isHidden = hiddenSet.has(mappedItem.guid);
                     mappedItem.isStarred = starredSet.has(mappedItem.guid);
-                    // --- END FIX ---
-                    
                     items.push(mappedItem);
-                    
-                    // --- FIX: Use mappedItem.guid instead of mappedItem.id ---
                     seenGuidsForDeck.add(mappedItem.guid);
                     // --- END FIX ---
                     
@@ -207,12 +202,10 @@ export function rssApp() {
                     filtered = this.entries;
                     break;
                 case "hidden":
-                    // --- FIX: Use e.guid instead of e.id ---
                     filtered = this.entries.filter(e => hiddenMap.has(e.guid))
                         .sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime());
                     break;
                 case "starred":
-                    // --- FIX: Use e.guid instead of e.id ---
                     filtered = this.entries.filter(e => starredMap.has(e.guid))
                         .sort((a, b) => new Date(starredMap.get(b.guid)).getTime() - new Date(starredMap.get(a.guid)).getTime());
                     break;
@@ -255,6 +248,9 @@ export function rssApp() {
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
+            // CRITICAL FIX: Reload the entire data set and manage the deck after a state change.
+            // This ensures the app's state is fully refreshed from the database,
+            // reflecting the synced change immediately.
             await this._loadAndManageAllData();
         },
         processShuffle: async function() {
@@ -340,7 +336,6 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
             this.progressMessage = 'Pruning hidden items...';
-            // The `Object.values(this.feedItems)` call passes a list of objects with the 'guid' property, which `loadAndPruneHiddenItems` expects.
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             console.log("[deckManager] Starting deck management with all data loaded.");
 
