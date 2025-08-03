@@ -63,33 +63,47 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Use respondWith for caching GET requests
-  event.respondWith(
-    caches.match(event.request).then(function(response) {
-      // If we have a cached response, return it.
-      if (response) {
-        return response;
+  // Define the response handler logic as an async function
+  const handleRequest = async () => {
+    // 1. Check the cache first for any request
+    const cachedResponse = await caches.match(event.request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    // 2. If not in cache, try the network
+    try {
+      const networkResponse = await fetch(event.request);
+
+      // Only cache a valid response from the network.
+      if (networkResponse && networkResponse.status === 200) {
+        const responseToCache = networkResponse.clone();
+        const cache = await caches.open(cacheName);
+        await cache.put(event.request, responseToCache);
       }
 
-      // If nothing is in the cache, try the network.
-      return fetch(event.request).then(function(networkResponse) {
-        // Only cache a valid response from the network.
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
-        }
+      return networkResponse;
+    } catch (error) {
+      // 3. Network failed. Now, handle the offline fallback.
+      
+      // Determine if the request is a navigation request.
+      const isNavigation = event.request.mode === 'navigate' || 
+                           (event.request.headers.get('accept') || '').includes('text/html');
 
-        // Clone the response to put in the cache.
-        const responseToCache = networkResponse.clone();
-        caches.open(cacheName).then(function(cache) {
-          // This call only happens for GET requests now.
-          cache.put(event.request, responseToCache);
-        });
+      if (isNavigation) {
+        // For navigation requests, fall back to the offline HTML page.
+        // I've used '/' as a robust way to get the root HTML page.
+        // It's also a good idea to cache an explicit offline.html page and
+        // return that instead for a better user experience.
+        return caches.match('/');
+      } else {
+        // For all other requests (scripts, CSS, images), let them fail.
+        // This is the correct behavior to avoid MIME type errors.
+        console.error('[Service Worker] Fetch failed and no cached response:', event.request.url);
+        return new Response(null, { status: 503, statusText: 'Service Unavailable' });
+      }
+    }
+  };
 
-        return networkResponse;
-      }).catch(function() {
-        // Fallback for failed network requests
-        return caches.match('index.html');
-      });
-    })
-  );
+  event.respondWith(handleRequest());
 });
