@@ -1,6 +1,7 @@
 // @filepath: src/js/helpers/userStateUtils.js
 
-// Refactored JS: concise, modern, functional, same output.
+// This file contains helper functions for managing user state and syncing with the server.
+// It relies on the synchronized database functions for all data access.
 
 import {
     loadSimpleState,
@@ -9,10 +10,9 @@ import {
     processPendingOperations,
     loadArrayState,
     saveArrayState
-} from '../data/database.js'; // These are now assumed to be re-exported from database.js
+} from '../data/database.js';
 
-import { getDb } from '../data/dbCore.js'; // getDb is now exported from dbCore.js
-import { isOnline } from '../utils/connectivity.js'; // <-- Corrected import path
+import { isOnline } from '../utils/connectivity.js';
 import { createStatusBarMessage } from '../ui/uiUpdaters.js';
 
 /**
@@ -107,7 +107,6 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck() {
-    // FIX: Changed to loadArrayState to match the corrected database schema.
     const { value: storedItems } = await loadArrayState('currentDeckGuids');
     const deckGuids = storedItems?.map(item => item.guid).filter(Boolean) || [];
     console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs.`);
@@ -130,7 +129,6 @@ export async function saveCurrentDeck(guids) {
         const guidsAsObjects = guids.map(guid => ({
             guid
         }));
-        // FIX: Changed to saveArrayState to match the corrected database schema.
         await saveArrayState('currentDeckGuids', guidsAsObjects);
 
         await addPendingOperation({
@@ -229,7 +227,3 @@ export async function loadFilterMode() {
     } = await loadSimpleState('filterMode');
     return mode || 'unread';
 }
-
-// NOTE: The original getUserSetting and setUserSetting functions have been removed
-// as their functionality is already provided by the more generic loadSimpleState
-// and saveSimpleState functions, which are used throughout the application.
