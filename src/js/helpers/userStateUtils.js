@@ -6,10 +6,9 @@
 import {
     loadSimpleState,
     saveSimpleState,
-    addPendingOperation,
-    processPendingOperations,
     loadArrayState,
-    saveArrayState
+    saveArrayState,
+    queueAndAttemptSyncOperation // <-- This is the new, correct function name
 } from '../data/database.js';
 
 import { isOnline } from '../utils/connectivity.js';
@@ -57,14 +56,7 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     if (typeof app.updateCounts === 'function') app.updateCounts();
 
     // Queue and attempt to sync the change.
-    await addPendingOperation(pendingOp);
-    if (isOnline()) {
-        try {
-            await processPendingOperations();
-        } catch (syncErr) {
-            console.error(`Failed to immediately sync ${stateKey} change, operation remains buffered:`, syncErr);
-        }
-    }
+    await queueAndAttemptSyncOperation(pendingOp);
 }
 
 /**
@@ -131,15 +123,11 @@ export async function saveCurrentDeck(guids) {
         }));
         await saveArrayState('currentDeckGuids', guidsAsObjects);
 
-        await addPendingOperation({
+        await queueAndAttemptSyncOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
             value: guids
         });
-
-        if (isOnline()) {
-            await processPendingOperations();
-        }
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred:", e);
         throw e;
@@ -173,24 +161,16 @@ export async function saveShuffleState(count, resetDate) {
     await saveSimpleState('shuffleCount', count);
     await saveSimpleState('lastShuffleResetDate', resetDate);
 
-    await addPendingOperation({
+    await queueAndAttemptSyncOperation({
         type: 'simpleUpdate',
         key: 'shuffleCount',
         value: count
     });
-    await addPendingOperation({
+    await queueAndAttemptSyncOperation({
         type: 'simpleUpdate',
         key: 'lastShuffleResetDate',
         value: resetDate
     });
-
-    if (isOnline()) {
-        try {
-            await processPendingOperations();
-        } catch (syncErr) {
-            console.error("Failed to immediately sync shuffle state change, operations remain buffered:", syncErr);
-        }
-    }
 }
 
 /**
@@ -202,19 +182,11 @@ export async function setFilterMode(app, mode) {
     app.filterMode = mode;
     await saveSimpleState('filterMode', mode);
 
-    await addPendingOperation({
+    await queueAndAttemptSyncOperation({
         type: 'simpleUpdate',
         key: 'filterMode',
         value: mode
     });
-
-    if (isOnline()) {
-        try {
-            await processPendingOperations();
-        } catch (syncErr) {
-            console.error("Failed to immediately sync filter mode change, operation remains buffered:", syncErr);
-        }
-    }
 }
 
 /**
