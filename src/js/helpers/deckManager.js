@@ -31,7 +31,22 @@ const MAX_DECK_SIZE = 10;
  * @param {object} app The main application object.
  */
 export const manageDailyDeck = async (app) => {
-    // We expect app.entries to be populated by the feed sync process.
+    // Defensive checks to ensure all necessary data is in a valid state.
+    if (!Array.isArray(app.entries)) {
+        console.warn("[deckManager] app.entries is not an array. Initializing to empty array.");
+        app.entries = [];
+    }
+
+    if (!Array.isArray(app.hidden)) {
+        console.warn("[deckManager] app.hidden is not an array. Initializing to empty array.");
+        app.hidden = [];
+    }
+    
+    if (!Array.isArray(app.shuffledOutGuids)) {
+        console.warn("[deckManager] app.shuffledOutGuids is not an array. Initializing to empty array.");
+        app.shuffledOutGuids = [];
+    }
+    
     const allItems = app.entries;
     
     // Create Sets for efficient lookups of hidden and shuffled-out GUIDs.
@@ -80,6 +95,7 @@ export const manageDailyDeck = async (app) => {
     } else {
         // If it's not a new day and the deck isn't empty, just load the existing deck.
         console.log(`[deckManager] Retaining existing deck. Deck size: ${app.currentDeckGuids.length}.`);
+        const starredGuids = new Set(app.starred.map(item => item.guid));
         app.deck = allItems
             .filter(item => app.currentDeckGuids.includes(item.id))
             .map(item => ({
