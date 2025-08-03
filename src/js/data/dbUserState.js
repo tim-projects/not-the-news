@@ -24,16 +24,19 @@ export const USER_STATE_DEFS = {
  * Loads a simple key-value state from the specified store.
  * @param {string} key The key to look for in the store.
  * @param {string} storeName The object store to query (e.g., 'userSettings').
- * @returns {Promise<{value: any}>} The value associated with the key.
+ * @returns {Promise<{value: any, lastModified: string | null}>} The value and last modified date.
  */
 export async function loadSimpleState(key, storeName = 'userSettings') {
     return withDb(async (db) => {
         try {
             const value = await db.get(storeName, key);
-            return { value: value ? value.value : USER_STATE_DEFS[key]?.default || null };
+            return {
+                value: value ? value.value : USER_STATE_DEFS[key]?.default || null,
+                lastModified: value?.lastModified || null // Return lastModified for sync
+            };
         } catch (e) {
             console.error(`Failed to load simple state for key '${key}':`, e);
-            return { value: USER_STATE_DEFS[key]?.default || null };
+            return { value: USER_STATE_DEFS[key]?.default || null, lastModified: null };
         }
     });
 }
@@ -48,7 +51,7 @@ export async function loadSimpleState(key, storeName = 'userSettings') {
 export async function saveSimpleState(key, value, storeName = 'userSettings') {
     return withDb(async (db) => {
         try {
-            await db.put(storeName, { key, value });
+            await db.put(storeName, { key, value, lastModified: new Date().toISOString() }); // Add lastModified timestamp
         } catch (e) {
             console.error(`Failed to save simple state for key '${key}':`, e);
         }

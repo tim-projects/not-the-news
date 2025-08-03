@@ -188,7 +188,6 @@ export function rssApp() {
         // --- Getters ---
         get filteredEntries() {
             if (!Array.isArray(this.deck)) this.deck = [];
-            // The hash needs to include 'hidden' to ensure reactivity.
             const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
@@ -200,8 +199,6 @@ export function rssApp() {
 
             switch (this.filterMode) {
                 case "unread":
-                    // CRITICAL FIX: The unread filter must explicitly filter out hidden items.
-                    // This ensures the view updates immediately when an item is hidden.
                     filtered = this.deck.filter(item => !hiddenMap.has(item.id));
                     break;
                 case "all":
@@ -252,7 +249,10 @@ export function rssApp() {
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            await manageDailyDeck(this);
+            // CRITICAL FIX: Reload the entire data set and manage the deck after a state change.
+            // This ensures the app's state is fully refreshed from the database,
+            // reflecting the synced change immediately.
+            await this._loadAndManageAllData();
         },
         processShuffle: async function() {
             await processShuffle(this);
