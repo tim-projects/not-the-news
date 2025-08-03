@@ -41,19 +41,17 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     if (isCurrentlyActive) {
         newList = app[stateKey].filter(item => item.guid !== guid);
     } else {
-        // --- FIX: Use a computed key to match the stateKey (e.g., 'hiddenAt', 'starredAt') ---
+        // Correctly create an object with the dynamic key for the timestamp.
         newList = [...app[stateKey], {
             guid,
             [`${stateKey}At`]: timestamp
         }];
-        // --- END FIX ---
     }
     app[stateKey] = newList;
     
-    // --- FIX: Save only the GUID strings to the database to avoid DataCloneError ---
-    const guidsToSave = newList.map(item => item.guid);
-    await saveArrayState(stateKey, guidsToSave);
-    // --- END FIX ---
+    // The database schema for 'starred' and 'hidden' expects an array of objects
+    // with a 'guid' keyPath. Saving 'newList' directly is the correct approach.
+    await saveArrayState(stateKey, newList);
 
     if (stateKey === 'hidden') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
@@ -100,25 +98,13 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
  * @returns {Promise<Array<object>>} The updated list of hidden items.
  */
 export async function loadAndPruneHiddenItems(feedItems) {
-    // --- FIX: This function assumes that the database stores arrays of GUIDs and loads them as such.
-    // However, the rest of the application expects objects with timestamps.
-    // The previous `toggleItemStateAndSync` fix stored GUIDs, so we must now load them as GUIDs.
-    // We can then create the expected object structure with a null timestamp to maintain compatibility.
-    // The database is no longer saving the timestamps for these items.
-    const { value: hiddenGuids } = await loadArrayState('hidden');
-    const hiddenItemsWithTimestamps = Array.isArray(hiddenGuids) ? hiddenGuids.map(guid => ({
-        guid,
-        hiddenAt: null
-    })) : [];
+    const { value: hiddenItems } = await loadArrayState('hidden');
+    const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItems, Date.now());
 
-    const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItemsWithTimestamps, Date.now());
-
-    if (prunedHiddenItems.length !== hiddenItemsWithTimestamps.length) {
+    if (prunedHiddenItems.length !== hiddenItems.length) {
         try {
-            // Now, we must save only the GUIDs back to the database.
-            const guidsToSave = prunedHiddenItems.map(item => item.guid);
-            await saveArrayState('hidden', guidsToSave);
-            console.log(`Pruned hidden items: removed ${hiddenItemsWithTimestamps.length - prunedHiddenItems.length} stale items.`);
+            await saveArrayState('hidden', prunedHiddenItems);
+            console.log(`Pruned hidden items: removed ${hiddenItems.length - prunedHiddenItems.length} stale items.`);
         } catch (error) {
             console.error("Error pruning stale hidden items:", error);
         }
@@ -132,14 +118,10 @@ export async function loadAndPruneHiddenItems(feedItems) {
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck() {
-    // --- FIX: Remove the messy fallback logic.
-    // Now that the data is consistently saved as an array of strings, we can
-    // simply load it and filter out any invalid entries.
     const { value: storedGuids } = await loadArrayState('currentDeckGuids');
     const deckGuids = storedGuids?.filter(guid => typeof guid === 'string' && guid) || [];
     console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs.`);
     return deckGuids;
-    // --- END FIX ---
 }
 
 /**
@@ -155,10 +137,8 @@ export async function saveCurrentDeck(guids) {
     console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs:", guids.slice(0, 3));
 
     try {
-        // The saveArrayState function now expects an array of strings.
         await saveArrayState('currentDeckGuids', guids);
 
-        // Deep clone the array before sending to the database.
         const clonedGuids = JSON.parse(JSON.stringify(guids));
 
         await queueAndAttemptSyncOperation({
