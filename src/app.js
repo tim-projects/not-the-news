@@ -188,6 +188,7 @@ export function rssApp() {
         // --- Getters ---
         get filteredEntries() {
             if (!Array.isArray(this.deck)) this.deck = [];
+            // The hash needs to include 'hidden' to ensure reactivity.
             const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
@@ -199,7 +200,9 @@ export function rssApp() {
 
             switch (this.filterMode) {
                 case "unread":
-                    filtered = this.deck;
+                    // CRITICAL FIX: The unread filter must explicitly filter out hidden items.
+                    // This ensures the view updates immediately when an item is hidden.
+                    filtered = this.deck.filter(item => !hiddenMap.has(item.id));
                     break;
                 case "all":
                     filtered = this.entries;
