@@ -3,18 +3,17 @@
 
 <head>
     <script>
-        // This script should run synchronously to apply theme before content renders
-        let t = localStorage.getItem('theme');
+        // Use localStorage for instant theme application.
+        // Fall back to system preference if no theme is saved.
+        const storedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const themeToApply = storedTheme || (systemPrefersDark ? 'dark' : 'light');
 
-        // Separate the logic to avoid temporal dead zone issues
-        let themeClass;
-        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
-            themeClass = 'dark';
+        if (themeToApply === 'dark') {
+            document.documentElement.classList.add('dark');
         } else {
-            themeClass = 'light';
+            document.documentElement.classList.add('light');
         }
-
-        document.documentElement.classList.add(themeClass);
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

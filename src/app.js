@@ -91,7 +91,8 @@ export function rssApp() {
                 initConfigPanelListeners(this);
                 attachScrollToTopHandler();
                 await initScrollPosition(this);
-                this.updateCounts();
+                
+                // Moved updateCounts to _loadAndManageAllData where the data is actually loaded.
                 
                 this._setupWatchers();
                 this._setupEventListeners();
@@ -298,7 +299,16 @@ export function rssApp() {
 
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
+
+            // After all data is loaded and managed, update the UI once.
+            this.updateAllUI();
         },
+
+        // New method to consolidate all UI updates after data loading
+        updateAllUI() {
+            this.updateCounts();
+        },
+
         _setupWatchers() {
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {
@@ -329,9 +339,15 @@ export function rssApp() {
                 if (newMode === 'unread') {
                     await manageDailyDeck(this);
                 }
-                this.updateCounts();
+                // The new watcher on the data will handle the counts update
                 this.scrollToTop();
             });
+            
+            // New watchers to automatically update counts when data changes
+            this.$watch('entries', () => this.updateCounts());
+            this.$watch('hidden', () => this.updateCounts());
+            this.$watch('starred', () => this.updateCounts());
+            this.$watch('currentDeckGuids', () => this.updateCounts());
         },
 
         _setupEventListeners() {

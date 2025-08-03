@@ -114,18 +114,23 @@ export async function initImagesToggle(app) {
     await setupBooleanToggle(app, getImagesToggle, getImagesText, 'imagesEnabled');
 }
 
-export async function initTheme(app) {
+/**
+ * Initializes the theme toggle. The actual theme application happens in a
+ * script tag in the HTML head for instant loading. This function only
+ * manages the toggle state and saving the preference.
+ * @param {object} app The Alpine.js app state object.
+ */
+export function initTheme(app) {
     const htmlEl = document.documentElement;
     const toggle = getThemeToggle();
     const text = getThemeText();
 
     if (!toggle || !text) return;
 
-    const { value: storedTheme } = await loadSimpleState('theme');
+    // Use localStorage for instant, non-blocking access
+    const storedTheme = localStorage.getItem('theme');
     const isDark = storedTheme === 'dark';
 
-    htmlEl.classList.toggle('dark', isDark);
-    htmlEl.classList.toggle('light', !isDark);
     toggle.checked = isDark;
     text.textContent = isDark ? 'dark' : 'light';
 
@@ -133,7 +138,11 @@ export async function initTheme(app) {
         const newTheme = toggle.checked ? 'dark' : 'light';
         htmlEl.classList.toggle('dark', toggle.checked);
         htmlEl.classList.toggle('light', !toggle.checked);
+        
+        // Save to both localStorage for instant access and IndexedDB for sync
+        localStorage.setItem('theme', newTheme);
         await saveSimpleState('theme', newTheme);
+        
         text.textContent = newTheme;
     });
 }
