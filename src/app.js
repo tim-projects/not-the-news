@@ -75,10 +75,14 @@ export function rssApp() {
         // --- Core Methods ---
         async initApp() {
             try {
+                // Step 1: Initialize the database first and wait for it.
+                // This is the single most important step to prevent the NotFoundError.
                 this.db = await initDb();
+                
+                // Step 2: Now that the database is ready, safely load all data.
                 await this._loadInitialState();
-                await this._runInitialSync();
                 await this._loadAndManageAllData();
+                await this._runInitialSync();
 
                 initTheme(this);
                 initSyncToggle(this);
@@ -100,7 +104,6 @@ export function rssApp() {
                 this.loading = false;
             }
         },
-
         async loadAndDisplayDeck() {
             await this.loadFeedItemsFromDB();
 
