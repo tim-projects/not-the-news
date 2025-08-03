@@ -29,11 +29,23 @@ import {
     setFilterMode,
     loadFilterMode
 } from './js/helpers/userStateUtils.js';
-import { updateCounts, manageSettingsPanelVisibility, scrollToTop, attachScrollToTopHandler, saveCurrentScrollPosition, createStatusBarMessage } from './js/ui/uiUpdaters.js'
-import { initSyncToggle, initImagesToggle, initTheme, initScrollPosition, initConfigPanelListeners } from './js/ui/uiInitializers.js';
+import {
+    updateCounts,
+    manageSettingsPanelVisibility,
+    scrollToTop,
+    attachScrollToTopHandler,
+    saveCurrentScrollPosition,
+    createStatusBarMessage
+} from './js/ui/uiUpdaters.js'
+import {
+    initSyncToggle,
+    initImagesToggle,
+    initTheme,
+    initScrollPosition,
+    initConfigPanelListeners
+} from './js/ui/uiInitializers.js';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
 
-// The Alpine component function is now directly exported
 export function rssApp() {
     return {
         loading: true,
@@ -58,7 +70,6 @@ export function rssApp() {
         isOnline: isOnline(),
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
-        // New state variable to trigger a reactive update
         deckManaged: false,
 
         async loadAndDisplayDeck() {
@@ -86,7 +97,7 @@ export function rssApp() {
             const seenGuidsForDeck = new Set();
 
             for (const guid of guidsToDisplay) {
-                if (typeof guid !== 'string') {
+                if (typeof guid !== 'string' || !guid) {
                     console.warn(`Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck): ${JSON.stringify(guid)}. Skipping.`);
                     continue;
                 }
@@ -105,13 +116,11 @@ export function rssApp() {
                 }
             }
             
-            // This is the primary fix: ensure `items` is an array and only then sort it.
             this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
             console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
         },
 
         get filteredEntries() {
-            // A defensive check to ensure this.deck is always an array before use
             if (!Array.isArray(this.deck)) {
                 console.error("this.deck is not an array in filteredEntries getter. Resetting to empty array.");
                 this.deck = [];
@@ -176,10 +185,36 @@ export function rssApp() {
             return filtered;
         },
 
-        // This function will be called by x-init="initApp()" in the HTML
         async initApp() {
             try {
                 this.db = await initDb();
+
+                const loadAndManageData = async () => {
+                    await this.loadFeedItemsFromDB();
+                    const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
+                        loadArrayState('hidden'),
+                        loadArrayState('starred'),
+                        loadArrayState('shuffledOutGuids'),
+                        loadArrayState('currentDeckGuids')
+                    ]);
+
+                    this.hidden = hiddenState.value || [];
+                    this.starred = starredState.value || [];
+                    this.shuffledOutGuids = shuffledOutState.value || [];
+                    this.currentDeckGuids = currentDeckState.value || [];
+
+                    const isValidDeck = Array.isArray(this.currentDeckGuids) && this.currentDeckGuids.every(guid => typeof guid === 'string' && guid.length > 0);
+                    if (!isValidDeck) {
+                        console.warn("Invalid or empty deck GUIDs detected. Resetting the current deck to be regenerated.");
+                        this.currentDeckGuids = [];
+                        await saveCurrentDeck([]);
+                    }
+
+                    const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
+                    this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
+                    await manageDailyDeck(this);
+                    await this.loadAndDisplayDeck();
+                };
 
                 this.syncEnabled = (await loadSimpleState('syncEnabled')).value ?? true;
                 this.imagesEnabled = (await loadSimpleState('imagesEnabled')).value ?? true;
@@ -187,47 +222,13 @@ export function rssApp() {
                 this.filterMode = (await loadFilterMode());
                 this.isOnline = isOnline();
 
-                // This is the combined function to ensure data is loaded before deck management
-                const loadAndManageData = async () => {
-                    // 1. Load the main feed items from the database.
-                    await this.loadFeedItemsFromDB();
-
-                    // 2. Load hidden, starred, and other user settings from the database.
-                    // This is the key change: ensure these are awaited and assigned to the correct properties.
-                    const hiddenState = await loadArrayState('hidden');
-                    const starredState = await loadArrayState('starred');
-
-                    this.hidden = hiddenState.value || [];
-                    this.starred = starredState.value || [];
-    
-                    // We can't use this.hidden in this log because it will be updated right after
-                    // so we will create a new variable
-                    const hiddenLengthForLog = this.hidden.length
-                    const starredLengthForLog = this.starred.length
-
-                    console.log(`DEBUG: After loading from DB, app.hidden has ${hiddenLengthForLog} items and app.starred has ${starredLengthForLog} items.`);
-
-                    // 3. Get the last feed sync time to use for pruning old hidden items.
-                    const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-
-                    // 4. Prune stale hidden items to keep the list from growing indefinitely.
-                    // The prune function should receive the current app entries and the hidden array.
-                    this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
-
-                    // 5. Call the main deck management function.
-                    await manageDailyDeck(this);
-                };
                 if (this.syncEnabled && this.isOnline) {
                     try {
-                        console.log("Attempting early pull of user state (including current deck) from server...");
+                        console.log("Attempting early pull of user state from server...");
                         await pullUserState();
                         console.log("Early user state pull completed.");
-                        await loadAndManageData();
                     } catch (error) {
                         console.warn("Early pullUserState failed, proceeding with local state. Error:", error);
-                        if (error instanceof SyntaxError && error.message.includes('Unexpected end of JSON input')) {
-                            console.error("Failed to parse user state JSON. The server likely sent incomplete or malformed data.");
-                        }
                     }
                 }
 
@@ -238,13 +239,15 @@ export function rssApp() {
                     createStatusBarMessage("Initial sync complete!", "success");
                 }
                 
-                // Ensure data is loaded and deck is managed after any potential full sync
                 await loadAndManageData();
 
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
                 initConfigPanelListeners(this);
+                
+                attachScrollToTopHandler();
+                await initScrollPosition(this);
 
                 this.$watch("openSettings", async (isOpen) => {
                     if (isOpen) {
@@ -269,28 +272,21 @@ export function rssApp() {
                 this.$watch("modalView", async () => {
                     await manageSettingsPanelVisibility(this);
                 });
-                // Corrected $watch listener for filterMode
                 this.$watch('filterMode', async (newMode) => {
-                    // This call now passes the `this` object, which represents the app state
                     await setFilterMode(this, newMode);
                     console.log(`Filter mode changed to: ${newMode}`);
-
                     if (newMode === 'unread') {
                         console.log('Filter set to unread. Managing daily deck to populate this.deck.');
                         await manageDailyDeck(this);
                     }
-
                     this.updateCounts(this);
                     this.scrollToTop();
                 });
 
                 this.updateCounts(this);
-                await initScrollPosition(this);
-
                 this.loading = false;
 
                 if (this.syncEnabled && this.isOnline) {
-                    // Capture the 'this' context in a variable to avoid timing issues in the async callback.
                     const app = this;
                     setTimeout(async () => {
                         try {
@@ -298,15 +294,12 @@ export function rssApp() {
                             await performFeedSync(app);
                             await pullUserState();
                             await loadAndManageData();
-                            // Set the flag to trigger the reactive update in the $watch listener
                             app.deckManaged = true;
                         } catch (error) {
                             console.error('Background partial sync failed', error);
                         }
                     }, 0);
                 }
-
-                attachScrollToTopHandler();
 
                 window.addEventListener('online', async () => {
                     this.isOnline = true;
@@ -316,7 +309,6 @@ export function rssApp() {
                         await performFeedSync(this);
                         await pullUserState();
                         await loadAndManageData();
-                        // Trigger the reactive update after all data is loaded
                         this.deckManaged = true;
                         console.log("Online resync completed.");
                     }
@@ -345,7 +337,6 @@ export function rssApp() {
                         await performFeedSync(this);
                         await pullUserState();
                         await loadAndManageData();
-                        // Trigger the reactive update after all data is loaded
                         this.deckManaged = true;
                         console.log("Periodic background sync completed.");
                     } catch (error) {
@@ -359,13 +350,13 @@ export function rssApp() {
                 this.loading = false;
             }
         },
+
         initScrollObserver() {
             const observer = new IntersectionObserver(async (entries) => {
                 for (const entry of entries) {
                     if (entry.isIntersecting) {
                         const guid = entry.target.dataset.guid;
-                        if (guid) {
-                        }
+                        if (guid) {}
                     }
                 }
             }, {
@@ -375,6 +366,10 @@ export function rssApp() {
             });
 
             const feedContainer = document.querySelector('#feed-container');
+            if (!feedContainer) {
+                console.warn("Feed container (#feed-container) not found. Skipping scroll observer initialization.");
+                return;
+            }
 
             const observeElements = () => {
                 feedContainer.querySelectorAll('[data-guid]').forEach(item => {
@@ -397,9 +392,7 @@ export function rssApp() {
 
         handleEntryLinks(element) {
             if (!element) return;
-
             const links = element.querySelectorAll('a');
-
             links.forEach(link => {
                 if (link.hostname !== window.location.hostname) {
                     if (this.openUrlsInNewTabEnabled) {
@@ -420,7 +413,6 @@ export function rssApp() {
                 return;
             }
             const rawItemsFromDb = await getAllFeedItems();
-
             this.feedItems = {};
             const uniqueEntries = [];
             const seenGuids = new Set();
@@ -451,23 +443,28 @@ export function rssApp() {
         isStarred(guid) {
             return this.starred.some(e => e.guid === guid);
         },
+
         isHidden(guid) {
             return this.hidden.some(e => e.guid === guid);
         },
+
         async toggleStar(guid) {
             await toggleStar(this, guid);
             this.updateCounts(this);
         },
+
         async toggleHidden(guid) {
             console.log("toggleHidden called with guid:", guid);
             await toggleHidden(this, guid);
             await manageDailyDeck(this);
             this.updateCounts(this);
         },
+
         async processShuffle() {
             await processShuffle(this);
             this.updateCounts(this);
         },
+
         async saveRssFeeds() {
             await saveSimpleState('rssFeeds', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
@@ -483,6 +480,6 @@ export function rssApp() {
             await saveSimpleState('keywordBlacklist', keywordsArray);
             createStatusBarMessage('Keyword Blacklist saved!', 'success');
             this.updateCounts(this);
-        }
+        },
     };
 }
