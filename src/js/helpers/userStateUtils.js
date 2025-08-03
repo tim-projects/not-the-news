@@ -7,131 +7,63 @@ import {
     saveSimpleState,
     addPendingOperation,
     processPendingOperations,
-    isOnline,
     loadArrayState,
-    saveArrayState,
-    getDb
-} from '../data/database.js';
+    saveArrayState
+} from '../data/database.js'; // These are now assumed to be re-exported from database.js
 
+import { getDb } from '../data/dbCore.js'; // getDb is now exported from dbCore.js
+import { isOnline } from '../utils/connectivity.js'; // <-- Corrected import path
 import { createStatusBarMessage } from '../ui/uiUpdaters.js';
 
 /**
- * Gets a single user setting from the userSettings store.
- * @param {string} key The key of the setting to get.
- * @returns {Promise<any>} The value of the setting.
+ * Toggles an item's state (e.g., starred or hidden) and syncs it with the server.
+ * This function consolidates the logic from `toggleStar` and `toggleHidden`.
+ * @param {object} app The Alpine.js app state object.
+ * @param {string} guid The unique identifier of the feed item.
+ * @param {string} stateKey The key for the state to toggle ('starred' or 'hidden').
  */
-export async function getUserSetting(key) {
-    const db = await getDb();
-    const tx = db.transaction('userSettings', 'readonly');
-    const store = tx.objectStore('userSettings');
-    const value = await store.get(key);
-    await tx.done;
-    return value;
-}
+export async function toggleItemStateAndSync(app, guid, stateKey) {
+    const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
+    const action = isCurrentlyActive ? 'remove' : 'add';
+    const timestamp = new Date().toISOString();
 
-/**
- * Sets a single user setting in the userSettings store.
- * @param {string} key The key of the setting to set.
- * @param {any} value The value to set for the key.
- * @returns {Promise<void>}
- */
-export async function setUserSetting(key, value) {
-    const db = await getDb();
-    const tx = db.transaction('userSettings', 'readwrite');
-    const store = tx.objectStore('userSettings');
-    await store.put(value, key);
-    await tx.done;
-}
-
-/**
- * Toggles the starred status of an item and manages synchronization.
- * @param {object} app - The main application state object (e.g., Vue instance).
- * @param {string} guid - The unique identifier of the item (this is an RSS item GUID).
- */
-export async function toggleStar(app, guid) {
-    const db = await getDb();
-    const tx = db.transaction('starredItems', 'readwrite');
-    const store = tx.objectStore('starredItems');
-
-    const starredAt = new Date().toISOString();
-    let action;
-    let newStarredList = [...app.starred];
-
-    try {
-        const existingIndex = newStarredList.findIndex(item => item.guid === guid);
-
-        if (existingIndex > -1) {
-            newStarredList.splice(existingIndex, 1);
-            await store.delete(guid);
-            action = "remove";
-        } else {
-            const newItem = { guid, starredAt };
-            newStarredList.push(newItem);
-            await store.put(newItem);
-            action = "add";
+    const opType = `${stateKey}Delta`;
+    const pendingOp = {
+        type: opType,
+        data: {
+            itemGuid: guid,
+            action,
+            timestamp
         }
+    };
 
-        await tx.done;
-
-        app.starred = newStarredList;
-        if (typeof app.updateCounts === 'function') app.updateCounts();
-
-        const deltaObject = { itemGuid: guid, action, starredAt };
-        await addPendingOperation({ type: 'starDelta', data: deltaObject });
-
-        if (isOnline()) {
-            try {
-                await processPendingOperations();
-            } catch (syncErr) {
-                console.error("Failed to immediately sync star change, operation remains buffered:", syncErr);
-            }
-        }
-    } catch (error) {
-        console.error("Error in toggleStar:", error);
+    // Update local state and DB for immediate UI feedback.
+    let newList;
+    if (isCurrentlyActive) {
+        newList = app[stateKey].filter(item => item.guid !== guid);
+    } else {
+        newList = [...app[stateKey], {
+            guid,
+            timestamp
+        }];
     }
-}
+    app[stateKey] = newList;
+    await saveArrayState(stateKey, newList);
 
-/**
- * Toggles the hidden status of an item and manages synchronization.
- * @param {object} app - The main application state object.
- * @param {string} guid - The unique identifier of the item (this is an RSS item GUID).
- */
-export async function toggleHidden(app, guid) {
-    const db = await getDb();
-    const tx = db.transaction('hiddenItems', 'readwrite');
-    const store = tx.objectStore('hiddenItems');
-    let action;
-    
-    const existingIndex = app.hidden.findIndex(item => item.guid === guid);
-    let newHiddenList = [...app.hidden];
+    if (stateKey === 'hidden') {
+        createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
+    }
 
-    try {
-        if (existingIndex > -1) {
-            newHiddenList.splice(existingIndex, 1);
-            await store.delete(guid);
-            action = 'remove';
-            createStatusBarMessage('Item unhidden.', 'info');
-        } else {
-            const hiddenAt = new Date().toISOString();
-            const newItem = { guid, hiddenAt };
-            newHiddenList.push(newItem);
-            await store.put(newItem);
-            action = 'add';
-            createStatusBarMessage('Item hidden.', 'info');
-        }
+    if (typeof app.updateCounts === 'function') app.updateCounts();
 
-        await tx.done; // Ensure transaction completes
-
-        app.hidden = newHiddenList;
-        await addPendingOperation({ type: 'hiddenDelta', data: { action, itemGuid: guid } });
-
-        if (isOnline()) {
+    // Queue and attempt to sync the change.
+    await addPendingOperation(pendingOp);
+    if (isOnline()) {
+        try {
             await processPendingOperations();
+        } catch (syncErr) {
+            console.error(`Failed to immediately sync ${stateKey} change, operation remains buffered:`, syncErr);
         }
-        
-        app.updateCounts();
-    } catch (error) {
-        console.error("Error in toggleHidden:", error);
     }
 }
 
@@ -158,21 +90,15 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
         return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
     });
 
-    // If the list of items to keep is different, save the new list to the database
     if (itemsToKeep.length !== hiddenItems.length) {
         try {
-            const db = await getDb();
-            const tx = db.transaction('hiddenItems', 'readwrite');
-            const store = tx.objectStore('hiddenItems');
-            await store.clear();
-            await Promise.all(itemsToKeep.map(item => store.put(item)));
-            await tx.done;
+            await saveArrayState('hidden', itemsToKeep);
             console.log(`Pruned hidden items: removed ${hiddenItems.length - itemsToKeep.length} stale items.`);
         } catch (error) {
             console.error("Error pruning stale hidden items:", error);
         }
     }
-    
+
     return itemsToKeep;
 }
 
@@ -181,11 +107,9 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck() {
-    const { value: storedItems } = await loadSimpleState('currentDeckGuids');
-    
-    // Ensure the stored value is an array of strings.
-    const deckGuids = Array.isArray(storedItems) ? storedItems.filter(guid => typeof guid === 'string') : [];
-    
+    // FIX: Changed to loadArrayState to match the corrected database schema.
+    const { value: storedItems } = await loadArrayState('currentDeckGuids');
+    const deckGuids = storedItems?.map(item => item.guid).filter(Boolean) || [];
     console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs.`);
     return deckGuids;
 }
@@ -193,7 +117,6 @@ export async function loadCurrentDeck() {
 /**
  * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store
  * and queues a corresponding sync operation.
- *
  * @param {string[]} guids An array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
@@ -201,18 +124,21 @@ export async function saveCurrentDeck(guids) {
         console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs, got:", typeof guids, guids);
         return;
     }
-    
     console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs.");
-    
+
     try {
-        await saveSimpleState('currentDeckGuids', guids);
-        
+        const guidsAsObjects = guids.map(guid => ({
+            guid
+        }));
+        // FIX: Changed to saveArrayState to match the corrected database schema.
+        await saveArrayState('currentDeckGuids', guidsAsObjects);
+
         await addPendingOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
             value: guids
         });
-        
+
         if (isOnline()) {
             await processPendingOperations();
         }
@@ -227,9 +153,13 @@ export async function saveCurrentDeck(guids) {
  * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: string}>} The shuffle state.
  */
 export async function loadShuffleState() {
-    const { value: shuffleCount } = await loadSimpleState('shuffleCount');
-    const { value: lastShuffleResetDate } = await loadSimpleState('lastShuffleResetDate');
-    
+    const {
+        value: shuffleCount
+    } = await loadSimpleState('shuffleCount');
+    const {
+        value: lastShuffleResetDate
+    } = await loadSimpleState('lastShuffleResetDate');
+
     return {
         shuffleCount: typeof shuffleCount === 'number' ? shuffleCount : 2,
         lastShuffleResetDate: lastShuffleResetDate || new Date().toDateString(),
@@ -238,8 +168,8 @@ export async function loadShuffleState() {
 
 /**
  * Saves the shuffle state, including shuffle count, last reset date.
- * @param {number} count - The current shuffle count.
- * @param {string} resetDate - The date of the last shuffle reset (as a string).
+ * @param {number} count The current shuffle count.
+ * @param {string} resetDate The date of the last shuffle reset (as a string).
  */
 export async function saveShuffleState(count, resetDate) {
     await saveSimpleState('shuffleCount', count);
@@ -267,8 +197,8 @@ export async function saveShuffleState(count, resetDate) {
 
 /**
  * Sets the current filter mode for the application.
- * @param {object} app - The main application state object.
- * @param {string} mode - The filter mode to set (e.g., 'unread', 'starred').
+ * @param {object} app The main application state object.
+ * @param {string} mode The filter mode to set (e.g., 'unread', 'starred').
  */
 export async function setFilterMode(app, mode) {
     app.filterMode = mode;
@@ -299,3 +229,7 @@ export async function loadFilterMode() {
     } = await loadSimpleState('filterMode');
     return mode || 'unread';
 }
+
+// NOTE: The original getUserSetting and setUserSetting functions have been removed
+// as their functionality is already provided by the more generic loadSimpleState
+// and saveSimpleState functions, which are used throughout the application.
