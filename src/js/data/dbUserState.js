@@ -1,6 +1,8 @@
 // @filepath: src/js/data/dbUserState.js
 
-// Refactored JS: concise, modern, functional, same output.
+// This module provides a simple API for saving and loading user-specific
+// state and settings from IndexedDB. It also integrates with the
+// synchronization logic.
 
 import { getDb } from './dbCore.js';
 import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
@@ -21,8 +23,8 @@ export const USER_STATE_DEFS = {
     shuffleCount: { store: 'userSettings', type: 'simple', default: 2 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', default: null },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', default: true },
-    lastViewedItemId: { store: 'userSettings', type: 'simple', default: null },
-    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0 },
+    lastViewedItemId: { store: 'userSettings', type: 'simple', default: null, localOnly: true },
+    lastViewedItemOffset: { store: 'userSettings', type: 'simple', default: 0, localOnly: true },
     lastStateSync: { store: 'userSettings', type: 'simple', default: null },
     theme: { store: 'userSettings', type: 'simple', default: 'light' },
     lastFeedSync: { store: 'userSettings', type: 'simple', default: null },
@@ -79,9 +81,13 @@ export async function saveSimpleState(key, value, serverTimestamp = null, tx = n
     try {
         await store.put(objToSave);
         console.log(`[DB] Saved "${key}" to userSettings.`);
-        if (!tx) { // Only queue if this function created the transaction
+        
+        // If this function created the transaction, wait for it to finish and then queue the sync.
+        if (!tx) {
             await transaction.done;
-            await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key, value });
+            if (!def.localOnly) {
+                await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key, value });
+            }
         }
     } catch (e) {
         console.error(`[DB] Error saving simple state "${key}":`, e);
@@ -163,11 +169,13 @@ export async function saveArrayState(key, arr, serverTimestamp = null, tx = null
 
         if (!tx) {
             await transaction.done;
-            await queueAndAttemptSyncOperation({
-                type: 'simpleUpdate',
-                key,
-                value: cleanedArr.map(item => item.guid)
-            });
+            if (!def.localOnly) {
+                await queueAndAttemptSyncOperation({
+                    type: 'simpleUpdate',
+                    key,
+                    value: cleanedArr.map(item => item.guid)
+                });
+            }
         }
     } catch (e) {
         console.error(`[DB] Error saving array state "${key}":`, e);
