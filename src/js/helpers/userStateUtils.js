@@ -8,7 +8,7 @@ import {
     saveSimpleState,
     loadArrayState,
     saveArrayState,
-    queueAndAttemptSyncOperation // <-- This is the new, correct function name
+    queueAndAttemptSyncOperation
 } from '../data/database.js';
 
 import { isOnline } from '../utils/connectivity.js';
@@ -123,10 +123,14 @@ export async function saveCurrentDeck(guids) {
         }));
         await saveArrayState('currentDeckGuids', guidsAsObjects);
 
+        // FIX: Deep clone the array before sending to the database.
+        // This prevents a DataCloneError if the array is an Alpine.js proxy.
+        const clonedGuids = JSON.parse(JSON.stringify(guids));
+
         await queueAndAttemptSyncOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
-            value: guids
+            value: clonedGuids
         });
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred:", e);
