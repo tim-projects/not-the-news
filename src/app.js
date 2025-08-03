@@ -191,6 +191,7 @@ export function rssApp() {
 
                 const loadAndManageData = async () => {
                     await this.loadFeedItemsFromDB();
+                    
                     const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
                         loadArrayState('hidden'),
                         loadArrayState('starred'),
@@ -198,16 +199,21 @@ export function rssApp() {
                         loadArrayState('currentDeckGuids')
                     ]);
 
-                    this.hidden = hiddenState.value || [];
-                    this.starred = starredState.value || [];
-                    this.shuffledOutGuids = shuffledOutState.value || [];
-                    this.currentDeckGuids = currentDeckState.value || [];
+                    this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
+                    this.starred = Array.isArray(starredState.value) ? starredState.value : [];
+                    this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
+                    this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
 
                     const isValidDeck = Array.isArray(this.currentDeckGuids) && this.currentDeckGuids.every(guid => typeof guid === 'string' && guid.length > 0);
                     if (!isValidDeck) {
                         console.warn("Invalid or empty deck GUIDs detected. Resetting the current deck to be regenerated.");
                         this.currentDeckGuids = [];
                         await saveCurrentDeck([]);
+                    }
+                    
+                    if (!Array.isArray(this.entries)) {
+                         console.error("this.entries is not an array. Resetting to an empty array to prevent further errors.");
+                         this.entries = [];
                     }
 
                     const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
@@ -429,11 +435,17 @@ export function rssApp() {
                 }
             });
 
-            this.entries = mapRawItems(uniqueEntries, formatDate);
+            // Ensure entries is always a valid array before assigning
+            this.entries = mapRawItems(uniqueEntries, formatDate) || [];
         },
 
         updateCounts(app) {
-            updateCounts(app);
+            // A defensive check to prevent the "Attempted to update counts with an invalid app object" error.
+            if (app && typeof app.updateCounts === 'function') {
+                updateCounts(app);
+            } else {
+                console.error("Invalid app object provided to updateCounts. Skipping update.");
+            }
         },
 
         scrollToTop() {
