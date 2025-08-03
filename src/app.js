@@ -271,20 +271,26 @@ export function rssApp() {
             if (!this.syncEnabled) return;
             try {
                 // First, pull all user state to get the latest deck GUIDs.
+                console.log("[DB] Pulling user state (initial sync)...");
                 await pullUserState();
                 // Then, sync the feed to ensure we have all feed items locally.
+                console.log("[DB] Fetching feed items from server (initial sync)...");
                 await performFullSync(this);
+                // CRITICAL: Reload app state with newly synced items.
+                console.log("[DB] Reloading feed items into app state...");
+                await this.loadFeedItemsFromDB();
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
                 console.error("Initial sync failed:", error);
                 this.errorMessage = `Initial sync failed: ${error.message}`;
+                // Avoid creating a status bar message if the container doesn't exist
+                if (document.querySelector('.status-bar-container')) {
+                    createStatusBarMessage(`Initial sync failed: ${error.message}`, "error");
+                }
             }
         },
 
         async _loadAndManageAllData() {
-            // Load feed items first, now that a full sync has been performed.
-            await this.loadFeedItemsFromDB();
-            
             // Replaced the manual loading and pruning of hidden items
             // with the new, single, robust function.
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
@@ -307,6 +313,7 @@ export function rssApp() {
             // This function contains the logic to check if the last shuffle
             // was over a day ago, generate a new deck if needed, and
             // save the new deck GUIDs to the server.
+            console.log("[deckManager] Starting deck management with all data loaded.");
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
 
