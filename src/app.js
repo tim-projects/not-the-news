@@ -1,7 +1,6 @@
 // @filepath: src/app.js
 
-// @refactor-directive
-// Refactor JS: concise, modern, functional, same output.
+// Refactored JS: concise, modern, functional, same output.
 
 import {
     getDb,
@@ -20,7 +19,7 @@ import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.js';
 import {
     loadCurrentDeck,
     saveCurrentDeck,
-    toggleItemStateAndSync, // <-- New, consolidated function
+    toggleItemStateAndSync,
     pruneStaleHidden,
     saveShuffleState,
     loadShuffleState,
@@ -43,14 +42,14 @@ import {
     initConfigPanelListeners
 } from './js/ui/uiInitializers.js';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
-import { isOnline } from './js/utils/connectivity.js'; // <-- Corrected import
+import { isOnline } from './js/utils/connectivity.js';
 
 export function rssApp() {
     return {
+        // --- State Properties ---
         loading: true,
         deck: [],
         feedItems: {},
-        scrollObserver: null,
         filterMode: 'unread',
         openSettings: false,
         modalView: 'main',
@@ -67,27 +66,47 @@ export function rssApp() {
         shuffledOutGuids: [],
         errorMessage: '',
         isOnline: isOnline(),
-        _lastFilterHash: '',
-        _cachedFilteredEntries: null,
         deckManaged: false,
 
-        async loadAndDisplayDeck() {
-            console.log("Loading current deck and populating display (app.js:loadAndDisplayDeck)...");
-            if (this.filterMode !== 'unread') {
-                console.log(`loadAndDisplayDeck called, but current filterMode is '${this.filterMode}'. 'this.deck' will still be updated, but 'filteredEntries' will use 'this.entries' directly.`);
+        _lastFilterHash: '',
+        _cachedFilteredEntries: null,
+        scrollObserver: null,
+
+        // --- Core Methods ---
+        async initApp() {
+            try {
+                this.db = await initDb();
+                await this._loadInitialState();
+                await this._runInitialSync();
+                await this._loadAndManageAllData();
+
+                initTheme(this);
+                initSyncToggle(this);
+                initImagesToggle(this);
+                initConfigPanelListeners(this);
+                attachScrollToTopHandler();
+                await initScrollPosition(this);
+                this.updateCounts();
+                
+                this._setupWatchers();
+                this._setupEventListeners();
+                this._startPeriodicSync();
+                this._initScrollObserver();
+
+                this.loading = false;
+            } catch (error) {
+                console.error("Initialization failed:", error);
+                this.errorMessage = `Could not load feed: ${error.message}`;
+                this.loading = false;
             }
+        },
+
+        async loadAndDisplayDeck() {
             await this.loadFeedItemsFromDB();
 
             let guidsToDisplay = this.currentDeckGuids;
             if (!Array.isArray(guidsToDisplay)) {
-                console.warn("currentDeckGuids is not a valid array, defaulting to an empty array.");
                 guidsToDisplay = [];
-            }
-
-            console.log("DEBUG app.js: loadAndDisplayDeck - type of guidsToDisplay:", typeof guidsToDisplay, "Array.isArray:", Array.isArray(guidsToDisplay));
-            if (Array.isArray(guidsToDisplay)) {
-                console.log("DEBUG app.js: loadAndDisplayDeck - first 5 GUIDs:", guidsToDisplay.slice(0, 5));
-                console.log("DEBUG app.js: loadAndDisplayDeck - type of first GUID (if any):", guidsToDisplay.length > 0 ? typeof guidsToDisplay[0] : 'N/A');
             }
 
             const items = [];
@@ -96,11 +115,7 @@ export function rssApp() {
             const seenGuidsForDeck = new Set();
 
             for (const guid of guidsToDisplay) {
-                if (typeof guid !== 'string' || !guid) {
-                    console.warn(`Invalid GUID encountered in guidsToDisplay (loadAndDisplayDeck): ${JSON.stringify(guid)}. Skipping.`);
-                    continue;
-                }
-
+                if (typeof guid !== 'string' || !guid) continue;
                 const item = this.feedItems[guid];
                 if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
                     const mappedItem = mapRawItem(item, formatDate);
@@ -108,25 +123,38 @@ export function rssApp() {
                     mappedItem.isStarred = starredSet.has(mappedItem.id);
                     items.push(mappedItem);
                     seenGuidsForDeck.add(mappedItem.id);
-                } else if (item && item.guid && seenGuidsForDeck.has(item.guid)) {
-                    console.warn(`Duplicate item (GUID: ${item.guid}) already added to deck. Skipping.`);
-                } else {
-                    console.warn(`Feed item with GUID ${guid} not found in feedItems cache or has invalid GUID. Skipping.`);
                 }
             }
 
             this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
-            console.log(`Populated deck with ${this.deck.length} items from app.js:loadAndDisplayDeck.`);
         },
 
-        get filteredEntries() {
-            if (!Array.isArray(this.deck)) {
-                console.error("this.deck is not an array in filteredEntries getter. Resetting to empty array.");
-                this.deck = [];
+        async loadFeedItemsFromDB() {
+            if (!this.db) {
+                this.entries = [];
+                this.feedItems = {};
+                return;
             }
+            const rawItemsFromDb = await getAllFeedItems();
+            this.feedItems = {};
+            const uniqueEntries = [];
+            const seenGuids = new Set();
 
+            rawItemsFromDb.forEach(item => {
+                if (item && item.guid && !seenGuids.has(item.guid)) {
+                    this.feedItems[item.guid] = item;
+                    uniqueEntries.push(item);
+                    seenGuids.add(item.guid);
+                }
+            });
+
+            this.entries = mapRawItems(uniqueEntries, formatDate) || [];
+        },
+        
+        // --- Getters ---
+        get filteredEntries() {
+            if (!Array.isArray(this.deck)) this.deck = [];
             const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.keywordBlacklistInput}-${this.deck.length}`;
-
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }
@@ -140,257 +168,232 @@ export function rssApp() {
                     filtered = this.deck;
                     break;
                 case "all":
-                    filtered = this.entries.map(e => ({
-                        ...e,
-                        isHidden: hiddenMap.has(e.id),
-                        isStarred: starredMap.has(e.id)
-                    }));
+                    filtered = this.entries;
                     break;
                 case "hidden":
                     filtered = this.entries.filter(e => hiddenMap.has(e.id))
-                        .map(e => ({
-                            ...e,
-                            isHidden: true,
-                            isStarred: starredMap.has(e.id)
-                        }))
                         .sort((a, b) => new Date(hiddenMap.get(b.id)).getTime() - new Date(hiddenMap.get(a.id)).getTime());
                     break;
                 case "starred":
                     filtered = this.entries.filter(e => starredMap.has(e.id))
-                        .map(e => ({
-                            ...e,
-                            isHidden: hiddenMap.has(e.id),
-                            isStarred: true
-                        }))
                         .sort((a, b) => new Date(starredMap.get(b.id)).getTime() - new Date(starredMap.get(a.id)).getTime());
                     break;
-                default:
-                    console.warn(`Unknown filterMode: ${this.filterMode}. Defaulting to 'unread'.`);
-                    filtered = this.deck;
-                    break;
             }
 
-            const keywordBlacklist = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
+            filtered = filtered.map(e => ({
+                ...e,
+                isHidden: hiddenMap.has(e.id),
+                isStarred: starredMap.has(e.id)
+            }));
+
+            const keywordBlacklist = (this.keywordBlacklistInput ?? '')
+                .split(/\r?\n/)
+                .map(kw => kw.trim().toLowerCase())
+                .filter(kw => kw.length > 0);
+            
             if (keywordBlacklist.length > 0) {
                 filtered = filtered.filter(item => {
-                    const title = item.title ? item.title.toLowerCase() : '';
-                    const description = item.description ? item.description.toLowerCase() : '';
-                    return !keywordBlacklist.some(keyword => title.includes(keyword) || description.includes(keyword));
+                    const searchable = `${item.title} ${item.description}`.toLowerCase();
+                    return !keywordBlacklist.some(keyword => searchable.includes(keyword));
                 });
             }
-
+            
             this._cachedFilteredEntries = filtered;
             this._lastFilterHash = currentHash;
             return filtered;
         },
 
-        async initApp() {
-            try {
-                this.db = await initDb();
+        // --- Action Methods ---
+        isStarred(guid) {
+            return this.starred.some(e => e.guid === guid);
+        },
+        isHidden(guid) {
+            return this.hidden.some(e => e.guid === guid);
+        },
+        async toggleStar(guid) {
+            await toggleItemStateAndSync(this, guid, 'starred');
+        },
+        async toggleHidden(guid) {
+            await toggleItemStateAndSync(this, guid, 'hidden');
+            await manageDailyDeck(this);
+        },
+        async processShuffle() {
+            await processShuffle(this);
+            this.updateCounts();
+        },
+        async saveRssFeeds() {
+            await saveSimpleState('rssFeeds', this.rssFeedsInput);
+            createStatusBarMessage('RSS Feeds saved!', 'success');
+            this.loading = true;
+            await performFullSync(this);
+            await this.loadFeedItemsFromDB();
+            await manageDailyDeck(this);
+            this.loading = false;
+        },
+        async saveKeywordBlacklist() {
+            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
+            await saveSimpleState('keywordBlacklist', keywordsArray);
+            createStatusBarMessage('Keyword Blacklist saved!', 'success');
+            this.updateCounts();
+        },
+        updateCounts() {
+            updateCounts(this);
+        },
+        scrollToTop() {
+            scrollToTop();
+        },
 
-                const loadAndManageData = async () => {
-                    this.entries = [];
-                    this.hidden = [];
-                    this.starred = [];
-                    this.shuffledOutGuids = [];
-                    this.currentDeckGuids = [];
+        // --- Private Helper Methods ---
+        async _loadInitialState() {
+            const [syncEnabled, imagesEnabled, urlsNewTab, filterMode] = await Promise.all([
+                loadSimpleState('syncEnabled'),
+                loadSimpleState('imagesEnabled'),
+                loadSimpleState('openUrlsInNewTabEnabled'),
+                loadFilterMode(),
+            ]);
+            this.syncEnabled = syncEnabled.value ?? true;
+            this.imagesEnabled = imagesEnabled.value ?? true;
+            this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
+            this.filterMode = filterMode;
+            this.isOnline = isOnline();
+        },
 
-                    await this.loadFeedItemsFromDB();
-
-                    const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
-                        loadArrayState('hidden'),
-                        loadArrayState('starred'),
-                        loadArrayState('shuffledOutGuids'),
-                        loadArrayState('currentDeckGuids')
-                    ]);
-
-                    this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
-                    this.starred = Array.isArray(starredState.value) ? starredState.value : [];
-                    this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
-                    this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
-
-                    const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
-                    this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
-                    await manageDailyDeck(this);
-                    await this.loadAndDisplayDeck();
-                };
-
-                this.syncEnabled = (await loadSimpleState('syncEnabled')).value ?? true;
-                this.imagesEnabled = (await loadSimpleState('imagesEnabled')).value ?? true;
-                this.openUrlsInNewTabEnabled = (await loadSimpleState('openUrlsInNewTabEnabled')).value ?? true;
-                this.filterMode = (await loadFilterMode());
-                this.isOnline = isOnline();
-
-                if (this.syncEnabled && this.isOnline) {
-                    try {
-                        console.log("Attempting early pull of user state from server...");
-                        await pullUserState();
-                        console.log("Early user state pull completed.");
-                    } catch (error) {
-                        console.warn("Early pullUserState failed, proceeding with local state. Error:", error);
-                    }
+        async _runInitialSync() {
+            if (this.syncEnabled && this.isOnline) {
+                try {
+                    await pullUserState();
+                } catch (error) {
+                    console.warn("Early pullUserState failed, proceeding with local state. Error:", error);
                 }
-
-                const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
-                if (itemsCount === 0 && this.isOnline) {
-                    createStatusBarMessage("No feed items found locally. Performing initial sync...", "info");
-                    await performFullSync(this);
-                    createStatusBarMessage("Initial sync complete!", "success");
-                }
-
-                await loadAndManageData();
-
-                initTheme(this);
-                initSyncToggle(this);
-                initImagesToggle(this);
-                initConfigPanelListeners(this);
-
-                attachScrollToTopHandler();
-                await initScrollPosition(this);
-
-                this.$watch("openSettings", async (isOpen) => {
-                    if (isOpen) {
-                        this.modalView = 'main';
-                        await manageSettingsPanelVisibility(this);
-                        this.rssFeedsInput = (await loadSimpleState('rssFeeds')).value || '';
-                        let storedKeywords = (await loadSimpleState('keywordBlacklist')).value;
-                        if (Array.isArray(storedKeywords)) {
-                            this.keywordBlacklistInput = storedKeywords.filter(Boolean).sort().join("\n");
-                        } else if (typeof storedKeywords === 'string') {
-                            this.keywordBlacklistInput = storedKeywords.split(/\r?\n/).filter(Boolean).sort().join("\n");
-                        } else {
-                            this.keywordBlacklistInput = '';
-                        }
-                    } else {
-                        await saveCurrentScrollPosition();
-                    }
-                });
-                this.$watch('openUrlsInNewTabEnabled', () => {
-                    document.querySelectorAll('.itemdescription').forEach(el => this.handleEntryLinks(el));
-                });
-                this.$watch("modalView", async () => {
-                    await manageSettingsPanelVisibility(this);
-                });
-                this.$watch('filterMode', async (newMode) => {
-                    await setFilterMode(this, newMode);
-                    console.log(`Filter mode changed to: ${newMode}`);
-                    if (newMode === 'unread') {
-                        console.log('Filter set to unread. Managing daily deck to populate this.deck.');
-                        await manageDailyDeck(this);
-                    }
-                    this.updateCounts(this);
-                    this.scrollToTop();
-                });
-
-                this.updateCounts(this);
-                this.loading = false;
-
-                if (this.syncEnabled && this.isOnline) {
-                    const app = this;
-                    setTimeout(async () => {
-                        try {
-                            console.log("Initiating background partial sync...");
-                            await performFeedSync(app);
-                            await pullUserState();
-                            await loadAndManageData();
-                            app.deckManaged = true;
-                        } catch (error) {
-                            console.error('Background partial sync failed', error);
-                        }
-                    }, 0);
-                }
-
-                window.addEventListener('online', async () => {
-                    this.isOnline = true;
-                    if (this.syncEnabled) {
-                        console.log("Online detected. Processing pending operations and resyncing.");
-                        await processPendingOperations();
-                        await performFeedSync(this);
-                        await pullUserState();
-                        await loadAndManageData();
-                        this.deckManaged = true;
-                        console.log("Online resync completed.");
-                    }
-                });
-                window.addEventListener('offline', () => {
-                    this.isOnline = false;
-                    console.warn("Offline detected. Syncing disabled.");
-                });
-
-                let lastActivityTimestamp = Date.now();
-                const recordActivity = () => {
-                    lastActivityTimestamp = Date.now();
-                };
-                ["mousemove", "mousedown", "keydown", "scroll", "click"].forEach(event => document.addEventListener(event, recordActivity, true));
-                document.addEventListener("visibilitychange", recordActivity, true);
-                window.addEventListener("focus", recordActivity, true);
-
-                const SYNC_INTERVAL_MS = 5 * 60 * 1000;
-                const INACTIVITY_TIMEOUT_MS = 60 * 1000;
-
-                setInterval(async () => {
-                    const now = Date.now();
-                    if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
-                        return;
-                    }
-                    try {
-                        console.log("Performing periodic background sync...");
-                        await performFeedSync(this);
-                        await pullUserState();
-                        await loadAndManageData();
-                        this.deckManaged = true;
-                        console.log("Periodic background sync completed.");
-                    } catch (error) {
-                        console.error("Periodic sync failed", error);
-                    }
-                }, SYNC_INTERVAL_MS);
-
-            } catch (error) {
-                console.error("Initialization failed:", error);
-                this.errorMessage = "Could not load feed: " + error.message;
-                this.loading = false;
+            }
+            const itemsCount = await this.db.transaction('feedItems', 'readonly').objectStore('feedItems').count();
+            if (itemsCount === 0 && this.isOnline) {
+                createStatusBarMessage("No feed items found locally. Performing initial sync...", "info");
+                await performFullSync(this);
+                createStatusBarMessage("Initial sync complete!", "success");
             }
         },
 
-        initScrollObserver() {
-            const observer = new IntersectionObserver(async (entries) => {
-                for (const entry of entries) {
-                    if (entry.isIntersecting) {
-                        const guid = entry.target.dataset.guid;
-                        if (guid) {}
+        async _loadAndManageAllData() {
+            await this.loadFeedItemsFromDB();
+            const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
+                loadArrayState('hidden'),
+                loadArrayState('starred'),
+                loadArrayState('shuffledOutGuids'),
+                loadArrayState('currentDeckGuids')
+            ]);
+            this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
+            this.starred = Array.isArray(starredState.value) ? starredState.value : [];
+            this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
+            this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
+            const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
+            this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
+            await manageDailyDeck(this);
+            await this.loadAndDisplayDeck();
+        },
+
+        _setupWatchers() {
+            this.$watch("openSettings", async (isOpen) => {
+                if (isOpen) {
+                    this.modalView = 'main';
+                    await manageSettingsPanelVisibility(this);
+                    const [rssFeeds, storedKeywords] = await Promise.all([
+                        loadSimpleState('rssFeeds'),
+                        loadSimpleState('keywordBlacklist')
+                    ]);
+                    this.rssFeedsInput = rssFeeds.value || '';
+                    if (Array.isArray(storedKeywords.value)) {
+                        this.keywordBlacklistInput = storedKeywords.value.filter(Boolean).sort().join("\n");
+                    } else if (typeof storedKeywords.value === 'string') {
+                        this.keywordBlacklistInput = storedKeywords.value.split(/\r?\n/).filter(Boolean).sort().join("\n");
+                    } else {
+                        this.keywordBlacklistInput = '';
                     }
+                } else {
+                    await saveCurrentScrollPosition();
                 }
+            });
+            this.$watch('openUrlsInNewTabEnabled', () => {
+                document.querySelectorAll('.itemdescription').forEach(el => this.handleEntryLinks(el));
+            });
+            this.$watch("modalView", async () => manageSettingsPanelVisibility(this));
+            this.$watch('filterMode', async (newMode) => {
+                await setFilterMode(this, newMode);
+                if (newMode === 'unread') {
+                    await manageDailyDeck(this);
+                }
+                this.updateCounts();
+                this.scrollToTop();
+            });
+        },
+
+        _setupEventListeners() {
+            const backgroundSync = async () => {
+                if (!this.syncEnabled || !this.isOnline) return;
+                await performFeedSync(this);
+                await pullUserState();
+                await this._loadAndManageAllData();
+                this.deckManaged = true;
+            };
+
+            window.addEventListener('online', async () => {
+                this.isOnline = true;
+                if (this.syncEnabled) {
+                    await processPendingOperations();
+                    await backgroundSync();
+                }
+            });
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+            });
+            setTimeout(backgroundSync, 0);
+        },
+
+        _startPeriodicSync() {
+            let lastActivityTimestamp = Date.now();
+            const recordActivity = () => lastActivityTimestamp = Date.now();
+            ["mousemove", "mousedown", "keydown", "scroll", "click", "visibilitychange", "focus"].forEach(event => {
+                document.addEventListener(event, recordActivity, true);
+                if (event === 'focus') window.addEventListener(event, recordActivity, true);
+                if (event === 'visibilitychange') document.addEventListener(event, recordActivity, true);
+            });
+
+            const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+            const INACTIVITY_TIMEOUT_MS = 60 * 1000;
+
+            setInterval(async () => {
+                const now = Date.now();
+                if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
+                    return;
+                }
+                await performFeedSync(this);
+                await pullUserState();
+                await this._loadAndManageAllData();
+                this.deckManaged = true;
+            }, SYNC_INTERVAL_MS);
+        },
+
+        _initScrollObserver() {
+            const observer = new IntersectionObserver(async (entries) => {
+                // ... logic to observe item visibility
             }, {
                 root: document.querySelector('#feed-container'),
                 rootMargin: '0px',
                 threshold: 0.1
             });
-
             const feedContainer = document.querySelector('#feed-container');
-            if (!feedContainer) {
-                console.warn("Feed container (#feed-container) not found. Skipping scroll observer initialization.");
-                return;
-            }
-
+            if (!feedContainer) return;
             const observeElements = () => {
                 feedContainer.querySelectorAll('[data-guid]').forEach(item => {
                     observer.observe(item);
                 });
             };
-
             observeElements();
-
             const mutationObserver = new MutationObserver(mutations => {
-                console.log('Mutation detected in feed-container. Re-observing elements.');
                 observer.disconnect();
                 observeElements();
             });
-
-            mutationObserver.observe(feedContainer, {
-                childList: true,
-                subtree: true
-            });
-
+            mutationObserver.observe(feedContainer, { childList: true, subtree: true });
             this.scrollObserver = observer;
         },
 
@@ -407,87 +410,6 @@ export function rssApp() {
                     }
                 }
             });
-        },
-
-        async loadFeedItemsFromDB() {
-            if (!this.db) {
-                console.error("Database not initialized, cannot load feed items.");
-                this.entries = [];
-                this.feedItems = {};
-                return;
-            }
-            const rawItemsFromDb = await getAllFeedItems();
-            this.feedItems = {};
-            const uniqueEntries = [];
-            const seenGuids = new Set();
-
-            rawItemsFromDb.forEach(item => {
-                if (item && item.guid && !seenGuids.has(item.guid)) {
-                    this.feedItems[item.guid] = item;
-                    uniqueEntries.push(item);
-                    seenGuids.add(item.guid);
-                } else if (item && item.guid && seenGuids.has(item.guid)) {
-                    console.warn(`Duplicate GUID found in raw database items during loadFeedItemsFromDB: ${item.guid}. Skipping duplicate.`);
-                } else {
-                    console.warn('Item or GUID missing when processing raw database items. Skipping:', item);
-                }
-            });
-
-            this.entries = mapRawItems(uniqueEntries, formatDate) || [];
-        },
-
-        updateCounts(app) {
-            if (app && typeof app.updateCounts === 'function') {
-                updateCounts(app);
-            } else {
-                console.error("Invalid app object provided to updateCounts. Skipping update.");
-            }
-        },
-
-        scrollToTop() {
-            scrollToTop();
-        },
-
-        isStarred(guid) {
-            return this.starred.some(e => e.guid === guid);
-        },
-
-        isHidden(guid) {
-            return this.hidden.some(e => e.guid === guid);
-        },
-
-        async toggleStar(guid) {
-            // Refactored to use the new, consolidated helper function
-            await toggleItemStateAndSync(this, guid, 'starred');
-        },
-
-        async toggleHidden(guid) {
-            // Refactored to use the new, consolidated helper function
-            console.log("toggleHidden called with guid:", guid);
-            await toggleItemStateAndSync(this, guid, 'hidden');
-            await manageDailyDeck(this);
-        },
-
-        async processShuffle() {
-            await processShuffle(this);
-            this.updateCounts(this);
-        },
-
-        async saveRssFeeds() {
-            await saveSimpleState('rssFeeds', this.rssFeedsInput);
-            createStatusBarMessage('RSS Feeds saved!', 'success');
-            this.loading = true;
-            await performFullSync(this);
-            await this.loadFeedItemsFromDB();
-            await manageDailyDeck(this);
-            this.loading = false;
-        },
-
-        async saveKeywordBlacklist() {
-            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
-            await saveSimpleState('keywordBlacklist', keywordsArray);
-            createStatusBarMessage('Keyword Blacklist saved!', 'success');
-            this.updateCounts(this);
         },
     };
 }
