@@ -11,7 +11,7 @@ let _dbInstance = null;
 let _dbInitPromise = null;
 
 // A consistent and declarative schema definition.
-// Use keyPath: null for stores without an explicit key.
+// The keyPath for all stores is now explicitly defined.
 const OBJECT_STORES_SCHEMA = [{
     name: 'feedItems',
     keyPath: 'guid',
@@ -26,10 +26,10 @@ const OBJECT_STORES_SCHEMA = [{
     keyPath: 'guid'
 }, {
     name: 'currentDeckGuids',
-    keyPath: null
+    keyPath: 'guid' // FIX: Changed from null to 'guid' to match usage
 }, {
     name: 'shuffledOutGuids',
-    keyPath: null
+    keyPath: 'guid' // FIX: Changed from null to 'guid' to match usage
 }, {
     name: 'userSettings',
     keyPath: 'key'
@@ -59,9 +59,7 @@ export async function getDb() {
             console.log(`[DB] Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
 
             // Migration logic for keyPath change in DB_VERSION 14
-            // This is a robust way to handle schema changes by deleting and recreating the store.
             if (oldVersion < 14) {
-                // The schema for these stores is changing from a keyPath to a simple key-value store.
                 if (db.objectStoreNames.contains('currentDeckGuids')) {
                     db.deleteObjectStore('currentDeckGuids');
                 }

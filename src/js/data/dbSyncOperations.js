@@ -22,7 +22,6 @@ const API_BASE_URL = window.location.origin;
 async function _addPendingOperationToBuffer(operation) {
     const db = await getDb();
     const opToStore = { ...operation };
-    // 'id' is the auto-incrementing key, so it should not be stored.
     if (opToStore.id) delete opToStore.id;
 
     const tx = db.transaction('pendingOperations', 'readwrite');
@@ -125,7 +124,6 @@ export async function processPendingOperations() {
     console.log(`[DB] Sending ${operations.length} batched operations to /api/user-state.`);
 
     try {
-        // The operations array already contains the necessary data.
         const response = await fetch(`${API_BASE_URL}/api/user-state`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -160,20 +158,6 @@ export async function processPendingOperations() {
 
     } catch (error) {
         console.error('[DB] Error during batch synchronization:', error);
-    }
-}
-
-/**
- * Gets the number of buffered changes waiting to be synced.
- * @returns {Promise<number>} The count of pending operations.
- */
-export async function getBufferedChangesCount() {
-    try {
-        const db = await getDb();
-        return await db.transaction('pendingOperations', 'readonly').objectStore('pendingOperations').count();
-    } catch (e) {
-        console.error('[DB] Error getting buffer count:', e);
-        return 0;
     }
 }
 
@@ -320,16 +304,9 @@ export async function performFeedSync(app) {
         console.log(`[DB] New/updated GUIDs: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
 
         const BATCH_SIZE = 50;
-        const tx = db.transaction(['feedItems'], 'readwrite');
-        const feedStore = tx.objectStore('feedItems');
+        const newItems = [];
 
-        // Handle deletions first
-        for (const guidToDelete of guidsToDelete) {
-            await feedStore.delete(guidToDelete);
-            console.log(`[DB] Deleted item: ${guidToDelete}`);
-        }
-
-        // Handle new/updated items in batches
+        // FIX: Perform all network requests outside the database transaction.
         for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
             const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
             const itemsResponse = await fetch(`${API_BASE_URL}/api/feed-items`, {
@@ -344,12 +321,24 @@ export async function performFeedSync(app) {
                 console.error(`[DB] HTTP error! status: ${itemsResponse.status} for /api/feed-items batch.`);
                 continue;
             }
+            const items = await itemsResponse.json();
+            newItems.push(...items);
+        }
 
-            const newItems = await itemsResponse.json();
-            for (const item of newItems) {
-                if (item.guid) await feedStore.put(item);
-                else console.error("[DB] Item missing GUID, cannot store:", item);
-            }
+        // FIX: Open a single transaction for all database operations.
+        const tx = db.transaction(['feedItems'], 'readwrite');
+        const feedStore = tx.objectStore('feedItems');
+
+        // Handle deletions first
+        for (const guidToDelete of guidsToDelete) {
+            await feedStore.delete(guidToDelete);
+            console.log(`[DB] Deleted item: ${guidToDelete}`);
+        }
+
+        // Handle new/updated items
+        for (const item of newItems) {
+            if (item.guid) await feedStore.put(item);
+            else console.error("[DB] Item missing GUID, cannot store:", item);
         }
         await tx.done;
 
