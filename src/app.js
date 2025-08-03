@@ -70,6 +70,11 @@ export function rssApp() {
         isOnline: isOnline(),
         deckManaged: false,
 
+        // --- FIX: Add new state properties for the status message ---
+        syncStatusMessage: '',
+        showSyncStatus: false,
+        // --- END FIX ---
+
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -106,6 +111,9 @@ export function rssApp() {
 
                 this.progressMessage = '';
                 this.loading = false;
+                
+                // --- FIX: Initial call to update the sync status message ---
+                await this.updateSyncStatusMessage();
             } catch (error) {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
@@ -113,6 +121,26 @@ export function rssApp() {
                 this.loading = false;
             }
         },
+
+        // --- FIX: Add new method to update the sync status message ---
+        updateSyncStatusMessage: function() {
+            const online = isOnline();
+            let message = '';
+            let show = false;
+
+            if (!online) {
+                message = 'Offline.';
+                show = true;
+            } else if (!this.syncEnabled) {
+                message = 'Sync is disabled.';
+                show = true;
+            }
+
+            this.syncStatusMessage = message;
+            this.showSyncStatus = show;
+        },
+        // --- END FIX ---
+        
         loadAndDisplayDeck: async function() {
             let guidsToDisplay = this.currentDeckGuids;
             if (!Array.isArray(guidsToDisplay)) {
@@ -249,6 +277,8 @@ export function rssApp() {
             // This ensures the app's state is fully refreshed from the database,
             // reflecting the synced change immediately.
             await this._loadAndManageAllData();
+            // --- FIX: Update the sync status message after a sync operation ---
+            this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
@@ -256,6 +286,8 @@ export function rssApp() {
             // This ensures the app's state is fully refreshed from the database,
             // reflecting the synced change immediately.
             await this._loadAndManageAllData();
+            // --- FIX: Update the sync status message after a sync operation ---
+            this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
             await processShuffle(this);
@@ -406,6 +438,7 @@ export function rssApp() {
 
             window.addEventListener('online', async () => {
                 this.isOnline = true;
+                this.updateSyncStatusMessage(); // <-- FIX: Update status on online event
                 if (this.syncEnabled) {
                     await processPendingOperations();
                     await backgroundSync();
@@ -413,6 +446,7 @@ export function rssApp() {
             });
             window.addEventListener('offline', () => {
                 this.isOnline = false;
+                this.updateSyncStatusMessage(); // <-- FIX: Update status on offline event
             });
             setTimeout(backgroundSync, 0);
         },

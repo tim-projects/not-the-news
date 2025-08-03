@@ -49,8 +49,10 @@ export async function queueAndAttemptSyncOperation(operation) {
     try {
         const generatedId = await _addPendingOperationToBuffer(operation);
         console.log(`[DB] Operation buffered with ID: ${generatedId}`, operation);
-
-        if ((operation.type === 'starDelta' || operation.type === 'hiddenDelta') && isOnline()) {
+        
+        // --- FIX: Check both online status and syncEnabled setting. ---
+        const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+        if ((operation.type === 'starDelta' || operation.type === 'hiddenDelta') && isOnline() && syncEnabled) {
             console.log(`[DB] Attempting immediate sync for ${operation.type} (ID: ${generatedId}).`);
             const syncPayload = [{ ...operation, id: generatedId }];
             const response = await fetch(`${API_BASE_URL}/api/user-state`, {
@@ -79,7 +81,7 @@ export async function queueAndAttemptSyncOperation(operation) {
                 console.warn(`[DB] Immediate sync for ${operation.type} (ID: ${generatedId}) reported non-success by server:`, result);
             }
         } else {
-            console.log(`[DB] Offline. Buffering ${operation.type} (ID: ${generatedId}) for later batch sync.`);
+            console.log(`[DB] ${!isOnline() ? 'Offline.' : 'Sync is disabled.'} Buffering ${operation.type} (ID: ${generatedId}) for later batch sync.`);
         }
     } catch (networkError) {
         console.error(`[DB] Network error during immediate sync for ${operation.type}. Will retry with batch sync.`, networkError);
@@ -90,8 +92,10 @@ export async function queueAndAttemptSyncOperation(operation) {
  * Processes all pending operations in the buffer and syncs them with the server.
  */
 export async function processPendingOperations() {
-    if (!isOnline()) {
-        console.log('[DB] Offline. Skipping batch sync.');
+    // --- FIX: Check both online status and syncEnabled setting. ---
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+    if (!isOnline() || !syncEnabled) {
+        console.log('[DB] Offline or sync is disabled. Skipping batch sync.');
         return;
     }
     
@@ -214,6 +218,13 @@ async function _pullSingleStateKey(key, def) {
  * Pulls the user state from the server.
  */
 export async function pullUserState() {
+    // --- FIX: Check both online status and syncEnabled setting. ---
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+    if (!isOnline() || !syncEnabled) {
+        console.log('[DB] Offline or sync is disabled. Skipping user state pull.');
+        return;
+    }
+    
     if (_isPullingUserState) return console.log('[DB] Already pulling state. Skipping.');
     const now = Date.now();
     if (now - _lastPullAttemptTime < PULL_DEBOUNCE_MS) return console.log('[DB] Debouncing pull.');
@@ -265,13 +276,23 @@ export async function getAllFeedItems() {
  * @param {object} app The main application state object.
  */
 export async function performFeedSync(app) {
-    if (!isOnline()) return console.log('[DB] Offline. Skipping feed sync.');
+    // --- FIX: Check both online status and syncEnabled setting. ---
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+    if (!isOnline() || !syncEnabled) {
+        return console.log('[DB] Offline or sync is disabled. Skipping feed sync.');
+    }
+    
     console.log('[DB] Fetching feed items from server.');
 
     try {
         const { value: lastFeedSyncTime } = await loadSimpleState('lastFeedSync');
         const sinceTimestamp = lastFeedSyncTime || '';
         const guidsResponse = await fetch(`${API_BASE_URL}/api/feed-guids?since=${sinceTimestamp}`);
+
+        if (guidsResponse.status === 304) {
+            console.log('[DB] Feed not modified. Skipping update.');
+            return;
+        }
 
         if (!guidsResponse.ok) throw new Error(`HTTP error! status: ${guidsResponse.status} for /api/feed-guids`);
 
@@ -346,6 +367,12 @@ export async function performFeedSync(app) {
  * @param {object} app The main application state object.
  */
 export async function performFullSync(app) {
+    // --- FIX: Check both online status and syncEnabled setting. ---
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+    if (!isOnline() || !syncEnabled) {
+        return console.log('[DB] Offline or sync is disabled. Skipping full sync.');
+    }
+    
     console.log('[DB] Full sync initiated.');
     try {
         await pullUserState();

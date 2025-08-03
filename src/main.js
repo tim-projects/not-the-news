@@ -15,6 +15,7 @@ import './css/content.css';
 import './css/forms.css';
 import './css/layout.css';
 import './css/modal.css';
+import './css/status.css';
 
 
 // Set up the Service Worker
