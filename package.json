@@ -18,6 +18,10 @@
   },
   "homepage": "https://github.com/tim-projects/not-the-news#readme",
   "devDependencies": {
-    "vite": "^5.3.3"
+    "vite": "^7.0.6",
+    "vite-plugin-pwa": "^1.0.2"
+  },
+  "dependencies": {
+    "alpinejs": "^3.14.9"
   }
 }
