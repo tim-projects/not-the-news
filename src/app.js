@@ -279,22 +279,23 @@ export function rssApp() {
 
         async _loadAndManageAllData() {
             await this.loadFeedItemsFromDB();
-            const [hiddenState, starredState, shuffledOutState, currentDeckState] = await Promise.all([
-                loadArrayState('hidden'),
-                loadArrayState('starred'),
-                loadArrayState('shuffledOutGuids'),
-                loadArrayState('currentDeckGuids')
-            ]);
+            
+            // FIX: Loading state sequentially to avoid a race condition with the database upgrade.
+            const hiddenState = await loadArrayState('hidden');
+            const starredState = await loadArrayState('starred');
+            const shuffledOutState = await loadArrayState('shuffledOutGuids');
+            const currentDeckState = await loadArrayState('currentDeckGuids');
+            
             this.hidden = Array.isArray(hiddenState.value) ? hiddenState.value : [];
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
             this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
+            
             const lastFeedSyncServerTime = (await loadSimpleState('lastFeedSync')).value || Date.now();
             this.hidden = await pruneStaleHidden(this.entries, this.hidden, lastFeedSyncServerTime);
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
         },
-
         _setupWatchers() {
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {
