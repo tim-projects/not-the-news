@@ -5,51 +5,84 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 13;
+const DB_VERSION = 14; // Incrementing the version to handle schema changes
+
 let _dbInstance = null;
 let _dbInitPromise = null;
 
-const OBJECT_STORES_SCHEMA = [
-    { name: 'feedItems', keyPath: 'guid', options: { unique: true } },
-    { name: 'starredItems', keyPath: 'guid' },
-    { name: 'hiddenItems', keyPath: 'guid' },
-    // Refactored schema for stores that hold a single array.
-    // They no longer have a keyPath, making them simple key-value stores.
-    { name: 'currentDeckGuids' },
-    { name: 'shuffledOutGuids' },
-    { name: 'userSettings', keyPath: 'key' },
-    { name: 'pendingOperations', keyPath: 'id', options: { autoIncrement: true } }
-];
+// A consistent and declarative schema definition.
+// Use keyPath: null for stores without an explicit key.
+const OBJECT_STORES_SCHEMA = [{
+    name: 'feedItems',
+    keyPath: 'guid',
+    options: {
+        unique: true
+    }
+}, {
+    name: 'starredItems',
+    keyPath: 'guid'
+}, {
+    name: 'hiddenItems',
+    keyPath: 'guid'
+}, {
+    name: 'currentDeckGuids',
+    keyPath: null
+}, {
+    name: 'shuffledOutGuids',
+    keyPath: null
+}, {
+    name: 'userSettings',
+    keyPath: 'key'
+}, {
+    name: 'pendingOperations',
+    keyPath: 'id',
+    options: {
+        autoIncrement: true
+    }
+}];
 
-export async function initDb() {
-    if (_dbInitPromise) return _dbInitPromise;
+/**
+ * Initializes and returns a singleton database instance using idb.
+ * This is the sole public function for accessing the database.
+ * @returns {Promise<IDBPDatabase>} The IndexedDB database instance.
+ */
+export async function getDb() {
+    if (_dbInstance) {
+        return _dbInstance;
+    }
+    if (_dbInitPromise) {
+        return _dbInitPromise;
+    }
 
     _dbInitPromise = openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion) {
-            console.log(`[DB] Upgrading database from version ${oldVersion} to ${newVersion}`);
+        upgrade(db, oldVersion) {
+            console.log(`[DB] Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
 
-            // General store creation and migration logic.
+            // Migration logic for keyPath change in DB_VERSION 14
+            // This is a robust way to handle schema changes by deleting and recreating the store.
+            if (oldVersion < 14) {
+                // The schema for these stores is changing from a keyPath to a simple key-value store.
+                if (db.objectStoreNames.contains('currentDeckGuids')) {
+                    db.deleteObjectStore('currentDeckGuids');
+                }
+                if (db.objectStoreNames.contains('shuffledOutGuids')) {
+                    db.deleteObjectStore('shuffledOutGuids');
+                }
+            }
+
+            // Create or update all stores based on the schema
             OBJECT_STORES_SCHEMA.forEach(schema => {
-                if (db.objectStoreNames.contains(schema.name)) {
-                    // If a store exists with a different schema, delete and recreate it.
-                    // This handles the migration for 'currentDeckGuids' and 'shuffledOutGuids'.
-                    const store = db.transaction.objectStore(schema.name);
-                    if (store.keyPath !== schema.keyPath || store.autoIncrement !== schema.options?.autoIncrement) {
-                        db.deleteObjectStore(schema.name);
-                        console.log(`[DB] Recreated store '${schema.name}' due to schema change.`);
-                        db.createObjectStore(schema.name, { keyPath: schema.keyPath, ...schema.options });
-                    }
-                } else {
-                    // Create new stores.
-                    db.createObjectStore(schema.name, { keyPath: schema.keyPath, ...schema.options });
+                if (!db.objectStoreNames.contains(schema.name)) {
+                    db.createObjectStore(schema.name, {
+                        keyPath: schema.keyPath,
+                        ...schema.options
+                    });
                     console.log(`[DB] Created new store: ${schema.name}`);
                 }
             });
         },
         blocked() {
             console.warn('[DB] Database upgrade blocked. Please close all other tabs with this site open.');
-            // The `alert()` call is a blocking operation and not best practice.
-            // Replacing it with a non-blocking console warning is a more modern approach.
         },
         blocking() {
             console.warn('[DB] Database blocking other tabs.');
@@ -63,17 +96,7 @@ export async function initDb() {
     } catch (e) {
         console.error(`[DB] Failed to open database '${DB_NAME}':`, e);
         _dbInstance = null;
+        _dbInitPromise = null;
         throw e;
     }
-}
-
-export async function getDb() {
-    if (!_dbInstance) {
-        await initDb();
-    }
-    return _dbInstance;
-}
-
-export function isOnline() {
-    return navigator.onLine;
 }

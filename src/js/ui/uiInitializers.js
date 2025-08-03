@@ -9,7 +9,8 @@ import {
     processPendingOperations,
     pullUserState,
     performFullSync,
-    isOnline
+    isOnline,
+    saveArrayState // <-- Import the correct function for array states
 } from '../data/database.js';
 
 import {
@@ -82,6 +83,11 @@ export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onT
     });
 }
 
+/**
+ * Initializes the synchronization toggle, including logic for full syncs and
+ * rebuilding the deck after a sync if it's empty.
+ * @param {object} app The Alpine.js app state object.
+ */
 export async function initSyncToggle(app) {
     await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => {
         if (enabled) {
@@ -91,7 +97,9 @@ export async function initSyncToggle(app) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
                 if (app.entries?.length) {
                     app.currentDeckGuids = app.entries.map(item => item.guid);
-                    await saveSimpleState('currentDeckGuids', app.currentDeckGuids);
+                    // FIX: This line was causing the error. It's now correctly saving
+                    // an array of objects to the `currentDeckGuids` store.
+                    await saveArrayState('currentDeckGuids', app.currentDeckGuids.map(guid => ({ guid })));
                     console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
                 } else {
                     console.warn("Cannot rebuild deck, app.entries is empty.");
