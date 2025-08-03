@@ -21,6 +21,7 @@ import {
 } from '../ui/uiElements.js';
 
 const MAX_DECK_SIZE = 10;
+const DAILY_SHUFFLE_LIMIT = 2; // Added a constant for the daily limit.
 
 /**
  * Manages the daily deck of news items.
@@ -80,6 +81,11 @@ export const manageDailyDeck = async (app) => {
             app.shuffledOutGuids = [];
             await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
             
+            // --- FIX: Reset shuffleCount and save it ---
+            app.shuffleCount = DAILY_SHUFFLE_LIMIT; // Reset the count
+            await saveShuffleState(app.shuffleCount, today); // Save the new count and date
+            // --- END FIX ---
+
             app.lastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
         }
