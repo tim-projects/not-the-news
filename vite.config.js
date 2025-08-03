@@ -12,19 +12,13 @@ export default defineConfig({
   build: {
     // Output everything to the 'www' directory, which is outside the 'src' folder
     outDir: '../www',
-
-    // Clear the output directory on each build
     emptyOutDir: true,
-
     rollupOptions: {
       input: {
-        // Remove sw.js from this list! The PWA plugin will handle it.
         main: resolve(__dirname, 'src/index.html'),
         login: resolve(__dirname, 'src/login.html'),
       },
       output: {
-        // Your old custom logic for sw.js is no longer needed.
-        // Vite will now use standard naming for all assets.
         entryFileNames: `assets/[name]-[hash].js`,
         chunkFileNames: `assets/[name]-[hash].js`,
         assetFileNames: `assets/[name]-[hash].[ext]`,
@@ -33,21 +27,19 @@ export default defineConfig({
   },
 
   plugins: [
-    // This is the new part.
     VitePWA({
       strategies: 'injectManifest',
-      srcDir: 'src',
+      // The fix is here: Change srcDir to '' or '.'
+      srcDir: '.',
       filename: 'sw.js',
       injectManifest: {
         globPatterns: [
           '**/*.{js,css,html,ico,png,svg,json}',
-          'images/*.{png,svg}', // Example to match images in the public dir
-          'manifest.json' // Assuming this is in your public directory
+          'images/*.{png,svg}',
+          'manifest.json'
         ],
       },
       manifest: {
-        // You should define your manifest here or let the plugin generate one.
-        // It's a good practice to define it here for consistency.
         name: 'Not The News',
         short_name: 'NTN',
         start_url: '/',
