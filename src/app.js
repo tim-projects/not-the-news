@@ -49,6 +49,7 @@ export function rssApp() {
     return {
         // --- State Properties ---
         loading: true,
+        progressMessage: 'Initializing...', // <-- ADDED
         deck: [],
         feedItems: {},
         filterMode: 'unread',
@@ -76,9 +77,11 @@ export function rssApp() {
         // --- Core Methods ---
         initApp: async function() {
             try {
+                this.progressMessage = 'Connecting to database...'; // <-- UPDATED
                 this.db = await initDb();
                 
                 // 1. Load basic configuration and settings first.
+                this.progressMessage = 'Loading settings...'; // <-- ADDED
                 await this._loadInitialState();
                 
                 // 2. Perform a full data sync from the server. This is the critical step.
@@ -89,8 +92,10 @@ export function rssApp() {
                 }
 
                 // 3. Load all data, including the deck, from the now-fresh database.
+                this.progressMessage = 'Loading feed data from storage...'; // <-- ADDED
                 await this._loadAndManageAllData();
 
+                this.progressMessage = 'Applying user preferences...'; // <-- ADDED
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
@@ -98,15 +103,18 @@ export function rssApp() {
                 attachScrollToTopHandler();
                 await initScrollPosition(this);
                 
+                this.progressMessage = 'Setting up app watchers...'; // <-- ADDED
                 this._setupWatchers();
                 this._setupEventListeners();
                 this._startPeriodicSync();
                 this._initScrollObserver();
 
+                this.progressMessage = ''; // <-- ADDED
                 this.loading = false;
             } catch (error) {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
+                this.progressMessage = `Error: ${error.message}`; // <-- ADDED
                 this.loading = false;
             }
         },
@@ -251,9 +259,11 @@ export function rssApp() {
             await saveSimpleState('rssFeeds', this.rssFeedsInput);
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
+            this.progressMessage = 'Saving feeds and performing full sync...'; // <-- ADDED
             await performFullSync(this);
             await this.loadFeedItemsFromDB();
             await manageDailyDeck(this);
+            this.progressMessage = ''; // <-- ADDED
             this.loading = false;
         },
         saveKeywordBlacklist: async function() {
@@ -288,13 +298,13 @@ export function rssApp() {
             if (!this.syncEnabled) return;
             try {
                 // First, pull all user state to get the latest deck GUIDs.
-                console.log("[DB] Pulling user state (initial sync)...");
+                this.progressMessage = 'Pulling user state from server...'; // <-- UPDATED
                 await pullUserState();
                 // Then, sync the feed to ensure we have all feed items locally.
-                console.log("[DB] Fetching feed items from server (initial sync)...");
+                this.progressMessage = 'Fetching new feed items...'; // <-- UPDATED
                 await performFullSync(this);
                 // CRITICAL: Reload app state with newly synced items.
-                console.log("[DB] Reloading feed items into app state...");
+                this.progressMessage = 'Reloading data into app state...'; // <-- UPDATED
                 await this.loadFeedItemsFromDB();
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
@@ -312,6 +322,7 @@ export function rssApp() {
             console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
 
             // Now, with a complete list of feed items, load and process other states.
+            this.progressMessage = 'Loading user state from storage...'; // <-- ADDED
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
@@ -330,9 +341,11 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
             // With all data loaded, it is now safe to prune and manage the deck.
+            this.progressMessage = 'Pruning hidden items...'; // <-- ADDED
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             console.log("[deckManager] Starting deck management with all data loaded.");
 
+            this.progressMessage = 'Managing today\'s deck...'; // <-- ADDED
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
 
@@ -389,10 +402,12 @@ export function rssApp() {
         _setupEventListeners: function() {
             const backgroundSync = async () => {
                 if (!this.syncEnabled || !this.isOnline) return;
+                console.log('Performing periodic background sync...'); // <-- ADDED console.log
                 await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
                 this.deckManaged = true;
+                console.log('Background sync complete.'); // <-- ADDED console.log
             };
 
             window.addEventListener('online', async () => {
@@ -425,10 +440,12 @@ export function rssApp() {
                 if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
                     return;
                 }
+                console.log('Starting scheduled background sync...'); // <-- ADDED console.log
                 await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
                 this.deckManaged = true;
+                console.log('Scheduled sync complete.'); // <-- ADDED console.log
             }, SYNC_INTERVAL_MS);
         },
 

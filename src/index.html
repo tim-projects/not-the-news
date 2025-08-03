@@ -20,11 +20,37 @@
     <title>Not The News</title>
     <link rel="icon" href="/images/favicon.svg">
     <link rel="manifest" href="/manifest.json">
+    <style>
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
+        .loading-text {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-message {
+            font-size: 0.875rem;
+            color: #666;
+            opacity: 0.8;
+            min-height: 1.2em;
+            font-family: monospace;
+        }
+    </style>
 </head>
 
 <body>
     <div id="app" x-data="rssApp" x-init="initApp()">
-        <div id="loading-screen" x-show="loading" class="loading-screen">Loading…</div>
+        <div id="loading-screen" x-show="loading" class="loading-screen">
+            <div class="loading-text">Loading…</div>
+            <div id="progress-message" class="progress-message" x-text="progressMessage"></div>
+        </div>
         <header id="header" x-show="!loading" class="header" x-cloak>
             <div id="ntn-title">
                 <h2>Not The News</h2>
@@ -193,6 +219,38 @@
     </div>
 
     <script type="module" src="/main.js"></script>
+    
+    <script>
+        // Global function to update progress message
+        window.updateProgress = function(message) {
+            // Try Alpine.js way first
+            if (window.Alpine && window.Alpine.store) {
+                const store = window.Alpine.store('rssApp');
+                if (store) {
+                    store.progressMessage = message;
+                    return;
+                }
+            }
+            
+            // Fallback to direct DOM manipulation
+            const progressEl = document.getElementById('progress-message');
+            if (progressEl) {
+                progressEl.textContent = message;
+            }
+        };
+
+        // Override console.log to capture messages
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            
+            // Update progress with the last console message
+            const message = args.join(' ');
+            if (window.updateProgress) {
+                window.updateProgress(message);
+            }
+        };
+    </script>
 
 </body>
 
