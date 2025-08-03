@@ -5,7 +5,7 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 19; // FIX: Incrementing the version to force a new migration run.
+const DB_VERSION = 20; // FIX: Aggressively incrementing the version to force a new migration run.
 
 let _dbInstance = null;
 let _dbInitPromise = null;
@@ -64,10 +64,10 @@ export async function getDb() {
             if (db.objectStoreNames.contains('hiddenItems')) {
                 db.deleteObjectStore('hiddenItems');
             }
-            if (db.objectStoreNames.contains('currentDeckGuids') && oldVersion < 14) {
+            if (db.objectStoreNames.contains('currentDeckGuids')) {
                 db.deleteObjectStore('currentDeckGuids');
             }
-            if (db.objectStoreNames.contains('shuffledOutGuids') && oldVersion < 14) {
+            if (db.objectStoreNames.contains('shuffledOutGuids')) {
                 db.deleteObjectStore('shuffledOutGuids');
             }
 
