@@ -92,6 +92,18 @@ export function mapRawItems(rawList, fmtFn) {
  * @param {string} filterMode - The current filter mode ('unread', 'hidden', 'starred').
  * @returns {Array<string>} An array of GUIDs for the new deck.
  */
+/**
+ * Generates a new deck of feed item GUIDs based on the provided data and filters.
+ *
+ * @param {Array} allFeedItems - An array of all available feed items.
+ * @param {Set|Array} hiddenGuids - A Set or Array of GUIDs for hidden items.
+ * @param {Set|Array} starredGuids - A Set or Array of GUIDs for starred items.
+ * @param {Set|Array} shuffledOutGuids - A Set or Array of GUIDs for shuffled-out items.
+ * @param {Set|Array} currentDeckItemGuids - A Set or Array of GUIDs for the current deck.
+ * @param {number} count - The desired size of the deck.
+ * @param {string} filterMode - The current filter mode ('unread', 'hidden', 'starred').
+ * @returns {Array<string>} An array of GUIDs for the new deck.
+ */
 export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
     try {
         const MAX_DECK_SIZE = 10;
@@ -100,7 +112,21 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
         const allFeedGuidsSet = new Set(allFeedItems.map(item => item.id));
         const prunedHiddenGuids = new Set(Array.isArray(hiddenGuids) ? hiddenGuids.filter(guid => allFeedGuidsSet.has(guid)) : []);
         const prunedShuffledOutGuids = new Set(Array.isArray(shuffledOutGuids) ? shuffledOutGuids.filter(guid => allFeedGuidsSet.has(guid)) : []);
-        const starredGuidsSet = new Set(Array.isArray(starredGuids) ? starredGuids.map(item => item.guid).filter(guid => allFeedGuidsSet.has(guid)) : []);
+        
+        // FIX: Handle both array of objects (with .guid property) and array of strings
+        let starredGuidsSet;
+        if (Array.isArray(starredGuids)) {
+            if (starredGuids.length > 0 && typeof starredGuids[0] === 'object' && starredGuids[0].guid) {
+                // Array of objects with .guid property
+                starredGuidsSet = new Set(starredGuids.map(item => item.guid).filter(guid => allFeedGuidsSet.has(guid)));
+            } else {
+                // Array of strings
+                starredGuidsSet = new Set(starredGuids.filter(guid => allFeedGuidsSet.has(guid)));
+            }
+        } else {
+            starredGuidsSet = new Set();
+        }
+        
         const currentDeckGuidsSet = new Set(Array.isArray(currentDeckItemGuids) ? currentDeckItemGuids : []);
 
         // Filter allFeedItems based on the selected filterMode
