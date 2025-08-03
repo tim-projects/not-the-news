@@ -78,26 +78,17 @@ export function rssApp() {
             try {
                 this.db = await initDb();
                 
-                // 1. Load basic state first.
+                // 1. Load basic configuration and settings first.
                 await this._loadInitialState();
                 
-                // 2. Load feed items from local DB.
-                await this.loadFeedItemsFromDB();
-                
-                // 3. If local DB is empty, perform a full sync.
-                if (this.entries.length === 0 && this.isOnline) {
-                    createStatusBarMessage("No feed items found locally. Performing initial sync...", "info");
-                    await performFullSync(this);
-                    await this.loadFeedItemsFromDB(); // Reload entries after sync.
-                    createStatusBarMessage("Initial sync complete!", "success");
+                // 2. Perform a full data sync from the server. This is the critical step.
+                // It ensures feed items and user state are fully up-to-date before
+                // any deck management or display logic runs.
+                if (this.isOnline) {
+                    await this._fullInitialSync();
                 }
-                
-                // 4. Now that feed items are available, pull user state and manage the deck.
-                if (this.syncEnabled && this.isOnline) {
-                    await pullUserState();
-                }
-                
-                // 5. Load and manage all other data. This will call manageDailyDeck().
+
+                // 3. Load all data, including the deck, from the now-fresh database.
                 await this._loadAndManageAllData();
 
                 initTheme(this);
@@ -172,7 +163,7 @@ export function rssApp() {
         // --- Getters ---
         get filteredEntries() {
             if (!Array.isArray(this.deck)) this.deck = [];
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}`;
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }
@@ -276,7 +267,23 @@ export function rssApp() {
             this.isOnline = isOnline();
         },
 
+        async _fullInitialSync() {
+            if (!this.syncEnabled) return;
+            try {
+                // First, pull all user state to get the latest deck GUIDs.
+                await pullUserState();
+                // Then, sync the feed to ensure we have all feed items locally.
+                await performFullSync(this);
+                createStatusBarMessage("Initial sync complete!", "success");
+            } catch (error) {
+                console.error("Initial sync failed:", error);
+                this.errorMessage = `Initial sync failed: ${error.message}`;
+            }
+        },
+
         async _loadAndManageAllData() {
+            // Load feed items first, now that a full sync has been performed.
+            await this.loadFeedItemsFromDB();
             
             // Replaced the manual loading and pruning of hidden items
             // with the new, single, robust function.
