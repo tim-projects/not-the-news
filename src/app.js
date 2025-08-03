@@ -291,11 +291,11 @@ export function rssApp() {
         },
 
         async _loadAndManageAllData() {
-            // CRITICAL FIX: Ensure feed items are loaded into app state first.
+            // CRITICAL FIX: Load all feed items from the DB into the app state first.
             await this.loadFeedItemsFromDB();
             console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
 
-            // Load all other states after feed items are available.
+            // Now, with a complete list of feed items, load and process other states.
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
@@ -309,7 +309,7 @@ export function rssApp() {
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            // Now, with a complete list of feed items, it is safe to prune and manage the deck.
+            // With all data loaded, it is now safe to prune and manage the deck.
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             console.log("[deckManager] Starting deck management with all data loaded.");
 
