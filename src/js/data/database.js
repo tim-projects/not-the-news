@@ -3,11 +3,23 @@
 // @refactor-directive
 // Refactor JS: concise, modern, functional, same output.
 
-// Re-export all functions and constants from dbCore.js
-export * from './dbCore.js';
+// This file acts as the public API for all database-related operations.
+// It re-exports functions from other modules to provide a single, consistent interface.
 
-// Re-export all functions and constants from dbUserState.js
-export * from './dbUserState.js';
-
-// Re-export all functions and constants from dbSyncOperations.js
-export * from './dbSyncOperations.js';
+export { initDb, getDb, getAllFeedItems } from './dbCore.js';
+export {
+    loadSimpleState,
+    saveSimpleState,
+    loadArrayState,
+    saveArrayState,
+    USER_STATE_DEFS
+} from './dbUserState.js';
+export {
+    addPendingOperation,
+    processPendingOperations,
+    queueAndAttemptSyncOperation,
+    performFeedSync,
+    performFullSync,
+    pullUserState,
+    getBufferedChangesCount
+} from './dbSyncOperations.js';
