@@ -291,11 +291,11 @@ export function rssApp() {
         },
 
         async _loadAndManageAllData() {
-            // Replaced the manual loading and pruning of hidden items
-            // with the new, single, robust function.
-            this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
+            // CRITICAL FIX: Ensure feed items are loaded into app state first.
+            await this.loadFeedItemsFromDB();
+            console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
 
-            // Load other states. They are not prone to the same data issues.
+            // Load all other states after feed items are available.
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
@@ -309,11 +309,10 @@ export function rssApp() {
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            // This is the single, authoritative call to manage the deck.
-            // This function contains the logic to check if the last shuffle
-            // was over a day ago, generate a new deck if needed, and
-            // save the new deck GUIDs to the server.
+            // Now, with a complete list of feed items, it is safe to prune and manage the deck.
+            this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             console.log("[deckManager] Starting deck management with all data loaded.");
+
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
 
