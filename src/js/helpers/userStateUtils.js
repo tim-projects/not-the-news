@@ -113,17 +113,38 @@ export async function loadAndPruneHiddenItems(feedItems) {
  * Loads the current deck of GUIDs.
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
+/**
+ * Loads the current deck of GUIDs.
+ * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
+ */
 export async function loadCurrentDeck() {
     const { value: storedItems } = await loadArrayState('currentDeckGuids');
+    
+    console.log(`[loadCurrentDeck] Raw stored data:`, storedItems);
+    console.log(`[loadCurrentDeck] First item structure:`, storedItems?.[0]);
+    
     // FIX: The load function should expect an array of strings, as that is the correct format.
     // However, it's good practice to handle the old, incorrect format as a fallback.
     // If the data is an array of objects, map it to strings. Otherwise, use the data directly.
     const deckGuids = storedItems?.map(item => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item.guid === 'string') return item.guid;
+        if (typeof item === 'string') {
+            return item;
+        }
+        if (item && typeof item === 'object') {
+            // Handle various object formats that might contain the GUID
+            if (typeof item.guid === 'string') return item.guid;
+            if (typeof item.id === 'string') return item.id;
+            // If it's a proxy object, try to extract the underlying value
+            if (item.valueOf && typeof item.valueOf() === 'string') return item.valueOf();
+            // Try to convert to string as last resort
+            const stringified = String(item);
+            if (stringified !== '[object Object]') return stringified;
+        }
+        console.warn(`[loadCurrentDeck] Invalid GUID format:`, item, typeof item);
         return null;
-    }).filter(Boolean) || [];
-    console.log(`[loadCurrentDeck] Loaded ${deckGuids.length} GUIDs:`, deckGuids);
+    }).filter(guid => guid && typeof guid === 'string') || [];
+    
+    console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs:`, deckGuids.slice(0, 3));
     return deckGuids;
 }
 
