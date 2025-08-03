@@ -110,87 +110,67 @@ export function rssApp() {
                 this.loading = false;
             }
         },
-        loadAndDisplayDeck() {
-            let guidsToDisplay = this.currentDeckGuids;
-            if (!Array.isArray(guidsToDisplay)) {
-                guidsToDisplay = [];
+        async _loadAndManageAllData() {
+        // CRITICAL: Load all feed items from the DB into the app state FIRST
+        this.loadFeedItemsFromDB();
+        console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
+
+        // Now load all other state data
+        const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
+            loadArrayState('starred'),
+            loadArrayState('shuffledOutGuids'),
+            loadArrayState('currentDeckGuids'),
+            loadShuffleState()
+        ]);
+    
+        this.starred = Array.isArray(starredState.value) ? starredState.value : [];
+        this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
+    
+        // CRITICAL FIX: Normalize currentDeckGuids to ensure they're strings, not objects
+        let rawCurrentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
+        this.currentDeckGuids = rawCurrentDeckGuids.map(item => {
+            if (typeof item === 'string') {
+                return item;
+            } else if (item && typeof item === 'object' && item.guid) {
+                console.log(`[DB] WARNING: Found object in currentDeckGuids, extracting GUID: ${item.guid}`);
+                return item.guid;
+            } else {
+                console.log(`[DB] WARNING: Invalid item in currentDeckGuids, skipping:`, item);
+                return null;
             }
+        }).filter(guid => guid !== null);
+    
+        // If we had to normalize, save the corrected version
+        if (rawCurrentDeckGuids.length !== this.currentDeckGuids.length || 
+            rawCurrentDeckGuids.some((item, index) => item !== this.currentDeckGuids[index])) {
+            console.log(`[DB] Normalizing currentDeckGuids from ${rawCurrentDeckGuids.length} to ${this.currentDeckGuids.length} valid GUIDs`);
+            await saveArrayState('currentDeckGuids', this.currentDeckGuids);
+        }
+    
+        this.shuffleCount = shuffleState.shuffleCount;
+        this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
-            console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
+        console.log(`[DB] currentDeckGuids loaded: ${this.currentDeckGuids.length} items`);
+        if (this.currentDeckGuids.length > 0) {
+            console.log(`[DB] First few deck GUIDs: ${this.currentDeckGuids.slice(0, 3).join(', ')}`);
+        }
 
-            // DEBUG: Log first few GUIDs and check if they exist
-            if (guidsToDisplay.length > 0) {
-                console.log(`[loadAndDisplayDeck] First 3 GUIDs to display:`, guidsToDisplay.slice(0, 3));
-        
-                for (let i = 0; i < Math.min(3, guidsToDisplay.length); i++) {
-                    const guid = guidsToDisplay[i];
-                    const item = this.feedItems[guid];
-                    console.log(`[loadAndDisplayDeck] GUID ${i}: ${guid}`);
-                    console.log(`[loadAndDisplayDeck] Item found:`, !!item);
-                    if (item) {
-                        console.log(`[loadAndDisplayDeck] Item has guid property:`, !!item.guid);
-                        console.log(`[loadAndDisplayDeck] Item.guid value:`, item.guid);
-                        console.log(`[loadAndDisplayDeck] GUIDs match:`, item.guid === guid);
-                        console.log(`[loadAndDisplayDeck] Item keys:`, Object.keys(item));
-                    }
-                }
-            }
+        // Load and prune hidden items with the complete feedItems
+        this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
+    
+        console.log("[deckManager] Starting deck management with all data loaded.");
+    
+        // Manage the daily deck
+        await manageDailyDeck(this);
+    
+        // Load and display deck
+        console.log(`[DB] About to display deck. feedItems has ${Object.keys(this.feedItems).length} items`);
+        await this.loadAndDisplayDeck();
+        console.log(`[DB] Deck display complete. Final deck size: ${this.deck.length}`);
 
-            const items = [];
-            const hiddenSet = new Set(this.hidden.map(h => h.guid));
-            const starredSet = new Set(this.starred.map(s => s.guid));
-            const seenGuidsForDeck = new Set();
-
-            let foundCount = 0;
-            let missingCount = 0;
-            let conditionFailCount = 0;
-
-            for (const guid of guidsToDisplay) {
-                if (typeof guid !== 'string' || !guid) {
-                    console.log(`[loadAndDisplayDeck] Skipping invalid GUID:`, guid);
-                    continue;
-                }
-        
-                const item = this.feedItems[guid];
-        
-                if (!item) {
-                    missingCount++;
-                    if (missingCount <= 3) {
-                        console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
-                    }
-                    continue;
-                }
-
-                // Check each condition separately
-                const hasGuid = !!item.guid;
-                const notSeenBefore = !seenGuidsForDeck.has(item.guid);
-        
-                console.log(`[loadAndDisplayDeck] Item analysis for ${guid}:`);
-                console.log(`  - Item exists: true`);
-                console.log(`  - Has guid property: ${hasGuid}`);
-                console.log(`  - Item.guid value: ${item.guid}`);
-                console.log(`  - Not seen before: ${notSeenBefore}`);
-        
-                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
-                    const mappedItem = mapRawItem(item, formatDate);
-                    mappedItem.isHidden = hiddenSet.has(mappedItem.id);
-                    mappedItem.isStarred = starredSet.has(mappedItem.id);
-                    items.push(mappedItem);
-                    seenGuidsForDeck.add(mappedItem.id);
-                    foundCount++;
-                    console.log(`  - ADDED to deck (mapped ID: ${mappedItem.id})`);
-                } else {
-                    conditionFailCount++;
-                    console.log(`  - REJECTED from deck`);
-                }
-            }
-
-            console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items, Condition failed ${conditionFailCount} items`);
-
-            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
-            console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
-        },
+        // Update UI once everything is loaded
+        this.updateAllUI();
+    },
 
         loadFeedItemsFromDB: async function() {
             if (!this.db) {
