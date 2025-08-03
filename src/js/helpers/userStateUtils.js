@@ -71,7 +71,8 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     if (!Array.isArray(hiddenItems)) return [];
     if (!Array.isArray(feedItems) || feedItems.length === 0) return hiddenItems;
 
-    const validFeedGuids = new Set(feedItems.map(e => e.guid.trim().toLowerCase()));
+    // FIX: Add a null/undefined check to prevent TypeError when accessing 'guid'
+    const validFeedGuids = new Set(feedItems.filter(e => e && e.guid).map(e => e.guid.trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
     const itemsToKeep = hiddenItems.filter(item => {
