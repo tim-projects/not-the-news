@@ -306,7 +306,6 @@ export function rssApp() {
                 }
             }
         },
-
         _loadAndManageAllData: async function() {
             // CRITICAL FIX: Load all feed items from the DB into the app state first.
             await this.loadFeedItemsFromDB();
@@ -316,13 +315,17 @@ export function rssApp() {
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
-                loadArrayState('currentDeckGuids'),
+                loadCurrentDeck(), // FIX: Use the fixed loadCurrentDeck function instead of loadArrayState
                 loadShuffleState()
             ]);
-            
+    
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
-            this.currentDeckGuids = Array.isArray(currentDeckState.value) ? currentDeckState.value : [];
+    
+            // FIX: currentDeckState is now already processed by loadCurrentDeck, so use it directly
+            this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
+            console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
+    
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
