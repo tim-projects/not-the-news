@@ -245,6 +245,10 @@ export function rssApp() {
         },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
+            // CRITICAL FIX: Reload the entire data set and manage the deck after a state change.
+            // This ensures the app's state is fully refreshed from the database,
+            // reflecting the synced change immediately.
+            await this._loadAndManageAllData();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');

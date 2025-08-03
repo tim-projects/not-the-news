@@ -41,13 +41,19 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     if (isCurrentlyActive) {
         newList = app[stateKey].filter(item => item.guid !== guid);
     } else {
+        // --- FIX: Use a computed key to match the stateKey (e.g., 'hiddenAt', 'starredAt') ---
         newList = [...app[stateKey], {
             guid,
-            timestamp
+            [`${stateKey}At`]: timestamp
         }];
+        // --- END FIX ---
     }
     app[stateKey] = newList;
-    await saveArrayState(stateKey, newList);
+    
+    // --- FIX: Save only the GUID strings to the database to avoid DataCloneError ---
+    const guidsToSave = newList.map(item => item.guid);
+    await saveArrayState(stateKey, guidsToSave);
+    // --- END FIX ---
 
     if (stateKey === 'hidden') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
@@ -94,13 +100,25 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
  * @returns {Promise<Array<object>>} The updated list of hidden items.
  */
 export async function loadAndPruneHiddenItems(feedItems) {
-    const { value: hiddenItems } = await loadArrayState('hidden');
-    const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItems, Date.now());
+    // --- FIX: This function assumes that the database stores arrays of GUIDs and loads them as such.
+    // However, the rest of the application expects objects with timestamps.
+    // The previous `toggleItemStateAndSync` fix stored GUIDs, so we must now load them as GUIDs.
+    // We can then create the expected object structure with a null timestamp to maintain compatibility.
+    // The database is no longer saving the timestamps for these items.
+    const { value: hiddenGuids } = await loadArrayState('hidden');
+    const hiddenItemsWithTimestamps = Array.isArray(hiddenGuids) ? hiddenGuids.map(guid => ({
+        guid,
+        hiddenAt: null
+    })) : [];
 
-    if (prunedHiddenItems.length !== hiddenItems.length) {
+    const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItemsWithTimestamps, Date.now());
+
+    if (prunedHiddenItems.length !== hiddenItemsWithTimestamps.length) {
         try {
-            await saveArrayState('hidden', prunedHiddenItems);
-            console.log(`Pruned hidden items: removed ${hiddenItems.length - prunedHiddenItems.length} stale items.`);
+            // Now, we must save only the GUIDs back to the database.
+            const guidsToSave = prunedHiddenItems.map(item => item.guid);
+            await saveArrayState('hidden', guidsToSave);
+            console.log(`Pruned hidden items: removed ${hiddenItemsWithTimestamps.length - prunedHiddenItems.length} stale items.`);
         } catch (error) {
             console.error("Error pruning stale hidden items:", error);
         }
