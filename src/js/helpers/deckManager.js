@@ -97,6 +97,29 @@ export const manageDailyDeck = async (app) => {
         }
     } else {
         console.log(`[deckManager] Retaining existing deck. Deck size: ${currentDeckGuids.length}.`);
+        
+        // DEBUG: Add detailed logging to understand the mismatch
+        console.log(`[deckManager] DEBUG: currentDeckGuids:`, currentDeckGuids.slice(0, 3)); // First 3 GUIDs
+        console.log(`[deckManager] DEBUG: sample allItems IDs:`, allItems.slice(0, 3).map(item => item.id)); // First 3 item IDs
+        console.log(`[deckManager] DEBUG: allItems[0] full object:`, allItems[0]); // See the structure
+        
+        // Check if any currentDeckGuids match any allItems IDs
+        const matchingItems = allItems.filter(item => currentDeckGuids.includes(item.id));
+        console.log(`[deckManager] DEBUG: Found ${matchingItems.length} matching items out of ${currentDeckGuids.length} deck GUIDs`);
+        
+        if (matchingItems.length === 0 && currentDeckGuids.length > 0) {
+            console.log(`[deckManager] ERROR: No matching items found! This suggests a GUID mismatch.`);
+            console.log(`[deckManager] DEBUG: First deck GUID: "${currentDeckGuids[0]}" (type: ${typeof currentDeckGuids[0]})`);
+            console.log(`[deckManager] DEBUG: First item ID: "${allItems[0]?.id}" (type: ${typeof allItems[0]?.id})`);
+            
+            // Try to find the item by checking if GUIDs exist as keys in feedItems
+            if (app.feedItems && app.feedItems[currentDeckGuids[0]]) {
+                console.log(`[deckManager] DEBUG: Found GUID in feedItems! Structure:`, Object.keys(app.feedItems[currentDeckGuids[0]]));
+            } else {
+                console.log(`[deckManager] DEBUG: GUID not found in feedItems either.`);
+            }
+        }
+        
         app.deck = allItems
             .filter(item => currentDeckGuids.includes(item.id))
             .map(item => ({
