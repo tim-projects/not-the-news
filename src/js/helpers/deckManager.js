@@ -32,6 +32,14 @@ export const manageDailyDeck = async (app) => {
     // The main app.js file should handle the initial loading, but these checks
     // act as a final safety net before critical operations.
     const allItems = Array.isArray(app.entries) ? app.entries : [];
+
+    // --- FIX: If allItems is empty, return early to prevent the deck from being cleared prematurely. ---
+    if (allItems.length === 0) {
+        console.log('[deckManager] Skipping deck management: allItems is empty.');
+        return;
+    }
+    // --- END FIX ---
+    
     const hiddenItems = Array.isArray(app.hidden) ? app.hidden : [];
     const starredItems = Array.isArray(app.starred) ? app.starred : [];
     const shuffledOutGuids = Array.isArray(app.shuffledOutGuids) ? app.shuffledOutGuids : [];
@@ -50,9 +58,7 @@ export const manageDailyDeck = async (app) => {
     const isNewDay = app.lastShuffleResetDate !== today;
     const isDeckEmpty = currentDeckGuids.length === 0;
 
-    // --- FIX: Added allItems.length === 0 to force a reset if data is missing. ---
-    if (isNewDay || isDeckEmpty || app.filterMode !== 'unread' || allItems.length === 0) {
-    // --- END FIX ---
+    if (isNewDay || isDeckEmpty || app.filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Empty Deck (${isDeckEmpty}), or Filter Mode Changed (${app.filterMode}).`);
 
         // Now, we pass all the required data to generateNewDeck.
