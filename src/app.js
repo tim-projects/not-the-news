@@ -111,32 +111,49 @@ export function rssApp() {
             }
         },
         async loadAndDisplayDeck() {
-            await this.loadFeedItemsFromDB();
+    // Don't reload from DB - we should already have feedItems populated
+    // await this.loadFeedItemsFromDB(); // Remove this line!
 
-            let guidsToDisplay = this.currentDeckGuids;
-            if (!Array.isArray(guidsToDisplay)) {
-                guidsToDisplay = [];
+    let guidsToDisplay = this.currentDeckGuids;
+    if (!Array.isArray(guidsToDisplay)) {
+        guidsToDisplay = [];
+    }
+
+    console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
+    console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
+
+    const items = [];
+    const hiddenSet = new Set(this.hidden.map(h => h.guid));
+    const starredSet = new Set(this.starred.map(s => s.guid));
+    const seenGuidsForDeck = new Set();
+
+    let foundCount = 0;
+    let missingCount = 0;
+
+    for (const guid of guidsToDisplay) {
+        if (typeof guid !== 'string' || !guid) continue;
+        
+        const item = this.feedItems[guid];
+        if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
+            const mappedItem = mapRawItem(item, formatDate);
+            mappedItem.isHidden = hiddenSet.has(mappedItem.id);
+            mappedItem.isStarred = starredSet.has(mappedItem.id);
+            items.push(mappedItem);
+            seenGuidsForDeck.add(mappedItem.id);
+            foundCount++;
+        } else {
+            missingCount++;
+            if (missingCount <= 3) { // Only log first few missing items
+                console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
             }
+        }
+    }
 
-            const items = [];
-            const hiddenSet = new Set(this.hidden.map(h => h.guid));
-            const starredSet = new Set(this.starred.map(s => s.guid));
-            const seenGuidsForDeck = new Set();
+    console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
 
-            for (const guid of guidsToDisplay) {
-                if (typeof guid !== 'string' || !guid) continue;
-                const item = this.feedItems[guid];
-                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
-                    const mappedItem = mapRawItem(item, formatDate);
-                    mappedItem.isHidden = hiddenSet.has(mappedItem.id);
-                    mappedItem.isStarred = starredSet.has(mappedItem.id);
-                    items.push(mappedItem);
-                    seenGuidsForDeck.add(mappedItem.id);
-                }
-            }
-
-            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
-        },
+    this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
+    console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
+}
 
         async loadFeedItemsFromDB() {
             if (!this.db) {
