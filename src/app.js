@@ -79,11 +79,11 @@ export function rssApp() {
                 this.db = await initDb();
                 
                 // --- FIX: Re-ordered the startup sequence. ---
-                // Load basic state and trigger initial sync first.
+                // 1. Load basic state and trigger initial sync first.
                 await this._loadInitialState();
                 await this._runInitialSync();
                 
-                // Now, with a stable and potentially updated data set,
+                // 2. Now, with a stable and potentially updated data set,
                 // load the remaining data and manage the deck once.
                 await this._loadAndManageAllData();
                 // --- END FIX ---
@@ -302,6 +302,9 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
             // This is the single, authoritative call to manage the deck.
+            // This function contains the logic to check if the last shuffle
+            // was over a day ago, generate a new deck if needed, and
+            // save the new deck GUIDs to the server.
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
 
