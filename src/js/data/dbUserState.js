@@ -66,8 +66,10 @@ export async function saveSimpleState(key, value, storeName = 'userSettings') {
 export async function loadArrayState(storeName) {
     return withDb(async (db) => {
         try {
-            const value = await db.getAll(storeName);
-            return { value: value || USER_STATE_DEFS[storeName]?.default || [] };
+            const allItems = await db.getAll(storeName);
+            // This is the key change: map the objects to just their GUIDs
+            const guids = allItems.map(item => item.guid);
+            return { value: guids || USER_STATE_DEFS[storeName]?.default || [] };
         } catch (e) {
             console.error(`Failed to load array state from store '${storeName}':`, e);
             return { value: USER_STATE_DEFS[storeName]?.default || [] };
@@ -76,18 +78,22 @@ export async function loadArrayState(storeName) {
 }
 
 /**
- * Puts an array of items into a store, overwriting existing data.
+ * Puts an array of items (assumed to be GUIDs) into a store, overwriting existing data.
  * @param {string} storeName The name of the object store.
- * @param {Array<any>} items The items to put into the store.
+ * @param {Array<string>} guids The array of GUIDs to put into the store.
  * @returns {Promise<void>}
  */
-export async function saveArrayState(storeName, items) {
+export async function saveArrayState(storeName, guids) {
     return withDb(async (db) => {
         try {
             const tx = db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
             await store.clear();
-            await Promise.all(items.map(item => store.add(item)));
+            
+            // This is the key change: map the GUIDs to objects before adding
+            const objectsToSave = guids.map(guid => ({ guid: guid }));
+            
+            await Promise.all(objectsToSave.map(item => store.put(item)));
             await tx.done;
         } catch (e) {
             console.error(`Failed to save array state to store '${storeName}':`, e);

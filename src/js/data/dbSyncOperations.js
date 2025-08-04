@@ -160,7 +160,7 @@ const PULL_DEBOUNCE_MS = 500;
 
 /**
  * A private helper to pull a single user state key from the server.
- * This version uses a single, atomic transaction to ensure data integrity.
+ * This version is adapted to work with the specific schema provided.
  * @param {string} key The state key to pull.
  * @param {object} def The state key definition from USER_STATE_DEFS.
  * @returns {Promise<object>} The result of the pull operation.
@@ -193,33 +193,17 @@ async function _pullSingleStateKey(key, def) {
         }
         const data = await response.json();
         console.log(`[DB] New data received for ${key}.`);
-        
-        // --- FIX: This is the core change to correctly handle your schema. ---
-        await withDb(async (db) => {
-            const tx = db.transaction([def.store], 'readwrite');
-            const store = tx.objectStore(def.store);
 
-            if (def.type === 'array') {
-                // Clear the existing store before writing new data
-                await store.clear();
-                
-                // The server response is an array of GUIDs.
-                // We need to save each GUID as a separate object with the 'guid' keyPath.
-                const cleanArray = (data.value || def.default || []).filter(item => {
-                    return typeof item === 'string' && item.trim();
-                });
-                
-                for (const guid of cleanArray) {
-                    await store.put({ guid: guid, timestamp: data.lastModified });
-                }
-            } 
+        // --- FIX: This is the core change to correctly handle your schema. ---
+        if (def.type === 'array') {
+            // The server response is an array of GUIDs.
+            const guidsFromServer = (data.value || def.default || []).filter(item => typeof item === 'string' && item.trim());
+            // Use the corrected saveArrayState function to store the data
+            await saveArrayState(def.store, guidsFromServer);
+        } else {
             // Handle simple state types like 'lastStateSync'
-            else {
-                // For stores with keyPath 'key', save as a key-value object
-                await store.put({ key: key, value: data.value, lastModified: data.lastModified });
-            }
-            await tx.done;
-        });
+            await saveSimpleState(key, data.value, def.store);
+        }
         
         return { key, status: 200, timestamp: data.lastModified };
     } catch (error) {
