@@ -86,14 +86,18 @@ export function rssApp() {
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 
-                // This is the core fix. The app's state should be rebuilt
-                // from the database after sync or if offline. The
-                // `_fullInitialSync` function is now responsible for
-                // both syncing and then loading into memory.
                 if (this.isOnline) {
-                    await this._fullInitialSync();
+                    this.progressMessage = 'Performing initial sync...';
+                    // Pull user state first, as feed items depend on it.
+                    await pullUserState();
+                    // Then sync feed items.
+                    await performFeedSync(this);
+                    
+                    // Now that both syncs are complete, load all data into app state.
+                    await this._loadAndManageAllData();
+                    createStatusBarMessage("Initial sync complete!", "success");
                 } else {
-                    // If offline, just load the local data.
+                    this.progressMessage = 'Offline mode. Loading local data...';
                     await this._loadAndManageAllData();
                 }
 
@@ -317,40 +321,7 @@ export function rssApp() {
             this.filterMode = filterMode;
             this.isOnline = isOnline();
         },
-        _fullInitialSync: async function() {
-            if (!this.syncEnabled) {
-                console.log("[DB] Sync is disabled, skipping initial sync.");
-                return;
-            }
-            try {
-                this.progressMessage = 'Pulling user state and feed items from server...';
-                
-                // Perform the feed sync first. This will fetch new items.
-                await performFeedSync(this);
-                
-                // Then, pull user state, which includes starred and hidden items.
-                // It's important to do this after the feed sync to ensure user state
-                // can be applied to the newly fetched feed items.
-                await pullUserState();
-                
-                // Now, wait a very short time to ensure IndexedDB has finished
-                // writing the data from the server. This prevents the race condition.
-                await new Promise(resolve => setTimeout(resolve, 100));
-
-                this.progressMessage = 'Reloading data into app state...';
-                
-                // Now that the database is guaranteed to be up to date,
-                // we can safely load all the data into the app's memory.
-                await this._loadAndManageAllData();
-                createStatusBarMessage("Initial sync complete!", "success");
-            } catch (error) {
-                console.error("Initial sync failed:", error);
-                this.errorMessage = `Initial sync failed: ${error.message}`;
-                if (document.querySelector('.status-bar-container')) {
-                    createStatusBarMessage(`Initial sync failed: ${error.message}`, "error");
-                }
-            }
-        },
+        
         _loadAndManageAllData: async function() {
             await this.loadFeedItemsFromDB();
             console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
