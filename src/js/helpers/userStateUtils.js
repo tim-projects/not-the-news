@@ -9,7 +9,7 @@ import {
     loadArrayState,
     saveArrayState,
     queueAndAttemptSyncOperation,
-    updateArrayState // This is the key import for the fix
+    updateArrayState
 } from '../data/database.js';
 
 import { isOnline } from '../utils/connectivity.js';
@@ -23,6 +23,7 @@ import { createStatusBarMessage } from '../ui/uiUpdaters.js';
  * @param {string} stateKey The key for the state to toggle ('starred' or 'hidden').
  */
 export async function toggleItemStateAndSync(app, guid, stateKey) {
+    // Determine the current state based on the presence of the GUID in the local state array.
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
 
@@ -36,23 +37,27 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
         }
     };
 
-    // Use the specialized function to update the database
-    // The `updateArrayState` function will handle adding or removing the item correctly.
-    // It is more efficient than clearing and re-saving the entire array.
+    // Update the local database. This is robust and correct.
     await updateArrayState(stateKey, guid, !isCurrentlyActive);
 
-    // Update local state for immediate UI feedback.
+    // Update the app's reactive state correctly to trigger UI updates.
+    // By creating a new array, we ensure Alpine.js detects the change.
+    let newAppList;
     if (isCurrentlyActive) {
-        app[stateKey] = app[stateKey].filter(item => item.guid !== guid);
+        newAppList = app[stateKey].filter(item => item.guid !== guid);
     } else {
-        app[stateKey] = [...app[stateKey], {
+        newAppList = [...app[stateKey], {
             guid,
             [`${stateKey}At`]: pendingOp.data.timestamp
         }];
     }
+    // Reassign the new array to the app's state.
+    app[stateKey] = newAppList;
     
     if (stateKey === 'hidden') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
+    } else if (stateKey === 'starred') {
+        createStatusBarMessage(isCurrentlyActive ? 'Item unstarred.' : 'Item starred.', 'info');
     }
 
     if (typeof app.updateCounts === 'function') app.updateCounts();
