@@ -90,11 +90,10 @@ export async function saveArrayState(storeName, guids) {
             const store = tx.objectStore(storeName);
             await store.clear();
             
-            // This is the key change: map the GUIDs to objects before adding
-            // This ensures the object store's keyPath (`guid`) is fulfilled.
             const objectsToSave = guids.map(guid => ({ guid: guid }));
             
-            await Promise.all(objectsToSave.map(item => store.add(item)));
+            // This is the fix: use `put` instead of `add`
+            await Promise.all(objectsToSave.map(item => store.put(item)));
             await tx.done;
         } catch (e) {
             console.error(`Failed to save array state to store '${storeName}':`, e);
