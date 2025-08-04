@@ -8,7 +8,8 @@ import {
     saveSimpleState,
     loadArrayState,
     saveArrayState,
-    queueAndAttemptSyncOperation
+    queueAndAttemptSyncOperation,
+    updateArrayState // This is the key import for the fix
 } from '../data/database.js';
 
 import { isOnline } from '../utils/connectivity.js';
@@ -24,7 +25,6 @@ import { createStatusBarMessage } from '../ui/uiUpdaters.js';
 export async function toggleItemStateAndSync(app, guid, stateKey) {
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
-    const timestamp = new Date().toISOString();
 
     const opType = `${stateKey}Delta`;
     const pendingOp = {
@@ -32,29 +32,25 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
         data: {
             itemGuid: guid,
             action,
-            timestamp
+            timestamp: new Date().toISOString()
         }
     };
 
-    // Update local state and DB for immediate UI feedback.
-    let newList;
+    // Use the specialized function to update the database
+    // The `updateArrayState` function will handle adding or removing the item correctly.
+    // It is more efficient than clearing and re-saving the entire array.
+    await updateArrayState(stateKey, guid, !isCurrentlyActive);
+
+    // Update local state for immediate UI feedback.
     if (isCurrentlyActive) {
-        newList = app[stateKey].filter(item => item.guid !== guid);
+        app[stateKey] = app[stateKey].filter(item => item.guid !== guid);
     } else {
-        // Correctly create an object with the dynamic key for the timestamp.
-        newList = [...app[stateKey], {
+        app[stateKey] = [...app[stateKey], {
             guid,
-            [`${stateKey}At`]: timestamp
+            [`${stateKey}At`]: pendingOp.data.timestamp
         }];
     }
-    app[stateKey] = newList;
     
-    // --- FIX: Map the array to new, plain objects to avoid the DataCloneError. ---
-    // This is the most reliable way to strip the Proxy wrapper used by Alpine.js.
-    const cleanedList = newList.map(item => ({ ...item }));
-    await saveArrayState(stateKey, cleanedList);
-    // --- END FIX ---
-
     if (stateKey === 'hidden') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
     }
