@@ -361,7 +361,8 @@ export function rssApp() {
                 loadCurrentDeck(),
                 loadShuffleState()
             ]);
-    
+            console.log("Loaded starred state:", starredState.value); //debug
+
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
     
