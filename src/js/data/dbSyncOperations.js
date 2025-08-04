@@ -194,24 +194,30 @@ async function _pullSingleStateKey(key, def) {
         const data = await response.json();
         console.log(`[DB] New data received for ${key}.`);
         
-        // --- FIX: Use withDb for an atomic write, preventing the DataError. ---
+        // --- FIX: This is the core change to correctly handle your schema. ---
         await withDb(async (db) => {
             const tx = db.transaction([def.store], 'readwrite');
             const store = tx.objectStore(def.store);
 
-            let valueToStore = data.value;
-
             if (def.type === 'array') {
-                valueToStore = (valueToStore || def.default || []).filter(item => {
-                    if (typeof item === 'string' && item.trim()) return true;
-                    if (typeof item === 'object' && item?.guid?.trim()) return true;
-                    console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
-                    return false;
+                // Clear the existing store before writing new data
+                await store.clear();
+                
+                // The server response is an array of GUIDs.
+                // We need to save each GUID as a separate object with the 'guid' keyPath.
+                const cleanArray = (data.value || def.default || []).filter(item => {
+                    return typeof item === 'string' && item.trim();
                 });
+                
+                for (const guid of cleanArray) {
+                    await store.put({ guid: guid, timestamp: data.lastModified });
+                }
+            } 
+            // Handle simple state types like 'lastStateSync'
+            else {
+                // For stores with keyPath 'key', save as a key-value object
+                await store.put({ key: key, value: data.value, lastModified: data.lastModified });
             }
-            
-            // The fix is to ensure the saved object has a 'key' property that matches the keyPath
-            await store.put({ key: key, value: valueToStore, lastModified: data.lastModified });
             await tx.done;
         });
         
