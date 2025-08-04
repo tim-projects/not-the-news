@@ -88,12 +88,13 @@ export function rssApp() {
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 
+                // This is the core fix. The app's state should be rebuilt
+                // from the database after sync or if offline.
                 if (this.isOnline) {
                     await this._fullInitialSync();
+                } else {
+                    await this._loadAndManageAllData();
                 }
-
-                this.progressMessage = 'Loading feed data from storage...';
-                await this._loadAndManageAllData();
 
                 this.progressMessage = 'Applying user preferences...';
                 initTheme(this);
@@ -273,8 +274,7 @@ export function rssApp() {
         },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            // CRITICAL FIX: Reload the entire data set and manage the deck after a state change.
-            // This ensures the app's state is fully refreshed from the database,
+            // This fix ensures the app's state is fully refreshed from the database,
             // reflecting the synced change immediately.
             await this._loadAndManageAllData();
             // --- FIX: Update the sync status message after a sync operation ---
@@ -282,8 +282,7 @@ export function rssApp() {
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            // CRITICAL FIX: Reload the entire data set and manage the deck after a state change.
-            // This ensures the app's state is fully refreshed from the database,
+            // This fix ensures the app's state is fully refreshed from the database,
             // reflecting the synced change immediately.
             await this._loadAndManageAllData();
             // --- FIX: Update the sync status message after a sync operation ---
@@ -340,7 +339,10 @@ export function rssApp() {
                 this.progressMessage = 'Fetching new feed items...';
                 await performFullSync(this);
                 this.progressMessage = 'Reloading data into app state...';
-                await this.loadFeedItemsFromDB();
+                
+                // This ensures the application state is rebuilt after a full sync.
+                await this._loadAndManageAllData();
+
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
                 console.error("Initial sync failed:", error);
