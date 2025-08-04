@@ -156,6 +156,33 @@ export async function processPendingOperations() {
     }
 }
 
+/**
+ * NEW: A private helper to save pulled state data with a guaranteed transaction.
+ * @param {string} key The state key.
+ * @param {object} def The state key definition.
+ * @param {any} data The data to save.
+ */
+async function _savePulledStateToDb(key, def, data) {
+    return withDb(async (db) => {
+        const tx = db.transaction([def.store], 'readwrite');
+        const store = tx.objectStore(def.store);
+        
+        if (def.type === 'array') {
+            const cleanArray = (data.value || def.default || []).filter(item => {
+                if (typeof item === 'string' && item.trim()) return true;
+                if (typeof item === 'object' && item?.guid?.trim()) return true;
+                console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
+                return false;
+            });
+            await store.put({ key, value: cleanArray });
+        } else {
+            await store.put({ key, value: data.value });
+        }
+        await store.put({ key: 'lastModified', value: data.lastModified });
+        await tx.done;
+    });
+}
+
 let _isPullingUserState = false;
 let _lastPullAttemptTime = 0;
 const PULL_DEBOUNCE_MS = 500;
@@ -170,7 +197,6 @@ async function _pullSingleStateKey(key, def) {
     let localTimestamp = '';
     let isLocalStateEmpty = false;
 
-    // Use a single transaction for loading state.
     const { value, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store);
     const hasValidData = Array.isArray(value) ? value.length > 0 && value.every(item => item) : (value !== null && value !== undefined);
     isLocalStateEmpty = !hasValidData;
@@ -195,17 +221,7 @@ async function _pullSingleStateKey(key, def) {
         const data = await response.json();
         console.log(`[DB] New data received for ${key}.`);
         
-        if (def.type === 'array') {
-            const cleanArray = (data.value || def.default || []).filter(item => {
-                if (typeof item === 'string' && item.trim()) return true;
-                if (typeof item === 'object' && item?.guid?.trim()) return true;
-                console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
-                return false;
-            });
-            await saveArrayState(def.store, cleanArray);
-        } else {
-            await saveSimpleState(key, data.value);
-        }
+        await _savePulledStateToDb(key, def, data);
         
         return { key, status: 200, timestamp: data.lastModified };
     } catch (error) {
@@ -236,7 +252,6 @@ export async function pullUserState() {
 
     const keysToPull = Object.entries(USER_STATE_DEFS).filter(([key, def]) => !def.localOnly);
 
-    // Await for each pull in series to prevent race conditions.
     const results = [];
     for (const [key, def] of keysToPull) {
         const result = await _pullSingleStateKey(key, def);
