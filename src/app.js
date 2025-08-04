@@ -86,9 +86,14 @@ export function rssApp() {
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 
+                // This is the core fix. The app's state should be rebuilt
+                // from the database after sync or if offline. The
+                // `_fullInitialSync` function is now responsible for
+                // both syncing and then loading into memory.
                 if (this.isOnline) {
                     await this._fullInitialSync();
                 } else {
+                    // If offline, just load the local data.
                     await this._loadAndManageAllData();
                 }
 
@@ -316,11 +321,15 @@ export function rssApp() {
         _fullInitialSync: async function() {
             if (!this.syncEnabled) return;
             try {
-                this.progressMessage = 'Pulling user state from server...';
-                await pullUserState();
-                this.progressMessage = 'Fetching new feed items...';
+                this.progressMessage = 'Pulling user state and feed items from server...';
+                
+                // This is the single, authoritative point for syncing all data.
                 await performFullSync(this);
+                await pullUserState();
+                
                 this.progressMessage = 'Reloading data into app state...';
+                
+                // Now, load the data from the database into the application state.
                 await this._loadAndManageAllData();
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
