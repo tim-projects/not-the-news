@@ -70,10 +70,8 @@ export function rssApp() {
         isOnline: isOnline(),
         deckManaged: false,
 
-        // --- FIX: Add new state properties for the status message ---
         syncStatusMessage: '',
         showSyncStatus: false,
-        // --- END FIX ---
 
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
@@ -88,8 +86,6 @@ export function rssApp() {
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 
-                // This is the core fix. The app's state should be rebuilt
-                // from the database after sync or if offline.
                 if (this.isOnline) {
                     await this._fullInitialSync();
                 } else {
@@ -113,7 +109,6 @@ export function rssApp() {
                 this.progressMessage = '';
                 this.loading = false;
                 
-                // --- FIX: Initial call to update the sync status message ---
                 await this.updateSyncStatusMessage();
             } catch (error) {
                 console.error("Initialization failed:", error);
@@ -123,7 +118,6 @@ export function rssApp() {
             }
         },
 
-        // --- FIX: Add new method to update the sync status message ---
         updateSyncStatusMessage: function() {
             const online = isOnline();
             let message = '';
@@ -140,7 +134,6 @@ export function rssApp() {
             this.syncStatusMessage = message;
             this.showSyncStatus = show;
         },
-        // --- END FIX ---
         
         loadAndDisplayDeck: async function() {
             let guidsToDisplay = this.currentDeckGuids;
@@ -166,12 +159,10 @@ export function rssApp() {
                 if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
                     const mappedItem = mapRawItem(item, formatDate);
                     
-                    // --- FIX: Use mappedItem.guid instead of mappedItem.id ---
                     mappedItem.isHidden = hiddenSet.has(mappedItem.guid);
                     mappedItem.isStarred = starredSet.has(mappedItem.guid);
                     items.push(mappedItem);
                     seenGuidsForDeck.add(mappedItem.guid);
-                    // --- END FIX ---
                     
                     foundCount++;
                 } else {
@@ -224,7 +215,6 @@ export function rssApp() {
 
             switch (this.filterMode) {
                 case "unread":
-                    // --- FIX: Use item.guid instead of item.id ---
                     filtered = this.deck.filter(item => !hiddenMap.has(item.guid));
                     break;
                 case "all":
@@ -240,13 +230,11 @@ export function rssApp() {
                     break;
             }
 
-            // --- FIX: Use e.guid instead of e.id ---
             filtered = filtered.map(e => ({
                 ...e,
                 isHidden: hiddenMap.has(e.guid),
                 isStarred: starredMap.has(e.guid)
             }));
-            // --- END FIX ---
 
             const keywordBlacklist = (this.keywordBlacklistInput ?? '')
                 .split(/\r?\n/)
@@ -274,18 +262,12 @@ export function rssApp() {
         },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            // This fix ensures the app's state is fully refreshed from the database,
-            // reflecting the synced change immediately.
             await this._loadAndManageAllData();
-            // --- FIX: Update the sync status message after a sync operation ---
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            // This fix ensures the app's state is fully refreshed from the database,
-            // reflecting the synced change immediately.
             await this._loadAndManageAllData();
-            // --- FIX: Update the sync status message after a sync operation ---
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
@@ -339,10 +321,7 @@ export function rssApp() {
                 this.progressMessage = 'Fetching new feed items...';
                 await performFullSync(this);
                 this.progressMessage = 'Reloading data into app state...';
-                
-                // This ensures the application state is rebuilt after a full sync.
                 await this._loadAndManageAllData();
-
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
                 console.error("Initial sync failed:", error);
