@@ -67,12 +67,37 @@ export async function loadArrayState(storeName) {
     return withDb(async (db) => {
         try {
             const allItems = await db.getAll(storeName);
-            // This is the key change: map the objects to just their GUIDs
             const guids = allItems.map(item => item.guid);
             return { value: guids || USER_STATE_DEFS[storeName]?.default || [] };
         } catch (e) {
             console.error(`Failed to load array state from store '${storeName}':`, e);
             return { value: USER_STATE_DEFS[storeName]?.default || [] };
+        }
+    });
+}
+
+/**
+ * Adds or removes a single GUID from an array-based store.
+ * @param {string} storeName The name of the object store.
+ * @param {string} guid The GUID to add or remove.
+ * @param {boolean} add true to add, false to remove.
+ * @returns {Promise<void>}
+ */
+export async function updateArrayState(storeName, guid, add) {
+    return withDb(async (db) => {
+        try {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            if (add) {
+                // Use put to add the item, which handles overwriting if it already exists
+                await store.put({ guid: guid });
+            } else {
+                // Use delete to remove the item
+                await store.delete(guid);
+            }
+            await tx.done;
+        } catch (e) {
+            console.error(`Failed to update array state in store '${storeName}' for guid '${guid}':`, e);
         }
     });
 }
@@ -92,7 +117,6 @@ export async function saveArrayState(storeName, guids) {
             
             const objectsToSave = guids.map(guid => ({ guid: guid }));
             
-            // This is the fix: use `put` instead of `add`
             await Promise.all(objectsToSave.map(item => store.put(item)));
             await tx.done;
         } catch (e) {

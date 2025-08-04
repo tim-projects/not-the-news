@@ -7,8 +7,9 @@ import { isOnline } from '../utils/connectivity.js';
 import {
     loadSimpleState,
     saveSimpleState,
-    saveArrayState,
+    saveArrayState, // Keep this for now, but its use will be changed
     loadArrayState,
+    updateArrayState, // New function for single item updates
     USER_STATE_DEFS
 } from './dbUserState.js';
 
@@ -194,14 +195,28 @@ async function _pullSingleStateKey(key, def) {
         const data = await response.json();
         console.log(`[DB] New data received for ${key}.`);
 
-        // --- FIX: This is the core change to correctly handle your schema. ---
         if (def.type === 'array') {
-            // The server response is an array of GUIDs.
-            const guidsFromServer = (data.value || def.default || []).filter(item => typeof item === 'string' && item.trim());
-            // Use the corrected saveArrayState function to store the data
-            await saveArrayState(def.store, guidsFromServer);
+            const guidsFromServer = new Set((data.value || def.default || []).filter(item => typeof item === 'string' && item.trim()));
+            const guidsLocally = new Set(value);
+
+            // Find GUIDs to add and delete
+            const guidsToAdd = [...guidsFromServer].filter(guid => !guidsLocally.has(guid));
+            const guidsToRemove = [...guidsLocally].filter(guid => !guidsFromServer.has(guid));
+
+            await withDb(async (db) => {
+                const tx = db.transaction([def.store], 'readwrite');
+                const store = tx.objectStore(def.store);
+
+                for (const guid of guidsToAdd) {
+                    await store.put({ guid: guid });
+                }
+
+                for (const guid of guidsToRemove) {
+                    await store.delete(guid);
+                }
+                await tx.done;
+            });
         } else {
-            // Handle simple state types like 'lastStateSync'
             await saveSimpleState(key, data.value, def.store);
         }
         
