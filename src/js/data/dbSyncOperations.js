@@ -50,7 +50,6 @@ export async function queueAndAttemptSyncOperation(operation) {
         const generatedId = await _addPendingOperationToBuffer(operation);
         console.log(`[DB] Operation buffered with ID: ${generatedId}`, operation);
         
-        // --- FIX: Check both online status and syncEnabled setting. ---
         const { value: syncEnabled } = await loadSimpleState('syncEnabled');
         if ((operation.type === 'starDelta' || operation.type === 'hiddenDelta') && isOnline() && syncEnabled) {
             console.log(`[DB] Attempting immediate sync for ${operation.type} (ID: ${generatedId}).`);
@@ -92,7 +91,6 @@ export async function queueAndAttemptSyncOperation(operation) {
  * Processes all pending operations in the buffer and syncs them with the server.
  */
 export async function processPendingOperations() {
-    // --- FIX: Check both online status and syncEnabled setting. ---
     const { value: syncEnabled } = await loadSimpleState('syncEnabled');
     if (!isOnline() || !syncEnabled) {
         console.log('[DB] Offline or sync is disabled. Skipping batch sync.');
@@ -155,39 +153,14 @@ export async function processPendingOperations() {
         console.error('[DB] Error during batch synchronization:', error);
     }
 }
-i/**
- * NEW: A private helper to save pulled state data with a guaranteed transaction.
- * @param {string} key The state key.
- * @param {object} def The state key definition.
- * @param {any} data The data to save.
- */
-async function _savePulledStateToDb(key, def, data) {
-    return withDb(async (db) => {
-        const tx = db.transaction([def.store], 'readwrite');
-        const store = tx.objectStore(def.store);
 
-        if (def.type === 'array') {
-            const cleanArray = (data.value || def.default || []).filter(item => {
-                if (typeof item === 'string' && item.trim()) return true;
-                if (typeof item === 'object' && item?.guid?.trim()) return true;
-                console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
-                return false;
-            });
-            // The fix is to ensure the saved object has a 'key' property
-            await store.put({ key, value: cleanArray });
-        } else {
-            // The fix is to ensure the saved object has a 'key' property
-            await store.put({ key, value: data.value });
-        }
-        await tx.done;
-    });
-}
 let _isPullingUserState = false;
 let _lastPullAttemptTime = 0;
 const PULL_DEBOUNCE_MS = 500;
 
 /**
  * A private helper to pull a single user state key from the server.
+ * This version uses a single, atomic transaction to ensure data integrity.
  * @param {string} key The state key to pull.
  * @param {object} def The state key definition from USER_STATE_DEFS.
  * @returns {Promise<object>} The result of the pull operation.
@@ -196,6 +169,7 @@ async function _pullSingleStateKey(key, def) {
     let localTimestamp = '';
     let isLocalStateEmpty = false;
 
+    // Load local state outside the write transaction
     const { value, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store);
     const hasValidData = Array.isArray(value) ? value.length > 0 && value.every(item => item) : (value !== null && value !== undefined);
     isLocalStateEmpty = !hasValidData;
@@ -220,7 +194,26 @@ async function _pullSingleStateKey(key, def) {
         const data = await response.json();
         console.log(`[DB] New data received for ${key}.`);
         
-        await _savePulledStateToDb(key, def, data);
+        // --- FIX: Use withDb for an atomic write, preventing the DataError. ---
+        await withDb(async (db) => {
+            const tx = db.transaction([def.store], 'readwrite');
+            const store = tx.objectStore(def.store);
+
+            let valueToStore = data.value;
+
+            if (def.type === 'array') {
+                valueToStore = (valueToStore || def.default || []).filter(item => {
+                    if (typeof item === 'string' && item.trim()) return true;
+                    if (typeof item === 'object' && item?.guid?.trim()) return true;
+                    console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
+                    return false;
+                });
+            }
+            
+            // The fix is to ensure the saved object has a 'key' property that matches the keyPath
+            await store.put({ key: key, value: valueToStore, lastModified: data.lastModified });
+            await tx.done;
+        });
         
         return { key, status: 200, timestamp: data.lastModified };
     } catch (error) {
@@ -233,7 +226,6 @@ async function _pullSingleStateKey(key, def) {
  * Pulls the user state from the server.
  */
 export async function pullUserState() {
-    // --- FIX: Check both online status and syncEnabled setting. ---
     const { value: syncEnabled } = await loadSimpleState('syncEnabled');
     if (!isOnline() || !syncEnabled) {
         console.log('[DB] Offline or sync is disabled. Skipping user state pull.');
@@ -290,7 +282,6 @@ export async function getAllFeedItems() {
  * @param {object} app The main application state object.
  */
 export async function performFeedSync(app) {
-    // --- FIX: Check both online status and syncEnabled setting. ---
     const { value: syncEnabled } = await loadSimpleState('syncEnabled');
     if (!isOnline() || !syncEnabled) {
         return console.log('[DB] Offline or sync is disabled. Skipping feed sync.');
@@ -326,7 +317,6 @@ export async function performFeedSync(app) {
         const BATCH_SIZE = 50;
         const newItems = [];
 
-        // Perform all network requests outside the database transaction.
         for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
             const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
             const itemsResponse = await fetch(`${API_BASE_URL}/api/feed-items`, {
@@ -345,18 +335,15 @@ export async function performFeedSync(app) {
             newItems.push(...items);
         }
 
-        // Open a single transaction for all database operations.
         await withDb(async (db) => {
             const tx = db.transaction(['feedItems'], 'readwrite');
             const feedStore = tx.objectStore('feedItems');
 
-            // Handle deletions first
             for (const guidToDelete of guidsToDelete) {
                 await feedStore.delete(guidToDelete);
                 console.log(`[DB] Deleted item: ${guidToDelete}`);
             }
 
-            // Handle new/updated items
             for (const item of newItems) {
                 if (item.guid) await feedStore.put(item);
                 else console.error("[DB] Item missing GUID, cannot store:", item);
@@ -381,7 +368,6 @@ export async function performFeedSync(app) {
  * @param {object} app The main application state object.
  */
 export async function performFullSync(app) {
-    // --- FIX: Check both online status and syncEnabled setting. ---
     const { value: syncEnabled } = await loadSimpleState('syncEnabled');
     if (!isOnline() || !syncEnabled) {
         return console.log('[DB] Offline or sync is disabled. Skipping full sync.');
