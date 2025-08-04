@@ -155,8 +155,7 @@ export async function processPendingOperations() {
         console.error('[DB] Error during batch synchronization:', error);
     }
 }
-
-/**
+i/**
  * NEW: A private helper to save pulled state data with a guaranteed transaction.
  * @param {string} key The state key.
  * @param {object} def The state key definition.
@@ -166,7 +165,7 @@ async function _savePulledStateToDb(key, def, data) {
     return withDb(async (db) => {
         const tx = db.transaction([def.store], 'readwrite');
         const store = tx.objectStore(def.store);
-        
+
         if (def.type === 'array') {
             const cleanArray = (data.value || def.default || []).filter(item => {
                 if (typeof item === 'string' && item.trim()) return true;
@@ -174,15 +173,15 @@ async function _savePulledStateToDb(key, def, data) {
                 console.warn(`[DB] Skipping invalid array item for key '${key}':`, item);
                 return false;
             });
+            // The fix is to ensure the saved object has a 'key' property
             await store.put({ key, value: cleanArray });
         } else {
+            // The fix is to ensure the saved object has a 'key' property
             await store.put({ key, value: data.value });
         }
-        await store.put({ key: 'lastModified', value: data.lastModified });
         await tx.done;
     });
 }
-
 let _isPullingUserState = false;
 let _lastPullAttemptTime = 0;
 const PULL_DEBOUNCE_MS = 500;
