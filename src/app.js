@@ -317,19 +317,30 @@ export function rssApp() {
             this.filterMode = filterMode;
             this.isOnline = isOnline();
         },
-
         _fullInitialSync: async function() {
-            if (!this.syncEnabled) return;
+            if (!this.syncEnabled) {
+                console.log("[DB] Sync is disabled, skipping initial sync.");
+                return;
+            }
             try {
                 this.progressMessage = 'Pulling user state and feed items from server...';
                 
-                // This is the single, authoritative point for syncing all data.
-                await performFullSync(this);
+                // Perform the feed sync first. This will fetch new items.
+                await performFeedSync(this);
+                
+                // Then, pull user state, which includes starred and hidden items.
+                // It's important to do this after the feed sync to ensure user state
+                // can be applied to the newly fetched feed items.
                 await pullUserState();
                 
+                // Now, wait a very short time to ensure IndexedDB has finished
+                // writing the data from the server. This prevents the race condition.
+                await new Promise(resolve => setTimeout(resolve, 100));
+
                 this.progressMessage = 'Reloading data into app state...';
                 
-                // Now, load the data from the database into the application state.
+                // Now that the database is guaranteed to be up to date,
+                // we can safely load all the data into the app's memory.
                 await this._loadAndManageAllData();
                 createStatusBarMessage("Initial sync complete!", "success");
             } catch (error) {
