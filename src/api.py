@@ -9,6 +9,7 @@ import os
 import json
 import secrets
 import logging, html
+import tempfile
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -47,6 +48,24 @@ USER_STATE_SERVER_DEFAULTS = {
     'rssFeeds': {'type': 'array', 'default': []},
     'keywordBlacklist': {'type': 'array', 'default': []},
 }
+
+def _atomic_write(filepath, content, mode='w', encoding='utf-8'):
+    """
+    Writes content to a file in an atomic way.
+    It writes to a temporary file first and then renames it.
+    """
+    dir_name, file_name = os.path.split(filepath)
+    with tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, delete=False, dir=dir_name) as temp_file:
+        try:
+            temp_file.write(content)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+            temp_path = temp_file.name
+        except Exception:
+            os.unlink(temp_file.name)
+            raise
+    
+    os.rename(temp_path, filepath)
 
 @app.route("/api/login", methods=["POST"])
 def login():
@@ -97,7 +116,7 @@ def _load_feed_items():
 
     # Remove namespaces for easier parsing
     for elem in root.iter():
-        if "}" in elem.tag:
+        if "}" in elem in elem.tag:
             elem.tag = elem.tag.split("}", 1)[1]
 
     items = {}
@@ -205,8 +224,8 @@ def _load_state(key):
             now_utc = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
             initial_state = {"value": initial_value, "lastModified": now_utc}
             try:
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(initial_state, f, indent=2)
+                # Use atomic write for the initial file creation
+                _save_state(key, initial_value)
                 return initial_state
             except Exception:
                 return {"value": None, "lastModified": None}
@@ -224,8 +243,8 @@ def _save_state(key, value):
     data = {"value": value, "lastModified": now}
     path = _user_state_path(key)
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        json_content = json.dumps(data, indent=2)
+        _atomic_write(path, json_content)
         return now
     except Exception as e:
         app.logger.exception(f"Error saving user state for key '{key}': {e}")
