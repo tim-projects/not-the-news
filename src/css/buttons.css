@@ -221,7 +221,7 @@ button.close.hidden:active {
 #back-button {
   position: absolute;
   top: 0.5rem;
-  left: 0.5rem;
+  left: 1.2rem;
   background: none;
   color: var(--fg);
   font-size: 1.8rem;
