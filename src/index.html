@@ -1,3 +1,4 @@
+--- START OF FILE src/index.html ---
 <!DOCTYPE html>
 <html lang="en">
 
@@ -93,8 +94,8 @@
                     </div>
                     <div class="itemdescription" x-init="handleEntryLinks($el)">
                         <div class="itemfrom">
-                            <p class="source" x-text="`Source: ${entry.source}`"></p>
-                            <p class="pubdate" x-text="entry.pubDate"></p>
+                            <p class="source" x-text="`Source: ${entry.source || new URL(entry.link).hostname}`"></p>
+                            <p class="pubdate" x-text="new Date(entry.pubDate).toLocaleString()"></p>
                         </div>
                         <template x-if="imagesEnabled && entry.image">
                             <img :src="entry.image" alt="" class="entry-image" @load="$el.classList.add('loaded')"
@@ -121,8 +122,8 @@
                         <label for="filter-selector">RSS Items filter:</label>
                         <select id="filter-selector" x-model="filterMode" class="filter-select">
                             <option value="unread">Unread</option>
-                            <option value="starred">Starred</option>
-                            <option value="hidden">Hidden</option>
+                            <option value="starred" x-text="`Starred (${starred.length})`"></option>
+                            <option value="hidden" x-text="`Hidden (${hidden.length})`"></option>
                             <option value="all">All</option>
                         </select>
                     </div>
@@ -140,11 +141,10 @@
                     <div class="settings-group">
                         <label for="theme-toggle">Display theme:</label>
                         <div class="d-flex align-items-center">
-                            <span id="theme-text"
-                                x-text="document.documentElement.classList.contains('dark') ? 'dark' : 'light'"></span>
+                             <span id="theme-text" x-text="theme"></span>
                             <label class="switch">
                                 <input type="checkbox" id="theme-toggle"
-                                    :checked="document.documentElement.classList.contains('dark')">
+                                    :checked="theme === 'dark'">
                                 <span class="slider"></span>
                             </label>
                         </div>
@@ -216,42 +216,14 @@
                     stroke-width="1.5" />
             </svg>
         </button>
+
+        <!-- NEW: Status Message Container -->
+        <div id="sync-status-message"></div>
+
     </div>
 
     <script type="module" src="/main.js"></script>
-    
-    <script>
-        // Global function to update progress message
-        window.updateProgress = function(message) {
-            // Try Alpine.js way first
-            if (window.Alpine && window.Alpine.store) {
-                const store = window.Alpine.store('rssApp');
-                if (store) {
-                    store.progressMessage = message;
-                    return;
-                }
-            }
-            
-            // Fallback to direct DOM manipulation
-            const progressEl = document.getElementById('progress-message');
-            if (progressEl) {
-                progressEl.textContent = message;
-            }
-        };
-
-        // Override console.log to capture messages
-        const originalConsoleLog = console.log;
-        console.log = function(...args) {
-            originalConsoleLog.apply(console, args);
-            
-            // Update progress with the last console message
-            const message = args.join(' ');
-            if (window.updateProgress) {
-                window.updateProgress(message);
-            }
-        };
-    </script>
 
 </body>
-
 </html>
+--- END OF FILE src/index.html ---

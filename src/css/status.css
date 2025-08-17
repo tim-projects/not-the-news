@@ -1,32 +1,41 @@
+--- START OF FILE src/css/status.css ---
 /* --- Sync Status Message --- */
 #sync-status-message {
     position: fixed;
-    bottom: 10px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.8em;
-    font-weight: bold;
-    z-index: 1000;
+    padding: 10px 20px;
+    border-radius: 25px;
+    background-color: #333;
+    color: #fff;
+    font-size: 0.9em;
+    font-weight: 500;
+    z-index: 10000;
     opacity: 0;
-    transition: opacity 0.5s ease-in-out;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, bottom 0.3s ease-in-out;
     pointer-events: none; /* Allows clicks to pass through */
-    color: #fff; /* Default color, overridden by theme-specific classes */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
 
 #sync-status-message.visible {
     opacity: 1;
+    visibility: visible;
+    bottom: 30px;
 }
 
-/* Light Theme: Subtle red */
-.light-theme #sync-status-message {
-    background-color: rgba(220, 53, 69, 0.75); /* Subtle red */
-    color: #fff;
+/* Light Theme Styling */
+html.light #sync-status-message {
+    background-color: #ffffff;
+    color: #333;
+    border: 1px solid #eee;
 }
 
-/* Dark Theme: Subtle red */
-.dark-theme #sync-status-message {
-    background-color: rgba(255, 105, 97, 0.6); /* Slightly brighter red for dark backgrounds */
-    color: #fff;
+/* Dark Theme Styling */
+html.dark #sync-status-message {
+    background-color: #2a2a2e;
+    color: #f0f0f0;
+    border: 1px solid #444;
 }
+--- END OF FILE src/css/status.css ---
