@@ -46,7 +46,10 @@ export const manageDailyDeck = async (app) => {
     // Create Sets for efficient lookups.
     const hiddenGuidsSet = new Set(hiddenItems.map(item => item.guid));
     const starredGuidsSet = new Set(starredItems.map(item => item.guid));
-    const shuffledOutGuidsSet = new Set(shuffledOutGuids);
+    
+    // FIX: 'shuffledOutGuids' is now an array of objects from the DB.
+    // We must map it to an array of strings before creating the Set.
+    const shuffledOutGuidsSet = new Set(shuffledOutGuids.map(item => item.guid));
 
     console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
     console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuidsSet.size}`);
@@ -63,9 +66,9 @@ export const manageDailyDeck = async (app) => {
         // It will handle all the filtering and deck creation logic internally.
         const newDeckGuids = await generateNewDeck(
             allItems,
-            hiddenItems.map(item => item.guid),
-            starredItems.map(item => item.guid),
-            shuffledOutGuids,
+            Array.from(hiddenGuidsSet), // Pass a regular array of GUIDs
+            Array.from(starredGuidsSet), // Pass a regular array of GUIDs
+            Array.from(shuffledOutGuidsSet), // Pass a regular array of GUIDs
             currentDeckGuids,
             MAX_DECK_SIZE,
             app.filterMode

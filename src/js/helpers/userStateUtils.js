@@ -115,18 +115,22 @@ export async function loadAndPruneHiddenItems(feedItems) {
 
     return prunedHiddenItems;
 }
-
 /**
  * Loads the current deck of GUIDs.
  * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
  */
 export async function loadCurrentDeck() {
-    const { value: storedGuids } = await loadArrayState('currentDeckGuids');
-    const deckGuids = storedGuids?.filter(guid => typeof guid === 'string' && guid) || [];
+    const { value: storedObjects } = await loadArrayState('currentDeckGuids');
+    
+    // FIX: The database now returns an array of objects. We need to map these
+    // back to an array of simple string GUIDs for the app logic to use.
+    const deckGuids = Array.isArray(storedObjects)
+        ? storedObjects.map(item => item.guid).filter(guid => typeof guid === 'string' && guid)
+        : [];
+        
     console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs.`);
     return deckGuids;
 }
-
 /**
  * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store
  * and queues a corresponding sync operation.
@@ -140,7 +144,11 @@ export async function saveCurrentDeck(guids) {
     console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs:", guids.slice(0, 3));
 
     try {
-        await saveArrayState('currentDeckGuids', guids);
+        // FIX: Map the array of string GUIDs to an array of objects,
+        // which is the format the new database schema expects.
+        const deckObjects = guids.map(guid => ({ guid }));
+        
+        await saveArrayState('currentDeckGuids', deckObjects);
 
         const clonedGuids = JSON.parse(JSON.stringify(guids));
 
@@ -154,7 +162,6 @@ export async function saveCurrentDeck(guids) {
         throw e;
     }
 }
-
 /**
  * Loads the shuffle state, including shuffle count, last reset date.
  * @returns {Promise<{shuffleCount: number, lastShuffleResetDate: string}>} The shuffle state.
