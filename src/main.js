@@ -1,4 +1,3 @@
---- START OF FILE src/main.js ---
 import Alpine from 'alpinejs';
 import './css/variables.css';
 import './css/buttons.css';
