@@ -1,12 +1,13 @@
-// main.js - FINAL CORRECTED VERSION
+// main.js - FINAL BUNDLER-FRIENDLY VERSION
 
-// REMOVED: This line is for bundler-based setups and causes an error here.
-// import Alpine from 'alpinejs'; 
-
-// REMOVED: These CSS imports are also for bundlers. They are correctly
-// linked in your index.html file instead.
-// import './css/variables.css';
-// ... etc ...
+import Alpine from 'alpinejs';
+import './css/variables.css';
+import './css/buttons.css';
+import './css/forms.css';
+import './css/layout.css';
+import './css/content.css';
+import './css/modal.css';
+import './css/status.css';
 
 const DB_NAME = 'not-the-news-db';
 const DB_VERSION = 25;
@@ -101,8 +102,6 @@ function showStatusMessage(message, duration = 3000) {
 
 // --- Main Alpine.js Application ---
 document.addEventListener('alpine:init', () => {
-    // This function automatically has access to the global `Alpine` object
-    // created by the CDN script tag.
     Alpine.data('rssApp', () => ({
         // --- Core State ---
         loading: true,
@@ -182,72 +181,4 @@ document.addEventListener('alpine:init', () => {
             log('app', `Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
         },
 
-        applyTheme() {
-            localStorage.setItem('theme', this.theme);
-            document.documentElement.classList.remove('light', 'dark');
-            document.documentElement.classList.add(this.theme);
-        },
-
-        async toggleTheme() {
-            this.theme = this.theme === 'light' ? 'dark' : 'light';
-            this.applyTheme();
-            await dbSet(STORES.userState, 'theme', this.theme);
-        },
-        
-        async toggleStar(guid) {
-            const index = this.starred.findIndex(item => item.guid === guid);
-            if (index > -1) {
-                this.starred.splice(index, 1);
-                this.queueSync('starDelta', { itemGuid: guid, action: 'remove' });
-                showStatusMessage('Item Unstarred', 2000);
-            } else {
-                this.starred.push({ guid, starredAt: new Date().toISOString() });
-                this.queueSync('starDelta', { itemGuid: guid, action: 'add' });
-                showStatusMessage('Item Starred', 2000);
-            }
-            await dbSet(STORES.userState, 'starred', this.starred);
-        },
-
-        async toggleHidden(guid) {
-            const index = this.hidden.findIndex(item => item.guid === guid);
-            if (index > -1) {
-                this.hidden.splice(index, 1);
-                this.queueSync('hiddenDelta', { itemGuid: guid, action: 'remove' });
-            } else {
-                this.hidden.push({ guid, hiddenAt: new Date().toISOString() });
-                this.queueSync('hiddenDelta', { itemGuid: guid, action: 'add' });
-            }
-            await dbSet(STORES.userState, 'hidden', this.hidden);
-
-            const deckIndex = this.currentDeckGuids.indexOf(guid);
-            if (deckIndex > -1) {
-                this.currentDeckGuids.splice(deckIndex, 1);
-                await dbSet(STORES.userState, 'currentDeckGuids', this.currentDeckGuids);
-            }
-        },
-
-        isStarred(guid) {
-            return this.starred.some(item => item.guid === guid);
-        },
-
-        isHidden(guid) {
-            return this.hidden.some(item => item.guid === guid);
-        },
-        
-        async manageDeck() { /* ... unchanged ... */ },
-        async nextDeck() { /* ... unchanged ... */ },
-        async processShuffle() { /* ... unchanged ... */ },
-        getRandomGuids(guidArray, count) { /* ... unchanged ... */ },
-        async backgroundSync() { /* ... unchanged ... */ },
-        async syncFeed() { /* ... unchanged ... */ },
-        async queueSync(type, data) { /* ... unchanged ... */ },
-        async syncUserState() { /* ... unchanged ... */ },
-        handleEntryLinks(element) { /* ... unchanged ... */ },
-        scrollToTop() { /* ... unchanged ... */ }
-    }));
-});
-
-// REMOVED: These lines are for bundler-based setups.
-// The CDN script in index.html handles this automatically.
-// window.Alpine = Alpine;
-// Alpine.start();
+ 
