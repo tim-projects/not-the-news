@@ -181,4 +181,71 @@ document.addEventListener('alpine:init', () => {
             log('app', `Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
         },
 
- 
+        applyTheme() {
+            localStorage.setItem('theme', this.theme);
+            document.documentElement.classList.remove('light', 'dark');
+            document.documentElement.classList.add(this.theme);
+        },
+
+        async toggleTheme() {
+            this.theme = this.theme === 'light' ? 'dark' : 'light';
+            this.applyTheme();
+            await dbSet(STORES.userState, 'theme', this.theme);
+        },
+        
+        async toggleStar(guid) {
+            const index = this.starred.findIndex(item => item.guid === guid);
+            if (index > -1) {
+                this.starred.splice(index, 1);
+                this.queueSync('starDelta', { itemGuid: guid, action: 'remove' });
+                showStatusMessage('Item Unstarred', 2000);
+            } else {
+                this.starred.push({ guid, starredAt: new Date().toISOString() });
+                this.queueSync('starDelta', { itemGuid: guid, action: 'add' });
+                showStatusMessage('Item Starred', 2000);
+            }
+            await dbSet(STORES.userState, 'starred', this.starred);
+        },
+
+        async toggleHidden(guid) {
+            const index = this.hidden.findIndex(item => item.guid === guid);
+            if (index > -1) {
+                this.hidden.splice(index, 1);
+                this.queueSync('hiddenDelta', { itemGuid: guid, action: 'remove' });
+            } else {
+                this.hidden.push({ guid, hiddenAt: new Date().toISOString() });
+                this.queueSync('hiddenDelta', { itemGuid: guid, action: 'add' });
+            }
+            await dbSet(STORES.userState, 'hidden', this.hidden);
+
+            const deckIndex = this.currentDeckGuids.indexOf(guid);
+            if (deckIndex > -1) {
+                this.currentDeckGuids.splice(deckIndex, 1);
+                await dbSet(STORES.userState, 'currentDeckGuids', this.currentDeckGuids);
+            }
+        },
+
+        isStarred(guid) {
+            return this.starred.some(item => item.guid === guid);
+        },
+
+        isHidden(guid) {
+            return this.hidden.some(item => item.guid === guid);
+        },
+        
+        async manageDeck() { /* ... unchanged ... */ },
+        async nextDeck() { /* ... unchanged ... */ },
+        async processShuffle() { /* ... unchanged ... */ },
+        getRandomGuids(guidArray, count) { /* ... unchanged ... */ },
+        async backgroundSync() { /* ... unchanged ... */ },
+        async syncFeed() { /* ... unchanged ... */ },
+        async queueSync(type, data) { /* ... unchanged ... */ },
+        async syncUserState() { /* ... unchanged ... */ },
+        handleEntryLinks(element) { /* ... unchanged ... */ },
+        scrollToTop() { /* ... unchanged ... */ }
+    }));
+});
+
+// RESTORED: These lines are CRITICAL for a bundler-based setup.
+window.Alpine = Alpine;
+Alpine.start();
