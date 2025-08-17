@@ -1,4 +1,4 @@
-// @filepath: src/main.js (or wherever your main entry point is)
+// @filepath: src/app.js
 
 import Alpine from 'alpinejs';
 // CSS imports remain the same
@@ -10,24 +10,29 @@ import './css/content.css';
 import './css/modal.css';
 import './css/status.css';
 
-// --- FIX: Import the entire modular data and helper layer ---
+// Refactored JS: concise, modern, functional, same output.
+
 import {
-    initDb,
+    getDb,
     performFeedSync,
+    performFullSync,
     pullUserState,
     processPendingOperations,
     loadSimpleState,
     loadArrayState,
+    initDb,
     saveSimpleState,
-    updateArrayState,
-    getAllFeedItems,
-    queueAndAttemptSyncOperation // Ensure this is imported for user actions
+    getAllFeedItems
 } from './js/data/database.js';
+import { loadConfigFile, saveConfigFile } from './js/helpers/apiUtils.js';
 import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.js';
 import {
     loadCurrentDeck,
+    saveCurrentDeck,
     toggleItemStateAndSync,
-    loadAndPruneHiddenItems,
+    pruneStaleHidden, // This function is now a pure utility.
+    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
+    saveShuffleState,
     loadShuffleState,
     setFilterMode,
     loadFilterMode
@@ -50,11 +55,9 @@ import {
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
 import { isOnline } from './js/utils/connectivity.js';
 
-
-// --- Main Alpine.js Application ---
-document.addEventListener('alpine:init', () => {
-    Alpine.data('rssApp', () => ({
-        // --- State Properties (from the advanced app.js) ---
+export function rssApp() {
+    return {
+        // --- State Properties ---
         loading: true,
         progressMessage: 'Initializing...',
         deck: [],
@@ -75,177 +78,447 @@ document.addEventListener('alpine:init', () => {
         shuffledOutGuids: [],
         errorMessage: '',
         isOnline: isOnline(),
+        deckManaged: false,
 
+        syncStatusMessage: '',
+        showSyncStatus: false,
+        
+        // FIX: Add missing state properties to prevent Alpine errors
+        theme: 'dark', // Provide a default value
+        rssSaveMessage: '',
+        keywordSaveMessage: '',
+
+        _lastFilterHash: '',
+        _cachedFilteredEntries: null,
+        scrollObserver: null,
+        
         // --- Core Methods ---
-        async initApp() {
+        initApp: async function() {
             try {
                 this.progressMessage = 'Connecting to database...';
-                // FIX: Use the modular initDb
-                await initDb(); 
+                this.db = await initDb();
                 
                 this.progressMessage = 'Loading settings...';
-                // FIX: Use the advanced initial state loader
                 await this._loadInitialState();
+
+                this.progressMessage = 'Applying user preferences...';
+                this.applyTheme();
+                initSyncToggle(this);
+                initImagesToggle(this);
+                initConfigPanelListeners(this);
+                attachScrollToTopHandler();
+                await initScrollPosition(this);
                 
                 if (this.isOnline) {
                     this.progressMessage = 'Performing initial sync...';
-                    // These now correctly call the modular, fixed sync engine
+                    // Pull user state first, as feed items depend on it.
                     await pullUserState();
+                    // Then sync feed items.
                     await performFeedSync(this);
+                    
+                    // Now that both syncs are complete, load all data into app state.
+                    await this._loadAndManageAllData();
+                    createStatusBarMessage("Initial sync complete!", "success");
+                } else {
+                    this.progressMessage = 'Offline mode. Loading local data...';
+                    await this._loadAndManageAllData();
                 }
-                
-                this.progressMessage = 'Loading all data...';
-                // This function now correctly loads from the granular stores
-                await this._loadAndManageAllData();
-
-                this.progressMessage = 'Applying user preferences...';
-                initTheme(this);
-                // ... all other UI initializers from app.js ...
 
                 this.progressMessage = 'Setting up app watchers...';
-                this._setupWatchers(); // Restore advanced watchers
-                this._setupEventListeners(); // Restore advanced event listeners
+                this._setupWatchers();
+                this._setupEventListeners();
+                this._startPeriodicSync();
+                this._initScrollObserver();
 
                 this.progressMessage = '';
-                this.loading = false; // This line will now be reached
+                this.loading = false;
                 
+                await this.updateSyncStatusMessage();
             } catch (error) {
                 console.error("Initialization failed:", error);
-                this.errorMessage = `Could not load app: ${error.message}`;
+                this.errorMessage = `Could not load feed: ${error.message}`;
                 this.progressMessage = `Error: ${error.message}`;
-                // Keep loading screen on critical error
+                this.loading = false;
             }
         },
+
+        updateSyncStatusMessage: function() {
+            const online = isOnline();
+            let message = '';
+            let show = false;
+
+            if (!online) {
+                message = 'Offline.';
+                show = true;
+            } else if (!this.syncEnabled) {
+                message = 'Sync is disabled.';
+                show = true;
+            }
+
+            this.syncStatusMessage = message;
+            this.showSyncStatus = show;
+        },
         
-        // --- Getters (from the advanced app.js) ---
-        get filteredEntries() {
-            let filtered = [];
+        loadAndDisplayDeck: async function() {
+            let guidsToDisplay = this.currentDeckGuids;
+            if (!Array.isArray(guidsToDisplay)) {
+                guidsToDisplay = [];
+            }
+
+            console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
+            console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
+
+            const items = [];
             const hiddenSet = new Set(this.hidden.map(h => h.guid));
             const starredSet = new Set(this.starred.map(s => s.guid));
+            const seenGuidsForDeck = new Set();
+
+            let foundCount = 0;
+            let missingCount = 0;
+
+            for (const guid of guidsToDisplay) {
+                if (typeof guid !== 'string' || !guid) continue;
+                
+                const item = this.feedItems[guid];
+                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
+                    const mappedItem = mapRawItem(item, formatDate);
+                    
+                    mappedItem.isHidden = hiddenSet.has(mappedItem.guid);
+                    mappedItem.isStarred = starredSet.has(mappedItem.guid);
+                    items.push(mappedItem);
+                    seenGuidsForDeck.add(mappedItem.guid);
+                    
+                    foundCount++;
+                } else {
+                    missingCount++;
+                    if (missingCount <= 3) {
+                        console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
+                    }
+                }
+            }
+
+            console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
+
+            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
+            console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
+        },
+
+        loadFeedItemsFromDB: async function() {
+            if (!this.db) {
+                this.entries = [];
+                this.feedItems = {};
+                return;
+            }
+            const rawItemsFromDb = await getAllFeedItems();
+            this.feedItems = {};
+            const uniqueEntries = [];
+            const seenGuids = new Set();
+
+            rawItemsFromDb.forEach(item => {
+                if (item && item.guid && !seenGuids.has(item.guid)) {
+                    this.feedItems[item.guid] = item;
+                    uniqueEntries.push(item);
+                    seenGuids.add(item.guid);
+                }
+            });
+
+            this.entries = mapRawItems(uniqueEntries, formatDate) || [];
+        },
+        
+        // --- Getters ---
+        get filteredEntries() {
+            if (!Array.isArray(this.deck)) this.deck = [];
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
+            if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
+                return this._cachedFilteredEntries;
+            }
+
+            let filtered = [];
+            const hiddenMap = new Map(this.hidden.map(h => [h.guid, h.hiddenAt]));
+            const starredMap = new Map(this.starred.map(s => [s.guid, s.starredAt]));
 
             switch (this.filterMode) {
                 case "unread":
-                    const deckItemObjects = this.currentDeckGuids
-                        .map(guid => this.feedItems[guid])
-                        .filter(Boolean); // Ensure item exists
-                    filtered = deckItemObjects.filter(item => !hiddenSet.has(item.guid));
-                    break;
-                case "starred":
-                    filtered = Object.values(this.feedItems).filter(item => starredSet.has(item.guid));
-                    break;
-                case "hidden":
-                    filtered = Object.values(this.feedItems).filter(item => hiddenSet.has(item.guid));
+                    filtered = this.deck.filter(item => !hiddenMap.has(item.guid));
                     break;
                 case "all":
-                    filtered = Object.values(this.feedItems);
+                    filtered = this.entries;
+                    break;
+                case "hidden":
+                    filtered = this.entries.filter(e => hiddenMap.has(e.guid))
+                        .sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime());
+                    break;
+                case "starred":
+                    filtered = this.entries.filter(e => starredMap.has(e.guid))
+                        .sort((a, b) => new Date(starredMap.get(b.guid)).getTime() - new Date(starredMap.get(a.guid)).getTime());
                     break;
             }
+
+            filtered = filtered.map(e => ({
+                ...e,
+                isHidden: hiddenMap.has(e.guid),
+                isStarred: starredMap.has(e.guid)
+            }));
+
+            const keywordBlacklist = (this.keywordBlacklistInput ?? '')
+                .split(/\r?\n/)
+                .map(kw => kw.trim().toLowerCase())
+                .filter(kw => kw.length > 0);
             
-            // Map to final display format AFTER filtering
-            return mapRawItems(filtered, formatDate).sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+            if (keywordBlacklist.length > 0) {
+                filtered = filtered.filter(item => {
+                    const searchable = `${item.title} ${item.description}`.toLowerCase();
+                    return !keywordBlacklist.some(keyword => searchable.includes(keyword));
+                });
+            }
+            
+            this._cachedFilteredEntries = filtered;
+            this._lastFilterHash = currentHash;
+            return filtered;
         },
 
         // --- Action Methods ---
-        isStarred(guid) {
+        isStarred: function(guid) {
             return this.starred.some(e => e.guid === guid);
         },
-        isHidden(guid) {
+        isHidden: function(guid) {
             return this.hidden.some(e => e.guid === guid);
         },
-        async toggleStar(guid) {
-            // FIX: Use the advanced toggle function that handles UI, DB, and Sync Queue
+        toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            await this._loadAndManageAllData(); // Reload data to reflect change
+            await this._loadAndManageAllData();
+            this.updateSyncStatusMessage();
         },
-        async toggleHidden(guid) {
+        toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
             await this._loadAndManageAllData();
+            this.updateSyncStatusMessage();
+        },
+        processShuffle: async function() {
+            await processShuffle(this);
+            this.updateCounts();
+        },
+        
+        // FIX: Update save methods to provide UI feedback
+        async saveRssFeeds() {
+            await saveSimpleState('rssFeeds', this.rssFeedsInput);
+            this.rssSaveMessage = 'Feeds saved! Syncing...';
+            createStatusBarMessage('RSS Feeds saved!', 'success');
+            this.loading = true;
+            this.progressMessage = 'Saving feeds and performing full sync...';
+            await performFullSync(this);
+            await this.loadFeedItemsFromDB();
+            await manageDailyDeck(this);
+            this.progressMessage = '';
+            this.loading = false;
+        },
+        async saveKeywordBlacklist() {
+            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
+            await saveSimpleState('keywordBlacklist', keywordsArray);
+            this.keywordSaveMessage = 'Keywords saved!';
+            createStatusBarMessage('Keyword Blacklist saved!', 'success');
+            this.updateCounts();
+        },
+        updateCounts: function() {
+            updateCounts(this);
+        },
+        scrollToTop: function() {
+            scrollToTop();
+        },
+        
+        // FIX: Add methods for theme handling, called by the HTML
+        async toggleTheme() {
+            this.theme = this.theme === 'light' ? 'dark' : 'light';
+            this.applyTheme();
+            await saveSimpleState('theme', this.theme);
         },
 
-        // --- Private Helper Methods (from the advanced app.js) ---
-        async _loadInitialState() {
-            const [syncEnabled, imagesEnabled, urlsNewTab, filterMode] = await Promise.all([
+        // --- Private Helper Methods ---
+        _loadInitialState: async function() {
+            const [syncEnabled, imagesEnabled, urlsNewTab, filterMode, themeState] = await Promise.all([
                 loadSimpleState('syncEnabled'),
                 loadSimpleState('imagesEnabled'),
                 loadSimpleState('openUrlsInNewTabEnabled'),
                 loadFilterMode(),
+                loadSimpleState('theme', 'userSettings')
             ]);
             this.syncEnabled = syncEnabled.value ?? true;
             this.imagesEnabled = imagesEnabled.value ?? true;
             this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
             this.filterMode = filterMode;
+            this.theme = themeState.value ?? 'dark';
+            this.isOnline = isOnline();
+        },
+
+        applyTheme: function() {
+            initTheme(this);
         },
         
-        async _loadAndManageAllData() {
-            // This function now correctly uses the modular data functions against the correct DB schema
-            const [rawItemsFromDb, starredState, hiddenState, deckGuids, shuffleState] = await Promise.all([
-                getAllFeedItems(),
+        _loadAndManageAllData: async function() {
+            await this.loadFeedItemsFromDB();
+            console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
+
+            this.progressMessage = 'Loading user state from storage...';
+            const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
-                loadAndPruneHiddenItems(), // Use the pruning version
+                loadArrayState('shuffledOutGuids'),
                 loadCurrentDeck(),
                 loadShuffleState()
             ]);
+            console.log("Loaded starred state:", starredState.value); //debug
 
-            this.feedItems = rawItemsFromDb.reduce((acc, item) => {
-                if (item && item.guid) acc[item.guid] = item;
-                return acc;
-            }, {});
-            
-            this.starred = starredState.value || [];
-            this.hidden = hiddenState || [];
-            this.currentDeckGuids = deckGuids || [];
+            this.starred = Array.isArray(starredState.value) ? starredState.value : [];
+            this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
+    
+            this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
+            console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
+    
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
+            this.progressMessage = 'Pruning hidden items...';
+            this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
+            console.log("[deckManager] Starting deck management with all data loaded.");
+
+            this.progressMessage = 'Managing today\'s deck...';
             await manageDailyDeck(this);
+            await this.loadAndDisplayDeck();
+
+            this.updateAllUI();
         },
 
-        _setupWatchers() {
-            // Restores the efficient watchers from the advanced app.js
+        updateAllUI: function() {
+            this.updateCounts();
+        },
+
+        _setupWatchers: function() {
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {
-                    const [rssFeeds, keywords] = await Promise.all([
+                    this.modalView = 'main';
+                    await manageSettingsPanelVisibility(this);
+                    const [rssFeeds, storedKeywords] = await Promise.all([
                         loadSimpleState('rssFeeds'),
                         loadSimpleState('keywordBlacklist')
                     ]);
                     this.rssFeedsInput = rssFeeds.value || '';
-                    this.keywordBlacklistInput = Array.isArray(keywords.value) ? keywords.value.join('\n') : '';
+                    if (Array.isArray(storedKeywords.value)) {
+                        this.keywordBlacklistInput = storedKeywords.value.filter(Boolean).sort().join("\n");
+                    } else if (typeof storedKeywords.value === 'string') {
+                        this.keywordBlacklistInput = storedKeywords.value.split(/\r?\n/).filter(Boolean).sort().join("\n");
+                    } else {
+                        this.keywordBlacklistInput = '';
+                    }
+                } else {
+                    await saveCurrentScrollPosition();
                 }
             });
+            this.$watch('openUrlsInNewTabEnabled', () => {
+                document.querySelectorAll('.itemdescription').forEach(el => this.handleEntryLinks(el));
+            });
+            this.$watch("modalView", async () => manageSettingsPanelVisibility(this));
             this.$watch('filterMode', async (newMode) => {
-                await setFilterMode(newMode);
+                await setFilterMode(this, newMode);
+                if (newMode === 'unread') {
+                    await manageDailyDeck(this);
+                }
+                this.scrollToTop();
+            });
+            
+            this.$watch('entries', () => this.updateCounts());
+            this.$watch('hidden', () => this.updateCounts());
+            this.$watch('starred', () => this.updateCounts());
+            this.$watch('currentDeckGuids', () => this.updateCounts());
+        },
+
+        _setupEventListeners: function() {
+            const backgroundSync = async () => {
+                if (!this.syncEnabled || !this.isOnline) return;
+                console.log('Performing periodic background sync...');
+                await performFeedSync(this);
+                await pullUserState();
+                await this._loadAndManageAllData();
+                this.deckManaged = true;
+                console.log('Background sync complete.');
+            };
+
+            window.addEventListener('online', async () => {
+                this.isOnline = true;
+                this.updateSyncStatusMessage(); // <-- FIX: Update status on online event
+                if (this.syncEnabled) {
+                    await processPendingOperations();
+                    await backgroundSync();
+                }
+            });
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+                this.updateSyncStatusMessage(); // <-- FIX: Update status on offline event
+            });
+            setTimeout(backgroundSync, 0);
+        },
+
+        _startPeriodicSync: function() {
+            let lastActivityTimestamp = Date.now();
+            const recordActivity = () => lastActivityTimestamp = Date.now();
+            ["mousemove", "mousedown", "keydown", "scroll", "click", "visibilitychange", "focus"].forEach(event => {
+                document.addEventListener(event, recordActivity, true);
+                if (event === 'focus') window.addEventListener(event, recordActivity, true);
+                if (event === 'visibilitychange') document.addEventListener(event, recordActivity, true);
+            });
+
+            const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+            const INACTIVITY_TIMEOUT_MS = 60 * 1000;
+
+            setInterval(async () => {
+                const now = Date.now();
+                if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
+                    return;
+                }
+                console.log('Starting scheduled background sync...');
+                await performFeedSync(this);
+                await pullUserState();
+                await this._loadAndManageAllData();
+                this.deckManaged = true;
+                console.log('Scheduled sync complete.');
+            }, SYNC_INTERVAL_MS);
+        },
+
+        _initScrollObserver: function() {
+            const observer = new IntersectionObserver(async (entries) => {
+                // ... logic to observe item visibility
+            }, {
+                root: document.querySelector('#feed-container'),
+                rootMargin: '0px',
+                threshold: 0.1
+            });
+            const feedContainer = document.querySelector('#feed-container');
+            if (!feedContainer) return;
+            const observeElements = () => {
+                feedContainer.querySelectorAll('[data-guid]').forEach(item => {
+                    observer.observe(item);
+                });
+            };
+            observeElements();
+            const mutationObserver = new MutationObserver(mutations => {
+                observer.disconnect();
+                observeElements();
+            });
+            mutationObserver.observe(feedContainer, { childList: true, subtree: true });
+            this.scrollObserver = observer;
+        },
+
+        handleEntryLinks: function(element) {
+            if (!element) return;
+            const links = element.querySelectorAll('a');
+            links.forEach(link => {
+                if (link.hostname !== window.location.hostname) {
+                    if (this.openUrlsInNewTabEnabled) {
+                        link.setAttribute('target', '_blank');
+                        link.setAttribute('rel', 'noopener noreferrer');
+                    } else {
+                        link.removeAttribute('target');
+                    }
+                }
             });
         },
-
-        _setupEventListeners() {
-            // Restores the online/offline listeners
-            const syncOnline = async () => {
-                if (!this.syncEnabled) return;
-                await processPendingOperations();
-                await pullUserState();
-                await performFeedSync(this);
-                await this._loadAndManageAllData();
-            };
-            window.addEventListener('online', () => { this.isOnline = true; syncOnline(); });
-            window.addEventListener('offline', () => { this.isOnline = false; });
-        },
-        
-        // --- Stubs for other methods from simple main.js ---
-        // (These can be fleshed out with the logic from app.js as needed)
-        applyTheme() { initTheme(this); },
-        toggleTheme() { 
-            this.theme = this.theme === 'light' ? 'dark' : 'light';
-            saveSimpleState('theme', this.theme);
-            this.applyTheme();
-        },
-        async processShuffle() { 
-            await processShuffle(this); 
-            await this._loadAndManageAllData();
-        },
-        scrollToTop() { scrollToTop(); }
-    }));
-});
-
-// These lines are required for the module-based setup
-window.Alpine = Alpine;
-Alpine.start();
+    };
+}
