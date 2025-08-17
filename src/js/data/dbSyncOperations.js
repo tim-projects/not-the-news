@@ -85,15 +85,6 @@ async function _pullSingleStateKey(key, def) {
     }
 }
 
-
-// --- Functions without changes ---
-export async function pullUserState() { /* ... no changes ... */ }
-export async function getAllFeedItems() { /* ... no changes ... */ }
-export async function performFeedSync(app) { /* ... no changes ... */ }
-export async function performFullSync(app) { /* ... no changes ... */ }
-
-// --- The rest of the original file is here, unchanged ---
-
 /**
  * Pulls the user state from the server.
  */
