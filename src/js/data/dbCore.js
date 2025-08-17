@@ -1,12 +1,10 @@
 // @filepath: src/js/data/dbCore.js
 
-// This file handles the core IndexedDB initialization and schema definition.
-// It also provides the synchronized `withDb` helper function.
-
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 24; // DB_VERSION has been incremented to force a schema migration.
+// FIX: Increment the version to trigger the necessary schema upgrade.
+const DB_VERSION = 26;
 
 let _dbInstance = null;
 let _dbInitPromise = null;
@@ -24,11 +22,11 @@ export const OBJECT_STORES_SCHEMA = [{
     keyPath: 'guid'
 }, {
     name: 'currentDeckGuids',
-    // FIX: Set keyPath to 'guid' to allow for direct lookup, addition, and deletion by GUID.
+    // FIX: Define keyPath as 'guid' to allow for direct lookups and deletions.
     keyPath: 'guid'
 }, {
     name: 'shuffledOutGuids',
-    // FIX: Set keyPath to 'guid' to allow for direct lookup, addition, and deletion by GUID.
+    // FIX: Define keyPath as 'guid' to allow for direct lookups and deletions.
     keyPath: 'guid'
 }, {
     name: 'userSettings',
@@ -41,8 +39,6 @@ export const OBJECT_STORES_SCHEMA = [{
 
 /**
  * Initializes and returns a singleton database instance using idb.
- * This is the sole public function for accessing the database.
- * @returns {Promise<IDBPDatabase>} The IndexedDB database instance.
  */
 async function getDb() {
     if (_dbInstance) {
@@ -55,16 +51,18 @@ async function getDb() {
     _dbInitPromise = openDB(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion) {
             console.log(`[DB] Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
+            const existingStores = new Set(db.objectStoreNames);
+
             OBJECT_STORES_SCHEMA.forEach(schema => {
-                if (db.objectStoreNames.contains(schema.name)) {
+                // More robust upgrade: only delete/recreate if it exists
+                if (existingStores.has(schema.name)) {
                     db.deleteObjectStore(schema.name);
-                    console.log(`[DB] Deleted old store: ${schema.name}`);
                 }
                 db.createObjectStore(schema.name, {
                     keyPath: schema.keyPath,
-                    ...schema.options
+                    ...(schema.options || {})
                 });
-                console.log(`[DB] Created new store: ${schema.name}`);
+                console.log(`[DB] Created/Recreated store: ${schema.name}`);
             });
         },
         blocked() {
@@ -89,14 +87,10 @@ async function getDb() {
 
 /**
  * Ensures a single, ready database instance is available before a callback is executed.
- * This helper is the key to preventing the race condition.
- * @param {Function} callback The function to execute with the database instance.
- * @returns {Promise<any>} The result of the callback.
  */
 export async function withDb(callback) {
     let dbInstance = await getDb();
     return callback(dbInstance);
 }
 
-// Re-export getDb for backward compatibility if needed
 export { getDb as initDb };
