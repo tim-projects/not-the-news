@@ -5,14 +5,14 @@ import './css/forms.css';
 import './css/layout.css';
 import './css/content.css';
 import './css/modal.css';
-import './css/status.css'; // Import the new CSS file
+import './css/status.css';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 24; // Incremented version to ensure schema updates
+const DB_VERSION = 25; // INCREMENTED: Forces a clean DB migration
 const STORES = {
-    userState: 'userState', // Key-value store for user preferences
-    feedItems: 'feedItems', // Store for individual feed articles
-    pendingOperations: 'pendingOperations' // Queue for sync operations
+    userState: 'userState',
+    feedItems: 'feedItems',
+    pendingOperations: 'pendingOperations'
 };
 
 // --- Helper Functions ---
@@ -43,16 +43,16 @@ async function initDB() {
         request.onupgradeneeded = event => {
             log('db', 'Database upgrade needed.');
             db = event.target.result;
-            // Clear old stores if they exist
             const existingStores = Array.from(db.objectStoreNames);
             existingStores.forEach(storeName => {
+                // If a store exists that is NOT in our new schema, remove it.
                 if (!Object.values(STORES).includes(storeName)) {
                     db.deleteObjectStore(storeName);
-                    log('db', `Removed old store: ${storeName}`);
+                    log('db', `Removed old/orphaned store: ${storeName}`);
                 }
             });
 
-            // Create new stores
+            // Create stores if they don't exist
             if (!db.objectStoreNames.contains(STORES.userState)) {
                 db.createObjectStore(STORES.userState, { keyPath: 'key' });
                 log('db', `Created store: ${STORES.userState}`);
@@ -125,14 +125,14 @@ document.addEventListener('alpine:init', () => {
         // --- Core State ---
         loading: true,
         progressMessage: 'Initializing...',
-        allItems: {}, // All feed items, keyed by guid
+        allItems: {},
         currentDeckGuids: [],
         openSettings: false,
         modalView: 'main',
 
         // --- User State (Reactive) ---
-        starred: [], // Array of guid strings
-        hidden: [], // Array of guid strings
+        starred: [],
+        hidden: [],
         shuffleCount: 2,
         lastShuffleResetDate: null,
         shuffledOutGuids: [],
@@ -148,14 +148,12 @@ document.addEventListener('alpine:init', () => {
 
         // --- Computed Properties ---
         get filteredEntries() {
-            let guidsToShow = this.currentDeckGuids;
-
-            // Apply filter based on mode
+            // This is the getter that was crashing. It now safely handles its data.
             switch (this.filterMode) {
                 case 'starred':
                     return this.starred
                         .map(guid => this.allItems[guid])
-                        .filter(Boolean) // Filter out items not in allItems
+                        .filter(Boolean)
                         .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 case 'hidden':
                      return this.hidden
@@ -168,6 +166,8 @@ document.addEventListener('alpine:init', () => {
                         .filter(Boolean);
                 case 'unread':
                 default:
+                    // Ensure currentDeckGuids is always an array before filtering
+                    if (!Array.isArray(this.currentDeckGuids)) return [];
                     return this.currentDeckGuids
                         .filter(guid => !this.hidden.includes(guid))
                         .map(guid => this.allItems[guid])
@@ -181,7 +181,6 @@ document.addEventListener('alpine:init', () => {
             this.progressMessage = 'Opening local database...';
             await initDB();
 
-            // Load theme first for immediate visual feedback
             this.progressMessage = 'Applying theme...';
             await this.loadTheme();
 
@@ -189,7 +188,7 @@ document.addEventListener('alpine:init', () => {
             await this.loadAllUserState();
 
             this.progressMessage = 'Synchronizing with server...';
-            await this.syncFeed(); // Full sync on startup
+            await this.syncFeed();
 
             this.progressMessage = 'Building your deck...';
             await this.manageDeck();
@@ -197,8 +196,7 @@ document.addEventListener('alpine:init', () => {
             this.loading = false;
             log('app', 'Initialization complete.');
 
-            // Setup periodic sync
-            setInterval(() => this.backgroundSync(), 5 * 60 * 1000); // Sync every 5 minutes
+            setInterval(() => this.backgroundSync(), 5 * 60 * 1000);
         },
 
         // --- State Management ---
@@ -210,17 +208,21 @@ document.addEventListener('alpine:init', () => {
                 return acc;
             }, {});
 
-            this.starred = stateMap.starred || [];
-            this.hidden = stateMap.hidden || [];
-            this.shuffleCount = stateMap.shuffleCount !== undefined ? stateMap.shuffleCount : 2;
-            this.lastShuffleResetDate = stateMap.lastShuffleResetDate || null;
-            this.shuffledOutGuids = stateMap.shuffledOutGuids || [];
-            this.filterMode = stateMap.filterMode || 'unread';
-            this.syncEnabled = stateMap.syncEnabled !== undefined ? stateMap.syncEnabled : true;
-            this.imagesEnabled = stateMap.imagesEnabled !== undefined ? stateMap.imagesEnabled : true;
-            this.openUrlsInNewTabEnabled = stateMap.openUrlsInNewTabEnabled !== undefined ? stateMap.openUrlsInNewTabEnabled : true;
-            this.currentDeckGuids = stateMap.currentDeckGuids || [];
+            // FIX: Defensively check if the loaded data is an array.
+            // This prevents crashes if the DB contains corrupted/old data.
+            this.starred = Array.isArray(stateMap.starred) ? stateMap.starred : [];
+            this.hidden = Array.isArray(stateMap.hidden) ? stateMap.hidden : [];
+            this.currentDeckGuids = Array.isArray(stateMap.currentDeckGuids) ? stateMap.currentDeckGuids : [];
+            this.shuffledOutGuids = Array.isArray(stateMap.shuffledOutGuids) ? stateMap.shuffledOutGuids : [];
 
+            // Load other settings with safe defaults
+            this.shuffleCount = typeof stateMap.shuffleCount === 'number' ? stateMap.shuffleCount : 2;
+            this.lastShuffleResetDate = stateMap.lastShuffleResetDate || null;
+            this.filterMode = stateMap.filterMode || 'unread';
+            this.syncEnabled = typeof stateMap.syncEnabled === 'boolean' ? stateMap.syncEnabled : true;
+            this.imagesEnabled = typeof stateMap.imagesEnabled === 'boolean' ? stateMap.imagesEnabled : true;
+            this.openUrlsInNewTabEnabled = typeof stateMap.openUrlsInNewTabEnabled === 'boolean' ? stateMap.openUrlsInNewTabEnabled : true;
+            
             log('app', `Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
         },
 
@@ -230,7 +232,6 @@ document.addEventListener('alpine:init', () => {
             this.theme = storedTheme;
             this.applyTheme();
 
-            // Listener for settings toggle
             const themeToggle = document.getElementById('theme-toggle');
             if (themeToggle) {
                 themeToggle.addEventListener('change', () => {
@@ -251,7 +252,6 @@ document.addEventListener('alpine:init', () => {
             }
             document.getElementById('theme-toggle').checked = (this.theme === 'dark');
         },
-
 
         // --- Star/Hide Actions ---
         async toggleStar(guid) {
@@ -280,7 +280,6 @@ document.addEventListener('alpine:init', () => {
             await dbSet(STORES.userState, 'hidden', this.hidden);
             this.queueSync('hiddenDelta', { itemGuid: guid, action });
 
-             // Check if the deck is now empty and load the next one
             if (this.filterMode === 'unread' && this.filteredEntries.length === 0) {
                 showStatusMessage('Deck cleared! Loading next deck...', 3000);
                 this.nextDeck();
@@ -398,7 +397,6 @@ document.addEventListener('alpine:init', () => {
             await new Promise(resolve => tx.oncomplete = resolve);
             log('db', `Operation buffered with type: ${type}`);
             
-            // Attempt to sync immediately
             this.syncUserState();
         },
 
@@ -422,7 +420,6 @@ document.addEventListener('alpine:init', () => {
                 });
                 if (!response.ok) throw new Error(`Server responded with ${response.status}`);
                 
-                // Clear pending operations on successful sync
                 const tx = db.transaction(STORES.pendingOperations, 'readwrite');
                 tx.objectStore(STORES.pendingOperations).clear();
                 await new Promise(resolve => tx.oncomplete = resolve);
