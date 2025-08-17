@@ -195,6 +195,7 @@ document.addEventListener('alpine:init', () => {
 
                 this.progressMessage = 'Synchronizing with server...';
                 await this.syncFeed();
+                await this.syncUserStateFromServer();
 
                 this.progressMessage = 'Building your deck...';
                 await this.manageDeck();
@@ -233,7 +234,10 @@ document.addEventListener('alpine:init', () => {
             this.openUrlsInNewTabEnabled = typeof stateMap.openUrlsInNewTabEnabled === 'boolean' ? stateMap.openUrlsInNewTabEnabled : this.openUrlsInNewTabEnabled;
             this.theme = stateMap.theme || this.theme;
 
-            log('app', `Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
+            log('app', `Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items from local storage.`);
+            
+            // After loading local state, fetch and merge server state
+            await this.syncUserStateFromServer();
         },
 
         // --- Theme ---
@@ -359,6 +363,43 @@ document.addEventListener('alpine:init', () => {
             await this.syncUserState();
         },
 
+        async syncUserStateFromServer() {
+            log('sync', 'Fetching initial user state from server...');
+            try {
+                const response = await fetch('/api/user-state', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        log('sync', 'No existing user state on server - starting fresh');
+                        return;
+                    }
+                    throw new Error(`Server responded with ${response.status}`);
+                }
+                
+                const serverState = await response.json();
+                log('sync', 'Received server user state:', serverState);
+                
+                // Store server state in IndexedDB
+                if (Array.isArray(serverState.starred)) {
+                    this.starred = serverState.starred;
+                    await dbSet(STORES.userState, 'starred', this.starred);
+                    log('sync', `Stored ${this.starred.length} starred items`);
+                }
+                
+                if (Array.isArray(serverState.hidden)) {
+                    this.hidden = serverState.hidden;
+                    await dbSet(STORES.userState, 'hidden', this.hidden);
+                    log('sync', `Stored ${this.hidden.length} hidden items`);
+                }
+                
+            } catch (error) {
+                log('sync', 'Failed to fetch initial user state from server:', error);
+                // Don't show error message during initial load, just continue with local state
+            }
+        },
+
         async syncFeed() {
             log('sync', 'Fetching feed from server...');
             try {
@@ -414,7 +455,7 @@ document.addEventListener('alpine:init', () => {
                 showAppStatusMessage('Offline. Changes saved locally.', 3000);
                 return;
             }
-            log('sync', 'Syncing user state with server...');
+            log('sync', 'Syncing pending operations with server...');
             const ops = await dbGetAll(STORES.pendingOperations);
             if (ops.length === 0) {
                 log('sync', 'No pending operations to sync.');
