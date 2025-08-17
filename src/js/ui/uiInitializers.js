@@ -1,508 +1,253 @@
-// @filepath: src/app.js
-
-import Alpine from 'alpinejs';
-// CSS imports remain the same
-import './css/variables.css';
-import './css/buttons.css';
-import './css/forms.css';
-import './css/layout.css';
-import './css/content.css';
-import './css/modal.css';
-import './css/status.css';
+// @filepath: src/js/ui/uiInitializers.js
 
 // Refactored JS: concise, modern, functional, same output.
 
 import {
-    getDb,
-    performFeedSync,
-    performFullSync,
-    pullUserState,
-    processPendingOperations,
     loadSimpleState,
-    loadArrayState,
-    initDb,
     saveSimpleState,
-    getAllFeedItems
-} from './js/data/database.js';
-import { loadConfigFile, saveConfigFile } from './js/helpers/apiUtils.js';
-import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.js';
+    getBufferedChangesCount,
+    processPendingOperations,
+    pullUserState,
+    performFullSync,
+    isOnline,
+    saveArrayState // <-- Import the correct function for array states
+} from '../data/database.js';
+
 import {
-    loadCurrentDeck,
-    saveCurrentDeck,
-    toggleItemStateAndSync,
-    pruneStaleHidden, // This function is now a pure utility.
-    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
-    saveShuffleState,
-    loadShuffleState,
-    setFilterMode,
-    loadFilterMode
-} from './js/helpers/userStateUtils.js';
+    getSyncToggle,
+    getSyncText,
+    getImagesToggle,
+    getImagesText,
+    getThemeToggle,
+    getThemeText,
+    getBackButton,
+    getRssFeedsTextarea,
+    getKeywordsBlacklistTextarea,
+    getConfigureRssButton,
+    getConfigureKeywordsButton,
+    getSaveKeywordsButton,
+    getSaveRssButton
+} from './uiElements.js';
+
 import {
-    updateCounts,
-    manageSettingsPanelVisibility,
-    scrollToTop,
-    attachScrollToTopHandler,
-    saveCurrentScrollPosition,
     createStatusBarMessage
-} from './js/ui/uiUpdaters.js';
-import {
-    initSyncToggle,
-    initImagesToggle,
-    initTheme,
-    initScrollPosition,
-    initConfigPanelListeners
-} from './js/ui/uiInitializers.js';
-import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
-import { isOnline } from './js/utils/connectivity.js';
+} from './uiUpdaters.js';
 
-export function rssApp() {
-    return {
-        // --- State Properties ---
-        loading: true,
-        progressMessage: 'Initializing...',
-        deck: [],
-        feedItems: {},
-        filterMode: 'unread',
-        openSettings: false,
-        modalView: 'main',
-        shuffleCount: 0,
-        syncEnabled: true,
-        imagesEnabled: true,
-        openUrlsInNewTabEnabled: true,
-        rssFeedsInput: '',
-        keywordBlacklistInput: '',
-        entries: [],
-        hidden: [],
-        starred: [],
-        currentDeckGuids: [],
-        shuffledOutGuids: [],
-        errorMessage: '',
-        isOnline: isOnline(),
-        deckManaged: false,
-
-        syncStatusMessage: '',
-        showSyncStatus: false,
-
-        _lastFilterHash: '',
-        _cachedFilteredEntries: null,
-        scrollObserver: null,
-        
-        // --- Core Methods ---
-        initApp: async function() {
-            try {
-                this.progressMessage = 'Connecting to database...';
-                this.db = await initDb();
-                
-                this.progressMessage = 'Loading settings...';
-                await this._loadInitialState();
-
-                this.progressMessage = 'Applying user preferences...';
-                this.applyTheme();
-                initSyncToggle(this);
-                initImagesToggle(this);
-                initConfigPanelListeners(this);
-                attachScrollToTopHandler();
-                await initScrollPosition(this);
-                
-                if (this.isOnline) {
-                    this.progressMessage = 'Performing initial sync...';
-                    // Pull user state first, as feed items depend on it.
-                    await pullUserState();
-                    // Then sync feed items.
-                    await performFeedSync(this);
-                    
-                    // Now that both syncs are complete, load all data into app state.
-                    await this._loadAndManageAllData();
-                    createStatusBarMessage("Initial sync complete!", "success");
-                } else {
-                    this.progressMessage = 'Offline mode. Loading local data...';
-                    await this._loadAndManageAllData();
-                }
-
-                this.progressMessage = 'Setting up app watchers...';
-                this._setupWatchers();
-                this._setupEventListeners();
-                this._startPeriodicSync();
-                this._initScrollObserver();
-
-                this.progressMessage = '';
-                this.loading = false;
-                
-                await this.updateSyncStatusMessage();
-            } catch (error) {
-                console.error("Initialization failed:", error);
-                this.errorMessage = `Could not load feed: ${error.message}`;
-                this.progressMessage = `Error: ${error.message}`;
-                this.loading = false;
-            }
-        },
-
-        updateSyncStatusMessage: function() {
-            const online = isOnline();
-            let message = '';
-            let show = false;
-
-            if (!online) {
-                message = 'Offline.';
-                show = true;
-            } else if (!this.syncEnabled) {
-                message = 'Sync is disabled.';
-                show = true;
-            }
-
-            this.syncStatusMessage = message;
-            this.showSyncStatus = show;
-        },
-        
-        loadAndDisplayDeck: async function() {
-            let guidsToDisplay = this.currentDeckGuids;
-            if (!Array.isArray(guidsToDisplay)) {
-                guidsToDisplay = [];
-            }
-
-            console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
-            console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
-
-            const items = [];
-            const hiddenSet = new Set(this.hidden.map(h => h.guid));
-            const starredSet = new Set(this.starred.map(s => s.guid));
-            const seenGuidsForDeck = new Set();
-
-            let foundCount = 0;
-            let missingCount = 0;
-
-            for (const guid of guidsToDisplay) {
-                if (typeof guid !== 'string' || !guid) continue;
-                
-                const item = this.feedItems[guid];
-                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
-                    const mappedItem = mapRawItem(item, formatDate);
-                    
-                    mappedItem.isHidden = hiddenSet.has(mappedItem.guid);
-                    mappedItem.isStarred = starredSet.has(mappedItem.guid);
-                    items.push(mappedItem);
-                    seenGuidsForDeck.add(mappedItem.guid);
-                    
-                    foundCount++;
-                } else {
-                    missingCount++;
-                    if (missingCount <= 3) {
-                        console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
-                    }
-                }
-            }
-
-            console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
-
-            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
-            console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
-        },
-
-        loadFeedItemsFromDB: async function() {
-            if (!this.db) {
-                this.entries = [];
-                this.feedItems = {};
-                return;
-            }
-            const rawItemsFromDb = await getAllFeedItems();
-            this.feedItems = {};
-            const uniqueEntries = [];
-            const seenGuids = new Set();
-
-            rawItemsFromDb.forEach(item => {
-                if (item && item.guid && !seenGuids.has(item.guid)) {
-                    this.feedItems[item.guid] = item;
-                    uniqueEntries.push(item);
-                    seenGuids.add(item.guid);
-                }
-            });
-
-            this.entries = mapRawItems(uniqueEntries, formatDate) || [];
-        },
-        
-        // --- Getters ---
-        get filteredEntries() {
-            if (!Array.isArray(this.deck)) this.deck = [];
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
-            if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
-                return this._cachedFilteredEntries;
-            }
-
-            let filtered = [];
-            const hiddenMap = new Map(this.hidden.map(h => [h.guid, h.hiddenAt]));
-            const starredMap = new Map(this.starred.map(s => [s.guid, s.starredAt]));
-
-            switch (this.filterMode) {
-                case "unread":
-                    filtered = this.deck.filter(item => !hiddenMap.has(item.guid));
-                    break;
-                case "all":
-                    filtered = this.entries;
-                    break;
-                case "hidden":
-                    filtered = this.entries.filter(e => hiddenMap.has(e.guid))
-                        .sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime());
-                    break;
-                case "starred":
-                    filtered = this.entries.filter(e => starredMap.has(e.guid))
-                        .sort((a, b) => new Date(starredMap.get(b.guid)).getTime() - new Date(starredMap.get(a.guid)).getTime());
-                    break;
-            }
-
-            filtered = filtered.map(e => ({
-                ...e,
-                isHidden: hiddenMap.has(e.guid),
-                isStarred: starredMap.has(e.guid)
-            }));
-
-            const keywordBlacklist = (this.keywordBlacklistInput ?? '')
-                .split(/\r?\n/)
-                .map(kw => kw.trim().toLowerCase())
-                .filter(kw => kw.length > 0);
-            
-            if (keywordBlacklist.length > 0) {
-                filtered = filtered.filter(item => {
-                    const searchable = `${item.title} ${item.description}`.toLowerCase();
-                    return !keywordBlacklist.some(keyword => searchable.includes(keyword));
-                });
-            }
-            
-            this._cachedFilteredEntries = filtered;
-            this._lastFilterHash = currentHash;
-            return filtered;
-        },
-
-        // --- Action Methods ---
-        isStarred: function(guid) {
-            return this.starred.some(e => e.guid === guid);
-        },
-        isHidden: function(guid) {
-            return this.hidden.some(e => e.guid === guid);
-        },
-        toggleStar: async function(guid) {
-            await toggleItemStateAndSync(this, guid, 'starred');
-            await this._loadAndManageAllData();
-            this.updateSyncStatusMessage();
-        },
-        toggleHidden: async function(guid) {
-            await toggleItemStateAndSync(this, guid, 'hidden');
-            await this._loadAndManageAllData();
-            this.updateSyncStatusMessage();
-        },
-        processShuffle: async function() {
-            await processShuffle(this);
-            this.updateCounts();
-        },
-        saveRssFeeds: async function() {
-            await saveSimpleState('rssFeeds', this.rssFeedsInput);
-            createStatusBarMessage('RSS Feeds saved!', 'success');
-            this.loading = true;
-            this.progressMessage = 'Saving feeds and performing full sync...';
-            await performFullSync(this);
-            await this.loadFeedItemsFromDB();
-            await manageDailyDeck(this);
-            this.progressMessage = '';
-            this.loading = false;
-        },
-        saveKeywordBlacklist: async function() {
-            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
-            await saveSimpleState('keywordBlacklist', keywordsArray);
-            createStatusBarMessage('Keyword Blacklist saved!', 'success');
-            this.updateCounts();
-        },
-        updateCounts: function() {
-            updateCounts(this);
-        },
-        scrollToTop: function() {
-            scrollToTop();
-        },
-
-        // --- Private Helper Methods ---
-        _loadInitialState: async function() {
-            const [syncEnabled, imagesEnabled, urlsNewTab, filterMode, themeState] = await Promise.all([
-                loadSimpleState('syncEnabled'),
-                loadSimpleState('imagesEnabled'),
-                loadSimpleState('openUrlsInNewTabEnabled'),
-                loadFilterMode(),
-                loadSimpleState('theme', 'userSettings')
-            ]);
-            this.syncEnabled = syncEnabled.value ?? true;
-            this.imagesEnabled = imagesEnabled.value ?? true;
-            this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
-            this.filterMode = filterMode;
-            this.theme = themeState.value ?? 'dark';
-            this.isOnline = isOnline();
-        },
-
-        applyTheme: function() {
-            initTheme(this);
-        },
-        
-        _loadAndManageAllData: async function() {
-            await this.loadFeedItemsFromDB();
-            console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
-
-            this.progressMessage = 'Loading user state from storage...';
-            const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
-                loadArrayState('starred'),
-                loadArrayState('shuffledOutGuids'),
-                loadCurrentDeck(),
-                loadShuffleState()
-            ]);
-            console.log("Loaded starred state:", starredState.value); //debug
-
-            this.starred = Array.isArray(starredState.value) ? starredState.value : [];
-            this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
-    
-            this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
-            console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
-    
-            this.shuffleCount = shuffleState.shuffleCount;
-            this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
-
-            this.progressMessage = 'Pruning hidden items...';
-            this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
-            console.log("[deckManager] Starting deck management with all data loaded.");
-
-            this.progressMessage = 'Managing today\'s deck...';
-            await manageDailyDeck(this);
-            await this.loadAndDisplayDeck();
-
-            this.updateAllUI();
-        },
-
-        updateAllUI: function() {
-            this.updateCounts();
-        },
-
-        _setupWatchers: function() {
-            this.$watch("openSettings", async (isOpen) => {
-                if (isOpen) {
-                    this.modalView = 'main';
-                    await manageSettingsPanelVisibility(this);
-                    const [rssFeeds, storedKeywords] = await Promise.all([
-                        loadSimpleState('rssFeeds'),
-                        loadSimpleState('keywordBlacklist')
-                    ]);
-                    this.rssFeedsInput = rssFeeds.value || '';
-                    if (Array.isArray(storedKeywords.value)) {
-                        this.keywordBlacklistInput = storedKeywords.value.filter(Boolean).sort().join("\n");
-                    } else if (typeof storedKeywords.value === 'string') {
-                        this.keywordBlacklistInput = storedKeywords.value.split(/\r?\n/).filter(Boolean).sort().join("\n");
-                    } else {
-                        this.keywordBlacklistInput = '';
-                    }
-                } else {
-                    await saveCurrentScrollPosition();
-                }
-            });
-            this.$watch('openUrlsInNewTabEnabled', () => {
-                document.querySelectorAll('.itemdescription').forEach(el => this.handleEntryLinks(el));
-            });
-            this.$watch("modalView", async () => manageSettingsPanelVisibility(this));
-            this.$watch('filterMode', async (newMode) => {
-                await setFilterMode(this, newMode);
-                if (newMode === 'unread') {
-                    await manageDailyDeck(this);
-                }
-                this.scrollToTop();
-            });
-            
-            this.$watch('entries', () => this.updateCounts());
-            this.$watch('hidden', () => this.updateCounts());
-            this.$watch('starred', () => this.updateCounts());
-            this.$watch('currentDeckGuids', () => this.updateCounts());
-        },
-
-        _setupEventListeners: function() {
-            const backgroundSync = async () => {
-                if (!this.syncEnabled || !this.isOnline) return;
-                console.log('Performing periodic background sync...');
-                await performFeedSync(this);
-                await pullUserState();
-                await this._loadAndManageAllData();
-                this.deckManaged = true;
-                console.log('Background sync complete.');
-            };
-
-            window.addEventListener('online', async () => {
-                this.isOnline = true;
-                this.updateSyncStatusMessage(); // <-- FIX: Update status on online event
-                if (this.syncEnabled) {
-                    await processPendingOperations();
-                    await backgroundSync();
-                }
-            });
-            window.addEventListener('offline', () => {
-                this.isOnline = false;
-                this.updateSyncStatusMessage(); // <-- FIX: Update status on offline event
-            });
-            setTimeout(backgroundSync, 0);
-        },
-
-        _startPeriodicSync: function() {
-            let lastActivityTimestamp = Date.now();
-            const recordActivity = () => lastActivityTimestamp = Date.now();
-            ["mousemove", "mousedown", "keydown", "scroll", "click", "visibilitychange", "focus"].forEach(event => {
-                document.addEventListener(event, recordActivity, true);
-                if (event === 'focus') window.addEventListener(event, recordActivity, true);
-                if (event === 'visibilitychange') document.addEventListener(event, recordActivity, true);
-            });
-
-            const SYNC_INTERVAL_MS = 5 * 60 * 1000;
-            const INACTIVITY_TIMEOUT_MS = 60 * 1000;
-
-            setInterval(async () => {
-                const now = Date.now();
-                if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
-                    return;
-                }
-                console.log('Starting scheduled background sync...');
-                await performFeedSync(this);
-                await pullUserState();
-                await this._loadAndManageAllData();
-                this.deckManaged = true;
-                console.log('Scheduled sync complete.');
-            }, SYNC_INTERVAL_MS);
-        },
-
-        _initScrollObserver: function() {
-            const observer = new IntersectionObserver(async (entries) => {
-                // ... logic to observe item visibility
-            }, {
-                root: document.querySelector('#feed-container'),
-                rootMargin: '0px',
-                threshold: 0.1
-            });
-            const feedContainer = document.querySelector('#feed-container');
-            if (!feedContainer) return;
-            const observeElements = () => {
-                feedContainer.querySelectorAll('[data-guid]').forEach(item => {
-                    observer.observe(item);
-                });
-            };
-            observeElements();
-            const mutationObserver = new MutationObserver(mutations => {
-                observer.disconnect();
-                observeElements();
-            });
-            mutationObserver.observe(feedContainer, { childList: true, subtree: true });
-            this.scrollObserver = observer;
-        },
-
-        handleEntryLinks: function(element) {
-            if (!element) return;
-            const links = element.querySelectorAll('a');
-            links.forEach(link => {
-                if (link.hostname !== window.location.hostname) {
-                    if (this.openUrlsInNewTabEnabled) {
-                        link.setAttribute('target', '_blank');
-                        link.setAttribute('rel', 'noopener noreferrer');
-                    } else {
-                        link.removeAttribute('target');
-                    }
-                }
-            });
-        },
-    };
+/**
+ * Dispatches a custom event to signal that core application data is loaded.
+ */
+function dispatchAppDataReady() {
+    document.dispatchEvent(new CustomEvent('app-data-ready', { bubbles: true }));
+    console.log("Dispatched 'app-data-ready' event.");
 }
+
+/**
+ * Initializes listeners for data readiness to update UI elements.
+ * @param {object} app The Alpine.js app state object.
+ * @param {Function} updateCountsCb The callback function to update all counts.
+ */
+export function initDataReadyListener(app, updateCountsCb) {
+    document.addEventListener('app-data-ready', () => {
+        if (typeof updateCountsCb === 'function') {
+            console.log("App data is ready, updating counts now.");
+            updateCountsCb();
+        } else {
+            console.error("updateCountsCb function not provided to initDataReadyListener.");
+        }
+    });
+}
+
+/**
+ * Sets up a boolean toggle UI element and syncs its state with IndexedDB.
+ * @param {object} app The Alpine.js app state object.
+ * @param {Function} getToggleEl Function returning the toggle DOM element.
+ * @param {Function} getTextEl Function returning the text display DOM element.
+ * @param {string} dbKey The key to use in the 'userSettings' object store.
+ * @param {Function} [onToggleCb=() => {}] Optional callback when the toggle changes.
+ */
+export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) {
+    const [toggleEl, textEl] = [getToggleEl(), getTextEl()];
+    if (!toggleEl || !textEl) return;
+
+    const { value } = await loadSimpleState(dbKey);
+    app[dbKey] = value;
+    toggleEl.checked = app[dbKey];
+    textEl.textContent = app[dbKey] ? 'yes' : 'no';
+
+    toggleEl.addEventListener('change', async () => {
+        const newValue = toggleEl.checked;
+        app[dbKey] = newValue;
+        await saveSimpleState(dbKey, newValue);
+        textEl.textContent = newValue ? 'yes' : 'no';
+        onToggleCb(newValue);
+    });
+}
+
+/**
+ * Initializes the synchronization toggle, including logic for full syncs and
+ * rebuilding the deck after a sync if it's empty.
+ * @param {object} app The Alpine.js app state object.
+ */
+export async function initSyncToggle(app) {
+    await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => {
+        if (enabled) {
+            console.log("Sync enabled, triggering full sync.");
+            await performFullSync(app);
+            if (!app.currentDeckGuids?.length) {
+                console.log("Deck is empty after sync. Rebuilding from all available items.");
+                if (app.entries?.length) {
+                    app.currentDeckGuids = app.entries.map(item => item.guid);
+                    
+                    // --- FIX: Correctly save the array of GUID strings. ---
+                    await saveArrayState('currentDeckGuids', app.currentDeckGuids);
+                    // --- END FIX ---
+
+                    console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
+                } else {
+                    console.warn("Cannot rebuild deck, app.entries is empty.");
+                }
+            }
+            dispatchAppDataReady();
+        }
+    });
+}
+
+export async function initImagesToggle(app) {
+    await setupBooleanToggle(app, getImagesToggle, getImagesText, 'imagesEnabled');
+}
+
+/**
+ * Initializes the theme toggle. The actual theme application happens in a
+ * script tag in the HTML head for instant loading. This function only
+ * manages the toggle state and saving the preference.
+ * @param {object} app The Alpine.js app state object.
+ */
+export function initTheme(app) {
+    const htmlEl = document.documentElement;
+    const toggle = getThemeToggle();
+    const text = getThemeText();
+
+    if (!toggle || !text) return;
+
+    // Use localStorage for instant, non-blocking access
+    const storedTheme = localStorage.getItem('theme');
+    const isDark = storedTheme === 'dark';
+
+    toggle.checked = isDark;
+    text.textContent = isDark ? 'dark' : 'light';
+
+    toggle.addEventListener('change', async () => {
+        const newTheme = toggle.checked ? 'dark' : 'light';
+        htmlEl.classList.toggle('dark', toggle.checked);
+        htmlEl.classList.toggle('light', !toggle.checked);
+        
+        // Save to both localStorage for instant access and IndexedDB for sync
+        localStorage.setItem('theme', newTheme);
+        await saveSimpleState('theme', newTheme);
+        
+        text.textContent = newTheme;
+    });
+}
+
+export async function initScrollPosition(app) {
+    window.requestAnimationFrame(async () => {
+        const { value: lastViewedItemId } = await loadSimpleState('lastViewedItemId');
+        const { value: lastViewedItemOffset } = await loadSimpleState('lastViewedItemOffset');
+
+        if (!lastViewedItemId || !app.entries?.length || !app.hidden) {
+            console.log("Not attempting scroll to a specific item. Insufficient data.");
+            return;
+        }
+
+        const hiddenGuids = new Set(app.hidden.map(item => item.guid));
+        const targetEntry = app.entries.find(entry => entry.guid === lastViewedItemId);
+
+        if (!targetEntry) {
+            console.log(`Last viewed item GUID ${lastViewedItemId} not found in app.entries.`);
+            return;
+        }
+        if (hiddenGuids.has(lastViewedItemId)) {
+            console.log(`Last viewed item GUID ${lastViewedItemId} is hidden. Not scrolling.`);
+            return;
+        }
+
+        const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
+        if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (typeof lastViewedItemOffset === 'number' && lastViewedItemOffset > 0) {
+                window.scrollTo({ top: window.scrollY + lastViewedItemOffset, behavior: 'smooth' });
+                console.log(`Scrolled to last viewed item: ${lastViewedItemId} with offset: ${lastViewedItemOffset}`);
+            } else {
+                console.log(`Scrolled to last viewed item: ${lastViewedItemId}`);
+            }
+        } else {
+            console.log(`Target element with GUID ${lastViewedItemId} not found in DOM.`);
+        }
+    });
+}
+
+/**
+ * A reusable helper to set up listeners for a textarea-based config panel.
+ * @param {string} key The state key for the configuration.
+ * @param {Function} getConfigButton A function that returns the button to open the panel.
+ * @param {Function} getTextarea A function that returns the textarea element.
+ * @param {Function} getSaveButton A function that returns the save button.
+ * @param {object} app The Alpine.js app state object.
+ */
+async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButton, app) {
+    const configBtn = getConfigButton();
+    const saveBtn = getSaveButton();
+    const textarea = getTextarea();
+
+    configBtn?.addEventListener('click', async () => {
+        const { value } = await loadSimpleState(key);
+        const content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
+        app[`${key}Input`] = content;
+        app.modalView = key;
+    });
+
+    saveBtn?.addEventListener("click", async () => {
+        const content = textarea?.value ?? app[`${key}Input`];
+        const keywordsArray = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        try {
+            await saveSimpleState(key, keywordsArray);
+            app[`${key}Input`] = keywordsArray.sort().join("\n");
+            createStatusBarMessage(`${key} saved.`, 'success');
+        } catch (err) {
+            console.error(err);
+            createStatusBarMessage(`Error saving ${key}!`, 'error');
+        }
+    });
+}
+
+export async function initConfigPanelListeners(app) {
+    const backBtn = getBackButton();
+    backBtn?.addEventListener('click', () => {
+        app.modalView = 'main';
+    });
+
+    await setupTextareaPanel('rssFeeds', getConfigureRssButton, getRssFeedsTextarea, getSaveRssButton, app);
+    await setupTextareaPanel('keywordBlacklist', getConfigureKeywordsButton, getKeywordsBlacklistTextarea, getSaveKeywordsButton, app);
+}
+
+// The PWA logic is standard and does not require refactoring.
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installButton = document.getElementById('install-button');
+    if (installButton) {
+        installButton.style.display = 'block';
+        installButton.addEventListener('click', () => {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('PWA installed');
+                } else {
+                    console.log('PWA installation dismissed');
+                }
+                deferredPrompt = null;
+            });
+        });
+    }
+});
