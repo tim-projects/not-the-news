@@ -299,7 +299,6 @@ export function rssApp() {
             this.updateCounts();
         },
         
-        // FIX: Update save methods to provide UI feedback
         async saveRssFeeds() {
             await saveSimpleState('rssFeeds', this.rssFeedsInput);
             this.rssSaveMessage = 'Feeds saved! Syncing...';
@@ -326,7 +325,6 @@ export function rssApp() {
             scrollToTop();
         },
         
-        // FIX: Add methods for theme handling, called by the HTML
         async toggleTheme() {
             this.theme = this.theme === 'light' ? 'dark' : 'light';
             this.applyTheme();
@@ -443,7 +441,7 @@ export function rssApp() {
 
             window.addEventListener('online', async () => {
                 this.isOnline = true;
-                this.updateSyncStatusMessage(); // <-- FIX: Update status on online event
+                this.updateSyncStatusMessage();
                 if (this.syncEnabled) {
                     await processPendingOperations();
                     await backgroundSync();
@@ -451,7 +449,7 @@ export function rssApp() {
             });
             window.addEventListener('offline', () => {
                 this.isOnline = false;
-                this.updateSyncStatusMessage(); // <-- FIX: Update status on offline event
+                this.updateSyncStatusMessage();
             });
             setTimeout(backgroundSync, 0);
         },
@@ -486,11 +484,11 @@ export function rssApp() {
             const observer = new IntersectionObserver(async (entries) => {
                 // ... logic to observe item visibility
             }, {
-                root: document.querySelector('#feed-container'),
+                root: document.querySelector('#items'), // <-- CORRECTED
                 rootMargin: '0px',
                 threshold: 0.1
             });
-            const feedContainer = document.querySelector('#feed-container');
+            const feedContainer = document.querySelector('#items'); // <-- CORRECTED
             if (!feedContainer) return;
             const observeElements = () => {
                 feedContainer.querySelectorAll('[data-guid]').forEach(item => {
@@ -522,3 +520,10 @@ export function rssApp() {
         },
     };
 }
+
+// --- FIX: Add Alpine.js initialization ---
+// Register the rssApp component with Alpine.
+Alpine.data('rssApp', rssApp);
+
+// Start Alpine to initialize the application.
+Alpine.start();
