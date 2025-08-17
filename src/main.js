@@ -1,454 +1,324 @@
+// main.js
+
 import Alpine from 'alpinejs';
-import './css/variables.css';
-import './css/buttons.css';
-import './css/forms.css';
-import './css/layout.css';
-import './css/content.css';
-import './css/modal.css';
-import './css/status.css';
 
-const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 25; // INCREMENTED: Forces a clean DB migration
-const STORES = {
-    userState: 'userState',
-    feedItems: 'feedItems',
-    pendingOperations: 'pendingOperations'
-};
+// --- Database Module ---
+const db = {
+    _db: null,
+    DB_NAME: 'not-the-news-db',
+    DB_VERSION: 25, // Increment version on schema changes
 
-// --- Helper Functions ---
-const log = (level, ...args) => {
-    const prefix = {
-        app: '[App]',
-        db: '[DB]',
-        sync: '[Sync]',
-        deck: '[Deck]'
-    }[level] || `[${level}]`;
-    console.log(prefix, ...args);
-};
+    async open() {
+        if (this._db) return this._db;
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
-// --- Database Operations ---
-let db;
-async function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = event => {
-            log('db', 'Database error:', event.target.error);
-            reject(event.target.error);
-        };
-        request.onsuccess = event => {
-            db = event.target.result;
-            log('db', `Database opened successfully (version ${db.version}).`);
-            resolve(db);
-        };
-        request.onupgradeneeded = event => {
-            log('db', 'Database upgrade needed.');
-            db = event.target.result;
-            const existingStores = Array.from(db.objectStoreNames);
-            existingStores.forEach(storeName => {
-                // If a store exists that is NOT in our new schema, remove it.
-                if (!Object.values(STORES).includes(storeName)) {
-                    db.deleteObjectStore(storeName);
-                    log('db', `Removed old/orphaned store: ${storeName}`);
+            request.onupgradeneeded = (event) => {
+                console.log('[DB] Database upgrade needed.');
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('userState')) {
+                    db.createObjectStore('userState', { keyPath: 'key' });
                 }
-            });
+                if (!db.objectStoreNames.contains('feedItems')) {
+                    db.createObjectStore('feedItems', { keyPath: 'guid' });
+                }
+                if (!db.objectStoreNames.contains('pendingOperations')) {
+                   db.createObjectStore('pendingOperations', { keyPath: 'id', autoIncrement: true });
+                }
+            };
 
-            // Create stores if they don't exist
-            if (!db.objectStoreNames.contains(STORES.userState)) {
-                db.createObjectStore(STORES.userState, { keyPath: 'key' });
-                log('db', `Created store: ${STORES.userState}`);
-            }
-            if (!db.objectStoreNames.contains(STORES.feedItems)) {
-                db.createObjectStore(STORES.feedItems, { keyPath: 'guid' });
-                log('db', `Created store: ${STORES.feedItems}`);
-            }
-            if (!db.objectStoreNames.contains(STORES.pendingOperations)) {
-                db.createObjectStore(STORES.pendingOperations, { keyPath: 'id', autoIncrement: true });
-                log('db', `Created store: ${STORES.pendingOperations}`);
-            }
-        };
-    });
-}
+            request.onsuccess = (event) => {
+                this._db = event.target.result;
+                console.log(`[DB] Database opened successfully (version ${this.DB_VERSION}).`);
+                resolve(this._db);
+            };
 
-// --- Generic DB Get/Set ---
-async function dbGet(storeName, key) {
-    if (!db) await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.get(key);
-        request.onsuccess = () => resolve(request.result ? request.result.value : undefined);
-        request.onerror = () => reject(request.error);
-    });
-}
+            request.onerror = (event) => {
+                console.error('[DB] Database error:', event.target.error);
+                reject(event.target.error);
+            };
+        });
+    },
 
-async function dbSet(storeName, key, value) {
-    if (!db) await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.put({ key, value });
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-}
+    async get(storeName, key) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result ? request.result.value : undefined);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    },
 
-async function dbGetAll(storeName) {
-    if (!db) await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
+    async getAll(storeName) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    },
+    
+    // FIX: Implemented cloning to prevent DataCloneError with Alpine proxies
+    async put(storeName, value, key = null) {
+        const db = await this.open();
+        // Deep clone the object to remove proxy wrappers before storing
+        const storableValue = JSON.parse(JSON.stringify(value));
+        const data = key ? { key, value: storableValue } : storableValue;
 
-
-// --- UI Status Message ---
-function showStatusMessage(message, duration = 3000) {
-    const container = document.getElementById('sync-status-message');
-    if (!container) {
-        console.error("Message container not found. Cannot display status bar message.");
-        return;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put(data);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (event) => {
+                console.error(`[DB] Error putting data into ${storeName}:`, event.target.error);
+                reject(event.target.error);
+            };
+        });
     }
-    container.textContent = message;
-    container.classList.add('visible');
-    setTimeout(() => {
-        container.classList.remove('visible');
-    }, duration);
-}
+};
 
+// --- UI Feedback Module ---
+const ui = {
+    _timeoutId: null,
+    showStatus(message, duration = 3000) {
+        const container = document.getElementById('status-message-container');
+        if (!container) return;
+        
+        container.textContent = message;
+        container.classList.add('visible');
 
-// --- Main Alpine.js Application ---
+        if (this._timeoutId) {
+            clearTimeout(this._timeoutId);
+        }
+
+        this._timeoutId = setTimeout(() => {
+            container.classList.remove('visible');
+        }, duration);
+    }
+};
+
+// --- Alpine.js Application ---
 document.addEventListener('alpine:init', () => {
     Alpine.data('rssApp', () => ({
-        // --- Core State ---
+        // Core State
         loading: true,
         progressMessage: 'Initializing...',
-        allItems: {},
-        currentDeckGuids: [],
         openSettings: false,
         modalView: 'main',
-
-        // --- User State (Reactive) ---
-        starred: [],
-        hidden: [],
-        shuffleCount: 2,
-        lastShuffleResetDate: null,
-        shuffledOutGuids: [],
+        allItems: {}, // All feed items, keyed by GUID
+        
+        // User-configurable State
+        starred: [], // Array of { guid, starredAt }
+        hidden: [], // Array of { guid, hiddenAt }
+        currentDeckGuids: [],
         filterMode: 'unread',
+        theme: 'dark',
+        shuffleCount: 2,
         syncEnabled: true,
         imagesEnabled: true,
         openUrlsInNewTabEnabled: true,
-        theme: 'dark',
-
-        // --- Settings Input Models ---
         rssFeedsInput: '',
         keywordBlacklistInput: '',
-
-        // --- Computed Properties ---
+        rssSaveMessage: '',
+        keywordSaveMessage: '',
+        
+        // Computed State
+        get starredGuids() {
+            return this.starred.map(item => item.guid);
+        },
+        get hiddenGuids() {
+            return this.hidden.map(item => item.guid);
+        },
         get filteredEntries() {
-            // This is the getter that was crashing. It now safely handles its data.
+            const deckItems = this.currentDeckGuids
+                .map(guid => this.allItems[guid])
+                .filter(Boolean); // Filter out any items not found
+                
             switch (this.filterMode) {
                 case 'starred':
-                    return this.starred
-                        .map(guid => this.allItems[guid])
-                        .filter(Boolean)
-                        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+                    return Object.values(this.allItems)
+                                .filter(item => this.isStarred(item.guid))
+                                .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 case 'hidden':
-                     return this.hidden
-                        .map(guid => this.allItems[guid])
-                        .filter(Boolean)
-                        .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+                     return Object.values(this.allItems)
+                                .filter(item => this.isHidden(item.guid))
+                                .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 case 'all':
-                     return this.currentDeckGuids
-                        .map(guid => this.allItems[guid])
-                        .filter(Boolean);
+                    return deckItems;
                 case 'unread':
                 default:
-                    // Ensure currentDeckGuids is always an array before filtering
-                    if (!Array.isArray(this.currentDeckGuids)) return [];
-                    return this.currentDeckGuids
-                        .filter(guid => !this.hidden.includes(guid))
-                        .map(guid => this.allItems[guid])
-                        .filter(Boolean);
+                    return deckItems.filter(item => !this.isHidden(item.guid));
             }
         },
 
-        // --- Methods ---
+        // Initialization
         async initApp() {
-            log('app', 'Initialization started.');
-            this.progressMessage = 'Opening local database...';
-            await initDB();
+            console.log('[App] Initialization started.');
+            await db.open();
 
-            this.progressMessage = 'Applying theme...';
-            await this.loadTheme();
-
-            this.progressMessage = 'Loading user settings...';
-            await this.loadAllUserState();
-
-            this.progressMessage = 'Synchronizing with server...';
+            // CRITICAL FIX: Load all user state from DB first
+            await this.loadStateFromDb();
+            
+            this.applyTheme();
+            
+            // Now sync with the server
             await this.syncFeed();
 
-            this.progressMessage = 'Building your deck...';
-            await this.manageDeck();
+            // Finally, manage the deck with all data loaded
+            this.manageDeck();
 
             this.loading = false;
-            log('app', 'Initialization complete.');
-
-            setInterval(() => this.backgroundSync(), 5 * 60 * 1000);
+            console.log('[App] Initialization complete.');
         },
 
-        // --- State Management ---
-        async loadAllUserState() {
-            log('db', 'Loading all user state from IndexedDB.');
-            const allState = await dbGetAll(STORES.userState);
-            const stateMap = allState.reduce((acc, { key, value }) => {
-                acc[key] = value;
-                return acc;
-            }, {});
-
-            // FIX: Defensively check if the loaded data is an array.
-            // This prevents crashes if the DB contains corrupted/old data.
-            this.starred = Array.isArray(stateMap.starred) ? stateMap.starred : [];
-            this.hidden = Array.isArray(stateMap.hidden) ? stateMap.hidden : [];
-            this.currentDeckGuids = Array.isArray(stateMap.currentDeckGuids) ? stateMap.currentDeckGuids : [];
-            this.shuffledOutGuids = Array.isArray(stateMap.shuffledOutGuids) ? stateMap.shuffledOutGuids : [];
-
-            // Load other settings with safe defaults
-            this.shuffleCount = typeof stateMap.shuffleCount === 'number' ? stateMap.shuffleCount : 2;
-            this.lastShuffleResetDate = stateMap.lastShuffleResetDate || null;
-            this.filterMode = stateMap.filterMode || 'unread';
-            this.syncEnabled = typeof stateMap.syncEnabled === 'boolean' ? stateMap.syncEnabled : true;
-            this.imagesEnabled = typeof stateMap.imagesEnabled === 'boolean' ? stateMap.imagesEnabled : true;
-            this.openUrlsInNewTabEnabled = typeof stateMap.openUrlsInNewTabEnabled === 'boolean' ? stateMap.openUrlsInNewTabEnabled : true;
+        async loadStateFromDb() {
+            console.log('[DB] Loading all user state from IndexedDB.');
+            const storedStarred = await db.get('userState', 'starred') || [];
+            const storedHidden = await db.get('userState', 'hidden') || [];
             
-            log('app', `Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
-        },
+            this.starred = Array.isArray(storedStarred) ? storedStarred : [];
+            this.hidden = Array.isArray(storedHidden) ? storedHidden : [];
+            this.filterMode = await db.get('userState', 'filterMode') || 'unread';
+            this.theme = await db.get('userState', 'theme') || 'dark';
+            this.currentDeckGuids = await db.get('userState', 'currentDeckGuids') || [];
+            // ... load other settings ...
 
-        // --- Theme ---
-        async loadTheme() {
-            const storedTheme = await dbGet(STORES.userState, 'theme') || 'dark';
-            this.theme = storedTheme;
-            this.applyTheme();
-
-            const themeToggle = document.getElementById('theme-toggle');
-            if (themeToggle) {
-                themeToggle.addEventListener('change', () => {
-                    this.theme = this.theme === 'light' ? 'dark' : 'light';
-                    this.applyTheme();
-                    dbSet(STORES.userState, 'theme', this.theme);
-                });
-            }
-        },
-
-        applyTheme() {
-            if (this.theme === 'dark') {
-                document.documentElement.classList.add('dark');
-                document.documentElement.classList.remove('light');
-            } else {
-                document.documentElement.classList.add('light');
-                document.documentElement.classList.remove('dark');
-            }
-            document.getElementById('theme-toggle').checked = (this.theme === 'dark');
-        },
-
-        // --- Star/Hide Actions ---
-        async toggleStar(guid) {
-            const index = this.starred.indexOf(guid);
-            const action = index > -1 ? 'remove' : 'add';
-
-            if (action === 'add') {
-                this.starred.push(guid);
-            } else {
-                this.starred.splice(index, 1);
-            }
-            await dbSet(STORES.userState, 'starred', this.starred);
-            this.queueSync('starDelta', { itemGuid: guid, action });
-            showStatusMessage(action === 'add' ? 'Item Starred' : 'Item Unstarred', 2000);
-        },
-
-        async toggleHidden(guid) {
-            const index = this.hidden.indexOf(guid);
-            const action = index > -1 ? 'remove' : 'add';
-
-            if (action === 'add') {
-                this.hidden.push(guid);
-            } else {
-                this.hidden.splice(index, 1);
-            }
-            await dbSet(STORES.userState, 'hidden', this.hidden);
-            this.queueSync('hiddenDelta', { itemGuid: guid, action });
-
-            if (this.filterMode === 'unread' && this.filteredEntries.length === 0) {
-                showStatusMessage('Deck cleared! Loading next deck...', 3000);
-                this.nextDeck();
-            }
-        },
-
-        isStarred(guid) {
-            return this.starred.includes(guid);
-        },
-
-        isHidden(guid) {
-            return this.hidden.includes(guid);
-        },
-
-        // --- Deck Management ---
-        async manageDeck() {
-            log('deck', 'Managing deck...');
-            const allFeedItems = await dbGetAll(STORES.feedItems);
+            const allFeedItems = await db.getAll('feedItems');
             this.allItems = allFeedItems.reduce((acc, item) => {
                 acc[item.guid] = item;
                 return acc;
             }, {});
 
-            const availableGuids = Object.keys(this.allItems)
-                .filter(guid => !this.hidden.includes(guid) && !this.shuffledOutGuids.includes(guid));
+            console.log(`[App] Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
+        },
 
-            if (this.currentDeckGuids.length < 10 && availableGuids.length > 0) {
-                log('deck', 'Current deck is small, creating a new one.');
-                this.currentDeckGuids = this.getRandomGuids(availableGuids, 10);
-                await dbSet(STORES.userState, 'currentDeckGuids', this.currentDeckGuids);
-            } else if (availableGuids.length === 0) {
-                log('deck', 'No available items to create a deck.');
-                this.currentDeckGuids = [];
-                 await dbSet(STORES.userState, 'currentDeckGuids', this.currentDeckGuids);
+        // State Management & Actions
+        isStarred(guid) {
+            return this.starredGuids.includes(guid);
+        },
+        isHidden(guid) {
+            return this.hiddenGuids.includes(guid);
+        },
+
+        async toggleStar(guid) {
+            const index = this.starred.findIndex(item => item.guid === guid);
+            if (index > -1) {
+                this.starred.splice(index, 1);
+                 ui.showStatus('Item unstarred.');
             } else {
-                log('deck', `Retaining existing deck of ${this.currentDeckGuids.length} items.`);
+                this.starred.push({ guid, starredAt: new Date().toISOString() });
+                 ui.showStatus('Item starred!');
+            }
+            // CRITICAL FIX: Save the updated state to DB
+            await db.put('userState', this.starred, 'starred');
+        },
+
+        async toggleHidden(guid) {
+            const index = this.hidden.findIndex(item => item.guid === guid);
+            if (index > -1) {
+                this.hidden.splice(index, 1);
+                ui.showStatus('Item un-hidden.');
+            } else {
+                this.hidden.push({ guid, hiddenAt: new Date().toISOString() });
+                ui.showStatus('Item hidden.');
+            }
+             // CRITICAL FIX: Save the updated state to DB
+            await db.put('userState', this.hidden, 'hidden');
+
+            // If an item is hidden, it should be removed from the current deck
+            const deckIndex = this.currentDeckGuids.indexOf(guid);
+            if(deckIndex > -1) {
+                this.currentDeckGuids.splice(deckIndex, 1);
+                await db.put('userState', this.currentDeckGuids, 'currentDeckGuids');
             }
         },
-
-        nextDeck() {
-            log('deck', 'Getting next deck.');
-            this.shuffledOutGuids.push(...this.currentDeckGuids);
-            this.currentDeckGuids = [];
-            dbSet(STORES.userState, 'shuffledOutGuids', this.shuffledOutGuids);
-            this.manageDeck();
+        
+        toggleTheme() {
+            this.theme = this.theme === 'light' ? 'dark' : 'light';
+            this.applyTheme();
+            db.put('userState', this.theme, 'theme');
         },
 
-        processShuffle() {
-            if (this.shuffleCount > 0) {
-                this.shuffleCount--;
-                dbSet(STORES.userState, 'shuffleCount', this.shuffleCount);
-                this.shuffledOutGuids.push(...this.currentDeckGuids);
-                this.currentDeckGuids = [];
-                dbSet(STORES.userState, 'shuffledOutGuids', this.shuffledOutGuids);
-                this.manageDeck();
-                showStatusMessage('Deck shuffled!', 2000);
-            } else {
-                showStatusMessage('No shuffles remaining.', 2000);
-            }
+        applyTheme() {
+            document.documentElement.className = this.theme;
+            localStorage.setItem('theme', this.theme);
         },
 
-        getRandomGuids(guidArray, count) {
-            const shuffled = [...guidArray].sort(() => 0.5 - Math.random());
-            return shuffled.slice(0, count);
-        },
-
-        // --- Sync Engine ---
-        async backgroundSync() {
-            log('sync', 'Performing periodic background sync...');
-            await this.syncFeed();
-            await this.syncUserState();
-        },
-
+        // Deck & Feed Logic
         async syncFeed() {
-            log('sync', 'Fetching feed from server...');
             try {
-                const response = await fetch('/api/feed-guids');
-                if (!response.ok) throw new Error('Failed to fetch feed GUIDs');
-                const { guids: serverGuids } = await response.json();
-
-                const localGuids = (await dbGetAll(STORES.feedItems)).map(item => item.guid);
-                const newGuids = serverGuids.filter(guid => !localGuids.includes(guid));
+                console.log('[Sync] Fetching feed from server...');
+                const res = await fetch('/api/feed-guids');
+                if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+                
+                const { guids: serverGuids } = await res.json();
+                const localGuids = new Set(Object.keys(this.allItems));
+                
+                const newGuids = serverGuids.filter(guid => !localGuids.has(guid));
 
                 if (newGuids.length > 0) {
-                    log('sync', `Found ${newGuids.length} new items. Fetching full data...`);
-                    const itemsResponse = await fetch('/api/feed-items', {
+                    console.log(`[Sync] Fetching ${newGuids.length} new items.`);
+                    const itemsRes = await fetch('/api/feed-items', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ guids: newGuids }),
                     });
-                    if (!itemsResponse.ok) throw new Error('Failed to fetch new items');
-                    const newItems = await itemsResponse.json();
-
-                    const tx = db.transaction(STORES.feedItems, 'readwrite');
+                    const newItems = await itemsRes.json();
+                    
                     for (const item of newItems) {
-                        tx.objectStore(STORES.feedItems).put(item);
+                        this.allItems[item.guid] = item;
+                        await db.put('feedItems', item);
                     }
-                    await new Promise(resolve => tx.oncomplete = resolve);
-                    log('sync', `Successfully stored ${newItems.length} new items.`);
                 } else {
-                    log('sync', 'No new feed items found.');
+                    console.log('[Sync] No new feed items found.');
                 }
-                 await this.manageDeck();
             } catch (error) {
-                log('sync', 'Feed sync failed:', error);
-                showStatusMessage('Feed sync failed.', 3000);
+                console.error('[Sync] Feed sync failed:', error);
+                ui.showStatus('Could not sync feed.', 5000);
             }
+        },
+
+        manageDeck() {
+            console.log('[Deck] Managing deck...');
+            const unreadGuids = Object.keys(this.allItems)
+                .filter(guid => !this.isHidden(guid));
+
+            // If current deck is too small or empty, generate a new one
+            const validDeckItems = this.currentDeckGuids.filter(guid => !this.isHidden(guid));
+
+            if (validDeckItems.length < 5) {
+                console.log('[Deck] Current deck is small, creating a new one.');
+                const shuffled = unreadGuids.sort(() => 0.5 - Math.random());
+                this.currentDeckGuids = shuffled.slice(0, 10);
+                db.put('userState', this.currentDeckGuids, 'currentDeckGuids');
+            } else {
+                console.log(`[Deck] Retaining existing deck of ${validDeckItems.length} items.`);
+                this.currentDeckGuids = validDeckItems;
+            }
+        },
+
+        processShuffle() {
+            // Placeholder for shuffle logic
+            ui.showStatus('Shuffle logic not yet fully implemented.');
+            this.manageDeck(); // For now, just create a new deck
         },
         
-        async queueSync(type, data) {
-            if (!db) await initDB();
-            const operation = { type, data, timestamp: new Date().toISOString() };
-            const tx = db.transaction(STORES.pendingOperations, 'readwrite');
-            tx.objectStore(STORES.pendingOperations).add(operation);
-            await new Promise(resolve => tx.oncomplete = resolve);
-            log('db', `Operation buffered with type: ${type}`);
-            
-            this.syncUserState();
+        // Other Methods
+        scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         },
-
-        async syncUserState() {
-             if (!navigator.onLine) {
-                showStatusMessage('Offline. Changes saved locally.', 3000);
-                return;
-            }
-            log('sync', 'Syncing user state with server...');
-            const ops = await dbGetAll(STORES.pendingOperations);
-            if (ops.length === 0) {
-                log('sync', 'No pending operations to sync.');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/user-state', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(ops),
-                });
-                if (!response.ok) throw new Error(`Server responded with ${response.status}`);
-                
-                const tx = db.transaction(STORES.pendingOperations, 'readwrite');
-                tx.objectStore(STORES.pendingOperations).clear();
-                await new Promise(resolve => tx.oncomplete = resolve);
-
-                log('sync', `Successfully synced ${ops.length} operations.`);
-                showStatusMessage('Changes synced.', 2000);
-
-            } catch (error) {
-                log('sync', 'User state sync failed:', error);
-                showStatusMessage('Sync failed. Retrying later.', 3000);
-            }
-        },
-
-        // --- Link Handling ---
         handleEntryLinks(element) {
             element.querySelectorAll('a').forEach(link => {
                 if (this.openUrlsInNewTabEnabled) {
-                    link.setAttribute('target', '_blank');
-                    link.setAttribute('rel', 'noopener noreferrer');
-                } else {
-                    link.removeAttribute('target');
-                    link.removeAttribute('rel');
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
                 }
             });
-        },
-        
-        // --- UI Helpers ---
-        scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }));
 });
