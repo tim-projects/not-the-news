@@ -7,9 +7,9 @@ import { isOnline } from '../utils/connectivity.js';
 import {
     loadSimpleState,
     saveSimpleState,
-    saveArrayState, // Keep this for now, but its use will be changed
+    saveArrayState,
     loadArrayState,
-    updateArrayState, // New function for single item updates
+    updateArrayState,
     USER_STATE_DEFS
 } from './dbUserState.js';
 
@@ -196,7 +196,10 @@ async function _pullSingleStateKey(key, def) {
         console.log(`[DB] New data received for ${key}.`);
 
         if (def.type === 'array') {
-            const guidsFromServer = new Set((data.value || def.default || []).filter(item => typeof item === 'string' && item.trim()));
+            // FIX: Map the incoming array of objects to a simple array of GUID strings
+            const serverGuids = (data.value || def.default || []).map(item => item.guid).filter(guid => typeof guid === 'string' && guid.trim());
+            const guidsFromServer = new Set(serverGuids);
+            
             const guidsLocally = new Set(value);
 
             // Find GUIDs to add and delete

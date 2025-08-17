@@ -6,7 +6,7 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-const DB_VERSION = 23; // FIX: Aggressively incrementing to force a new migration run.
+const DB_VERSION = 24; // DB_VERSION has been incremented to force a schema migration.
 
 let _dbInstance = null;
 let _dbInitPromise = null;
@@ -24,12 +24,12 @@ export const OBJECT_STORES_SCHEMA = [{
     keyPath: 'guid'
 }, {
     name: 'currentDeckGuids',
-    // Remove keyPath - let IndexedDB auto-generate keys
-    options: { autoIncrement: true }
+    // FIX: Set keyPath to 'guid' to allow for direct lookup, addition, and deletion by GUID.
+    keyPath: 'guid'
 }, {
     name: 'shuffledOutGuids',
-    // Remove keyPath - let IndexedDB auto-generate keys  
-    options: { autoIncrement: true }
+    // FIX: Set keyPath to 'guid' to allow for direct lookup, addition, and deletion by GUID.
+    keyPath: 'guid'
 }, {
     name: 'userSettings',
     keyPath: 'key'
