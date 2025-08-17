@@ -1,81 +1,21 @@
 /**
  * @filepath: src/main.js
- * --- DEBUGGING VERSION ---
- * This version includes console.log checkpoints to identify where the app is hanging.
+ * --- MINIMAL DEBUGGING VERSION ---
+ * This version bypasses all complex data loading to ensure the UI can be displayed.
+ * It uses dummy data to confirm the Alpine.js component is working.
  */
 
-// --- Simple IndexedDB Promised-based Wrapper ---
-function openDb() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('NotTheNewsDB', 25);
-        request.onerror = (event) => {
-            console.error("[DB] IndexedDB error:", event.target.error);
-            reject("Error opening DB");
-        };
-        request.onsuccess = (event) => {
-            // --- DEBUG --- CHECKPOINT 5 ---
-            console.log('[DB] Database opened successfully.');
-            resolve(event.target.result);
-        };
-        request.onupgradeneeded = event => {
-            // --- DEBUG --- CHECKPOINT 4 ---
-            console.log('[DB] onupgradeneeded event triggered. Creating object stores...');
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains('userState')) {
-                db.createObjectStore('userState', { keyPath: 'key' });
-            }
-            if (!db.objectStoreNames.contains('feedItems')) {
-                db.createObjectStore('feedItems', { keyPath: 'guid' });
-            }
-        };
-    });
-}
-
-async function getAllFromDb(storeName) {
-    // --- DEBUG --- CHECKPOINT 3 ---
-    console.log(`[DB] Attempting to get all from store: ${storeName}`);
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
-        request.onsuccess = () => {
-             // --- DEBUG --- CHECKPOINT 6 ---
-            console.log(`[DB] Successfully got all data from ${storeName}.`);
-            resolve(request.result);
-        };
-        request.onerror = (event) => {
-            console.error(`[DB] Error getting all from ${storeName}:`, event.target.error);
-            reject("Error getting all data from DB");
-        };
-    });
-}
-
-async function saveToDb(storeName, data) {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.put(data);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => {
-             console.error(`[DB] Error saving to ${storeName}:`, event.target.error);
-            reject("Error saving data to DB");
-        };
-    });
-}
-
-
-// --- Main Alpine.js Application Component ---
 document.addEventListener('alpine:init', () => {
-    // --- DEBUG --- CHECKPOINT 1 ---
-    console.log('[App] Alpine is initialized. Defining rssApp component.');
-
     Alpine.data('rssApp', () => ({
+        // --- UI State Properties ---
         loading: true,
-        progressMessage: 'Initializing...',
+        progressMessage: 'Starting...',
         openSettings: false,
         modalView: 'main',
+
+        // --- State Properties (FIX APPLIED HERE) ---
+        // The original error is fixed by initializing these as empty arrays.
+        // This is the only part of the previous fix we are keeping.
         allEntries: [],
         currentDeckGuids: [],
         shuffledOutGuids: [],
@@ -83,17 +23,22 @@ document.addEventListener('alpine:init', () => {
         hidden: [],
         rssFeeds: [],
         keywordBlacklist: [],
-        shuffleCount: 2,
+        
+        // Default values for other settings
+        shuffleCount: 0,
         openUrlsInNewTabEnabled: true,
         filterMode: 'unread',
         syncEnabled: true,
         imagesEnabled: true,
-        theme: 'dark',
+        theme: 'dark', // Default theme
+
+        // --- Temporary state for settings modal inputs ---
         rssFeedsInput: '',
         keywordBlacklistInput: '',
         rssSaveMessage: '',
         keywordSaveMessage: '',
 
+        // --- Getters (Computed Properties) ---
         get filteredEntries() {
             const starredGuids = this.starred.map(s => s.guid);
             const hiddenGuids = this.hidden.map(h => h.guid);
@@ -113,86 +58,99 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async initApp() {
-            // --- DEBUG --- CHECKPOINT 2 ---
-            console.log('[App] initApp() has been called.');
+        // --- Core Methods ---
 
-            try {
-                await this.loadStateFromDb();
-                
-                // --- DEBUG --- CHECKPOINT 7 ---
-                console.log('[App] State loaded from DB. Applying theme and fetching feed.');
-                this.applyTheme();
-                
-                await this.fetchFeedItems();
-                
-                // --- DEBUG --- CHECKPOINT 9 ---
-                console.log('[App] Feed items fetched. Finalizing initialization.');
-                
-                this.loading = false;
-                console.log('[App] Initialization complete. Loading screen should disappear now.');
-            } catch (error) {
-                console.error("[App] A critical error occurred during initialization:", error);
-                this.progressMessage = 'A fatal error occurred. Check the console.';
-                // We keep `loading` true here to prevent showing a broken UI.
-            }
+        /**
+         * A minimal init function that loads dummy data and shows the UI.
+         */
+        initApp() {
+            console.log("[Debug] Running minimal initApp().");
+            this.progressMessage = 'Applying theme...';
+            this.applyTheme();
+
+            this.progressMessage = 'Loading dummy data...';
+            this.loadDummyData(); // Load fake data to display something
+
+            this.progressMessage = 'Finalizing UI...';
+            this.loading = false; // Immediately hide the loading screen
+            console.log("[Debug] UI should now be visible with dummy data.");
         },
 
-        async loadStateFromDb() {
-            console.log('[DB] Starting loadStateFromDb().');
-            const userState = await getAllFromDb('userState');
-            const stateMap = userState.reduce((acc, item) => {
-                acc[item.key] = item.value;
-                return acc;
-            }, {});
-
-            this.currentDeckGuids = Array.isArray(stateMap.currentDeckGuids) ? stateMap.currentDeckGuids : [];
-            this.shuffledOutGuids = Array.isArray(stateMap.shuffledOutGuids) ? stateMap.shuffledOutGuids : [];
-            this.starred = Array.isArray(stateMap.starred) ? stateMap.starred : [];
-            this.hidden = Array.isArray(stateMap.hidden) ? stateMap.hidden : [];
-            this.rssFeeds = Array.isArray(stateMap.rssFeeds) ? stateMap.rssFeeds : [];
-            this.keywordBlacklist = Array.isArray(stateMap.keywordBlacklist) ? stateMap.keywordBlacklist : [];
-            this.shuffleCount = typeof stateMap.shuffleCount === 'number' ? stateMap.shuffleCount : 2;
-            this.openUrlsInNewTabEnabled = typeof stateMap.openUrlsInNewTabEnabled === 'boolean' ? stateMap.openUrlsInNewTabEnabled : true;
-            this.filterMode = typeof stateMap.filterMode === 'string' ? stateMap.filterMode : 'unread';
-            this.syncEnabled = typeof stateMap.syncEnabled === 'boolean' ? stateMap.syncEnabled : true;
-            this.imagesEnabled = typeof stateMap.imagesEnabled === 'boolean' ? stateMap.imagesEnabled : true;
-            this.theme = stateMap.theme === 'light' || stateMap.theme === 'dark' ? stateMap.theme : 'dark';
-            
-            console.log(`[App] Loaded ${this.starred.length} starred, ${this.hidden.length} hidden items.`);
+        /**
+         * Loads fake data to test the UI rendering.
+         */
+        loadDummyData() {
+            this.allEntries = [
+                { 
+                    guid: 'dummy1', 
+                    title: '<h1>Dummy Article One</h1><h2>This is a test</h2>', 
+                    description: 'The UI is now loading. This confirms that the data loading process was the issue.',
+                    image: 'https://via.placeholder.com/600x338.png/2a2a2e/ffffff?text=Test+Image+1', 
+                    source: 'Debug System', 
+                    pubDate: new Date().toLocaleString()
+                },
+                { 
+                    guid: 'dummy2', 
+                    title: '<h1>Second Dummy Post (Starred)</h1>', 
+                    description: 'The next step is to restore your original data loading functions.',
+                    image: 'https://via.placeholder.com/600x338.png/1e1e1e/ffffff?text=Test+Image+2',
+                    source: 'Debug System', 
+                    pubDate: new Date().toLocaleString()
+                }
+            ];
+            this.starred = [{ guid: 'dummy2', starredAt: new Date().toISOString() }];
+            this.shuffleCount = this.allEntries.length;
         },
 
-        async fetchFeedItems() {
-            // --- DEBUG --- CHECKPOINT 8 ---
-            console.log('[API] Starting fetchFeedItems(). Fetching from /api/feed-items');
-            this.progressMessage = 'Fetching latest feed...';
-            
-            const response = await fetch('/api/feed-items');
-            if (!response.ok) {
-                console.error(`[API] Fetch failed with status: ${response.status}`);
-                throw new Error(`Failed to fetch feed: ${response.statusText}`);
-            }
-            this.allEntries = await response.json();
-            this.progressMessage = 'Feed loaded.';
-            console.log(`[API] Successfully fetched ${this.allEntries.length} feed items.`);
-        },
+        // --- UI Interaction Methods ---
         
-        toggleHidden(guid) { /* ... no changes ... */ },
-        isHidden(guid) { /* ... no changes ... */ },
-        toggleStar(guid) { /* ... no changes ... */ },
-        isStarred(guid) { /* ... no changes ... */ },
-        toggleTheme() { /* ... no changes ... */ },
+        toggleHidden(guid) {
+            const index = this.hidden.findIndex(item => item.guid === guid);
+            if (index > -1) {
+                this.hidden.splice(index, 1);
+            } else {
+                this.hidden.push({ guid: guid, hiddenAt: new Date().toISOString() });
+            }
+        },
+
+        isHidden(guid) {
+            return this.hidden.some(item => item.guid === guid);
+        },
+
+        toggleStar(guid) {
+            const index = this.starred.findIndex(item => item.guid === guid);
+            if (index > -1) {
+                this.starred.splice(index, 1);
+            } else {
+                this.starred.push({ guid: guid, starredAt: new Date().toISOString() });
+            }
+        },
+
+        isStarred(guid) {
+            return this.starred.some(item => item.guid === guid);
+        },
+
+        toggleTheme() {
+            this.theme = this.theme === 'dark' ? 'light' : 'dark';
+            this.applyTheme();
+        },
 
         applyTheme() {
+            // Use the script from index.html to apply the theme instantly on next load
             localStorage.setItem('theme', this.theme);
             document.documentElement.classList.remove('light', 'dark');
             document.documentElement.classList.add(this.theme);
-            console.log(`[Theme] Theme applied: ${this.theme}`);
         },
 
-        handleEntryLinks(element) { /* ... no changes ... */ },
-        saveRssFeeds() { /* ... no changes ... */ },
-        saveKeywordBlacklist() { /* ... no changes ... */ },
-        scrollToTop() { /* ... no changes ... */ }
+        handleEntryLinks(element) {
+            if (this.openUrlsInNewTabEnabled) {
+                element.querySelectorAll('a').forEach(a => a.target = '_blank');
+            }
+        },
+        
+        processShuffle() { alert("Shuffle functionality placeholder."); },
+        saveRssFeeds() { alert("Save functionality placeholder."); },
+        saveKeywordBlacklist() { alert("Save functionality placeholder."); },
+        scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
     }));
 });
