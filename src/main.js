@@ -1,4 +1,4 @@
-// @filepath: src/app.js
+// @filepath: src//main.js
 
 import Alpine from 'alpinejs';
 // CSS imports remain the same
@@ -74,7 +74,7 @@ export function rssApp() {
         entries: [],
         hidden: [],
         starred: [],
-        currentDeck: [], // Was currentDeckGuids, now stores objects {guid, addedAt}
+        currentDeckGuids: [], // Correctly named: stores objects {guid, addedAt}
         shuffledOutItems: [], // Was shuffledOutGuids, now stores objects {guid, shuffledAt}
         errorMessage: '',
         isOnline: isOnline(),
@@ -157,10 +157,7 @@ export function rssApp() {
         
         loadAndDisplayDeck: async function() {
             // Business logic extracts GUIDs from the state objects
-            const guidsToDisplay = this.currentDeck.map(item => item.guid);
-            if (!Array.isArray(guidsToDisplay)) {
-                guidsToDisplay = [];
-            }
+            const guidsToDisplay = this.currentDeckGuids.map(item => item.guid);
 
             console.log(`[loadAndDisplayDeck] Processing ${guidsToDisplay.length} GUIDs for display`);
             console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
@@ -225,7 +222,7 @@ export function rssApp() {
         // --- Getters ---
         get filteredEntries() {
             if (!Array.isArray(this.deck)) this.deck = [];
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeck.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }
@@ -283,12 +280,26 @@ export function rssApp() {
         },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            await this._loadAndManageAllData();
+            
+            // --- START: FIX ---
+            // DO NOT reload all data. It creates a race condition and is inefficient.
+            // Instead, just re-evaluate the current deck with the new state.
+            await manageDailyDeck(this);
+            await this.loadAndDisplayDeck(); // Re-render the deck UI
+            // --- END: FIX ---
+            
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            await this._loadAndManageAllData();
+
+            // --- START: FIX ---
+            // DO NOT reload all data. It creates a race condition and is inefficient.
+            // Instead, just re-evaluate the current deck with the new state.
+            await manageDailyDeck(this);
+            await this.loadAndDisplayDeck(); // Re-render the deck UI
+            // --- END: FIX ---
+
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
@@ -396,8 +407,8 @@ export function rssApp() {
             this.shuffledOutItems = sanitizedShuffled;
     
             // loadCurrentDeck will now return an array of objects like {guid, addedAt}
-            this.currentDeck = Array.isArray(currentDeckState) ? currentDeckState : [];
-            console.log(`[app] Loaded currentDeck objects:`, this.currentDeck.slice(0, 5));
+            this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
+            console.log(`[app] Loaded currentDeck objects:`, this.currentDeckGuids.slice(0, 5));
     
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
@@ -453,7 +464,7 @@ export function rssApp() {
             this.$watch('entries', () => this.updateCounts());
             this.$watch('hidden', () => this.updateCounts());
             this.$watch('starred', () => this.updateCounts());
-            this.$watch('currentDeck', () => this.updateCounts());
+            this.$watch('currentDeckGuids', () => this.updateCounts()); // Corrected variable name
         },
 
         _setupEventListeners: function() {

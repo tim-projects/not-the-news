@@ -60,12 +60,19 @@ export const manageDailyDeck = async (app) => {
     
     const today = new Date().toDateString();
     const isNewDay = app.lastShuffleResetDate !== today;
-    const isDeckEmpty = currentDeckItems.length === 0;
 
-    if (isNewDay || isDeckEmpty || app.filterMode !== 'unread') {
-        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Empty Deck (${isDeckEmpty}), or Filter Mode Changed (${app.filterMode}).`);
+    // --- START: FIX ---
+    // The original `isDeckEmpty` check was flawed. It didn't account for items
+    // being hidden after the deck was created. This new logic checks if the
+    // deck is *effectively* empty from the user's perspective.
+    const visibleItemsInCurrentDeck = currentDeckItems.filter(item => !hiddenGuidsSet.has(getGuid(item)));
+    const isDeckEffectivelyEmpty = visibleItemsInCurrentDeck.length === 0;
+    // --- END: FIX ---
 
-        // [FIX] generateNewDeck now returns an array of full item objects, not just GUIDs.
+    // Use the new, smarter variable in the condition
+    if (isNewDay || isDeckEffectivelyEmpty || app.filterMode !== 'unread') {
+        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${app.filterMode}).`);
+
         const newDeckItems = await generateNewDeck(
             allItems,
             hiddenItems,
@@ -76,37 +83,30 @@ export const manageDailyDeck = async (app) => {
             app.filterMode
         );
 
-        // [FIX] The newDeckItems are full objects. Extract their GUIDs to create the
-        // state object that gets saved to the database.
         const timestamp = new Date().toISOString();
         app.currentDeckGuids = (newDeckItems || []).map(item => ({
-            guid: item.guid, // <-- Extract GUID from the full item object
+            guid: item.guid,
             addedAt: timestamp
         }));
 
-        // [FIX] Construct the app's active deck directly from the full objects returned by generateNewDeck.
-        // This is more efficient than re-filtering allItems.
         app.deck = (newDeckItems || []).map(item => ({
             ...item,
             isHidden: hiddenGuidsSet.has(item.guid),
             isStarred: starredGuidsSet.has(item.guid)
         }));
         
-        // Save the full array of objects.
         await saveCurrentDeck(app.currentDeckGuids);
 
         if (isNewDay) {
             app.shuffledOutGuids = [];
             await saveArrayState('shuffledOutGuids', []);
-
             app.shuffleCount = DAILY_SHUFFLE_LIMIT;
             await saveShuffleState(app.shuffleCount, today);
-
             app.lastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
         }
     } else {
-        console.log(`[deckManager] Retaining existing deck. Deck size: ${currentDeckItems.length}.`);
+        console.log(`[deckManager] Retaining existing deck. Visible items: ${visibleItemsInCurrentDeck.length}.`);
 
         app.deck = allItems
             .filter(item => currentDeckGuidsSet.has(item.guid))
