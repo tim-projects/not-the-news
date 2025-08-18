@@ -1,5 +1,3 @@
-// @filepath: src/js/helpers/userStateUtils.js
-
 import {
     loadSimpleState,
     saveSimpleState,
@@ -139,32 +137,30 @@ export async function loadCurrentDeck() {
     return deckObjects;
 }
 
-export async function saveCurrentDeck(guids) {
-    if (!Array.isArray(guids)) {
-         console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs.");
+export async function saveCurrentDeck(deckObjects) {
+    if (!Array.isArray(deckObjects)) {
+         console.error("[saveCurrentDeck] Invalid input: expected an array of objects.");
          return;
     }
     
-    const validGuids = guids.filter(g => typeof g === 'string' && g);
+    // Validate that we are working with objects that have a valid GUID.
+    const validDeckObjects = deckObjects.filter(item => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid);
 
-    if (validGuids.length !== guids.length) {
-        console.warn("[saveCurrentDeck] Filtered out invalid GUIDs from the generated deck.");
+    if (validDeckObjects.length !== deckObjects.length) {
+        console.warn("[saveCurrentDeck] Filtered out invalid items from the generated deck.");
     }
 
-    console.log("[saveCurrentDeck] Saving", validGuids.length, "GUIDs.");
+    console.log("[saveCurrentDeck] Saving", validDeckObjects.length, "deck objects.");
 
     try {
-        // Convert GUIDs to full objects with timestamps
-        const timestamp = new Date().toISOString();
-        const deckObjects = validGuids.map(guid => ({ guid, addedAt: timestamp }));
+        // The input is already in the correct format, so we save it directly.
+        await saveArrayState('currentDeckGuids', validDeckObjects);
 
-        await saveArrayState('currentDeckGuids', deckObjects);
-
-        // Sync operation sends the full objects as well
+        // Sync operation sends the full objects.
         await queueAndAttemptSyncOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
-            value: deckObjects 
+            value: validDeckObjects 
         });
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
