@@ -65,31 +65,32 @@ export const manageDailyDeck = async (app) => {
     if (isNewDay || isDeckEmpty || app.filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Empty Deck (${isDeckEmpty}), or Filter Mode Changed (${app.filterMode}).`);
 
-        const newDeckGuids = await generateNewDeck(
+        // [FIX] generateNewDeck now returns an array of full item objects, not just GUIDs.
+        const newDeckItems = await generateNewDeck(
             allItems,
-            Array.from(hiddenGuidsSet),
-            Array.from(starredGuidsSet),
-            Array.from(shuffledOutGuidsSet),
-            Array.from(currentDeckGuidsSet),
+            hiddenItems,
+            starredItems,
+            shuffledOutItems,
+            currentDeckItems,
             MAX_DECK_SIZE,
             app.filterMode
         );
 
-        // Convert new deck GUIDs to objects with timestamps, per the new architecture.
+        // [FIX] The newDeckItems are full objects. Extract their GUIDs to create the
+        // state object that gets saved to the database.
         const timestamp = new Date().toISOString();
-        app.currentDeckGuids = (newDeckGuids || []).map(guid => ({
-            guid,
+        app.currentDeckGuids = (newDeckItems || []).map(item => ({
+            guid: item.guid, // <-- Extract GUID from the full item object
             addedAt: timestamp
         }));
 
-        const newDeckGuidsSet = new Set(newDeckGuids);
-        app.deck = allItems
-            .filter(item => newDeckGuidsSet.has(item.guid))
-            .map(item => ({
-                ...item,
-                isHidden: hiddenGuidsSet.has(item.guid),
-                isStarred: starredGuidsSet.has(item.guid)
-            }));
+        // [FIX] Construct the app's active deck directly from the full objects returned by generateNewDeck.
+        // This is more efficient than re-filtering allItems.
+        app.deck = (newDeckItems || []).map(item => ({
+            ...item,
+            isHidden: hiddenGuidsSet.has(item.guid),
+            isStarred: starredGuidsSet.has(item.guid)
+        }));
         
         // Save the full array of objects.
         await saveCurrentDeck(app.currentDeckGuids);

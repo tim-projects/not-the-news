@@ -274,6 +274,41 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
             nextDeckItems = nextDeckItems.concat(remainingItems.slice(0, 10 - nextDeckItems.length));
         }
 
+        // [FIX] START: Fallback logic to prevent an empty deck.
+        // This block runs if the deck is still not full, which happens when
+        // the initial 'unread' pool is empty.
+        if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
+            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest hidden/shuffled items.");
+
+            const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
+            const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
+
+            // Combine hidden and shuffled items into a pool of candidates for resurfacing.
+            const resurfaceCandidates = [
+                ...hiddenItems.filter(item => typeof item === 'object' && item.guid),
+                ...shuffledOutItems.filter(item => typeof item === 'object' && item.guid)
+            ];
+
+            // Filter out items already in the deck or that no longer exist, then sort by timestamp (oldest first).
+            const validCandidates = resurfaceCandidates
+                .filter(candidate => !guidsInDeck.has(candidate.guid) && allItemsMap.has(candidate.guid))
+                .sort((a, b) => {
+                    const timeA = new Date(a.hiddenAt || a.shuffledAt || 0).getTime();
+                    const timeB = new Date(b.hiddenAt || b.shuffledAt || 0).getTime();
+                    return timeA - timeB; // Sort ascending to get the oldest items first.
+                });
+
+            // Add the oldest valid candidates to the deck until it's full.
+            for (const candidate of validCandidates) {
+                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
+                const fullItem = allItemsMap.get(candidate.guid);
+                if (fullItem) {
+                    nextDeckItems.push(fullItem);
+                }
+            }
+        }
+        // [FIX] END: Fallback logic.
+
         nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
 
         // ARCHITECTURE CHANGE: Return the full objects for the deck, not just the GUIDs.
