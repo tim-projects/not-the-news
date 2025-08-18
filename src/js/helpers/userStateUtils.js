@@ -76,14 +76,14 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
 export async function loadAndPruneHiddenItems(feedItems) {
     const { value: rawItems } = await loadArrayState('hidden');
     
-    // FINAL FIX: Implement a universally robust sanitization and normalization pipeline.
-    // This logic handles any mix of strings, objects, nulls, or undefined values.
+    // FINAL FIX: Universal sanitization logic that handles any data format.
     let normalizedItems = [];
     if (Array.isArray(rawItems)) {
         for (const item of rawItems) {
             let guid = null;
             let hiddenAt = new Date().toISOString();
 
+            // Handle both old string format and new object format
             if (typeof item === 'string' && item) {
                 guid = item;
             } else if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) {
@@ -94,8 +94,7 @@ export async function loadAndPruneHiddenItems(feedItems) {
                     hiddenAt = item.hiddenAt;
                 }
             }
-
-            // Only add the item if we were able to extract a valid GUID.
+            // Only add the item if we extracted a valid GUID. This filters out nulls, undefined, etc.
             if (guid) {
                 normalizedItems.push({ guid, hiddenAt });
             }
@@ -104,7 +103,6 @@ export async function loadAndPruneHiddenItems(feedItems) {
 
     const prunedItems = await pruneStaleHidden(feedItems, normalizedItems, Date.now());
 
-    // Determine if the original data was dirty or in the old format.
     const originalLength = Array.isArray(rawItems) ? rawItems.length : 0;
     const needsResave = prunedItems.length !== originalLength || normalizedItems.length !== originalLength;
 
@@ -122,11 +120,9 @@ export async function loadAndPruneHiddenItems(feedItems) {
 
 export async function loadCurrentDeck() {
     const { value: storedObjects } = await loadArrayState('currentDeckGuids');
-    
     const deckGuids = Array.isArray(storedObjects)
         ? storedObjects.map(item => item.guid).filter(guid => typeof guid === 'string' && guid)
         : [];
-        
     console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs.`);
     return deckGuids;
 }
@@ -137,6 +133,7 @@ export async function saveCurrentDeck(guids) {
          return;
     }
     
+    // Final failsafe: filter out any invalid GUIDs before saving.
     const validGuids = guids.filter(g => typeof g === 'string' && g);
 
     if (validGuids.length !== guids.length) {
@@ -148,7 +145,6 @@ export async function saveCurrentDeck(guids) {
     try {
         const deckObjects = validGuids.map(guid => ({ guid }));
         await saveArrayState('currentDeckGuids', deckObjects);
-
         await queueAndAttemptSyncOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
@@ -162,13 +158,8 @@ export async function saveCurrentDeck(guids) {
 // --- Unchanged Functions Below ---
 
 export async function loadShuffleState() {
-    const {
-        value: shuffleCount
-    } = await loadSimpleState('shuffleCount');
-    const {
-        value: lastShuffleResetDate
-    } = await loadSimpleState('lastShuffleResetDate');
-
+    const { value: shuffleCount } = await loadSimpleState('shuffleCount');
+    const { value: lastShuffleResetDate } = await loadSimpleState('lastShuffleResetDate');
     return {
         shuffleCount: typeof shuffleCount === 'number' ? shuffleCount : 2,
         lastShuffleResetDate: lastShuffleResetDate || new Date().toDateString(),
@@ -178,33 +169,17 @@ export async function loadShuffleState() {
 export async function saveShuffleState(count, resetDate) {
     await saveSimpleState('shuffleCount', count);
     await saveSimpleState('lastShuffleResetDate', resetDate);
-
-    await queueAndAttemptSyncOperation({
-        type: 'simpleUpdate',
-        key: 'shuffleCount',
-        value: count
-    });
-    await queueAndAttemptSyncOperation({
-        type: 'simpleUpdate',
-        key: 'lastShuffleResetDate',
-        value: resetDate
-    });
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'shuffleCount', value: count });
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate });
 }
 
 export async function setFilterMode(app, mode) {
     app.filterMode = mode;
     await saveSimpleState('filterMode', mode);
-
-    await queueAndAttemptSyncOperation({
-        type: 'simpleUpdate',
-        key: 'filterMode',
-        value: mode
-    });
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'filterMode', value: mode });
 }
 
 export async function loadFilterMode() {
-    const {
-        value: mode
-    } = await loadSimpleState('filterMode');
+    const { value: mode } = await loadSimpleState('filterMode');
     return mode || 'unread';
 }

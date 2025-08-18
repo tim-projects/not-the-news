@@ -30,8 +30,8 @@ import {
     loadCurrentDeck,
     saveCurrentDeck,
     toggleItemStateAndSync,
-    pruneStaleHidden, // This function is now a pure utility.
-    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
+    pruneStaleHidden,
+    loadAndPruneHiddenItems,
     saveShuffleState,
     loadShuffleState,
     setFilterMode,
@@ -361,23 +361,23 @@ export function rssApp() {
             ]);
             console.log("Loaded starred state:", rawStarredState.value);
 
-            // FINAL FIX: Universal sanitization and normalization for starred items.
-            let sanitizedStarred = [];
+            // FINAL FIX: Universal sanitization for starred items.
+            const sanitizedStarred = [];
             if (Array.isArray(rawStarredState.value)) {
                 for (const item of rawStarredState.value) {
-                    let guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) ? item.guid : null;
+                    const guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item?.guid) ? item.guid : null;
                     if (guid) {
-                        sanitizedStarred.push({ guid, starredAt: new Date().toISOString() });
+                        sanitizedStarred.push({ guid, starredAt: item?.starredAt || new Date().toISOString() });
                     }
                 }
             }
             this.starred = sanitizedStarred;
 
-            // FINAL FIX: Universal sanitization and normalization for shuffled-out GUIDs.
-            let sanitizedShuffled = [];
+            // FINAL FIX: Universal sanitization for shuffled-out GUIDs.
+            const sanitizedShuffled = [];
             if (Array.isArray(rawShuffledOutState.value)) {
                  for (const item of rawShuffledOutState.value) {
-                    let guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) ? item.guid : null;
+                    const guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item?.guid) ? item.guid : null;
                     if (guid) {
                         sanitizedShuffled.push({ guid });
                     }
