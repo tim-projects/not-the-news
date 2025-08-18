@@ -111,12 +111,9 @@ export function rssApp() {
                 
                 if (this.isOnline) {
                     this.progressMessage = 'Performing initial sync...';
-                    // Pull user state first, as feed items depend on it.
                     await pullUserState();
-                    // Then sync feed items.
                     await performFeedSync(this);
                     
-                    // Now that both syncs are complete, load all data into app state.
                     await this._loadAndManageAllData();
                     createStatusBarMessage("Initial sync complete!", "success");
                 } else {
@@ -357,16 +354,25 @@ export function rssApp() {
             console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
 
             this.progressMessage = 'Loading user state from storage...';
-            const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
+            const [rawStarredState, rawShuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
                 loadCurrentDeck(),
                 loadShuffleState()
             ]);
-            console.log("Loaded starred state:", starredState.value); //debug
+            console.log("Loaded starred state:", rawStarredState.value);
 
-            this.starred = Array.isArray(starredState.value) ? starredState.value : [];
-            this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
+            // FIX: Normalize 'starred' data. If it's a string array, convert it to an object array.
+            const starredValue = rawStarredState.value;
+            this.starred = (Array.isArray(starredValue) && typeof starredValue[0] === 'string')
+                ? starredValue.map(guid => ({ guid, starredAt: new Date().toISOString() }))
+                : (starredValue || []);
+
+            // FIX: Normalize 'shuffledOutGuids' data.
+            const shuffledOutValue = rawShuffledOutState.value;
+            this.shuffledOutGuids = (Array.isArray(shuffledOutValue) && typeof shuffledOutValue[0] === 'string')
+                ? shuffledOutValue.map(guid => ({ guid }))
+                : (shuffledOutValue || []);
     
             this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
             console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
@@ -375,9 +381,10 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
             this.progressMessage = 'Pruning hidden items...';
+            // The `loadAndPruneHiddenItems` function now handles its own normalization.
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
+            
             console.log("[deckManager] Starting deck management with all data loaded.");
-
             this.progressMessage = 'Managing today\'s deck...';
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();

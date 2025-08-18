@@ -83,9 +83,11 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
     const itemsToKeep = hiddenItems.filter(item => {
+        // This function now assumes hiddenItems is an array of objects.
         const normalizedGuid = String(item.guid).trim().toLowerCase();
-        // Keep if it's a current feed item, or if it's not and less than 30 days old.
+        // Keep if it's a current feed item.
         if (validFeedGuids.has(normalizedGuid)) return true;
+        // Keep if it's not a current feed item but is less than 30 days old.
         const hiddenAtTS = new Date(item.hiddenAt).getTime();
         return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
     });
@@ -101,13 +103,23 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
  * @returns {Promise<Array<object>>} The updated list of hidden items.
  */
 export async function loadAndPruneHiddenItems(feedItems) {
-    const { value: hiddenItems } = await loadArrayState('hidden');
+    const { value: rawHiddenItems } = await loadArrayState('hidden');
+
+    // FIX: Add a data normalization/migration step.
+    // This checks if the loaded data is an array of strings (the old format)
+    // and converts it to the new object format if it is.
+    const hiddenItems = (Array.isArray(rawHiddenItems) && typeof rawHiddenItems[0] === 'string')
+        ? rawHiddenItems.map(guid => ({ guid, hiddenAt: new Date().toISOString() }))
+        : (rawHiddenItems || []); // Otherwise, use it as is or default to an empty array.
+
     const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItems, Date.now());
 
-    if (prunedHiddenItems.length !== hiddenItems.length) {
+    const originalLength = Array.isArray(rawHiddenItems) ? rawHiddenItems.length : 0;
+    if (prunedHiddenItems.length !== originalLength) {
         try {
+            // Always save the correctly formatted and pruned data back.
             await saveArrayState('hidden', prunedHiddenItems);
-            console.log(`Pruned hidden items: removed ${hiddenItems.length - prunedHiddenItems.length} stale items.`);
+            console.log(`Pruned hidden items: removed ${originalLength - prunedHiddenItems.length} stale items.`);
         } catch (error) {
             console.error("Error pruning stale hidden items:", error);
         }
@@ -122,8 +134,7 @@ export async function loadAndPruneHiddenItems(feedItems) {
 export async function loadCurrentDeck() {
     const { value: storedObjects } = await loadArrayState('currentDeckGuids');
     
-    // FIX: The database now returns an array of objects. We need to map these
-    // back to an array of simple string GUIDs for the app logic to use.
+    // This correctly maps the object array from the DB to a string array for the app.
     const deckGuids = Array.isArray(storedObjects)
         ? storedObjects.map(item => item.guid).filter(guid => typeof guid === 'string' && guid)
         : [];
@@ -138,14 +149,20 @@ export async function loadCurrentDeck() {
  */
 export async function saveCurrentDeck(guids) {
     if (!Array.isArray(guids) || !guids.every(g => typeof g === 'string' && g)) {
-        console.error("[saveCurrentDeck] Invalid input: expected an array of non-empty GUID strings.");
-        return;
+        if (guids && guids.length > 0) {
+            console.error("[saveCurrentDeck] Invalid input: expected an array of non-empty GUID strings.");
+        }
+        // Allow saving an empty array, just return.
+        if (Array.isArray(guids) && guids.length === 0) {
+            // Still save the empty array to clear the deck.
+        } else {
+            return;
+        }
     }
     console.log("[saveCurrentDeck] Saving", guids.length, "GUIDs:", guids.slice(0, 3));
 
     try {
-        // FIX: Map the array of string GUIDs to an array of objects,
-        // which is the format the new database schema expects.
+        // This correctly maps the string array from the app to an object array for the DB.
         const deckObjects = guids.map(guid => ({ guid }));
         
         await saveArrayState('currentDeckGuids', deckObjects);
