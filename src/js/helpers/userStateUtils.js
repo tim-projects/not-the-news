@@ -14,7 +14,35 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
     const timestamp = new Date().toISOString();
+    const actionVerb = stateKey.slice(0, -1); // e.g., 'star' from 'starred'
 
+    // Create the full object that will be used for the database operation and local state.
+    const itemObject = { guid, [`${actionVerb}At`]: timestamp };
+
+    // Correctly call updateArrayState with the required arguments:
+    // 1. storeName (string)
+    // 2. item (object with .guid)
+    // 3. add (boolean)
+    await updateArrayState(stateKey, itemObject, action === 'add');
+
+    // Update the local application state to match the database operation
+    if (action === 'add') {
+        app[stateKey] = [...app[stateKey], itemObject];
+    } else {
+        app[stateKey] = app[stateKey].filter(item => item.guid !== guid);
+    }
+    
+    // Display status message to the user
+    if (stateKey === 'hidden') {
+        createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
+    } else if (stateKey === 'starred') {
+        createStatusBarMessage(isCurrentlyActive ? 'Item unstarred.' : 'Item starred.', 'info');
+    }
+
+    // Update UI counts
+    if (typeof app.updateCounts === 'function') app.updateCounts();
+
+    // Queue the change for server-side synchronization
     const opType = `${stateKey}Delta`;
     const pendingOp = {
         type: opType,
@@ -24,28 +52,6 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
             timestamp
         }
     };
-    
-    const actionVerb = stateKey.slice(0, -1); // e.g., 'star' from 'starred'
-    const newItem = action === 'add' ? { guid, [`${actionVerb}At`]: timestamp } : null;
-
-    // This now finds by GUID and adds/removes the object internally
-    await updateArrayState(stateKey, guid, newItem);
-
-    // Update the local application state to match
-    if (action === 'add') {
-        app[stateKey] = [...app[stateKey], newItem];
-    } else {
-        app[stateKey] = app[stateKey].filter(item => item.guid !== guid);
-    }
-    
-    if (stateKey === 'hidden') {
-        createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
-    } else if (stateKey === 'starred') {
-        createStatusBarMessage(isCurrentlyActive ? 'Item unstarred.' : 'Item starred.', 'info');
-    }
-
-    if (typeof app.updateCounts === 'function') app.updateCounts();
-
     await queueAndAttemptSyncOperation(pendingOp);
 }
 
