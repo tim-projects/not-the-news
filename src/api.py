@@ -329,12 +329,12 @@ def post_user_state():
                 results.append({"id": op_id, "key": key, "status": "success", "lastModified": new_last_modified})
 
             elif op_type in ["starDelta", "hiddenDelta"]:
-                data = op.get("data", {})
-                item_guid = data.get("guid") # Match client-side object property
-                action = data.get("action")
+                # --- FIX: Read from the top-level 'op' object, not a nested 'data' object ---
+                item_guid = op.get("guid")
+                action = op.get("action")
                 state_key = "starred" if op_type == "starDelta" else "hidden"
                 timestamp_key = "starredAt" if op_type == "starDelta" else "hiddenAt"
-                timestamp = data.get(timestamp_key, server_time) # Use client timestamp if available
+                timestamp = op.get("timestamp", server_time) # Match client's 'timestamp' key
 
                 if not item_guid or action not in ["add", "remove"]:
                     raise ValueError("Missing 'guid' or invalid 'action'")
