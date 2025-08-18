@@ -166,6 +166,7 @@ export function rssApp() {
             console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
 
             const items = [];
+            // This now safely expects this.hidden and this.starred to be arrays of objects
             const hiddenSet = new Set(this.hidden.map(h => h.guid));
             const starredSet = new Set(this.starred.map(s => s.guid));
             const seenGuidsForDeck = new Set();
