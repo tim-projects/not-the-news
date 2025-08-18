@@ -280,26 +280,14 @@ export function rssApp() {
         },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            
-            // --- START: FIX ---
-            // DO NOT reload all data. It creates a race condition and is inefficient.
-            // Instead, just re-evaluate the current deck with the new state.
             await manageDailyDeck(this);
-            await this.loadAndDisplayDeck(); // Re-render the deck UI
-            // --- END: FIX ---
-            
+            // The redundant call to loadAndDisplayDeck() has been removed.
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-
-            // --- START: FIX ---
-            // DO NOT reload all data. It creates a race condition and is inefficient.
-            // Instead, just re-evaluate the current deck with the new state.
             await manageDailyDeck(this);
-            await this.loadAndDisplayDeck(); // Re-render the deck UI
-            // --- END: FIX ---
-
+            // The redundant call to loadAndDisplayDeck() has been removed.
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
