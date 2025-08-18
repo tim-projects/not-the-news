@@ -1,5 +1,3 @@
-// @filepath: src/js/data/dbUserState.js
-
 // This file contains all logic for managing local user state in the database.
 
 import { withDb } from './dbCore.js';
@@ -194,12 +192,23 @@ export async function saveArrayState(storeName, objects) {
 
             // Put each new object into the store. The auto-incrementing 'id' will be generated.
             for (const item of objects) {
-                await store.put(item);
+                // FIX: Sanitize the object to remove any reactivity/proxies before storing.
+                // This prevents the DataCloneError by ensuring we only store plain objects.
+                const sanitizedItem = JSON.parse(JSON.stringify(item));
+                
+                // Defensively remove the 'id' property. Since the store is cleared and
+                // we are adding new items, we want to ensure IndexedDB's autoIncrement
+                // feature generates a fresh ID for each object.
+                delete sanitizedItem.id; 
+                
+                await store.put(sanitizedItem);
             }
             
             await tx.done;
         } catch (e) {
             console.error(`Failed to save array state to store '${storeName}':`, e);
+            // Re-throw the error to make upstream logic aware of the failure.
+            throw e;
         }
     });
 }
