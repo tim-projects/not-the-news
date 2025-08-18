@@ -29,32 +29,29 @@ const DAILY_SHUFFLE_LIMIT = 2; // Added a constant for the daily limit.
  */
 export const manageDailyDeck = async (app) => {
     // Defensive checks to ensure all necessary data is in a valid state.
-    // The main app.js file should handle the initial loading, but these checks
-    // act as a final safety net before critical operations.
     const allItems = Array.isArray(app.entries) ? app.entries : [];
 
     if (allItems.length === 0) {
         console.log('[deckManager] Skipping deck management: allItems is empty.');
         return;
     }
-    
+
     const hiddenItems = Array.isArray(app.hidden) ? app.hidden : [];
     const starredItems = Array.isArray(app.starred) ? app.starred : [];
     const shuffledOutGuids = Array.isArray(app.shuffledOutGuids) ? app.shuffledOutGuids : [];
     const currentDeckGuids = Array.isArray(app.currentDeckGuids) ? app.currentDeckGuids : [];
-    
-    // Create Sets for efficient lookups.
-    const hiddenGuidsSet = new Set(hiddenItems.map(item => item.guid));
-    const starredGuidsSet = new Set(starredItems.map(item => item.guid));
-    
-    // FIX: 'shuffledOutGuids' is now an array of objects from the DB.
-    // We must map it to an array of strings before creating the Set.
-    const shuffledOutGuidsSet = new Set(shuffledOutGuids.map(item => item.guid));
+
+    // FIX: Make this resilient to both old (string array) and new (object array) data formats.
+    // This handles the data migration period where the app state might still hold the old format.
+    // If the item is an object, get its .guid property. If it's a string, use the string itself.
+    const hiddenGuidsSet = new Set(hiddenItems.map(item => (typeof item === 'object' && item.guid ? item.guid : item)));
+    const starredGuidsSet = new Set(starredItems.map(item => (typeof item === 'object' && item.guid ? item.guid : item)));
+    const shuffledOutGuidsSet = new Set(shuffledOutGuids.map(item => (typeof item === 'object' && item.guid ? item.guid : item)));
 
     console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
     console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuidsSet.size}`);
     console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuidsSet.size}`);
-    
+
     const today = new Date().toDateString();
     const isNewDay = app.lastShuffleResetDate !== today;
     const isDeckEmpty = currentDeckGuids.length === 0;
@@ -62,73 +59,54 @@ export const manageDailyDeck = async (app) => {
     if (isNewDay || isDeckEmpty || app.filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Empty Deck (${isDeckEmpty}), or Filter Mode Changed (${app.filterMode}).`);
 
-        // Now, we pass all the required data to generateNewDeck.
-        // It will handle all the filtering and deck creation logic internally.
         const newDeckGuids = await generateNewDeck(
             allItems,
-            Array.from(hiddenGuidsSet), // Pass a regular array of GUIDs
-            Array.from(starredGuidsSet), // Pass a regular array of GUIDs
-            Array.from(shuffledOutGuidsSet), // Pass a regular array of GUIDs
+            Array.from(hiddenGuidsSet),
+            Array.from(starredGuidsSet),
+            Array.from(shuffledOutGuidsSet),
             currentDeckGuids,
             MAX_DECK_SIZE,
             app.filterMode
         );
 
         // Update the app state with the new deck and its GUIDs.
-        app.currentDeckGuids = newDeckGuids;
+        app.currentDeckGuids = newDeckGuids || []; // Ensure it's an array
+
         app.deck = allItems
-            .filter(item => newDeckGuids.includes(item.guid))
+            .filter(item => app.currentDeckGuids.includes(item.guid))
             .map(item => ({
                 ...item,
                 isHidden: hiddenGuidsSet.has(item.guid),
                 isStarred: starredGuidsSet.has(item.guid)
             }));
-        
-        // --- FIX: saveCurrentDeck now correctly receives an array of GUIDs. ---
+
         await saveCurrentDeck(app.currentDeckGuids);
-        
+
         if (isNewDay) {
             app.shuffledOutGuids = [];
-            await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
-            
-            app.shuffleCount = DAILY_SHUFFLE_LIMIT; // Reset the count
-            await saveShuffleState(app.shuffleCount, today); // Save the new count and date
+            await saveArrayState('shuffledOutGuids', []);
+
+            app.shuffleCount = DAILY_SHUFFLE_LIMIT;
+            await saveShuffleState(app.shuffleCount, today);
 
             app.lastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
         }
     } else {
         console.log(`[deckManager] Retaining existing deck. Deck size: ${currentDeckGuids.length}.`);
-        
+
         // DEBUG: Add detailed logging to understand the mismatch
-        console.log(`[deckManager] DEBUG: currentDeckGuids:`, currentDeckGuids.slice(0, 3)); // First 3 GUIDs
-        console.log(`[deckManager] DEBUG: sample allItems GUIDs:`, allItems.slice(0, 3).map(item => item.guid)); // First 3 item GUIDs
-        console.log(`[deckManager] DEBUG: allItems[0] full object:`, allItems[0]); // See the structure
+        console.log(`[deckManager] DEBUG: currentDeckGuids:`, currentDeckGuids.slice(0, 3));
+        console.log(`[deckManager] DEBUG: sample allItems GUIDs:`, allItems.slice(0, 3).map(item => item.guid));
         
-        // Check if any currentDeckGuids match any allItems IDs
         const matchingItems = allItems.filter(item => currentDeckGuids.includes(item.guid));
         console.log(`[deckManager] DEBUG: Found ${matchingItems.length} matching items out of ${currentDeckGuids.length} deck GUIDs`);
-        
-        if (matchingItems.length === 0 && currentDeckGuids.length > 0) {
-            console.log(`[deckManager] ERROR: No matching items found! This suggests a GUID mismatch.`);
-            console.log(`[deckManager] DEBUG: First deck GUID: "${currentDeckGuids[0]}" (type: ${typeof currentDeckGuids[0]})`);
-            console.log(`[deckManager] DEBUG: First item GUID: "${allItems[0]?.guid}" (type: ${typeof allItems[0]?.guid})`);
-            
-            // Try to find the item by checking if GUIDs exist as keys in feedItems
-            if (app.feedItems && app.feedItems[currentDeckGuids[0]]) {
-                console.log(`[deckManager] DEBUG: Found GUID in feedItems! Structure:`, Object.keys(app.feedItems[currentDeckGuids[0]]));
-            } else {
-                console.log(`[deckManager] DEBUG: GUID not found in feedItems either.`);
-            }
-        }
-        
-        app.deck = allItems
-            .filter(item => currentDeckGuids.includes(item.guid))
-            .map(item => ({
-                ...item,
-                isHidden: hiddenGuidsSet.has(item.guid),
-                isStarred: starredGuidsSet.has(item.guid)
-            }));
+
+        app.deck = matchingItems.map(item => ({
+            ...item,
+            isHidden: hiddenGuidsSet.has(item.guid),
+            isStarred: starredGuidsSet.has(item.guid)
+        }));
     }
 
     console.log(`[deckManager] Deck management complete. Final deck size: ${app.deck.length}.`);
@@ -147,9 +125,13 @@ export async function processShuffle(app) {
     }
 
     const visibleGuids = app.deck.map(item => item.guid);
-    const updatedShuffledOutGuids = new Set([...app.shuffledOutGuids, ...visibleGuids]);
-    app.shuffledOutGuids = Array.from(updatedShuffledOutGuids);
+    
+    // FIX: Normalize the existing shuffled GUIDs before adding to the Set.
+    const existingShuffledGuids = app.shuffledOutGuids.map(item => (typeof item === 'object' && item.guid ? item.guid : item));
+    const updatedShuffledGuidsSet = new Set([...existingShuffledGuids, ...visibleGuids]);
 
+    // Convert back to the correct object format for saving and state consistency.
+    app.shuffledOutGuids = Array.from(updatedShuffledGuidsSet).map(guid => ({ guid }));
     app.shuffleCount--;
 
     await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
