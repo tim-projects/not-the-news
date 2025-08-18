@@ -4,9 +4,71 @@
 import re
 from urllib.parse import urlparse
 from typing import List
+import redis
+import json
+
+# ─── Redis client for reading cached data ────────────────────────────────────
+try:
+    r = redis.Redis(host="localhost", port=6379, db=0)
+    r.ping()
+    _redis_available = True
+except redis.exceptions.ConnectionError:
+    print("Warning: Could not connect to Redis. Reddit links will use a fallback domain.")
+    r = None
+    _redis_available = False
+
+# ─── Constants and Cache for Redlib domain ────────────────────────────────────
+REDIS_CONTENT_KEY = "redlib_instances_content"
+FALLBACK_DOMAIN = "safereddit.com"
+_redlib_domain_cache = None # In-memory cache for the domain for a single script run
 
 # punctuation title split priority: full stop, then ?, then :, then -, then comma
 _SPLIT_PUNCTUATION = [".", "?", ":", "-", ","]
+
+
+def get_redlib_domain():
+    """
+    Retrieves the first Redlib instance domain from the Redis cache.
+    Falls back to a default if the cache is unavailable or invalid.
+    Caches the result in memory for the duration of the script's run.
+    """
+    global _redlib_domain_cache
+    # If we've already figured it out during this run, don't query Redis again.
+    if _redlib_domain_cache:
+        return _redlib_domain_cache
+
+    if not _redis_available:
+        _redlib_domain_cache = FALLBACK_DOMAIN
+        return FALLBACK_DOMAIN
+
+    try:
+        cached_content = r.get(REDIS_CONTENT_KEY)
+        if not cached_content:
+            print("Warning: Redlib instances not found in Redis cache. Using fallback.")
+            _redlib_domain_cache = FALLBACK_DOMAIN
+            return FALLBACK_DOMAIN
+
+        # The content is stored as bytes, so decode it before parsing
+        instances_data = json.loads(cached_content.decode('utf-8'))
+        
+        # Safely get the first instance and its URL
+        first_instance = instances_data.get("instances", [])[0]
+        instance_url = first_instance.get("url")
+
+        if instance_url:
+            # Parse the URL to get just the hostname (e.g., "eu.safereddit.com")
+            domain = urlparse(instance_url).hostname
+            _redlib_domain_cache = domain
+            return domain
+        else:
+            print("Warning: First Redlib instance in cache has no URL. Using fallback.")
+            _redlib_domain_cache = FALLBACK_DOMAIN
+            return FALLBACK_DOMAIN
+
+    except (json.JSONDecodeError, IndexError) as e:
+        print(f"Error processing Redlib data from Redis: {e}. Using fallback.")
+        _redlib_domain_cache = FALLBACK_DOMAIN
+        return FALLBACK_DOMAIN
 
 
 def _split_segment(text: str, max_len: int = 60) -> List[str]:
@@ -53,15 +115,18 @@ def wrap_title(entry: dict, max_len: int = 60) -> str:
 
 
 def prettify_reddit_entry(entry):
+    # Get the current Redlib domain from Redis cache (or fallback)
+    redlib_domain = get_redlib_domain()
+
     # derive a clean source_url from the original link (reddit.com/r/<subreddit>)
     raw_link = entry.get("link", "").strip()
     m = re.search(r"(reddit\.com/r/[^/]+)", raw_link)
     source_url = m.group(1) if m else raw_link
     
     if "reddit.com" in source_url:
-        source_url = source_url.replace("reddit.com", "safereddit.com")
+        source_url = source_url.replace("reddit.com", redlib_domain)
     elif "old.reddit.com" in source_url:
-        source_url = source_url.replace("old.reddit.com", "safereddit.com")
+        source_url = source_url.replace("old.reddit.com", redlib_domain)
 
     # wrap it in a hidden <span> instead of an HTML comment
     metadata_tag = f'<span class="source-url">{source_url}</span>'

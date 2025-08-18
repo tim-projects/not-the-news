@@ -65,6 +65,50 @@ DOMAIN_DELAY = 1.0  # seconds
 session = requests.Session()
 session.headers.update({"User-Agent": "not-the-news/1.0 (by /u/not-the-news-app)"})
 
+# --- Constants for Redlib instances caching ---
+INSTANCES_URL = "https://raw.githubusercontent.com/redlib-org/redlib-instances/refs/heads/main/instances.json"
+REDIS_ETAG_KEY = "redlib_instances_etag"
+REDIS_CONTENT_KEY = "redlib_instances_content"
+
+def update_redlib_instances_cache():
+    """
+    Fetches the Redlib instances JSON file and caches it in Redis.
+    Uses ETag to avoid re-downloading if the file hasn't changed.
+    """
+    print("Checking for Redlib instances update...")
+    headers = {}
+    try:
+        # Get the last known ETag from Redis, if it exists
+        last_etag = r.get(REDIS_ETAG_KEY)
+        if last_etag:
+            # The value in Redis is bytes, so decode it for the header
+            headers["If-None-Match"] = last_etag.decode('utf-8')
+
+        # Use the global session to make the request
+        response = session.get(INSTANCES_URL, headers=headers)
+
+        # 304 Not Modified: The cached version is up-to-date
+        if response.status_code == 304:
+            print("Redlib instances file is already up-to-date.")
+            return
+
+        # Raise an exception for other bad status codes (4xx or 5xx)
+        response.raise_for_status()
+
+        # 200 OK: New version downloaded, update cache
+        new_etag = response.headers.get("ETag")
+        # response.content is already bytes, which is what r.set expects
+        r.set(REDIS_CONTENT_KEY, response.content)
+        if new_etag:
+            # new_etag is a string, so encode it before storing in Redis
+            r.set(REDIS_ETAG_KEY, new_etag.encode('utf-8'))
+        print("Successfully updated and cached Redlib instances.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching Redlib instances file: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred while updating Redlib instances: {e}")
+
 
 def extract_domain(url, cache={}):
     """Extract the domain from a URL with basic caching."""
@@ -202,7 +246,7 @@ def merge_feeds(feeds_file, output_file):
             date_str = entry.get("published") or entry.get("updated")
             if date_str:
                 # parse into a datetime (handles RFC-822, ISO8601, etc.)
-                pub_dt = parse(date_str)  # :contentReference[oaicite:1]{index=1}
+                pub_dt = parse(date_str)
             else:
                 # fallback to a true datetime object
                 pub_dt = datetime.now(timezone.utc)
@@ -231,6 +275,9 @@ def merge_feeds(feeds_file, output_file):
 
 
 if __name__ == "__main__":
+    # On each run, check for and cache the latest Redlib instances
+    update_redlib_instances_cache()
+
     parser = argparse.ArgumentParser(
         description="Merge multiple RSS/Atom feeds into one."
     )
