@@ -5,19 +5,13 @@
 import {
     loadSimpleState,
     saveSimpleState,
-    getBufferedChangesCount,
-    processPendingOperations,
-    pullUserState,
     performFullSync,
-    isOnline,
-    saveArrayState // <-- Import the correct function for array states
+    saveArrayState
 } from '../data/database.js';
 
 import {
     getSyncToggle,
-    getSyncText,
     getImagesToggle,
-    getImagesText,
     getThemeToggle,
     getThemeText,
     getBackButton,
@@ -58,60 +52,46 @@ export function initDataReadyListener(app, updateCountsCb) {
 }
 
 /**
- * Sets up a boolean toggle UI element and syncs its state with IndexedDB.
+ * Sets up a boolean toggle UI element to complement Alpine's x-model.
+ * x-model handles updating the 'app' state. This function adds the persistence logic.
  * @param {object} app The Alpine.js app state object.
  * @param {Function} getToggleEl Function returning the toggle DOM element.
- * @param {Function} getTextEl Function returning the text display DOM element.
  * @param {string} dbKey The key to use in the 'userSettings' object store.
  * @param {Function} [onToggleCb=() => {}] Optional callback when the toggle changes.
  */
-export async function setupBooleanToggle(app, getToggleEl, getTextEl, dbKey, onToggleCb = () => {}) {
-    const [toggleEl, textEl] = [getToggleEl(), getTextEl()];
-    if (!toggleEl || !textEl) return;
+async function setupBooleanToggle(app, getToggleEl, dbKey, onToggleCb = () => {}) {
+    const toggleEl = getToggleEl();
+    if (!toggleEl) return;
 
-    const { value } = await loadSimpleState(dbKey);
-    app[dbKey] = value;
-    toggleEl.checked = app[dbKey];
-    textEl.textContent = app[dbKey] ? 'yes' : 'no';
-
+    // This listener performs actions that x-model doesn't,
+    // like saving to the database and running side-effect callbacks.
     toggleEl.addEventListener('change', async () => {
-        const newValue = toggleEl.checked;
-        app[dbKey] = newValue;
+        // We read the new value from the app's state, which x-model has just updated.
+        const newValue = app[dbKey];
         await saveSimpleState(dbKey, newValue);
-        textEl.textContent = newValue ? 'yes' : 'no';
         onToggleCb(newValue);
     });
 }
 
 /**
- * Initializes the synchronization toggle, including logic for full syncs and
- * rebuilding the deck after a sync if it's empty.
+ * Initializes the synchronization toggle.
  * @param {object} app The Alpine.js app state object.
  */
 export async function initSyncToggle(app) {
-    await setupBooleanToggle(app, getSyncToggle, getSyncText, 'syncEnabled', async (enabled) => {
+    await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled) => {
+        app.updateSyncStatusMessage(); // Update the status message on toggle
         if (enabled) {
             console.log("Sync enabled, triggering full sync.");
             await performFullSync(app);
-            if (!app.currentDeckGuids?.length) {
+            if (!app.currentDeckGuids?.length && app.entries?.length) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
-                if (app.entries?.length) {
-                    // ✅ CRITICAL CHANGE: Convert GUID strings to full objects with timestamps.
-                    // This aligns with the dual-key architecture where IndexedDB stores objects,
-                    // not raw strings. The 'addedAt' timestamp tracks when the item entered the deck.
-                    const now = new Date().toISOString(); // e.g., "2025-01-01T00:00:00.000Z"
-                    app.currentDeckGuids = app.entries.map(item => ({
-                        guid: item.guid,
-                        addedAt: now
-                    }));
-
-                    // The refactored saveArrayState will now correctly handle this array of objects.
-                    await saveArrayState('currentDeckGuids', app.currentDeckGuids);
-
-                    console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
-                } else {
-                    console.warn("Cannot rebuild deck, app.entries is empty.");
-                }
+                const now = new Date().toISOString();
+                app.currentDeckGuids = app.entries.map(item => ({
+                    guid: item.guid,
+                    addedAt: now
+                }));
+                await saveArrayState('currentDeckGuids', app.currentDeckGuids);
+                console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
             }
             dispatchAppDataReady();
         }
@@ -119,39 +99,41 @@ export async function initSyncToggle(app) {
 }
 
 export async function initImagesToggle(app) {
-    await setupBooleanToggle(app, getImagesToggle, getImagesText, 'imagesEnabled');
+    await setupBooleanToggle(app, getImagesToggle, 'imagesEnabled');
 }
 
 /**
- * Initializes the theme toggle. The actual theme application happens in a
- * script tag in the HTML head for instant loading. This function only
- * manages the toggle state and saving the preference.
+ * REFINED: Initializes the theme, handling all UI logic internally.
+ * It applies the theme on load and manages all subsequent user interactions.
+ * This removes all theme-related DOM manipulation from main.js.
  * @param {object} app The Alpine.js app state object.
  */
 export function initTheme(app) {
     const htmlEl = document.documentElement;
     const toggle = getThemeToggle();
     const text = getThemeText();
-
     if (!toggle || !text) return;
 
-    // Use localStorage for instant, non-blocking access
-    const storedTheme = localStorage.getItem('theme');
-    const isDark = storedTheme === 'dark';
+    // Helper function to apply all theme UI changes in one place.
+    const applyThemeUI = (theme) => {
+        htmlEl.classList.remove('light', 'dark');
+        htmlEl.classList.add(theme);
+        toggle.checked = (theme === 'dark');
+        text.textContent = theme;
+    };
 
-    toggle.checked = isDark;
-    text.textContent = isDark ? 'dark' : 'light';
+    // 1. Apply the initial theme on load based on the app's state.
+    applyThemeUI(app.theme);
 
+    // 2. Handle all subsequent user interactions.
     toggle.addEventListener('change', async () => {
         const newTheme = toggle.checked ? 'dark' : 'light';
-        htmlEl.classList.toggle('dark', toggle.checked);
-        htmlEl.classList.toggle('light', !toggle.checked);
+        app.theme = newTheme; // Update the central state
+        applyThemeUI(newTheme); // Update all UI elements
         
-        // Save to both localStorage for instant access and IndexedDB for sync
+        // Persist the change
         localStorage.setItem('theme', newTheme);
         await saveSimpleState('theme', newTheme);
-        
-        text.textContent = newTheme;
     });
 }
 
@@ -160,60 +142,41 @@ export async function initScrollPosition(app) {
         const { value: lastViewedItemId } = await loadSimpleState('lastViewedItemId');
         const { value: lastViewedItemOffset } = await loadSimpleState('lastViewedItemOffset');
 
-        if (!lastViewedItemId || !app.entries?.length || !app.hidden) {
-            console.log("Not attempting scroll to a specific item. Insufficient data.");
-            return;
-        }
+        if (!lastViewedItemId || !app.entries?.length || !app.hidden) return;
 
-        // ✅ CORRECT USAGE: Business logic extracts GUIDs from object arrays for operations like Set creation.
         const hiddenGuids = new Set(app.hidden.map(item => item.guid));
         const targetEntry = app.entries.find(entry => entry.guid === lastViewedItemId);
 
-        if (!targetEntry) {
-            console.log(`Last viewed item GUID ${lastViewedItemId} not found in app.entries.`);
-            return;
-        }
-        if (hiddenGuids.has(lastViewedItemId)) {
-            console.log(`Last viewed item GUID ${lastViewedItemId} is hidden. Not scrolling.`);
-            return;
-        }
+        if (!targetEntry || hiddenGuids.has(lastViewedItemId)) return;
 
         const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
         if (targetEl) {
             targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
             if (typeof lastViewedItemOffset === 'number' && lastViewedItemOffset > 0) {
                 window.scrollTo({ top: window.scrollY + lastViewedItemOffset, behavior: 'smooth' });
-                console.log(`Scrolled to last viewed item: ${lastViewedItemId} with offset: ${lastViewedItemOffset}`);
-            } else {
-                console.log(`Scrolled to last viewed item: ${lastViewedItemId}`);
             }
-        } else {
-            console.log(`Target element with GUID ${lastViewedItemId} not found in DOM.`);
         }
     });
 }
 
 /**
- * A reusable helper to set up listeners for a textarea-based config panel.
- * @param {string} key The state key for the configuration.
- * @param {Function} getConfigButton A function that returns the button to open the panel.
- * @param {Function} getTextarea A function that returns the textarea element.
- * @param {Function} getSaveButton A function that returns the save button.
- * @param {object} app The Alpine.js app state object.
+ * REFINED: Now loads data when the configure button is clicked, not from a watcher in main.js.
  */
 async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButton, app) {
     const configBtn = getConfigButton();
     const saveBtn = getSaveButton();
-    const textarea = getTextarea();
+    if (!configBtn || !saveBtn) return;
 
-    configBtn?.addEventListener('click', async () => {
+    configBtn.addEventListener('click', async () => {
+        // Data is now loaded here, when the user intends to configure.
         const { value } = await loadSimpleState(key);
         const content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
         app[`${key}Input`] = content;
-        app.modalView = key;
+        app.modalView = key; // Switch to the correct view
     });
 
-    saveBtn?.addEventListener("click", async () => {
+    saveBtn.addEventListener("click", async () => {
+        const textarea = getTextarea();
         const content = textarea?.value ?? app[`${key}Input`];
         const keywordsArray = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
         try {
