@@ -96,11 +96,17 @@ export async function initSyncToggle(app) {
             if (!app.currentDeckGuids?.length) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
                 if (app.entries?.length) {
-                    app.currentDeckGuids = app.entries.map(item => item.guid);
-                    
-                    // --- FIX: Correctly save the array of GUID strings. ---
+                    // ✅ CRITICAL CHANGE: Convert GUID strings to full objects with timestamps.
+                    // This aligns with the dual-key architecture where IndexedDB stores objects,
+                    // not raw strings. The 'addedAt' timestamp tracks when the item entered the deck.
+                    const now = new Date().toISOString(); // e.g., "2025-01-01T00:00:00.000Z"
+                    app.currentDeckGuids = app.entries.map(item => ({
+                        guid: item.guid,
+                        addedAt: now
+                    }));
+
+                    // The refactored saveArrayState will now correctly handle this array of objects.
                     await saveArrayState('currentDeckGuids', app.currentDeckGuids);
-                    // --- END FIX ---
 
                     console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
                 } else {
@@ -159,6 +165,7 @@ export async function initScrollPosition(app) {
             return;
         }
 
+        // ✅ CORRECT USAGE: Business logic extracts GUIDs from object arrays for operations like Set creation.
         const hiddenGuids = new Set(app.hidden.map(item => item.guid));
         const targetEntry = app.entries.find(entry => entry.guid === lastViewedItemId);
 

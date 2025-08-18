@@ -6,6 +6,8 @@ import {
     loadSimpleState,
     saveSimpleState,
     loadArrayState,
+    // The 'updateArrayState' function which is designed to handle this logic is not used here.
+    // Sync logic performs a more complex merge than a simple update, so we use a direct transaction.
     USER_STATE_DEFS
 } from './dbUserState.js';
 
@@ -28,8 +30,9 @@ async function _pullSingleStateKey(key, def) {
     let localTimestamp = '';
     let isLocalStateEmpty = false;
 
-    const { value, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store);
-    const hasValidData = Array.isArray(value) && value.length > 0;
+    // Per architecture, loadArrayState now returns full objects: { value: [{id, guid, ...}], lastModified }
+    const { value: localObjects, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store);
+    const hasValidData = Array.isArray(localObjects) && localObjects.length > 0;
     isLocalStateEmpty = !hasValidData;
     if (hasValidData) localTimestamp = lastModified || '';
     
@@ -51,26 +54,33 @@ async function _pullSingleStateKey(key, def) {
         console.log(`[DB] New data received for ${key}.`);
 
         if (def.type === 'array') {
-            // Correctly parse SERVER data into a Set of strings (GUIDs)
-            const guidsFromServer = new Set(
-                (data.value || []).map(item => item.guid).filter(Boolean)
-            );
+            // ✅ ARCHITECTURE CHANGE: Work with full objects for comparison and database operations.
+            const serverObjects = data.value || [];
             
-            // FIX: Correctly parse LOCAL data into a Set of strings (GUIDs) for accurate comparison
-            const guidsLocally = new Set(
-                (value || []).map(item => item.guid).filter(Boolean)
-            );
+            const serverGuids = new Set(serverObjects.map(item => item.guid));
+            const localGuids = new Set(localObjects.map(item => item.guid));
 
-            // Now, the comparison will work correctly as we are comparing strings to strings.
-            const guidsToAdd = [...guidsFromServer].filter(guid => !guidsLocally.has(guid));
-            const guidsToRemove = [...guidsLocally].filter(guid => !guidsFromServer.has(guid));
+            // Determine which full objects to add (present on server, not locally)
+            const objectsToAdd = serverObjects.filter(item => !localGuids.has(item.guid));
+            // Determine which full objects to remove (present locally, not on server)
+            const objectsToRemove = localObjects.filter(item => !serverGuids.has(item.guid));
 
-            if (guidsToAdd.length > 0 || guidsToRemove.length > 0) {
+            if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
                  await withDb(async (db) => {
                     const tx = db.transaction(def.store, 'readwrite');
                     const store = tx.objectStore(def.store);
-                    for (const guid of guidsToAdd) await store.put({ guid });
-                    for (const guid of guidsToRemove) await store.delete(guid);
+
+                    // Add new items from the server. The object contains the guid and timestamp.
+                    // IndexedDB will auto-generate the 'id' since it's the keyPath.
+                    for (const item of objectsToAdd) {
+                        await store.put(item);
+                    }
+
+                    // Remove items that are no longer on the server.
+                    // ✅ CRITICAL FIX: We MUST delete by the primary key 'id', not 'guid'.
+                    for (const item of objectsToRemove) {
+                        await store.delete(item.id);
+                    }
                     await tx.done;
                 });
             }
@@ -189,9 +199,12 @@ export async function performFeedSync(app) {
                     newItems.push(...await itemsResponse.json());
                 }
             }
+            // This 'put' operation is correct. 'newItems' are full objects from the server,
+            // and IndexedDB will auto-assign the 'id'.
             await withDb(async (db) => {
                 const tx = db.transaction('feedItems', 'readwrite');
                 for (const item of newItems) {
+                    // Assuming server provides valid items with a guid.
                     if (item.guid) await tx.store.put(item);
                 }
                 await tx.done;
@@ -199,10 +212,17 @@ export async function performFeedSync(app) {
         }
         
         if (guidsToDelete.length > 0) {
+            // ✅ ARCHITECTURE CHANGE: Create a map for efficient lookup of an item's 'id' via its 'guid'.
+            const guidToIdMap = new Map(localItems.map(item => [item.guid, item.id]));
+
             await withDb(async (db) => {
                 const tx = db.transaction('feedItems', 'readwrite');
                 for (const guid of guidsToDelete) {
-                    await tx.store.delete(guid);
+                    const idToDelete = guidToIdMap.get(guid);
+                    if (idToDelete !== undefined) {
+                        // ✅ CRITICAL FIX: Delete by 'id', the store's primary key, not by 'guid'.
+                        await tx.store.delete(idToDelete);
+                    }
                 }
                 await tx.done;
             });

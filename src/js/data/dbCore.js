@@ -3,36 +3,47 @@
 import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
-// FIX: Increment the version to trigger the necessary schema upgrade.
-const DB_VERSION = 26;
+// Increment the version to trigger the necessary schema upgrade.
+const DB_VERSION = 27;
 
 let _dbInstance = null;
 let _dbInitPromise = null;
 
-// A consistent and declarative schema definition.
+/**
+ * A consistent and declarative schema definition.
+ * All data object stores now use a numeric, auto-incrementing primary key ('id') for
+ * storage efficiency, and a 'guid' index for business logic lookups.
+ */
 export const OBJECT_STORES_SCHEMA = [{
     name: 'feedItems',
-    keyPath: 'guid',
-    options: { unique: true }
+    keyPath: 'id',
+    options: { autoIncrement: true },
+    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
     name: 'starred',
-    keyPath: 'guid'
+    keyPath: 'id',
+    options: { autoIncrement: true },
+    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
     name: 'hidden',
-    keyPath: 'guid'
+    keyPath: 'id',
+    options: { autoIncrement: true },
+    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
-    name: 'currentDeckGuids',
-    // FIX: Define keyPath as 'guid' to allow for direct lookups and deletions.
-    keyPath: 'guid'
+    name: 'currentDeckGuids', // NOTE: This store now holds full objects, not just GUIDs.
+    keyPath: 'id',
+    options: { autoIncrement: true },
+    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
-    name: 'shuffledOutGuids',
-    // FIX: Define keyPath as 'guid' to allow for direct lookups and deletions.
-    keyPath: 'guid'
+    name: 'shuffledOutGuids', // NOTE: This store now holds full objects, not just GUIDs.
+    keyPath: 'id',
+    options: { autoIncrement: true },
+    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
-    name: 'userSettings',
+    name: 'userSettings', // Standard key-value store.
     keyPath: 'key'
 }, {
-    name: 'pendingOperations',
+    name: 'pendingOperations', // Queue for offline operations.
     keyPath: 'id',
     options: { autoIncrement: true }
 }];
@@ -54,15 +65,24 @@ async function getDb() {
             const existingStores = new Set(db.objectStoreNames);
 
             OBJECT_STORES_SCHEMA.forEach(schema => {
-                // More robust upgrade: only delete/recreate if it exists
+                let store;
+                // The most reliable way to handle a keyPath change is to recreate the store.
                 if (existingStores.has(schema.name)) {
                     db.deleteObjectStore(schema.name);
                 }
-                db.createObjectStore(schema.name, {
+                store = db.createObjectStore(schema.name, {
                     keyPath: schema.keyPath,
                     ...(schema.options || {})
                 });
                 console.log(`[DB] Created/Recreated store: ${schema.name}`);
+
+                // Create indexes for efficient lookups (e.g., by guid).
+                if (schema.indexes) {
+                    schema.indexes.forEach(index => {
+                        store.createIndex(index.name, index.keyPath, index.options || {});
+                        console.log(`[DB] Created index '${index.name}' on store '${schema.name}'`);
+                    });
+                }
             });
         },
         blocked() {

@@ -111,24 +111,26 @@ export function updateCounts(app) {
         return;
     }
 
-    const hiddenSet = new Set(app.hidden.map(e => e.guid));
-    const starredSet = new Set(app.starred.map(s => s.guid));
-    const deckGuidsSet = new Set(app.currentDeckGuids);
+    const hiddenSet = new Set(app.hidden.map(item => item.guid));
+    const starredSet = new Set(app.starred.map(item => item.guid));
+    // CHANGE: Per the new architecture, `app.currentDeckGuids` is an array of objects.
+    // We must extract the `guid` from each object before creating the Set.
+    const deckGuidsSet = new Set(app.currentDeckGuids.map(item => item.guid));
     const entries = app.entries;
 
     const allC = entries.length;
-    // --- FIX: Change 'e.id' to 'e.guid' for all filters ---
     const hiddenC = entries.filter(e => hiddenSet.has(e.guid)).length;
     const starredC = entries.filter(e => starredSet.has(e.guid)).length;
     const unreadInDeckC = entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length;
-    // --- END FIX ---
 
     const selector = getFilterSelector();
     if (!selector) return;
 
     const counts = { all: allC, hidden: hiddenC, starred: starredC, unread: unreadInDeckC };
     Array.from(selector.options).forEach(opt => {
-        opt.text = `${opt.text.split(' ')[0]} (${counts[opt.value] ?? 0})`;
+        // Retain the filter name (e.g., "All") and update the count
+        const filterName = opt.text.split(' ')[0];
+        opt.text = `${filterName} (${counts[opt.value] ?? 0})`;
     });
 }
 

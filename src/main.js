@@ -74,8 +74,8 @@ export function rssApp() {
         entries: [],
         hidden: [],
         starred: [],
-        currentDeckGuids: [],
-        shuffledOutGuids: [],
+        currentDeck: [], // Was currentDeckGuids, now stores objects {guid, addedAt}
+        shuffledOutItems: [], // Was shuffledOutGuids, now stores objects {guid, shuffledAt}
         errorMessage: '',
         isOnline: isOnline(),
         deckManaged: false,
@@ -156,7 +156,8 @@ export function rssApp() {
         },
         
         loadAndDisplayDeck: async function() {
-            let guidsToDisplay = this.currentDeckGuids;
+            // Business logic extracts GUIDs from the state objects
+            const guidsToDisplay = this.currentDeck.map(item => item.guid);
             if (!Array.isArray(guidsToDisplay)) {
                 guidsToDisplay = [];
             }
@@ -224,7 +225,7 @@ export function rssApp() {
         // --- Getters ---
         get filteredEntries() {
             if (!Array.isArray(this.deck)) this.deck = [];
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeck.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }
@@ -359,34 +360,44 @@ export function rssApp() {
                 loadCurrentDeck(),
                 loadShuffleState()
             ]);
-            console.log("Loaded starred state:", rawStarredState.value);
-
-            // FINAL FIX: Universal sanitization for starred items.
+            
+            // --- Data Migration & Sanitization ---
+            // This logic ensures that legacy string-based arrays are converted to the new object format.
+            console.log("Migrating/sanitizing starred items state...");
             const sanitizedStarred = [];
             if (Array.isArray(rawStarredState.value)) {
                 for (const item of rawStarredState.value) {
-                    const guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item?.guid) ? item.guid : null;
+                    const guid = (typeof item === 'string') ? item : item?.guid;
                     if (guid) {
-                        sanitizedStarred.push({ guid, starredAt: item?.starredAt || new Date().toISOString() });
+                        // Ensure a timestamp exists, adding one for migrated data
+                        sanitizedStarred.push({
+                            guid,
+                            starredAt: item?.starredAt || new Date().toISOString()
+                        });
                     }
                 }
             }
             this.starred = sanitizedStarred;
 
-            // FINAL FIX: Universal sanitization for shuffled-out GUIDs.
+            console.log("Migrating/sanitizing shuffled out items state...");
             const sanitizedShuffled = [];
             if (Array.isArray(rawShuffledOutState.value)) {
                  for (const item of rawShuffledOutState.value) {
-                    const guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item?.guid) ? item.guid : null;
+                    const guid = (typeof item === 'string') ? item : item?.guid;
                     if (guid) {
-                        sanitizedShuffled.push({ guid });
+                        // Ensure a timestamp exists, adding one for migrated data
+                        sanitizedShuffled.push({ 
+                            guid,
+                            shuffledAt: item?.shuffledAt || new Date().toISOString()
+                        });
                     }
                 }
             }
-            this.shuffledOutGuids = sanitizedShuffled;
+            this.shuffledOutItems = sanitizedShuffled;
     
-            this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
-            console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
+            // loadCurrentDeck will now return an array of objects like {guid, addedAt}
+            this.currentDeck = Array.isArray(currentDeckState) ? currentDeckState : [];
+            console.log(`[app] Loaded currentDeck objects:`, this.currentDeck.slice(0, 5));
     
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
@@ -442,7 +453,7 @@ export function rssApp() {
             this.$watch('entries', () => this.updateCounts());
             this.$watch('hidden', () => this.updateCounts());
             this.$watch('starred', () => this.updateCounts());
-            this.$watch('currentDeckGuids', () => this.updateCounts());
+            this.$watch('currentDeck', () => this.updateCounts());
         },
 
         _setupEventListeners: function() {

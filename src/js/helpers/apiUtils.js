@@ -21,6 +21,34 @@
  */
 
 /**
+ * Handles the response from a fetch request, checking for errors and parsing JSON.
+ * @private
+ * @param {Response} response - The Response object from the fetch call.
+ * @param {string} filename - The name of the file being processed, for error logging.
+ * @returns {Promise<any>} A promise that resolves with the parsed JSON data.
+ * @throws {Error} If the response status is not 'ok'.
+ */
+const handleResponse = async (response, filename) => {
+    if (!response.ok) {
+        throw new Error(`Failed to process configuration file '${filename}': ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+};
+
+/**
+ * Builds a URL for the config API endpoints.
+ * @private
+ * @param {string} endpoint - The API endpoint (e.g., 'load-config').
+ * @param {string} filename - The name of the configuration file.
+ * @returns {URL} A URL object with the filename properly encoded.
+ */
+const buildConfigUrl = (endpoint, filename) => {
+    const url = new URL(`/${endpoint}`, window.location.origin);
+    url.searchParams.append('filename', filename);
+    return url;
+};
+
+/**
  * Loads the content of a specified configuration file from the server.
  * This function interacts with the `/load-config` endpoint on the server,
  * which is designed to serve static configuration files.
@@ -31,13 +59,10 @@
  * The response is expected to contain a 'content' field with the file's data.
  * @throws {Error} If the network request fails or the server returns an error status.
  */
-export async function loadConfigFile(filename) {
-    const response = await fetch(`/load-config?filename=${filename}`);
-    if (!response.ok) {
-        throw new Error(`Failed to load configuration file '${filename}': ${response.status} ${response.statusText}`);
-    }
-    return response.json();
-}
+export const loadConfigFile = async (filename) => {
+    const response = await fetch(buildConfigUrl('load-config', filename));
+    return handleResponse(response, filename);
+};
 
 /**
  * Saves content to a specified configuration file on the server.
@@ -51,14 +76,11 @@ export async function loadConfigFile(filename) {
  * typically indicating success (e.g., `{status: "ok"}`).
  * @throws {Error} If the network request fails or the server returns an error status.
  */
-export async function saveConfigFile(filename, content) {
-    const response = await fetch(`/save-config?filename=${filename}`, {
+export const saveConfigFile = async (filename, content) => {
+    const response = await fetch(buildConfigUrl('save-config', filename), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
     });
-    if (!response.ok) {
-        throw new Error(`Failed to save configuration file '${filename}': ${response.status} ${response.statusText}`);
-    }
-    return response.json();
-}
+    return handleResponse(response, filename);
+};

@@ -15,6 +15,7 @@ import { createStatusBarMessage } from '../ui/uiUpdaters.js';
 export async function toggleItemStateAndSync(app, guid, stateKey) {
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
+    const timestamp = new Date().toISOString();
 
     const opType = `${stateKey}Delta`;
     const pendingOp = {
@@ -22,22 +23,22 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
         data: {
             itemGuid: guid,
             action,
-            timestamp: new Date().toISOString()
+            timestamp
         }
     };
+    
+    const actionVerb = stateKey.slice(0, -1); // e.g., 'star' from 'starred'
+    const newItem = action === 'add' ? { guid, [`${actionVerb}At`]: timestamp } : null;
 
-    await updateArrayState(stateKey, guid, !isCurrentlyActive);
+    // This now finds by GUID and adds/removes the object internally
+    await updateArrayState(stateKey, guid, newItem);
 
-    let newAppList;
-    if (isCurrentlyActive) {
-        newAppList = app[stateKey].filter(item => item.guid !== guid);
+    // Update the local application state to match
+    if (action === 'add') {
+        app[stateKey] = [...app[stateKey], newItem];
     } else {
-        newAppList = [...app[stateKey], {
-            guid,
-            [`${stateKey}At`]: pendingOp.data.timestamp
-        }];
+        app[stateKey] = app[stateKey].filter(item => item.guid !== guid);
     }
-    app[stateKey] = newAppList;
     
     if (stateKey === 'hidden') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
@@ -63,53 +64,52 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
         const normalizedGuid = String(item.guid).trim().toLowerCase();
         if (validFeedGuids.has(normalizedGuid)) return true;
 
+        // Use the timestamp on the object for pruning logic
         if (item.hiddenAt) {
             const hiddenAtTS = new Date(item.hiddenAt).getTime();
             if (!isNaN(hiddenAtTS)) {
                 return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
             }
         }
-        return false;
+        // If an item somehow has no timestamp, don't prune it.
+        return true; 
     });
 }
 
 export async function loadAndPruneHiddenItems(feedItems) {
     const { value: rawItems } = await loadArrayState('hidden');
+    let needsResave = false;
     
-    // FINAL FIX: Universal sanitization logic that handles any data format.
+    // Data migration and normalization logic
     let normalizedItems = [];
     if (Array.isArray(rawItems)) {
+        const defaultTimestamp = new Date().toISOString();
         for (const item of rawItems) {
-            let guid = null;
-            let hiddenAt = new Date().toISOString();
-
-            // Handle both old string format and new object format
             if (typeof item === 'string' && item) {
-                guid = item;
+                // Legacy string data: migrate to object
+                normalizedItems.push({ guid: item, hiddenAt: defaultTimestamp });
+                needsResave = true;
             } else if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) {
-                guid = item.guid;
-                // Preserve original timestamp if it's valid
-                const ts = new Date(item.hiddenAt).getTime();
-                if (!isNaN(ts)) {
-                    hiddenAt = item.hiddenAt;
+                // Modern object data: ensure timestamp exists
+                if (!item.hiddenAt) {
+                    item.hiddenAt = defaultTimestamp;
+                    needsResave = true;
                 }
-            }
-            // Only add the item if we extracted a valid GUID. This filters out nulls, undefined, etc.
-            if (guid) {
-                normalizedItems.push({ guid, hiddenAt });
+                normalizedItems.push(item);
             }
         }
     }
 
     const prunedItems = await pruneStaleHidden(feedItems, normalizedItems, Date.now());
 
-    const originalLength = Array.isArray(rawItems) ? rawItems.length : 0;
-    const needsResave = prunedItems.length !== originalLength || normalizedItems.length !== originalLength;
+    if (prunedItems.length !== normalizedItems.length) {
+        needsResave = true;
+    }
 
     if (needsResave) {
         try {
             await saveArrayState('hidden', prunedItems);
-            console.log(`Sanitized, pruned, or migrated hidden items. Original count: ${originalLength}, New count: ${prunedItems.length}`);
+            console.log(`Sanitized, pruned, or migrated hidden items. Original count: ${rawItems.length}, New count: ${prunedItems.length}`);
         } catch (error) {
             console.error("Error saving pruned hidden items:", error);
         }
@@ -120,40 +120,57 @@ export async function loadAndPruneHiddenItems(feedItems) {
 
 export async function loadCurrentDeck() {
     const { value: storedObjects } = await loadArrayState('currentDeckGuids');
-    const deckGuids = Array.isArray(storedObjects)
-        ? storedObjects.map(item => item.guid).filter(guid => typeof guid === 'string' && guid)
+    
+    // Handle migration for legacy string-based data
+    if (storedObjects && storedObjects.length > 0 && typeof storedObjects[0] === 'string') {
+        console.log('[loadCurrentDeck] Migrating legacy string-based deck data...');
+        const defaultTimestamp = new Date().toISOString();
+        const migratedObjects = storedObjects.map(guid => ({ guid, addedAt: defaultTimestamp }));
+        await saveArrayState('currentDeckGuids', migratedObjects); // Resave in the new format
+        console.log(`[loadCurrentDeck] Migration complete. Loaded ${migratedObjects.length} objects.`);
+        return migratedObjects;
+    }
+
+    const deckObjects = Array.isArray(storedObjects)
+        ? storedObjects.filter(item => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid)
         : [];
-    console.log(`[loadCurrentDeck] Processed ${deckGuids.length} GUIDs.`);
-    return deckGuids;
+        
+    console.log(`[loadCurrentDeck] Loaded ${deckObjects.length} deck objects.`);
+    return deckObjects;
 }
 
 export async function saveCurrentDeck(guids) {
     if (!Array.isArray(guids)) {
-         console.error("[saveCurrentDeck] Invalid input: expected an array.");
+         console.error("[saveCurrentDeck] Invalid input: expected an array of GUIDs.");
          return;
     }
     
-    // Final failsafe: filter out any invalid GUIDs before saving.
     const validGuids = guids.filter(g => typeof g === 'string' && g);
 
     if (validGuids.length !== guids.length) {
         console.warn("[saveCurrentDeck] Filtered out invalid GUIDs from the generated deck.");
     }
 
-    console.log("[saveCurrentDeck] Saving", validGuids.length, "GUIDs:", validGuids.slice(0, 3));
+    console.log("[saveCurrentDeck] Saving", validGuids.length, "GUIDs.");
 
     try {
-        const deckObjects = validGuids.map(guid => ({ guid }));
+        // Convert GUIDs to full objects with timestamps
+        const timestamp = new Date().toISOString();
+        const deckObjects = validGuids.map(guid => ({ guid, addedAt: timestamp }));
+
         await saveArrayState('currentDeckGuids', deckObjects);
+
+        // Sync operation sends the full objects as well
         await queueAndAttemptSyncOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
-            value: JSON.parse(JSON.stringify(validGuids))
+            value: deckObjects 
         });
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
     }
 }
+
 
 // --- Unchanged Functions Below ---
 

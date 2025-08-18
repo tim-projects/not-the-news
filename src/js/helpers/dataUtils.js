@@ -57,7 +57,6 @@ export function mapRawItem(item, fmtFn) {
     const descContent = doc.body.innerHTML.trim();
     const ts = Date.parse(item.pubDate) || 0;
 
-    // --- FIX: Change 'id' to 'guid' to match the rest of the application ---
     return {
         guid: item.guid,
         image: imgSrc,
@@ -68,7 +67,6 @@ export function mapRawItem(item, fmtFn) {
         source: sourceUrl,
         timestamp: ts
     };
-    // --- END FIX ---
 }
 
 export function mapRawItems(rawList, fmtFn) {
@@ -83,43 +81,47 @@ export function mapRawItems(rawList, fmtFn) {
 }
 
 /**
- * Generates a new deck of feed item GUIDs based on the provided data and filters.
+ * Generates a new deck of feed items based on the provided data and filters.
  *
- * @param {Array} allFeedItems - An array of all available feed items.
- * @param {Set|Array} hiddenGuids - A Set or Array of GUIDs for hidden items.
- * @param {Set|Array} starredGuids - A Set or Array of GUIDs for starred items.
- * @param {Set|Array} shuffledOutGuids - A Set or Array of GUIDs for shuffled-out items.
- * @param {Set|Array} currentDeckItemGuids - A Set or Array of GUIDs for the current deck.
+ * @param {Array<Object>} allFeedItems - An array of all available feed items.
+ * @param {Array<Object|string>} hiddenItems - An array of hidden item objects (or GUIDs for legacy data).
+ * @param {Array<Object|string>} starredItems - An array of starred item objects (or GUIDs for legacy data).
+ * @param {Array<Object|string>} shuffledOutItems - An array of shuffled-out item objects (or GUIDs for legacy data).
+ * @param {Array<Object|string>} currentDeckItems - An array of the current deck's item objects (or GUIDs for legacy data).
  * @param {number} count - The desired size of the deck.
  * @param {string} filterMode - The current filter mode ('unread', 'hidden', 'starred').
- * @returns {Array<string>} An array of GUIDs for the new deck.
+ * @returns {Promise<Array<Object>>} A promise that resolves to an array of full item objects for the new deck.
  */
-export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, shuffledOutGuids, currentDeckItemGuids, count, filterMode) {
+export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, shuffledOutItems, currentDeckItems, count, filterMode) {
     try {
         const MAX_DECK_SIZE = 10;
-        
-        // --- FIX: All references to item.id must be changed to item.guid ---
-        const allFeedGuidsSet = new Set(allFeedItems.map(item => item.guid));
-        const prunedHiddenGuids = new Set(Array.isArray(hiddenGuids) ? hiddenGuids.filter(guid => allFeedGuidsSet.has(guid)) : []);
-        const prunedShuffledOutGuids = new Set(Array.isArray(shuffledOutGuids) ? shuffledOutGuids.filter(guid => allFeedGuidsSet.has(guid)) : []);
-        
-        let starredGuidsSet;
-        if (Array.isArray(starredGuids)) {
-            if (starredGuids.length > 0 && typeof starredGuids[0] === 'object' && starredGuids[0].guid) {
-                starredGuidsSet = new Set(starredGuids.map(item => item.guid).filter(guid => allFeedGuidsSet.has(guid)));
-            } else {
-                starredGuidsSet = new Set(starredGuids.filter(guid => allFeedGuidsSet.has(guid)));
+
+        /**
+         * Safely extracts GUIDs from an array that might contain full objects or raw strings,
+         * supporting the data migration period.
+         * @param {Array<Object|string>} arr - The array to process.
+         * @returns {Set<string>} A Set of GUIDs.
+         */
+        const getGuidSet = (arr) => {
+            if (!Array.isArray(arr)) {
+                return new Set();
             }
-        } else {
-            starredGuidsSet = new Set();
-        }
-        
-        const currentDeckGuidsSet = new Set(Array.isArray(currentDeckItemGuids) ? currentDeckItemGuids : []);
+            const guids = arr.map(item => (typeof item === 'object' && item.guid ? item.guid : item));
+            return new Set(guids.filter(Boolean)); // Filter out any null/undefined values
+        };
+
+        const allFeedGuidsSet = new Set(allFeedItems.map(item => item.guid));
+
+        // Create GUID sets for efficient lookups, pruning GUIDs that no longer exist in the main feed.
+        const hiddenGuidsSet = new Set([...getGuidSet(hiddenItems)].filter(guid => allFeedGuidsSet.has(guid)));
+        const starredGuidsSet = new Set([...getGuidSet(starredItems)].filter(guid => allFeedGuidsSet.has(guid)));
+        const shuffledOutGuidsSet = new Set([...getGuidSet(shuffledOutItems)].filter(guid => allFeedGuidsSet.has(guid)));
+        const currentDeckGuidsSet = getGuidSet(currentDeckItems);
 
         let filteredItems = [];
         switch (filterMode) {
             case 'hidden':
-                filteredItems = allFeedItems.filter(item => prunedHiddenGuids.has(item.guid));
+                filteredItems = allFeedItems.filter(item => hiddenGuidsSet.has(item.guid));
                 break;
             case 'starred':
                 filteredItems = allFeedItems.filter(item => starredGuidsSet.has(item.guid));
@@ -127,8 +129,8 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
             case 'unread':
             default:
                 filteredItems = allFeedItems.filter(item =>
-                    !prunedHiddenGuids.has(item.guid) &&
-                    !prunedShuffledOutGuids.has(item.guid) &&
+                    !hiddenGuidsSet.has(item.guid) &&
+                    !shuffledOutGuidsSet.has(item.guid) &&
                     !currentDeckGuidsSet.has(item.guid)
                 );
                 break;
@@ -136,7 +138,8 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
 
         if (filterMode === 'hidden' || filterMode === 'starred') {
             filteredItems.sort((a, b) => b.timestamp - a.timestamp);
-            return filteredItems.map(item => item.guid);
+            // ARCHITECTURE CHANGE: Return full objects instead of just GUIDs.
+            return filteredItems;
         }
 
         let nextDeckItems = [];
@@ -206,7 +209,7 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
             
             if (nextDeckItems.length < MAX_DECK_SIZE) {
                 const resurfaceCandidates = allFeedItems.filter(item =>
-                    prunedShuffledOutGuids.has(item.guid) && !prunedHiddenGuids.has(item.guid) && !selectedIds.has(item.guid)
+                    shuffledOutGuidsSet.has(item.guid) && !hiddenGuidsSet.has(item.guid) && !selectedIds.has(item.guid)
                 );
                 resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -272,8 +275,10 @@ export async function generateNewDeck(allFeedItems, hiddenGuids, starredGuids, s
         }
 
         nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
-        return nextDeckItems.map(item => item.guid);
-        // --- END FIX ---
+
+        // ARCHITECTURE CHANGE: Return the full objects for the deck, not just the GUIDs.
+        // This preserves the object structure as required by the new architecture.
+        return nextDeckItems;
 
     } catch (error) {
         console.error("An error occurred during deck generation:", error);

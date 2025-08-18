@@ -1,6 +1,5 @@
 // @filepath: src/js/helpers/deckManager.js
 
-// Refactored JS: concise, modern, functional, same output.
 import {
     saveSimpleState,
     saveArrayState
@@ -21,7 +20,15 @@ import {
 } from '../ui/uiElements.js';
 
 const MAX_DECK_SIZE = 10;
-const DAILY_SHUFFLE_LIMIT = 2; // Added a constant for the daily limit.
+const DAILY_SHUFFLE_LIMIT = 2;
+
+/**
+ * Helper to safely extract GUID from either a string or an object.
+ * This ensures backward compatibility during data migration.
+ * @param {string|object} item The item to extract a GUID from.
+ * @returns {string} The GUID.
+ */
+const getGuid = item => (typeof item === 'object' && item.guid ? item.guid : item);
 
 /**
  * Manages the daily deck of news items.
@@ -29,32 +36,31 @@ const DAILY_SHUFFLE_LIMIT = 2; // Added a constant for the daily limit.
  */
 export const manageDailyDeck = async (app) => {
     // Defensive checks to ensure all necessary data is in a valid state.
-    const allItems = Array.isArray(app.entries) ? app.entries : [];
-
-    if (allItems.length === 0) {
-        console.log('[deckManager] Skipping deck management: allItems is empty.');
+    if (!Array.isArray(app.entries) || app.entries.length === 0) {
+        console.log('[deckManager] Skipping deck management: app.entries is empty.');
         return;
     }
 
+    // Standardize data arrays to handle potential inconsistencies.
+    const allItems = app.entries;
     const hiddenItems = Array.isArray(app.hidden) ? app.hidden : [];
     const starredItems = Array.isArray(app.starred) ? app.starred : [];
-    const shuffledOutGuids = Array.isArray(app.shuffledOutGuids) ? app.shuffledOutGuids : [];
-    const currentDeckGuids = Array.isArray(app.currentDeckGuids) ? app.currentDeckGuids : [];
+    const shuffledOutItems = Array.isArray(app.shuffledOutGuids) ? app.shuffledOutGuids : [];
+    const currentDeckItems = Array.isArray(app.currentDeckGuids) ? app.currentDeckGuids : [];
 
-    // FIX: Make this resilient to both old (string array) and new (object array) data formats.
-    // This handles the data migration period where the app state might still hold the old format.
-    // If the item is an object, get its .guid property. If it's a string, use the string itself.
-    const hiddenGuidsSet = new Set(hiddenItems.map(item => (typeof item === 'object' && item.guid ? item.guid : item)));
-    const starredGuidsSet = new Set(starredItems.map(item => (typeof item === 'object' && item.guid ? item.guid : item)));
-    const shuffledOutGuidsSet = new Set(shuffledOutGuids.map(item => (typeof item === 'object' && item.guid ? item.guid : item)));
+    // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
+    const hiddenGuidsSet = new Set(hiddenItems.map(getGuid));
+    const starredGuidsSet = new Set(starredItems.map(getGuid));
+    const shuffledOutGuidsSet = new Set(shuffledOutItems.map(getGuid));
+    const currentDeckGuidsSet = new Set(currentDeckItems.map(getGuid));
 
     console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
     console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuidsSet.size}`);
     console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuidsSet.size}`);
-
+    
     const today = new Date().toDateString();
     const isNewDay = app.lastShuffleResetDate !== today;
-    const isDeckEmpty = currentDeckGuids.length === 0;
+    const isDeckEmpty = currentDeckItems.length === 0;
 
     if (isNewDay || isDeckEmpty || app.filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Empty Deck (${isDeckEmpty}), or Filter Mode Changed (${app.filterMode}).`);
@@ -64,22 +70,28 @@ export const manageDailyDeck = async (app) => {
             Array.from(hiddenGuidsSet),
             Array.from(starredGuidsSet),
             Array.from(shuffledOutGuidsSet),
-            currentDeckGuids,
+            Array.from(currentDeckGuidsSet),
             MAX_DECK_SIZE,
             app.filterMode
         );
 
-        // Update the app state with the new deck and its GUIDs.
-        app.currentDeckGuids = newDeckGuids || []; // Ensure it's an array
+        // Convert new deck GUIDs to objects with timestamps, per the new architecture.
+        const timestamp = new Date().toISOString();
+        app.currentDeckGuids = (newDeckGuids || []).map(guid => ({
+            guid,
+            addedAt: timestamp
+        }));
 
+        const newDeckGuidsSet = new Set(newDeckGuids);
         app.deck = allItems
-            .filter(item => app.currentDeckGuids.includes(item.guid))
+            .filter(item => newDeckGuidsSet.has(item.guid))
             .map(item => ({
                 ...item,
                 isHidden: hiddenGuidsSet.has(item.guid),
                 isStarred: starredGuidsSet.has(item.guid)
             }));
-
+        
+        // Save the full array of objects.
         await saveCurrentDeck(app.currentDeckGuids);
 
         if (isNewDay) {
@@ -93,20 +105,15 @@ export const manageDailyDeck = async (app) => {
             await saveSimpleState('lastShuffleResetDate', today);
         }
     } else {
-        console.log(`[deckManager] Retaining existing deck. Deck size: ${currentDeckGuids.length}.`);
+        console.log(`[deckManager] Retaining existing deck. Deck size: ${currentDeckItems.length}.`);
 
-        // DEBUG: Add detailed logging to understand the mismatch
-        console.log(`[deckManager] DEBUG: currentDeckGuids:`, currentDeckGuids.slice(0, 3));
-        console.log(`[deckManager] DEBUG: sample allItems GUIDs:`, allItems.slice(0, 3).map(item => item.guid));
-        
-        const matchingItems = allItems.filter(item => currentDeckGuids.includes(item.guid));
-        console.log(`[deckManager] DEBUG: Found ${matchingItems.length} matching items out of ${currentDeckGuids.length} deck GUIDs`);
-
-        app.deck = matchingItems.map(item => ({
-            ...item,
-            isHidden: hiddenGuidsSet.has(item.guid),
-            isStarred: starredGuidsSet.has(item.guid)
-        }));
+        app.deck = allItems
+            .filter(item => currentDeckGuidsSet.has(item.guid))
+            .map(item => ({
+                ...item,
+                isHidden: hiddenGuidsSet.has(item.guid),
+                isStarred: starredGuidsSet.has(item.guid)
+            }));
     }
 
     console.log(`[deckManager] Deck management complete. Final deck size: ${app.deck.length}.`);
@@ -125,15 +132,20 @@ export async function processShuffle(app) {
     }
 
     const visibleGuids = app.deck.map(item => item.guid);
+    const existingShuffledGuids = (app.shuffledOutGuids || []).map(getGuid);
     
-    // FIX: Normalize the existing shuffled GUIDs before adding to the Set.
-    const existingShuffledGuids = app.shuffledOutGuids.map(item => (typeof item === 'object' && item.guid ? item.guid : item));
     const updatedShuffledGuidsSet = new Set([...existingShuffledGuids, ...visibleGuids]);
+    
+    // Convert the combined set of GUIDs back to an array of objects with the correct timestamp.
+    const timestamp = new Date().toISOString();
+    app.shuffledOutGuids = Array.from(updatedShuffledGuidsSet).map(guid => ({
+        guid,
+        shuffledAt: timestamp
+    }));
 
-    // Convert back to the correct object format for saving and state consistency.
-    app.shuffledOutGuids = Array.from(updatedShuffledGuidsSet).map(guid => ({ guid }));
     app.shuffleCount--;
 
+    // Persist the new state.
     await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
     await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate);
 

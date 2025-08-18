@@ -30,12 +30,12 @@ os.makedirs(USER_STATE_DIR, exist_ok=True)
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
 
 USER_STATE_SERVER_DEFAULTS = {
-    'currentDeckGuids': {'type': 'array', 'default': []},
+    'currentDeck': {'type': 'array', 'default': []},          # Array of { guid, addedAt }
     'lastShuffleResetDate': {'type': 'simple', 'default': None},
     'shuffleCount': {'type': 'simple', 'default': 2},
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
-    'starred': {'type': 'array', 'default': []}, # Array of { guid, starredAt }
-    'hidden': {'type': 'array', 'default': []},   # Array of { guid, hiddenAt }
+    'starred': {'type': 'array', 'default': []},               # Array of { guid, starredAt }
+    'hidden': {'type': 'array', 'default': []},                # Array of { guid, hiddenAt }
     'filterMode': {'type': 'simple', 'default': 'unread'},
     'syncEnabled': {'type': 'simple', 'default': True},
     'imagesEnabled': {'type': 'simple', 'default': True},
@@ -44,7 +44,7 @@ USER_STATE_SERVER_DEFAULTS = {
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
     'theme': {'type': 'simple', 'default': 'light'},
     'lastFeedSync': {'type': 'simple', 'default': None},
-    'shuffledOutGuids': {'type': 'array', 'default': []},
+    'shuffledOut': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
     'rssFeeds': {'type': 'array', 'default': []},
     'keywordBlacklist': {'type': 'array', 'default': []},
 }
@@ -55,13 +55,15 @@ def _atomic_write(filepath, content, mode='w', encoding='utf-8'):
     It writes to a temporary file first and then renames it.
     """
     dir_name, file_name = os.path.split(filepath)
-    with tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, delete=False, dir=dir_name) as temp_file:
+    # Create a temporary file in the same directory to ensure rename is atomic.
+    with tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, delete=False, dir=dir_name, prefix=f"{file_name}.") as temp_file:
         try:
             temp_file.write(content)
             temp_file.flush()
             os.fsync(temp_file.fileno())
             temp_path = temp_file.name
         except Exception:
+            # Cleanup the temp file on error before raising
             os.unlink(temp_file.name)
             raise
     
@@ -116,7 +118,7 @@ def _load_feed_items():
 
     # Remove namespaces for easier parsing
     for elem in root.iter():
-        if "}" in elem in elem.tag:
+        if "}" in elem.tag:
             elem.tag = elem.tag.split("}", 1)[1]
 
     items = {}
@@ -136,13 +138,12 @@ def _load_feed_items():
         description_element = it.find("description")
         description_content = ""
         if description_element is not None:
-            description_content = "".join(
+            # Preserve inner HTML of the description tag
+            description_content = (description_element.text or '') + ''.join(
                 ET.tostring(child, encoding='unicode') for child in description_element
             )
-            if description_element.text:
-                description_content = description_element.text.strip() + description_content
-        
-        unescaped_description = html.unescape(description_content)
+
+        unescaped_description = html.unescape(description_content.strip())
 
         data = {
             "guid": guid,
@@ -165,10 +166,12 @@ def feed_guids():
     latest_pub_date = None
     if items:
         try:
-            latest_pub_date = max(
+            pub_dates = [
                 datetime.fromisoformat(item['pubDate'].replace('Z', '+00:00'))
                 for item in items.values() if item.get('pubDate')
-            )
+            ]
+            if pub_dates:
+                latest_pub_date = max(pub_dates)
         except (ValueError, TypeError):
             latest_pub_date = None
 
@@ -216,30 +219,66 @@ def _user_state_path(key):
     return os.path.join(USER_STATE_DIR, f"{key}.json")
 
 def _load_state(key):
+    # --- MIGRATION: Handle renaming of legacy state files ---
+    legacy_key_map = {
+        'currentDeck': 'currentDeckGuids',
+        'shuffledOut': 'shuffledOutGuids'
+    }
+    if key in legacy_key_map:
+        new_path = _user_state_path(key)
+        old_path = _user_state_path(legacy_key_map[key])
+        if not os.path.exists(new_path) and os.path.exists(old_path):
+            app.logger.info(f"Migrating user state file from '{old_path}' to '{new_path}'")
+            os.rename(old_path, new_path)
+    
     path = _user_state_path(key)
     if not os.path.exists(path):
         default_data = USER_STATE_SERVER_DEFAULTS.get(key)
         if default_data:
             initial_value = default_data['default']
-            now_utc = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
-            initial_state = {"value": initial_value, "lastModified": now_utc}
+            # Use _save_state to create the initial file atomically with a timestamp
             try:
-                # Use atomic write for the initial file creation
-                _save_state(key, initial_value)
-                return initial_state
-            except Exception:
+                last_modified = _save_state(key, initial_value)
+                return {"value": initial_value, "lastModified": last_modified}
+            except Exception as e:
+                app.logger.error(f"Failed to create initial state for '{key}': {e}")
                 return {"value": None, "lastModified": None}
         return {"value": None, "lastModified": None}
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {"value": data.get("value"), "lastModified": data.get("lastModified")}
-    except (json.JSONDecodeError, KeyError):
+        
+        value = data.get("value")
+        last_modified = data.get("lastModified")
+
+        # --- MIGRATION: Convert string arrays to object arrays ---
+        array_keys_to_migrate = {
+            'starred': 'starredAt',
+            'hidden': 'hiddenAt',
+            'currentDeck': 'addedAt',
+            'shuffledOut': 'shuffledAt'
+        }
+
+        if key in array_keys_to_migrate and isinstance(value, list) and value and isinstance(value[0], str):
+            app.logger.info(f"Migrating data format for key '{key}' from string array to object array.")
+            timestamp_key = array_keys_to_migrate[key]
+            # Use the file's last modified time as a consistent default for all migrated items
+            default_timestamp = last_modified or datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+            
+            new_value = [{"guid": guid, timestamp_key: default_timestamp} for guid in value]
+            
+            # Atomically save the migrated data and get the new timestamp
+            new_last_modified = _save_state(key, new_value)
+            return {"value": new_value, "lastModified": new_last_modified}
+
+        return {"value": value, "lastModified": last_modified}
+    except (json.JSONDecodeError, KeyError, FileNotFoundError):
+        # If file is corrupt or missing after checks, return a clean state
         return {"value": None, "lastModified": None}
 
 def _save_state(key, value):
-    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
+    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     data = {"value": value, "lastModified": now}
     path = _user_state_path(key)
     try:
@@ -255,7 +294,7 @@ def get_single_user_state_key(key):
     if not key:
         abort(400, description="User state key is required")
     state_data = _load_state(key)
-    if state_data["value"] is None and state_data["lastModified"] is None:
+    if state_data["value"] is None and key not in USER_STATE_SERVER_DEFAULTS:
         abort(404, description=f"User state key '{key}' not found.")
 
     if_none_match = request.headers.get("If-None-Match")
@@ -274,7 +313,8 @@ def post_user_state():
         return jsonify({"error": "Invalid JSON body, expected a list of operations"}), 400
 
     results = []
-    server_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds') + 'Z'
+    # Use a single consistent timestamp for all operations in the batch
+    server_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
     for op in operations:
         op_type = op.get("type")
@@ -285,30 +325,32 @@ def post_user_state():
                 if key not in USER_STATE_SERVER_DEFAULTS:
                     results.append({"id": op_id, "status": "skipped", "reason": "Unknown key"})
                     continue
-                _save_state(key, op.get("value"))
-                results.append({"id": op_id, "key": key, "status": "success", "serverTime": server_time})
+                new_last_modified = _save_state(key, op.get("value"))
+                results.append({"id": op_id, "key": key, "status": "success", "lastModified": new_last_modified})
 
             elif op_type in ["starDelta", "hiddenDelta"]:
                 data = op.get("data", {})
-                item_guid = data.get("itemGuid")
+                item_guid = data.get("guid") # Match client-side object property
                 action = data.get("action")
                 state_key = "starred" if op_type == "starDelta" else "hidden"
                 timestamp_key = "starredAt" if op_type == "starDelta" else "hiddenAt"
+                timestamp = data.get(timestamp_key, server_time) # Use client timestamp if available
 
                 if not item_guid or action not in ["add", "remove"]:
-                    raise ValueError("Missing 'itemGuid' or invalid 'action'")
+                    raise ValueError("Missing 'guid' or invalid 'action'")
 
                 current_state_data = _load_state(state_key)
                 current_list = current_state_data['value'] or []
 
                 if action == "add":
-                    if not any(item["guid"] == item_guid for item in current_list):
-                        current_list.append({"guid": item_guid, timestamp_key: server_time})
+                    # Remove any existing item with the same guid before adding
+                    current_list = [item for item in current_list if item.get("guid") != item_guid]
+                    current_list.append({"guid": item_guid, timestamp_key: timestamp})
                 elif action == "remove":
                     current_list = [item for item in current_list if item.get("guid") != item_guid]
 
-                _save_state(state_key, current_list)
-                results.append({"id": op_id, "status": "success", "serverTime": server_time})
+                new_last_modified = _save_state(state_key, current_list)
+                results.append({"id": op_id, "status": "success", "lastModified": new_last_modified})
 
             else:
                 results.append({"id": op_id, "status": "skipped", "reason": "Unknown operation type"})
