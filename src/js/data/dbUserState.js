@@ -1,6 +1,8 @@
 // @filepath: src/js/data/dbUserState.js
 
 import { withDb } from './dbCore.js';
+// NEW: Import the sync operation handler to create a uniform save/sync pipeline.
+import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
 
 // --- User State Definitions ---
 export const USER_STATE_DEFS = {
@@ -27,10 +29,10 @@ export const USER_STATE_DEFS = {
 export async function loadSimpleState(key, storeName = 'userSettings') {
     return withDb(async (db) => {
         try {
-            const value = await db.get(storeName, key);
+            const record = await db.get(storeName, key);
             return {
-                value: value ? value.value : USER_STATE_DEFS[key]?.default || null,
-                lastModified: value?.lastModified || null // Return lastModified for sync
+                value: record ? record.value : USER_STATE_DEFS[key]?.default || null,
+                lastModified: record?.lastModified || null // Return lastModified for sync
             };
         } catch (e) {
             console.error(`Failed to load simple state for key '${key}':`, e);
@@ -40,20 +42,33 @@ export async function loadSimpleState(key, storeName = 'userSettings') {
 }
 
 /**
- * Saves a simple key-value state to the specified store.
+ * --- MODIFIED: Saves a simple key-value state locally AND queues it for synchronization. ---
  * @param {string} key The key to save.
  * @param {any} value The value to save.
  * @param {string} storeName The object store to use (e.g., 'userSettings').
  * @returns {Promise<void>}
  */
 export async function saveSimpleState(key, value, storeName = 'userSettings') {
-    return withDb(async (db) => {
+    // First, save the state locally for immediate UI feedback.
+    await withDb(async (db) => {
         try {
-            await db.put(storeName, { key, value, lastModified: new Date().toISOString() }); // Add lastModified timestamp
+            await db.put(storeName, { key, value, lastModified: new Date().toISOString() });
         } catch (e) {
             console.error(`Failed to save simple state for key '${key}':`, e);
+            throw e; // Re-throw to prevent queuing if local save fails.
         }
     });
+
+    // Second, after local save, queue the operation for the server if it's not local-only.
+    const def = USER_STATE_DEFS[key];
+    if (def && !def.localOnly) {
+        await queueAndAttemptSyncOperation({
+            type: 'simpleUpdate',
+            key: key,
+            value: value,
+            timestamp: new Date().toISOString()
+        });
+    }
 }
 
 // Helper to generate the correct timestamp key based on the store name / action.
@@ -82,7 +97,7 @@ export async function loadArrayState(storeName) {
             const needsMigration = allItems.length > 0 && (typeof allItems[0] === 'string' || allItems[0].id === undefined);
 
             if (needsMigration) {
-                console.log(`Migration required for '${storeName}'. Converting string GUIDs to objects.`);
+                console.log(`[DB] Migration required for '${storeName}'. Converting string GUIDs to objects.`);
                 const timestampKey = getTimestampKey(storeName);
                 const now = new Date().toISOString();
 
@@ -91,7 +106,6 @@ export async function loadArrayState(storeName) {
                     return { guid, [timestampKey]: now };
                 });
 
-                // Overwrite the store with the newly structured objects
                 const tx = db.transaction(storeName, 'readwrite');
                 await tx.store.clear();
                 for (const item of migratedItems) {
@@ -99,8 +113,7 @@ export async function loadArrayState(storeName) {
                 }
                 await tx.done;
 
-                console.log(`Migration complete for '${storeName}'.`);
-                // Re-fetch the data to get the newly assigned IDs
+                console.log(`[DB] Migration complete for '${storeName}'.`);
                 const finalItems = await db.getAll(storeName);
                 return { value: finalItems };
             }
@@ -115,7 +128,6 @@ export async function loadArrayState(storeName) {
 
 /**
  * Finds a single object in a store by its GUID.
- * Note: This requires a 'guid' index on the specified store, which will be defined in dbCore.js.
  * @param {string} storeName The name of the object store.
  * @param {string} guid The GUID to find.
  * @returns {Promise<object|undefined>} The found object (including its auto-incrementing id) or undefined.
@@ -123,7 +135,6 @@ export async function loadArrayState(storeName) {
 export async function findByGuid(storeName, guid) {
     return withDb(async (db) => {
         try {
-            // Uses an index for an efficient lookup.
             return await db.getFromIndex(storeName, 'guid', guid);
         } catch (e) {
             console.error(`Error finding item by GUID '${guid}' in store '${storeName}':`, e);
@@ -133,96 +144,97 @@ export async function findByGuid(storeName, guid) {
 }
 
 /**
- * Adds or removes a single object from an array-based store.
+ * --- MODIFIED: Adds or removes an object locally AND queues the change for synchronization. ---
  * @param {string} storeName The name of the object store.
  * @param {object} item The object to add or remove. Must contain a 'guid' property.
  * @param {boolean} add true to add, false to remove.
  * @returns {Promise<void>}
  */
 export async function updateArrayState(storeName, item, add) {
-    return withDb(async (db) => {
-        // --- START: MODIFICATION - ENHANCED LOGGING ---
+    // First, perform the local database operation.
+    await withDb(async (db) => {
         const tx = db.transaction(storeName, 'readwrite');
         try {
             if (!item || !item.guid) {
                 console.error("[DB] FATAL: updateArrayState requires an item with a guid property.", item);
                 return;
             }
-
-            console.log(`[DB] Starting transaction for '${storeName}'. Action: ${add ? 'add' : 'remove'}, GUID: ${item.guid}`);
             const store = tx.objectStore(storeName);
-
             if (add) {
-                // 'put' adds the new object. The 'id' is auto-generated by IndexedDB.
-                const id = await store.put(item);
-                console.log(`[DB] SUCCESS: Put item with guid '${item.guid}' into '${storeName}'. New ID: ${id}`);
+                await store.put(item);
             } else {
-                // To delete, we must find the item by its business key (guid)
-                // to get its database primary key (id).
-                const index = store.index('guid');
-                const existingItem = await index.get(item.guid);
-
+                const existingItem = await store.index('guid').get(item.guid);
                 if (existingItem && typeof existingItem.id !== 'undefined') {
-                    // Once we have the primary key (id), we can perform the delete.
                     await store.delete(existingItem.id);
-                    console.log(`[DB] SUCCESS: Deleted item with id '${existingItem.id}' (guid: '${item.guid}') from '${storeName}'.`);
                 } else {
-                    console.warn(`[DB] WARN: Attempted to delete item with guid '${item.guid}' but it was not found in '${storeName}'. This can happen if data is out of sync.`);
+                    console.warn(`[DB] WARN: Attempted to delete item with guid '${item.guid}' but it was not found in '${storeName}'.`);
                 }
             }
-
             await tx.done;
-            console.log(`[DB] Transaction for '${storeName}' (GUID: ${item.guid}) completed successfully.`);
-
         } catch (e) {
             console.error(`[DB] FATAL: Transaction FAILED in updateArrayState for store '${storeName}' (GUID: '${item.guid}'):`, e);
-            // If the transaction is active and has an abort method, call it.
-            if (tx && tx.abort) {
-                tx.abort();
-            }
-            throw e; // Re-throw to make the application aware of the failure.
+            if (tx && tx.abort) tx.abort();
+            throw e; // Re-throw to prevent queuing if local save fails.
         }
-        // --- END: MODIFICATION ---
     });
+
+    // Second, determine if this store needs to be synced and queue the operation.
+    const defEntry = Object.entries(USER_STATE_DEFS).find(([, v]) => v.store === storeName);
+    if (defEntry && !defEntry[1].localOnly) {
+        let opType = '';
+        if (storeName === 'starred') opType = 'starDelta';
+        if (storeName === 'hidden') opType = 'hiddenDelta';
+        
+        if (opType) {
+            await queueAndAttemptSyncOperation({
+                type: opType,
+                guid: item.guid,
+                action: add ? 'add' : 'remove',
+                timestamp: item[getTimestampKey(storeName)] || new Date().toISOString()
+            });
+        }
+    }
 }
 
 
 /**
- * Overwrites an entire store with a new array of objects.
+ * --- MODIFIED: Overwrites a store locally AND queues the change for synchronization. ---
  * @param {string} storeName The name of the object store.
  * @param {Array<object>} objects The array of objects to save into the store.
  * @returns {Promise<void>}
  */
 export async function saveArrayState(storeName, objects) {
-    return withDb(async (db) => {
+    // First, perform the local database operation.
+    await withDb(async (db) => {
         try {
             if (!Array.isArray(objects)) {
-                console.error(`saveArrayState expects an array of objects, but received:`, objects);
+                console.error(`saveArrayState expects an array, but received:`, objects);
                 return;
             }
             const tx = db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
-            await store.clear(); // Clear all existing data first.
-
-            // Put each new object into the store. The auto-incrementing 'id' will be generated.
+            await store.clear();
             for (const item of objects) {
-                // FIX: Sanitize the object to remove any reactivity/proxies before storing.
-                // This prevents the DataCloneError by ensuring we only store plain objects.
                 const sanitizedItem = JSON.parse(JSON.stringify(item));
-                
-                // Defensively remove the 'id' property. Since the store is cleared and
-                // we are adding new items, we want to ensure IndexedDB's autoIncrement
-                // feature generates a fresh ID for each object.
-                delete sanitizedItem.id; 
-                
+                delete sanitizedItem.id;
                 await store.put(sanitizedItem);
             }
-            
             await tx.done;
         } catch (e) {
             console.error(`Failed to save array state to store '${storeName}':`, e);
-            // Re-throw the error to make upstream logic aware of the failure.
-            throw e;
+            throw e; // Re-throw to prevent queuing if local save fails.
         }
     });
+
+    // Second, determine if this store needs to be synced and queue a 'replaceAll' operation.
+    const defEntry = Object.entries(USER_STATE_DEFS).find(([, v]) => v.store === storeName);
+    if (defEntry && !defEntry[1].localOnly) {
+        await queueAndAttemptSyncOperation({
+            type: 'arrayReplace',
+            key: defEntry[0], // The key from USER_STATE_DEFS, e.g., 'starred'
+            // The server payload can be simplified to just GUIDs for a full replace.
+            value: objects.map(item => item.guid),
+            timestamp: new Date().toISOString()
+        });
+    }
 }
