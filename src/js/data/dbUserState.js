@@ -1,4 +1,4 @@
-// This file contains all logic for managing local user state in the database.
+// dbUserState.js This file contains all logic for managing local user state in the database.
 
 import { withDb } from './dbCore.js';
 

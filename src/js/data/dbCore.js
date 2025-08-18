@@ -4,7 +4,7 @@ import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
 // Increment the version to trigger the necessary schema upgrade.
-const DB_VERSION = 27;
+const DB_VERSION = 28;
 
 let _dbInstance = null;
 let _dbInitPromise = null;
