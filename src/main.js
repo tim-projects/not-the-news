@@ -361,21 +361,29 @@ export function rssApp() {
             ]);
             console.log("Loaded starred state:", rawStarredState.value);
 
-            // FIX: Sanitize and normalize 'starred' data.
-            const starredValue = rawStarredState.value;
-            this.starred = (Array.isArray(starredValue))
-                ? starredValue
-                      .filter(guid => typeof guid === 'string' && guid) // Sanitize
-                      .map(guid => ({ guid, starredAt: new Date().toISOString() })) // Normalize
-                : [];
+            // FINAL FIX: Universal sanitization and normalization for starred items.
+            let sanitizedStarred = [];
+            if (Array.isArray(rawStarredState.value)) {
+                for (const item of rawStarredState.value) {
+                    let guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) ? item.guid : null;
+                    if (guid) {
+                        sanitizedStarred.push({ guid, starredAt: new Date().toISOString() });
+                    }
+                }
+            }
+            this.starred = sanitizedStarred;
 
-            // FIX: Sanitize and normalize 'shuffledOutGuids' data.
-            const shuffledOutValue = rawShuffledOutState.value;
-            this.shuffledOutGuids = (Array.isArray(shuffledOutValue))
-                ? shuffledOutValue
-                      .filter(guid => typeof guid === 'string' && guid) // Sanitize
-                      .map(guid => ({ guid })) // Normalize
-                : [];
+            // FINAL FIX: Universal sanitization and normalization for shuffled-out GUIDs.
+            let sanitizedShuffled = [];
+            if (Array.isArray(rawShuffledOutState.value)) {
+                 for (const item of rawShuffledOutState.value) {
+                    let guid = (typeof item === 'string' && item) ? item : (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) ? item.guid : null;
+                    if (guid) {
+                        sanitizedShuffled.push({ guid });
+                    }
+                }
+            }
+            this.shuffledOutGuids = sanitizedShuffled;
     
             this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
             console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);

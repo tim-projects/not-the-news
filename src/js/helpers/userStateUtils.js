@@ -1,8 +1,5 @@
 // @filepath: src/js/helpers/userStateUtils.js
 
-// This file contains helper functions for managing user state and syncing with the server.
-// It relies on the synchronized database functions for all data access.
-
 import {
     loadSimpleState,
     saveSimpleState,
@@ -15,13 +12,6 @@ import {
 import { isOnline } from '../utils/connectivity.js';
 import { createStatusBarMessage } from '../ui/uiUpdaters.js';
 
-/**
- * Toggles an item's state (e.g., starred or hidden) and syncs it with the server.
- * This function consolidates the logic from `toggleStar` and `toggleHidden`.
- * @param {object} app The Alpine.js app state object.
- * @param {string} guid The unique identifier of the feed item.
- * @param {string} stateKey The key for the state to toggle ('starred' or 'hidden').
- */
 export async function toggleItemStateAndSync(app, guid, stateKey) {
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
@@ -60,13 +50,6 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     await queueAndAttemptSyncOperation(pendingOp);
 }
 
-/**
- * A pure function to prune stale hidden items from the hiddenItems list.
- * @param {Array<object>} feedItems - The array of current feed items.
- * @param {Array<object>} hiddenItems - The current array of hidden items (already normalized).
- * @param {number} currentTS - The current timestamp in milliseconds.
- * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
- */
 export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     if (!Array.isArray(hiddenItems)) return [];
     if (!Array.isArray(feedItems) || feedItems.length === 0) return hiddenItems;
@@ -75,7 +58,7 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
     return hiddenItems.filter(item => {
-        if (!item || !item.guid) return false; // Safety check
+        if (!item || !item.guid) return false;
 
         const normalizedGuid = String(item.guid).trim().toLowerCase();
         if (validFeedGuids.has(normalizedGuid)) return true;
@@ -90,45 +73,53 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     });
 }
 
-/**
- * Loads, sanitizes, normalizes, and prunes hidden items.
- * @param {Array<object>} feedItems - The array of current feed items.
- * @returns {Promise<Array<object>>} The updated list of hidden items.
- */
 export async function loadAndPruneHiddenItems(feedItems) {
-    const { value: rawHiddenItems } = await loadArrayState('hidden');
+    const { value: rawItems } = await loadArrayState('hidden');
+    
+    // FINAL FIX: Implement a universally robust sanitization and normalization pipeline.
+    // This logic handles any mix of strings, objects, nulls, or undefined values.
+    let normalizedItems = [];
+    if (Array.isArray(rawItems)) {
+        for (const item of rawItems) {
+            let guid = null;
+            let hiddenAt = new Date().toISOString();
 
-    // FIX: Sanitize and normalize the data in one step.
-    // 1. Ensure it's an array.
-    // 2. Filter out any invalid entries (null, undefined, empty strings).
-    // 3. Map the clean data to the new object format.
-    const normalizedItems = (Array.isArray(rawHiddenItems))
-        ? rawHiddenItems
-              .filter(guid => typeof guid === 'string' && guid) // Sanitize the data
-              .map(guid => ({ guid, hiddenAt: new Date().toISOString() })) // Normalize to objects
-        : [];
+            if (typeof item === 'string' && item) {
+                guid = item;
+            } else if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) {
+                guid = item.guid;
+                // Preserve original timestamp if it's valid
+                const ts = new Date(item.hiddenAt).getTime();
+                if (!isNaN(ts)) {
+                    hiddenAt = item.hiddenAt;
+                }
+            }
 
-    const prunedHiddenItems = await pruneStaleHidden(feedItems, normalizedItems, Date.now());
-
-    // Save back to the database if the data has been cleaned, pruned, or migrated.
-    const isMigrated = Array.isArray(rawHiddenItems) && typeof rawHiddenItems[0] === 'string';
-    if (prunedHiddenItems.length !== normalizedItems.length || isMigrated) {
-        try {
-            await saveArrayState('hidden', prunedHiddenItems);
-            console.log(`Pruned or normalized hidden items: removed ${normalizedItems.length - prunedHiddenItems.length} stale items.`);
-        } catch (error) {
-            console.error("Error saving pruned hidden items:", error);
-            // Don't re-throw, as we can continue with the in-memory version.
+            // Only add the item if we were able to extract a valid GUID.
+            if (guid) {
+                normalizedItems.push({ guid, hiddenAt });
+            }
         }
     }
 
-    return prunedHiddenItems;
+    const prunedItems = await pruneStaleHidden(feedItems, normalizedItems, Date.now());
+
+    // Determine if the original data was dirty or in the old format.
+    const originalLength = Array.isArray(rawItems) ? rawItems.length : 0;
+    const needsResave = prunedItems.length !== originalLength || normalizedItems.length !== originalLength;
+
+    if (needsResave) {
+        try {
+            await saveArrayState('hidden', prunedItems);
+            console.log(`Sanitized, pruned, or migrated hidden items. Original count: ${originalLength}, New count: ${prunedItems.length}`);
+        } catch (error) {
+            console.error("Error saving pruned hidden items:", error);
+        }
+    }
+
+    return prunedItems;
 }
 
-/**
- * Loads the current deck of GUIDs.
- * @returns {Promise<Array<string>>} A promise that resolves to an array of GUIDs.
- */
 export async function loadCurrentDeck() {
     const { value: storedObjects } = await loadArrayState('currentDeckGuids');
     
@@ -140,17 +131,12 @@ export async function loadCurrentDeck() {
     return deckGuids;
 }
 
-/**
- * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store.
- * @param {string[]} guids An array of GUIDs to save as the current deck.
- */
 export async function saveCurrentDeck(guids) {
     if (!Array.isArray(guids)) {
          console.error("[saveCurrentDeck] Invalid input: expected an array.");
          return;
     }
     
-    // FIX: Sanitize the incoming array to prevent crashes from bad data.
     const validGuids = guids.filter(g => typeof g === 'string' && g);
 
     if (validGuids.length !== guids.length) {
@@ -169,11 +155,9 @@ export async function saveCurrentDeck(guids) {
             value: JSON.parse(JSON.stringify(validGuids))
         });
     } catch (e) {
-        console.error("[saveCurrentDeck] An error occurred:", e);
-        // Do not re-throw, to prevent crashing the entire app flow.
+        console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
     }
 }
-
 
 // --- Unchanged Functions Below ---
 
