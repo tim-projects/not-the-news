@@ -23,7 +23,6 @@ import { createStatusBarMessage } from '../ui/uiUpdaters.js';
  * @param {string} stateKey The key for the state to toggle ('starred' or 'hidden').
  */
 export async function toggleItemStateAndSync(app, guid, stateKey) {
-    // Determine the current state based on the presence of the GUID in the local state array.
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
 
@@ -37,11 +36,8 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
         }
     };
 
-    // Update the local database. This is robust and correct.
     await updateArrayState(stateKey, guid, !isCurrentlyActive);
 
-    // Update the app's reactive state correctly to trigger UI updates.
-    // By creating a new array, we ensure Alpine.js detects the change.
     let newAppList;
     if (isCurrentlyActive) {
         newAppList = app[stateKey].filter(item => item.guid !== guid);
@@ -51,7 +47,6 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
             [`${stateKey}At`]: pendingOp.data.timestamp
         }];
     }
-    // Reassign the new array to the app's state.
     app[stateKey] = newAppList;
     
     if (stateKey === 'hidden') {
@@ -62,16 +57,13 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
 
     if (typeof app.updateCounts === 'function') app.updateCounts();
 
-    // Queue and attempt to sync the change.
     await queueAndAttemptSyncOperation(pendingOp);
 }
 
 /**
  * A pure function to prune stale hidden items from the hiddenItems list.
- * Items are considered stale if they are not in the current feedItems and are older than 30 days.
- * This function does NOT modify the database.
- * @param {Array<object>} feedItems - The array of current feed items (expected to have 'guid' property).
- * @param {Array<object>} hiddenItems - The current array of hidden items from the app state.
+ * @param {Array<object>} feedItems - The array of current feed items.
+ * @param {Array<object>} hiddenItems - The current array of hidden items (already normalized).
  * @param {number} currentTS - The current timestamp in milliseconds.
  * @returns {Promise<Array<object>>} The updated list of hidden items after pruning.
  */
@@ -82,54 +74,51 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     const validFeedGuids = new Set(feedItems.filter(e => e && e.guid).map(e => e.guid.trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-    const itemsToKeep = hiddenItems.filter(item => {
-        // FIX: Make pruning logic more robust.
-        if (!item || !item.guid) return false; // Discard invalid items immediately.
+    return hiddenItems.filter(item => {
+        if (!item || !item.guid) return false; // Safety check
 
         const normalizedGuid = String(item.guid).trim().toLowerCase();
-        // 1. Always keep items that are still in the main feed.
         if (validFeedGuids.has(normalizedGuid)) return true;
 
-        // 2. For items no longer in the feed, only prune them if they have a valid date and are older than 30 days.
         if (item.hiddenAt) {
             const hiddenAtTS = new Date(item.hiddenAt).getTime();
             if (!isNaN(hiddenAtTS)) {
                 return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
             }
         }
-        
-        // 3. If the item is no longer in the feed and has no valid date, it's safer to remove it.
         return false;
     });
-
-    return itemsToKeep;
 }
 
 /**
- * Loads the current list of hidden items, prunes the stale ones,
- * saves the changes to the database, and returns the final list.
- * This function should be called during app startup to ensure a clean state.
+ * Loads, sanitizes, normalizes, and prunes hidden items.
  * @param {Array<object>} feedItems - The array of current feed items.
  * @returns {Promise<Array<object>>} The updated list of hidden items.
  */
 export async function loadAndPruneHiddenItems(feedItems) {
     const { value: rawHiddenItems } = await loadArrayState('hidden');
 
-    // Data normalization/migration step.
-    const hiddenItems = (Array.isArray(rawHiddenItems) && typeof rawHiddenItems[0] === 'string')
-        ? rawHiddenItems.map(guid => ({ guid, hiddenAt: new Date().toISOString() }))
-        : (rawHiddenItems || []);
+    // FIX: Sanitize and normalize the data in one step.
+    // 1. Ensure it's an array.
+    // 2. Filter out any invalid entries (null, undefined, empty strings).
+    // 3. Map the clean data to the new object format.
+    const normalizedItems = (Array.isArray(rawHiddenItems))
+        ? rawHiddenItems
+              .filter(guid => typeof guid === 'string' && guid) // Sanitize the data
+              .map(guid => ({ guid, hiddenAt: new Date().toISOString() })) // Normalize to objects
+        : [];
 
-    const prunedHiddenItems = await pruneStaleHidden(feedItems, hiddenItems, Date.now());
+    const prunedHiddenItems = await pruneStaleHidden(feedItems, normalizedItems, Date.now());
 
-    const originalLength = Array.isArray(rawHiddenItems) ? rawHiddenItems.length : 0;
-    // Only save if a meaningful change happened (pruning or format change).
-    if (prunedHiddenItems.length !== originalLength || typeof rawHiddenItems[0] === 'string') {
+    // Save back to the database if the data has been cleaned, pruned, or migrated.
+    const isMigrated = Array.isArray(rawHiddenItems) && typeof rawHiddenItems[0] === 'string';
+    if (prunedHiddenItems.length !== normalizedItems.length || isMigrated) {
         try {
             await saveArrayState('hidden', prunedHiddenItems);
-            console.log(`Pruned or normalized hidden items: removed ${originalLength - prunedHiddenItems.length} stale items.`);
+            console.log(`Pruned or normalized hidden items: removed ${normalizedItems.length - prunedHiddenItems.length} stale items.`);
         } catch (error) {
             console.error("Error saving pruned hidden items:", error);
+            // Don't re-throw, as we can continue with the in-memory version.
         }
     }
 
@@ -152,8 +141,7 @@ export async function loadCurrentDeck() {
 }
 
 /**
- * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store
- * and queues a corresponding sync operation.
+ * Saves a new array of deck GUIDs to the 'currentDeckGuids' IndexedDB store.
  * @param {string[]} guids An array of GUIDs to save as the current deck.
  */
 export async function saveCurrentDeck(guids) {
@@ -161,11 +149,12 @@ export async function saveCurrentDeck(guids) {
          console.error("[saveCurrentDeck] Invalid input: expected an array.");
          return;
     }
-     // Filter out any potential undefined/null values before processing.
+    
+    // FIX: Sanitize the incoming array to prevent crashes from bad data.
     const validGuids = guids.filter(g => typeof g === 'string' && g);
 
     if (validGuids.length !== guids.length) {
-        console.warn("[saveCurrentDeck] Filtered out invalid GUIDs from deck.", { original: guids.length, valid: validGuids.length });
+        console.warn("[saveCurrentDeck] Filtered out invalid GUIDs from the generated deck.");
     }
 
     console.log("[saveCurrentDeck] Saving", validGuids.length, "GUIDs:", validGuids.slice(0, 3));
@@ -181,12 +170,12 @@ export async function saveCurrentDeck(guids) {
         });
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred:", e);
-        throw e;
+        // Do not re-throw, to prevent crashing the entire app flow.
     }
 }
 
-// --- The rest of the file (loadShuffleState, saveShuffleState, etc.) remains unchanged ---
-// (No changes are needed for the functions below this line)
+
+// --- Unchanged Functions Below ---
 
 export async function loadShuffleState() {
     const {

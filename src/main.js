@@ -83,8 +83,7 @@ export function rssApp() {
         syncStatusMessage: '',
         showSyncStatus: false,
         
-        // FIX: Add missing state properties to prevent Alpine errors
-        theme: 'dark', // Provide a default value
+        theme: 'dark',
         rssSaveMessage: '',
         keywordSaveMessage: '',
 
@@ -166,7 +165,6 @@ export function rssApp() {
             console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
 
             const items = [];
-            // This now safely expects this.hidden and this.starred to be arrays of objects
             const hiddenSet = new Set(this.hidden.map(h => h.guid));
             const starredSet = new Set(this.starred.map(s => s.guid));
             const seenGuidsForDeck = new Set();
@@ -363,17 +361,21 @@ export function rssApp() {
             ]);
             console.log("Loaded starred state:", rawStarredState.value);
 
-            // FIX: Normalize 'starred' data. If it's a string array, convert it to an object array.
+            // FIX: Sanitize and normalize 'starred' data.
             const starredValue = rawStarredState.value;
-            this.starred = (Array.isArray(starredValue) && typeof starredValue[0] === 'string')
-                ? starredValue.map(guid => ({ guid, starredAt: new Date().toISOString() }))
-                : (starredValue || []);
+            this.starred = (Array.isArray(starredValue))
+                ? starredValue
+                      .filter(guid => typeof guid === 'string' && guid) // Sanitize
+                      .map(guid => ({ guid, starredAt: new Date().toISOString() })) // Normalize
+                : [];
 
-            // FIX: Normalize 'shuffledOutGuids' data.
+            // FIX: Sanitize and normalize 'shuffledOutGuids' data.
             const shuffledOutValue = rawShuffledOutState.value;
-            this.shuffledOutGuids = (Array.isArray(shuffledOutValue) && typeof shuffledOutValue[0] === 'string')
-                ? shuffledOutValue.map(guid => ({ guid }))
-                : (shuffledOutValue || []);
+            this.shuffledOutGuids = (Array.isArray(shuffledOutValue))
+                ? shuffledOutValue
+                      .filter(guid => typeof guid === 'string' && guid) // Sanitize
+                      .map(guid => ({ guid })) // Normalize
+                : [];
     
             this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
             console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
@@ -382,7 +384,6 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
             this.progressMessage = 'Pruning hidden items...';
-            // The `loadAndPruneHiddenItems` function now handles its own normalization.
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             
             console.log("[deckManager] Starting deck management with all data loaded.");
@@ -492,11 +493,11 @@ export function rssApp() {
             const observer = new IntersectionObserver(async (entries) => {
                 // ... logic to observe item visibility
             }, {
-                root: document.querySelector('#items'), // <-- CORRECTED
+                root: document.querySelector('#items'),
                 rootMargin: '0px',
                 threshold: 0.1
             });
-            const feedContainer = document.querySelector('#items'); // <-- CORRECTED
+            const feedContainer = document.querySelector('#items');
             if (!feedContainer) return;
             const observeElements = () => {
                 feedContainer.querySelectorAll('[data-guid]').forEach(item => {
@@ -529,7 +530,6 @@ export function rssApp() {
     };
 }
 
-// --- FIX: Add Alpine.js initialization ---
 // Register the rssApp component with Alpine.
 Alpine.data('rssApp', rssApp);
 
