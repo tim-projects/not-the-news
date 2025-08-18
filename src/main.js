@@ -102,14 +102,12 @@ export function rssApp() {
 
                 this.progressMessage = 'Initializing UI components...';
                 
-                // Initialize all UI components, passing the app instance to them.
-                // initTheme will now handle applying the initial theme as well as wiring up the toggle.
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
                 initConfigPanelListeners(this);
                 attachScrollToTopHandler();
-                await initScrollPosition(this);
+                // REMOVED: The call to initScrollPosition is moved to after data is loaded.
                 
                 if (this.isOnline) {
                     this.progressMessage = 'Performing initial sync...';
@@ -350,6 +348,12 @@ export function rssApp() {
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
             this.updateAllUI();
+
+            // ADDED: Restore scroll position AFTER the deck is loaded and ready to be rendered.
+            // Using $nextTick ensures Alpine has updated the DOM before we try to scroll.
+            this.$nextTick(() => {
+                initScrollPosition(this);
+            });
         },
 
         updateAllUI: function() { this.updateCounts(); },
@@ -403,6 +407,15 @@ export function rssApp() {
                 this.isOnline = false;
                 this.updateSyncStatusMessage();
             });
+            
+            // ADDED: Save the current scroll position when the user leaves or refreshes the page.
+            window.addEventListener('beforeunload', () => {
+                // Only save the position if the user is looking at the main feed view.
+                if (this.filterMode === 'unread' && !this.openSettings) {
+                    saveCurrentScrollPosition();
+                }
+            });
+
             setTimeout(backgroundSync, 0);
         },
 

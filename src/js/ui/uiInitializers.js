@@ -138,22 +138,30 @@ export function initTheme(app) {
 }
 
 export async function initScrollPosition(app) {
+    // This function is now called inside a $nextTick in main.js,
+    // which ensures the DOM is ready. The requestAnimationFrame provides
+    // an extra layer of certainty that rendering is complete.
     window.requestAnimationFrame(async () => {
         const { value: lastViewedItemId } = await loadSimpleState('lastViewedItemId');
         const { value: lastViewedItemOffset } = await loadSimpleState('lastViewedItemOffset');
 
-        if (!lastViewedItemId || !app.entries?.length || !app.hidden) return;
+        // Exit if there's no saved position or the deck is empty.
+        if (!lastViewedItemId || !app.deck?.length) return;
 
-        const hiddenGuids = new Set(app.hidden.map(item => item.guid));
-        const targetEntry = app.entries.find(entry => entry.guid === lastViewedItemId);
+        // REFINED LOGIC: Check if the item to scroll to is actually in the current deck.
+        // This is the most reliable check, as it represents what's currently on screen.
+        // It implicitly handles items that are hidden or have been shuffled out.
+        const itemIsInDeck = app.deck.some(item => item.guid === lastViewedItemId);
 
-        if (!targetEntry || hiddenGuids.has(lastViewedItemId)) return;
-
-        const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
-        if (targetEl) {
-            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            if (typeof lastViewedItemOffset === 'number' && lastViewedItemOffset > 0) {
-                window.scrollTo({ top: window.scrollY + lastViewedItemOffset, behavior: 'smooth' });
+        if (itemIsInDeck) {
+            const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
+            if (targetEl) {
+                // Use 'auto' for instant scroll on load.
+                targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+                // Restore the fine-tuned vertical offset if it exists.
+                if (typeof lastViewedItemOffset === 'number' && lastViewedItemOffset > 0) {
+                    window.scrollTo({ top: window.scrollY + lastViewedItemOffset, behavior: 'auto' });
+                }
             }
         }
     });

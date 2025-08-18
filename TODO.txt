@@ -8,10 +8,6 @@ After implementing these changes, thorough testing will be critical:
 
 Core App Initialization & Data Loading:
 
-- [ ] Verify the db not initialized error disappears or is handled gracefully during early Alpine.js reactivity.
-
-- [ ] Confirm DataCloneError is resolved.
-
 Basic Functionality:
 
 - [ ] Verify starring/unstarring and hiding/unhiding items works locally and syncs correctly to the server.
