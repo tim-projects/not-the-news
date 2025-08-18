@@ -1,7 +1,6 @@
 // @filepath: src/js/data/dbUserState.js
 
 import { withDb } from './dbCore.js';
-// NEW: Import the sync operation handler to create a uniform save/sync pipeline.
 import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
 
 // --- User State Definitions ---
@@ -42,7 +41,7 @@ export async function loadSimpleState(key, storeName = 'userSettings') {
 }
 
 /**
- * --- MODIFIED: Saves a simple key-value state locally AND queues it for synchronization. ---
+ * Saves a simple key-value state locally AND queues it for synchronization.
  * @param {string} key The key to save.
  * @param {any} value The value to save.
  * @param {string} storeName The object store to use (e.g., 'userSettings').
@@ -93,7 +92,6 @@ export async function loadArrayState(storeName) {
         try {
             const allItems = await db.getAll(storeName);
 
-            // Check if data migration is needed (i.e., data is old string format or objects without ids).
             const needsMigration = allItems.length > 0 && (typeof allItems[0] === 'string' || allItems[0].id === undefined);
 
             if (needsMigration) {
@@ -109,7 +107,7 @@ export async function loadArrayState(storeName) {
                 const tx = db.transaction(storeName, 'readwrite');
                 await tx.store.clear();
                 for (const item of migratedItems) {
-                    await tx.store.put(item); // New IDs will be auto-generated
+                    await tx.store.put(item);
                 }
                 await tx.done;
 
@@ -130,7 +128,7 @@ export async function loadArrayState(storeName) {
  * Finds a single object in a store by its GUID.
  * @param {string} storeName The name of the object store.
  * @param {string} guid The GUID to find.
- * @returns {Promise<object|undefined>} The found object (including its auto-incrementing id) or undefined.
+ * @returns {Promise<object|undefined>} The found object or undefined.
  */
 export async function findByGuid(storeName, guid) {
     return withDb(async (db) => {
@@ -144,7 +142,7 @@ export async function findByGuid(storeName, guid) {
 }
 
 /**
- * --- MODIFIED: Adds or removes an object locally AND queues the change for synchronization. ---
+ * Adds or removes a single object locally AND queues the change for synchronization.
  * @param {string} storeName The name of the object store.
  * @param {object} item The object to add or remove. Must contain a 'guid' property.
  * @param {boolean} add true to add, false to remove.
@@ -174,7 +172,7 @@ export async function updateArrayState(storeName, item, add) {
         } catch (e) {
             console.error(`[DB] FATAL: Transaction FAILED in updateArrayState for store '${storeName}' (GUID: '${item.guid}'):`, e);
             if (tx && tx.abort) tx.abort();
-            throw e; // Re-throw to prevent queuing if local save fails.
+            throw e;
         }
     });
 
@@ -196,16 +194,91 @@ export async function updateArrayState(storeName, item, add) {
     }
 }
 
+/**
+ * --- NEW: Re-implements the 30-day grace period pruning for hidden items. ---
+ * It removes hidden items that are no longer in the main feed, but only after they
+ * have been missing for 30 days.
+ * @param {Array<object>} hiddenItems The current array of hidden item objects.
+ * @param {Array<object>} feedItems The current array of all valid feed item objects.
+ * @returns {Promise<void>} A promise that resolves when the pruning and sync queuing is complete.
+ */
+export async function pruneStaleHiddenItems(hiddenItems, feedItems) {
+    if (!Array.isArray(hiddenItems) || !Array.isArray(feedItems)) {
+        console.warn('[DB] pruneStaleHiddenItems skipped due to invalid input.');
+        return;
+    }
+
+    const validFeedGuids = new Set(feedItems.map(item => item.guid));
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const prunedHiddenItems = hiddenItems.filter(item => {
+        if (validFeedGuids.has(item.guid)) {
+            return true;
+        }
+        const hiddenAtTimestamp = new Date(item.hiddenAt).getTime();
+        return (now - hiddenAtTimestamp) < THIRTY_DAYS_MS;
+    });
+
+    if (prunedHiddenItems.length < hiddenItems.length) {
+        const itemsRemoved = hiddenItems.length - prunedHiddenItems.length;
+        console.log(`[DB] Pruning ${itemsRemoved} stale hidden items (older than 30 days and no longer in feed).`);
+        await overwriteArrayAndSyncChanges('hidden', prunedHiddenItems);
+    } else {
+        console.log('[DB] No stale hidden items to prune.');
+    }
+}
 
 /**
- * --- MODIFIED: Overwrites a store locally AND queues the change for synchronization. ---
+ * --- NEW: Overwrites an array locally, calculates the changes, and queues them for sync. ---
+ * This is the correct function to use for data migration or sanitization tasks.
+ * @param {string} storeName The name of the object store (e.g., 'hidden').
+ * @param {Array<object>} newObjects The new, complete array of objects for the store.
+ * @returns {Promise<void>}
+ */
+export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
+    const { value: oldObjects } = await loadArrayState(storeName);
+    const oldGuids = new Set(oldObjects.map(item => item.guid));
+    await saveArrayState(storeName, newObjects);
+    const newGuids = new Set(newObjects.map(item => item.guid));
+
+    const defEntry = Object.entries(USER_STATE_DEFS).find(([, v]) => v.store === storeName);
+    if (!defEntry || defEntry[1].localOnly) {
+        console.log(`[DB] '${storeName}' is local-only. No sync operations will be queued.`);
+        return;
+    }
+
+    const guidsToRemove = [...oldGuids].filter(guid => !newGuids.has(guid));
+    if (guidsToRemove.length > 0) {
+        console.log(`[DB] Queuing ${guidsToRemove.length} 'remove' operations for '${storeName}'.`);
+        for (const guid of guidsToRemove) {
+            // Re-use updateArrayState's sync logic to queue a valid 'delta' operation.
+            // We pass a minimal object because only the guid is needed for the sync op.
+            // The local DB operation was already handled by saveArrayState.
+            await updateArrayState(storeName, { guid }, false);
+        }
+    }
+
+    const guidsToAdd = [...newGuids].filter(guid => !oldGuids.has(guid));
+    if (guidsToAdd.length > 0) {
+        console.log(`[DB] Queuing ${guidsToAdd.length} 'add' operations for '${storeName}'.`);
+        const timestampKey = getTimestampKey(storeName);
+        const now = new Date().toISOString();
+        for (const guid of guidsToAdd) {
+            await updateArrayState(storeName, { guid, [timestampKey]: now }, true);
+        }
+    }
+}
+
+/**
+ * --- MODIFIED: Overwrites a store LOCALLY ONLY. ---
+ * This is now a simple utility function. For syncing, use `overwriteArrayAndSyncChanges`.
  * @param {string} storeName The name of the object store.
  * @param {Array<object>} objects The array of objects to save into the store.
  * @returns {Promise<void>}
  */
 export async function saveArrayState(storeName, objects) {
-    // First, perform the local database operation.
-    await withDb(async (db) => {
+    return withDb(async (db) => {
         try {
             if (!Array.isArray(objects)) {
                 console.error(`saveArrayState expects an array, but received:`, objects);
@@ -222,19 +295,7 @@ export async function saveArrayState(storeName, objects) {
             await tx.done;
         } catch (e) {
             console.error(`Failed to save array state to store '${storeName}':`, e);
-            throw e; // Re-throw to prevent queuing if local save fails.
+            throw e;
         }
     });
-
-    // Second, determine if this store needs to be synced and queue a 'replaceAll' operation.
-    const defEntry = Object.entries(USER_STATE_DEFS).find(([, v]) => v.store === storeName);
-    if (defEntry && !defEntry[1].localOnly) {
-        await queueAndAttemptSyncOperation({
-            type: 'arrayReplace',
-            key: defEntry[0], // The key from USER_STATE_DEFS, e.g., 'starred'
-            // The server payload can be simplified to just GUIDs for a full replace.
-            value: objects.map(item => item.guid),
-            timestamp: new Date().toISOString()
-        });
-    }
 }
