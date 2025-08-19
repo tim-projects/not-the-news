@@ -91,6 +91,12 @@ export async function queueAndAttemptSyncOperation(operation) {
                 await withDb(db => db.delete('pendingOperations', generatedId));
                 console.log(`[DB] Successfully synced and removed immediate op ${generatedId} (${operation.type}).`);
                 if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
+
+                // --- SOLUTION ---
+                // After successfully pushing a change, pull the latest state to ensure consistency.
+                pullUserState();
+                // --- END SOLUTION ---
+
             } else {
                 console.warn(`[DB] Immediate sync for op ${generatedId} reported non-success by server:`, result);
             }
@@ -155,6 +161,11 @@ export async function processPendingOperations() {
         }
 
         if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
+
+        // --- SOLUTION ---
+        // After a successful batch sync, pull the latest state.
+        pullUserState();
+        // --- END SOLUTION ---
 
     } catch (error) {
         console.error('[DB] Error during batch synchronization:', error);
