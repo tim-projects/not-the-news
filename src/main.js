@@ -107,7 +107,6 @@ export function rssApp() {
                 initImagesToggle(this);
                 initConfigPanelListeners(this);
                 attachScrollToTopHandler();
-                // REMOVED: The call to initScrollPosition is moved to after data is loaded.
                 
                 if (this.isOnline) {
                     this.progressMessage = 'Performing initial sync...';
@@ -257,12 +256,14 @@ export function rssApp() {
         isHidden: function(guid) { return this.hidden.some(e => e.guid === guid); },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            await manageDailyDeck(this);
+            // Pass specific data instead of the entire app object
+            await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            await manageDailyDeck(this);
+            // Pass specific data instead of the entire app object
+            await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
@@ -277,7 +278,8 @@ export function rssApp() {
             this.progressMessage = 'Saving feeds and performing full sync...';
             await performFullSync(this);
             await this.loadFeedItemsFromDB();
-            await manageDailyDeck(this);
+            // Pass specific data instead of the entire app object
+            await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
             this.progressMessage = '';
             this.loading = false;
         },
@@ -345,10 +347,10 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             
-            await manageDailyDeck(this);
+            // Pass specific data instead of the entire app object
+            await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
             await this.loadAndDisplayDeck();
             
-            // FIX: Call updateAllUI() only after all data has been loaded and processed
             this.updateAllUI();
 
             // ADDED: Restore scroll position AFTER the deck is loaded and ready to be rendered.
@@ -377,15 +379,14 @@ export function rssApp() {
             this.$watch('filterMode', async (newMode) => {
                 await setFilterMode(this, newMode);
                 if (newMode === 'unread') {
-                    await manageDailyDeck(this);
+                    // Pass specific data instead of the entire app object
+                    await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
                 }
                 this.scrollToTop();
             });
             
-            this.$watch('entries', () => this.updateCounts());
-            this.$watch('hidden', () => this.updateCounts());
-            this.$watch('starred', () => this.updateCounts());
-            this.$watch('currentDeckGuids', () => this.updateCounts());
+            // FIX: Removed individual watchers here as they cause a race condition
+            // The single this.updateAllUI() call at the end of _loadAndManageAllData is sufficient.
         },
 
         _setupEventListeners: function() {
@@ -418,7 +419,7 @@ export function rssApp() {
                 }
             });
 
-            setTimeout(backgroundSync, 0);
+            // FIX: Removed the immediate setTimeout here to prevent the race condition.
         },
 
         _startPeriodicSync: function() {
