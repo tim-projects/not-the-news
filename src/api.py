@@ -44,7 +44,7 @@ USER_STATE_SERVER_DEFAULTS = {
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
     'theme': {'type': 'simple', 'default': 'light'},
     'lastFeedSync': {'type': 'simple', 'default': None},
-    'shuffledOut': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
+    'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
     'rssFeeds': {'type': 'array', 'default': []},
     'keywordBlacklist': {'type': 'array', 'default': []},
 }
