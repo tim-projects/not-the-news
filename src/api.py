@@ -30,7 +30,7 @@ os.makedirs(USER_STATE_DIR, exist_ok=True)
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
 
 USER_STATE_SERVER_DEFAULTS = {
-    'currentDeck': {'type': 'array', 'default': []},          # Array of { guid, addedAt }
+    'currentDeckGuids': {'type': 'array', 'default': []},          # Array of { guid, addedAt }
     'lastShuffleResetDate': {'type': 'simple', 'default': None},
     'shuffleCount': {'type': 'simple', 'default': 2},
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
