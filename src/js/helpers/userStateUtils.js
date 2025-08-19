@@ -1,4 +1,4 @@
-// userStateUtils.js
+// @filepath: src/js/userStateUtils.js
 
 import {
     loadSimpleState,
@@ -11,6 +11,44 @@ import {
 
 import { isOnline } from '../utils/connectivity.js';
 import { createStatusBarMessage } from '../ui/uiUpdaters.js';
+
+/**
+ * A helper function to deeply clone an object, sanitizing it for IndexedDB storage.
+ * It removes non-cloneable properties like functions.
+ * @param {object} obj The object to sanitize.
+ * @returns {object} A sanitized, cloneable copy of the object.
+ */
+function sanitizeForIndexedDB(obj) {
+    if (typeof structuredClone === 'function') {
+        try {
+            return structuredClone(obj);
+        } catch (e) {
+            console.error("structuredClone failed, falling back to manual sanitization.", e);
+        }
+    }
+
+    // Fallback for older browsers or complex, non-cloneable data
+    // This is a manual recursive check that omits functions.
+    const sanitized = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const value = obj[key];
+            if (typeof value === 'object' && value !== null) {
+                // Recursively sanitize nested objects and arrays
+                if (Array.isArray(value)) {
+                    sanitized[key] = value.map(item => sanitizeForIndexedDB(item));
+                } else {
+                    sanitized[key] = sanitizeForIndexedDB(value);
+                }
+            } else if (typeof value !== 'function') {
+                // Copy primitive values, but omit functions
+                sanitized[key] = value;
+            }
+        }
+    }
+    return sanitized;
+}
+
 
 export async function toggleItemStateAndSync(app, guid, stateKey) {
     const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
@@ -161,14 +199,18 @@ export async function saveCurrentDeck(deckObjects) {
     console.log("[saveCurrentDeck] Saving", validDeckObjects.length, "deck objects.");
 
     try {
-        // The input is already in the correct format, so we save it directly.
-        await saveArrayState('currentDeckGuids', validDeckObjects);
+        // Step 1: Sanitize the deck objects to remove any non-cloneable properties.
+        const sanitizedDeckObjects = validDeckObjects.map(item => sanitizeForIndexedDB(item));
 
-        // Sync operation sends the full objects.
+        // Step 2: Save the sanitized objects to the local database.
+        await saveArrayState('currentDeckGuids', sanitizedDeckObjects);
+
+        // Step 3: Queue the sanitized objects for synchronization.
+        // The server needs the full objects, so we pass the sanitized version.
         await queueAndAttemptSyncOperation({
             type: 'simpleUpdate',
             key: 'currentDeckGuids',
-            value: validDeckObjects 
+            value: sanitizedDeckObjects 
         });
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
