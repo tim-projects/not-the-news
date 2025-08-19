@@ -189,7 +189,8 @@ export async function processShuffle(app) {
     const visibleGuids = app.deck.map(item => item.guid);
     const existingShuffledGuids = (app.shuffledOutItems || app.shuffledOutGuids || []).map(getGuid);
     
-    const updatedShuffledGuidsSet = new Set([...existingShuffledGuids, ...visibleGuids]);
+    const existingShuffledGuidsSet = new Set(existingShuffledGuids);
+    const updatedShuffledGuidsSet = new Set([...existingShuffledGuidsSet, ...visibleGuids]);
     
     // Convert the combined set of GUIDs back to an array of objects with the correct timestamp.
     const timestamp = new Date().toISOString();

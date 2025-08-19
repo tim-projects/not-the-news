@@ -500,7 +500,7 @@ export function rssApp() {
                         }
                     }
                 }
-                this.starred = sanitizedStarred;
+                this.starred = [...new Map(sanitizedStarred.map(item => [item.guid, item])).values()];
 
                 const sanitizedShuffled = [];
                 if (Array.isArray(rawShuffledOutState.value)) {
@@ -511,7 +511,7 @@ export function rssApp() {
                         }
                     }
                 }
-                this.shuffledOutItems = sanitizedShuffled;
+                this.shuffledOutItems = [...new Map(sanitizedShuffled.map(item => [item.guid, item])).values()];
         
                 this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
                 this.shuffleCount = shuffleState.shuffleCount || 0;

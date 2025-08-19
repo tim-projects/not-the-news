@@ -77,7 +77,18 @@ export async function loadArrayState(storeName) {
                 console.log(`[DB] Migration required for '${storeName}'.`);
                 const timestampKey = getTimestampKey(storeName);
                 const now = new Date().toISOString();
-                const migratedItems = allItems.map(item => ({
+                // Deduplicate the array before migration to prevent unique constraint errors.
+                const uniqueItems = new Map();
+                allItems.forEach(item => {
+                    const guid = typeof item === 'string' ? item : item.guid;
+                    if (guid && !uniqueItems.has(guid)) {
+                        uniqueItems.set(guid, item);
+                    }
+                });
+
+                const deduplicatedItems = Array.from(uniqueItems.values());
+
+                const migratedItems = deduplicatedItems.map(item => ({
                     guid: typeof item === 'string' ? item : item.guid,
                     [timestampKey]: now
                 }));

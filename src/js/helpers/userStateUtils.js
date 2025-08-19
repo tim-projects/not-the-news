@@ -86,11 +86,9 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     const opType = `${stateKey}Delta`;
     const pendingOp = {
         type: opType,
-        data: {
-            itemGuid: guid,
-            action,
-            timestamp
-        }
+        guid: guid,
+        action: action,
+        timestamp: timestamp
     };
     await queueAndAttemptSyncOperation(pendingOp);
 }

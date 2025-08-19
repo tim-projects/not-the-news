@@ -86,10 +86,14 @@ export async function initSyncToggle(app) {
             if (!app.currentDeckGuids?.length && app.entries?.length) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
                 const now = new Date().toISOString();
-                app.currentDeckGuids = app.entries.map(item => ({
-                    guid: item.guid,
-                    addedAt: now
-                }));
+                const hiddenGuids = new Set(app.hidden.map(h => h.guid));
+                const shuffledOutGuids = new Set(app.shuffledOutItems.map(s => s.guid));
+                app.currentDeckGuids = app.entries
+                    .filter(item => !hiddenGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
+                    .map(item => ({
+                        guid: item.guid,
+                        addedAt: now
+                    }));
                 await saveArrayState('currentDeckGuids', app.currentDeckGuids);
                 console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
             }
