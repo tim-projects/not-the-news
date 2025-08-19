@@ -32,34 +32,51 @@ const getGuid = item => (typeof item === 'object' && item.guid ? item.guid : ite
 
 /**
  * Manages the daily deck of news items.
- * @param {object} app The main application object.
+ * @param {Array} entries Array of all feed entries
+ * @param {Array} hiddenItems Array of hidden items
+ * @param {Array} starredItems Array of starred items  
+ * @param {Array} shuffledOutItems Array of shuffled out items
+ * @param {number} shuffleCount Current shuffle count
+ * @param {string} filterMode Current filter mode (optional, defaults to 'unread')
+ * @param {string} lastShuffleResetDate Last shuffle reset date (optional)
+ * @returns {Object} Updated deck state
  */
-export const manageDailyDeck = async (app) => {
+export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffledOutItems, shuffleCount, filterMode = 'unread', lastShuffleResetDate = null) => {
     // Defensive checks to ensure all necessary data is in a valid state.
-    if (!Array.isArray(app.entries) || app.entries.length === 0) {
-        console.log('[deckManager] Skipping deck management: app.entries is empty.');
-        return;
+    if (!Array.isArray(entries) || entries.length === 0) {
+        console.log('[deckManager] Skipping deck management: entries is empty.');
+        return {
+            deck: [],
+            currentDeckGuids: [],
+            shuffledOutGuids: shuffledOutItems || [],
+            shuffleCount: shuffleCount || DAILY_SHUFFLE_LIMIT,
+            lastShuffleResetDate: lastShuffleResetDate || new Date().toDateString()
+        };
     }
 
     // Standardize data arrays to handle potential inconsistencies.
-    const allItems = app.entries;
-    const hiddenItems = Array.isArray(app.hidden) ? app.hidden : [];
-    const starredItems = Array.isArray(app.starred) ? app.starred : [];
-    const shuffledOutItems = Array.isArray(app.shuffledOutGuids) ? app.shuffledOutGuids : [];
-    const currentDeckItems = Array.isArray(app.currentDeckGuids) ? app.currentDeckGuids : [];
+    const allItems = entries;
+    const hiddenItemsArray = Array.isArray(hiddenItems) ? hiddenItems : [];
+    const starredItemsArray = Array.isArray(starredItems) ? starredItems : [];
+    const shuffledOutItemsArray = Array.isArray(shuffledOutItems) ? shuffledOutItems : [];
+    
+    // Load current deck from storage
+    const { loadCurrentDeck } = await import('./userStateUtils.js');
+    const currentDeckItems = await loadCurrentDeck();
 
     // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
-    const hiddenGuidsSet = new Set(hiddenItems.map(getGuid));
-    const starredGuidsSet = new Set(starredItems.map(getGuid));
-    const shuffledOutGuidsSet = new Set(shuffledOutItems.map(getGuid));
+    const hiddenGuidsSet = new Set(hiddenItemsArray.map(getGuid));
+    const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
+    const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
     const currentDeckGuidsSet = new Set(currentDeckItems.map(getGuid));
 
     console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
     console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuidsSet.size}`);
     console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuidsSet.size}`);
+    console.log(`[deckManager] DEBUG: currentDeck count: ${currentDeckItems.length}`);
     
     const today = new Date().toDateString();
-    const isNewDay = app.lastShuffleResetDate !== today;
+    const isNewDay = lastShuffleResetDate !== today;
 
     // --- START: FIX ---
     // The original `isDeckEmpty` check was flawed. It didn't account for items
@@ -69,46 +86,52 @@ export const manageDailyDeck = async (app) => {
     const isDeckEffectivelyEmpty = visibleItemsInCurrentDeck.length === 0;
     // --- END: FIX ---
 
+    let newDeck = [];
+    let newCurrentDeckGuids = currentDeckItems;
+    let newShuffledOutGuids = shuffledOutItemsArray;
+    let newShuffleCount = shuffleCount || DAILY_SHUFFLE_LIMIT;
+    let newLastShuffleResetDate = lastShuffleResetDate || today;
+
     // Use the new, smarter variable in the condition
-    if (isNewDay || isDeckEffectivelyEmpty || app.filterMode !== 'unread') {
-        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${app.filterMode}).`);
+    if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
+        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${filterMode}).`);
 
         const newDeckItems = await generateNewDeck(
             allItems,
-            hiddenItems,
-            starredItems,
-            shuffledOutItems,
+            hiddenItemsArray,
+            starredItemsArray,
+            shuffledOutItemsArray,
             currentDeckItems,
             MAX_DECK_SIZE,
-            app.filterMode
+            filterMode
         );
 
         const timestamp = new Date().toISOString();
-        app.currentDeckGuids = (newDeckItems || []).map(item => ({
+        newCurrentDeckGuids = (newDeckItems || []).map(item => ({
             guid: item.guid,
             addedAt: timestamp
         }));
 
-        app.deck = (newDeckItems || []).map(item => ({
+        newDeck = (newDeckItems || []).map(item => ({
             ...item,
             isHidden: hiddenGuidsSet.has(item.guid),
             isStarred: starredGuidsSet.has(item.guid)
         }));
         
-        await saveCurrentDeck(app.currentDeckGuids);
+        await saveCurrentDeck(newCurrentDeckGuids);
 
         if (isNewDay) {
-            app.shuffledOutGuids = [];
+            newShuffledOutGuids = [];
             await saveArrayState('shuffledOutGuids', []);
-            app.shuffleCount = DAILY_SHUFFLE_LIMIT;
-            await saveShuffleState(app.shuffleCount, today);
-            app.lastShuffleResetDate = today;
+            newShuffleCount = DAILY_SHUFFLE_LIMIT;
+            await saveShuffleState(newShuffleCount, today);
+            newLastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
         }
     } else {
         console.log(`[deckManager] Retaining existing deck. Visible items: ${visibleItemsInCurrentDeck.length}.`);
 
-        app.deck = allItems
+        newDeck = allItems
             .filter(item => currentDeckGuidsSet.has(item.guid))
             .map(item => ({
                 ...item,
@@ -117,7 +140,38 @@ export const manageDailyDeck = async (app) => {
             }));
     }
 
-    console.log(`[deckManager] Deck management complete. Final deck size: ${app.deck.length}.`);
+    console.log(`[deckManager] Deck management complete. Final deck size: ${newDeck.length}.`);
+    
+    return {
+        deck: newDeck,
+        currentDeckGuids: newCurrentDeckGuids,
+        shuffledOutGuids: newShuffledOutGuids,
+        shuffleCount: newShuffleCount,
+        lastShuffleResetDate: newLastShuffleResetDate
+    };
+};
+
+/**
+ * Legacy wrapper function that accepts the app object (for backward compatibility)
+ * @param {object} app The main application object.
+ */
+export const manageDailyDeckLegacy = async (app) => {
+    const result = await manageDailyDeck(
+        app.entries,
+        app.hidden,
+        app.starred, 
+        app.shuffledOutItems || app.shuffledOutGuids,
+        app.shuffleCount,
+        app.filterMode,
+        app.lastShuffleResetDate
+    );
+    
+    // Update the app object with the results
+    app.deck = result.deck;
+    app.currentDeckGuids = result.currentDeckGuids;
+    app.shuffledOutItems = result.shuffledOutGuids;
+    app.shuffleCount = result.shuffleCount;
+    app.lastShuffleResetDate = result.lastShuffleResetDate;
 };
 
 /**
@@ -133,21 +187,23 @@ export async function processShuffle(app) {
     }
 
     const visibleGuids = app.deck.map(item => item.guid);
-    const existingShuffledGuids = (app.shuffledOutGuids || []).map(getGuid);
+    const existingShuffledGuids = (app.shuffledOutItems || app.shuffledOutGuids || []).map(getGuid);
     
     const updatedShuffledGuidsSet = new Set([...existingShuffledGuids, ...visibleGuids]);
     
     // Convert the combined set of GUIDs back to an array of objects with the correct timestamp.
     const timestamp = new Date().toISOString();
-    app.shuffledOutGuids = Array.from(updatedShuffledGuidsSet).map(guid => ({
+    const newShuffledOutGuids = Array.from(updatedShuffledGuidsSet).map(guid => ({
         guid,
         shuffledAt: timestamp
     }));
 
+    app.shuffledOutItems = newShuffledOutGuids;
+    app.shuffledOutGuids = newShuffledOutGuids; // Maintain backward compatibility
     app.shuffleCount--;
 
     // Persist the new state.
-    await saveArrayState('shuffledOutGuids', app.shuffledOutGuids);
+    await saveArrayState('shuffledOutGuids', newShuffledOutGuids);
     await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate);
 
     const shuffleDisplay = getShuffleCountDisplay();
@@ -155,7 +211,20 @@ export async function processShuffle(app) {
         shuffleDisplay.textContent = app.shuffleCount;
     }
 
-    await manageDailyDeck(app);
+    // Use the new manageDailyDeck function
+    const result = await manageDailyDeck(
+        app.entries,
+        app.hidden,
+        app.starred,
+        app.shuffledOutItems,
+        app.shuffleCount,
+        app.filterMode,
+        app.lastShuffleResetDate
+    );
+    
+    // Update the app object with the results
+    app.deck = result.deck;
+    app.currentDeckGuids = result.currentDeckGuids;
 
     displayTemporaryMessageInTitle('Feed shuffled!');
     console.log(`[deckManager] Deck shuffled. Remaining shuffles: ${app.shuffleCount}.`);

@@ -319,9 +319,20 @@ export function rssApp() {
         toggleStar: async function(guid) {
             try {
                 await toggleItemStateAndSync(this, guid, 'starred');
-                // Pass specific data instead of the entire app object
-                await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
-                await this.loadAndDisplayDeck(); // Refresh deck display
+                // Call manageDailyDeck with individual parameters
+                const deckResult = await manageDailyDeck(
+                    this.entries,
+                    this.hidden,
+                    this.starred,
+                    this.shuffledOutItems,
+                    this.shuffleCount,
+                    this.filterMode,
+                    this.lastShuffleResetDate
+                );
+                
+                // Update app state with results
+                this.deck = deckResult.deck;
+                this.currentDeckGuids = deckResult.currentDeckGuids;
                 this.updateSyncStatusMessage();
             } catch (error) {
                 console.error('Error toggling star:', error);
@@ -332,9 +343,20 @@ export function rssApp() {
         toggleHidden: async function(guid) {
             try {
                 await toggleItemStateAndSync(this, guid, 'hidden');
-                // Pass specific data instead of the entire app object
-                await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
-                await this.loadAndDisplayDeck(); // Refresh deck display
+                // Call manageDailyDeck with individual parameters
+                const deckResult = await manageDailyDeck(
+                    this.entries,
+                    this.hidden,
+                    this.starred,
+                    this.shuffledOutItems,
+                    this.shuffleCount,
+                    this.filterMode,
+                    this.lastShuffleResetDate
+                );
+                
+                // Update app state with results
+                this.deck = deckResult.deck;
+                this.currentDeckGuids = deckResult.currentDeckGuids;
                 this.updateSyncStatusMessage();
             } catch (error) {
                 console.error('Error toggling hidden:', error);
@@ -362,9 +384,20 @@ export function rssApp() {
                 this.progressMessage = 'Saving feeds and performing full sync...';
                 await performFullSync(this);
                 await this.loadFeedItemsFromDB();
-                // Pass specific data instead of the entire app object
-                await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
-                await this.loadAndDisplayDeck();
+                // Call manageDailyDeck with individual parameters
+                const deckResult = await manageDailyDeck(
+                    this.entries,
+                    this.hidden,
+                    this.starred,
+                    this.shuffledOutItems,
+                    this.shuffleCount,
+                    this.filterMode,
+                    this.lastShuffleResetDate
+                );
+                
+                // Update app state with results
+                this.deck = deckResult.deck;
+                this.currentDeckGuids = deckResult.currentDeckGuids;
                 this.progressMessage = '';
                 this.loading = false;
             } catch (error) {
@@ -497,13 +530,26 @@ export function rssApp() {
                     }
                 }
                 
-                // Pass specific data to manageDailyDeck to avoid cloning issues
-                await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
+                // Call manageDailyDeck with individual parameters and get the result
+                const deckResult = await manageDailyDeck(
+                    this.entries,
+                    this.hidden,
+                    this.starred,
+                    this.shuffledOutItems,
+                    this.shuffleCount,
+                    this.filterMode,
+                    this.lastShuffleResetDate
+                );
                 
-                // Load the current deck after managing it
-                const updatedDeckState = await loadCurrentDeck();
-                this.currentDeckGuids = Array.isArray(updatedDeckState) ? updatedDeckState : [];
-                console.log(`Updated deck state has ${this.currentDeckGuids.length} items`);
+                // Update app state with the results
+                this.deck = deckResult.deck;
+                this.currentDeckGuids = deckResult.currentDeckGuids;
+                this.shuffledOutItems = deckResult.shuffledOutGuids;
+                this.shuffleCount = deckResult.shuffleCount;
+                this.lastShuffleResetDate = deckResult.lastShuffleResetDate;
+                
+                // Load the current deck after managing it - no longer needed since manageDailyDeck returns the data
+                console.log(`Final deck state has ${this.currentDeckGuids.length} items`);
                 
                 await this.loadAndDisplayDeck();
                 console.log('Data management complete - final deck size:', this.deck.length);
@@ -555,9 +601,20 @@ export function rssApp() {
                 try {
                     await setFilterMode(this, newMode);
                     if (newMode === 'unread') {
-                        // Pass specific data instead of the entire app object
-                        await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
-                        await this.loadAndDisplayDeck();
+                        // Call manageDailyDeck with individual parameters
+                        const deckResult = await manageDailyDeck(
+                            this.entries,
+                            this.hidden,
+                            this.starred,
+                            this.shuffledOutItems,
+                            this.shuffleCount,
+                            this.filterMode,
+                            this.lastShuffleResetDate
+                        );
+                        
+                        // Update app state with results
+                        this.deck = deckResult.deck;
+                        this.currentDeckGuids = deckResult.currentDeckGuids;
                     }
                     this.scrollToTop();
                 } catch (error) {
