@@ -347,6 +347,8 @@ export function rssApp() {
             
             await manageDailyDeck(this);
             await this.loadAndDisplayDeck();
+            
+            // FIX: Call updateAllUI() only after all data has been loaded and processed
             this.updateAllUI();
 
             // ADDED: Restore scroll position AFTER the deck is loaded and ready to be rendered.
