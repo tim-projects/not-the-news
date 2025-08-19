@@ -121,8 +121,14 @@ export function rssApp() {
                 
                 if (this.isOnline && this.syncEnabled) {
                     try {
+                        // --- SOLUTION: Process pending changes BEFORE pulling server state ---
+                        this.progressMessage = 'Syncing local changes...';
+                        await processPendingOperations();
+                        console.log('Pending operations processed.');
+                        // --- END SOLUTION ---
+
                         this.progressMessage = 'Syncing user state...';
-                        await pullUserState();
+                        await pullUserState(); // This will no longer be skipped.
                         console.log('User state synced');
                         
                         this.progressMessage = 'Syncing feeds...';
