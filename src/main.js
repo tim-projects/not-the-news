@@ -101,7 +101,7 @@ export function rssApp() {
                 await this._loadInitialState();
 
                 this.progressMessage = 'Initializing UI components...';
-                
+                // UI components that are independent of feed data.
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
@@ -117,11 +117,12 @@ export function rssApp() {
                 this.progressMessage = 'Loading and managing data...';
                 await this._loadAndManageAllData();
                 
-                // FIX: This call now correctly happens after all data has been loaded.
+                // Now that all data is loaded and state is consistent, we can update the UI.
                 this.updateAllUI();
                 createStatusBarMessage("Initial load complete!", "success");
 
                 this.progressMessage = 'Setting up app watchers...';
+                // FIX: Watchers are now set up after ALL data is loaded to prevent race conditions.
                 this._setupWatchers();
                 this._setupEventListeners();
                 this._startPeriodicSync();
