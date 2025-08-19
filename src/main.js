@@ -112,13 +112,14 @@ export function rssApp() {
                     this.progressMessage = 'Performing initial sync...';
                     await pullUserState();
                     await performFeedSync(this);
-                    
-                    await this._loadAndManageAllData();
-                    createStatusBarMessage("Initial sync complete!", "success");
-                } else {
-                    this.progressMessage = 'Offline mode. Loading local data...';
-                    await this._loadAndManageAllData();
                 }
+                
+                this.progressMessage = 'Loading and managing data...';
+                await this._loadAndManageAllData();
+                
+                // FIX: This call now correctly happens after all data has been loaded.
+                this.updateAllUI();
+                createStatusBarMessage("Initial load complete!", "success");
 
                 this.progressMessage = 'Setting up app watchers...';
                 this._setupWatchers();
@@ -312,6 +313,8 @@ export function rssApp() {
         },
         
         _loadAndManageAllData: async function() {
+            // This function focuses purely on data loading and state updates.
+            // UI updates are deferred until the end of initApp().
             await this.loadFeedItemsFromDB();
             const [rawStarredState, rawShuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
@@ -347,14 +350,10 @@ export function rssApp() {
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             
-            // Pass specific data instead of the entire app object
+            // Pass specific data to manageDailyDeck to avoid cloning issues
             await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
             await this.loadAndDisplayDeck();
             
-            this.updateAllUI();
-
-            // ADDED: Restore scroll position AFTER the deck is loaded and ready to be rendered.
-            // Using $nextTick ensures Alpine has updated the DOM before we try to scroll.
             this.$nextTick(() => {
                 initScrollPosition(this);
             });
@@ -363,7 +362,6 @@ export function rssApp() {
         updateAllUI: function() { this.updateCounts(); },
 
         _setupWatchers: function() {
-            // REFACTORED: This watcher is now simpler, as data loading is handled by uiInitializers.
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {
                     this.modalView = 'main';
@@ -385,8 +383,7 @@ export function rssApp() {
                 this.scrollToTop();
             });
             
-            // FIX: Removed individual watchers here as they cause a race condition
-            // The single this.updateAllUI() call at the end of _loadAndManageAllData is sufficient.
+            // Removed individual watchers here as they caused a race condition
         },
 
         _setupEventListeners: function() {
@@ -418,8 +415,6 @@ export function rssApp() {
                     saveCurrentScrollPosition();
                 }
             });
-
-            // FIX: Removed the immediate setTimeout here to prevent the race condition.
         },
 
         _startPeriodicSync: function() {
