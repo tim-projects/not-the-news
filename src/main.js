@@ -452,7 +452,7 @@ export function rssApp() {
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.filterMode = filterMode;
                 // Use localStorage theme only as a fallback for the very first load
-                this.theme = themeState.value ?? localStorage.getItem('theme') ?? 'dark';
+                this.theme = themeState.value ?? 'dark';
                 this.isOnline = isOnline();
                 
                 // Load config inputs

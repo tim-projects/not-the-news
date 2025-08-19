@@ -132,7 +132,6 @@ export function initTheme(app) {
         applyThemeUI(newTheme); // Update all UI elements
         
         // Persist the change
-        localStorage.setItem('theme', newTheme);
         await saveSimpleState('theme', newTheme);
     });
 }
