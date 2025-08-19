@@ -1,6 +1,19 @@
 # TODO
 - major db/sync refactor
 
+https://aistudio.google.com/prompts/1Zr4CNOgZljxBPtA3nLkx_XtkHsQXDQq2
+
+You are trying to untangle a branching issue.
+you are in better-sync-hotfix. You need to get that up to date with the recent changes you made to better-sync - but you broke something along the way
+
+On better-sync the thing you were currently doing was getting the ui to load instantly. Really that should be in it's own branch. Make sure the theme fix and sync fixes are there then merge to better-sync, then branch for the ui stuff.
+
+Once you get better-sync-hotfix working and up to date with better-sync, then merge it and close the branch.
+
+You still need to fix loading configs to and from the server, and make sure the shuffle is working properly
+
+
+
 -----
 
 III. Verification and Testing Plan
