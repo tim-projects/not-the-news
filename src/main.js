@@ -140,6 +140,7 @@ export function rssApp() {
                 
                 this.progressMessage = 'Processing data...';
                 await this._loadAndManageAllData();
+                console.log('Data loaded and managed - entries:', this.entries.length);
                 console.log('Data loaded and managed');
                 
                 // Now that all data is loaded and state is consistent, we can update the UI.
@@ -163,7 +164,12 @@ export function rssApp() {
                 this.progressMessage = '';
                 this.loading = false;
                 
-                createStatusBarMessage("Initial load complete!", "success");
+                // Try to show success message, but don't fail if container isn't ready
+                try {
+                    createStatusBarMessage("Initial load complete!", "success");
+                } catch (statusError) {
+                    console.log("Status bar not ready yet, but initialization complete");
+                }
                 this.updateSyncStatusMessage();
                 
             } catch (error) {
@@ -441,6 +447,8 @@ export function rssApp() {
         _loadAndManageAllData: async function() {
             try {
                 console.log('Loading and managing all data...');
+                console.log('Current entries count before state loading:', this.entries.length);
+                
                 // This function focuses purely on data loading and state updates.
                 // UI updates are deferred until the end of initApp().
                 const [rawStarredState, rawShuffledOutState, currentDeckState, shuffleState] = await Promise.all([
@@ -479,15 +487,26 @@ export function rssApp() {
                 this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
                 console.log(`Loaded ${this.hidden.length} hidden items`);
                 
+                console.log('About to call manageDailyDeck with entries:', this.entries.length);
+                // Ensure we have the latest entries data before managing deck
+                if (this.entries.length === 0) {
+                    console.warn('Entries is empty, reloading from feedItems before deck management');
+                    if (Object.keys(this.feedItems).length > 0) {
+                        this.entries = mapRawItems(Object.values(this.feedItems), formatDate) || [];
+                        console.log('Reloaded entries from feedItems:', this.entries.length);
+                    }
+                }
+                
                 // Pass specific data to manageDailyDeck to avoid cloning issues
                 await manageDailyDeck(this.entries, this.hidden, this.starred, this.shuffledOutItems, this.shuffleCount);
                 
                 // Load the current deck after managing it
                 const updatedDeckState = await loadCurrentDeck();
                 this.currentDeckGuids = Array.isArray(updatedDeckState) ? updatedDeckState : [];
+                console.log(`Updated deck state has ${this.currentDeckGuids.length} items`);
                 
                 await this.loadAndDisplayDeck();
-                console.log('Data management complete');
+                console.log('Data management complete - final deck size:', this.deck.length);
             } catch (error) {
                 console.error('Error loading and managing data:', error);
                 // Initialize with empty arrays if loading fails
