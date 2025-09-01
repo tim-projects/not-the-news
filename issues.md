@@ -11,6 +11,8 @@ Additionally, there are two flaws in the synchronization logic:
 
 Furthermore, the deck generation logic has a flaw that prevents a new deck from being generated when all current items are hidden, and the shuffle count mechanism is not working as intended.
 
+Finally, a `PermissionError` was encountered when `merge_feeds.py` attempted to write to a log file.
+
 ## Issues Found
 
 ### 1. Redundant Data Loading and Race Condition
@@ -74,6 +76,42 @@ The `shuffleCount` is not being managed correctly. According to the requirements
 *   Pressing the shuffle button should force a new deck to be generated and then reduce the `shuffleCount` by one. This part of the logic is mostly correct, but the overall `shuffleCount` management is flawed because it's not being incremented when it should be.
 
 This leads to users prematurely running out of shuffles, as the count is only decremented by the shuffle button but never incremented by natural deck exhaustion.
+
+### 6. Permission Error for `merged_feeds.log`
+
+*   **File:** `rss/merge_feeds.py`
+*   **Context:** This is an operational issue, not a code bug within the Python script itself.
+
+**Description:**
+
+The `merge_feeds.py` script attempts to write its output to a file specified by the `--output` command-line argument. A `PermissionError: [Errno 13] Permission denied: '/tmp/merged_feeds.log'` indicates that the user or process executing the script does not have the necessary write permissions to the `/tmp` directory or to create the specified log file at that location.
+
+**Recommended Fix:**
+
+This issue needs to be resolved by the user or system administrator. The `merge_feeds.py` script should be invoked with an `--output` path where the executing user has write permissions. For example, writing to a location within the project directory, such as `data/feed/merged_feeds.xml` (if `merged_feeds.xml` is the intended output file, not a log file), or a user-writable temporary directory.
+
+### 7. Dockerfile Permissions for `/tmp`
+
+*   **File:** `dockerfile`
+*   **Context:** Related to Issue 6.
+
+**Description:**
+
+The `appuser` within the Docker container does not have write permissions to the root of the `/tmp` directory by default in the Alpine Linux base image. This prevents `merge_feeds.py` (when invoked to write to `/tmp`) from creating its output file.
+
+**Recommended Fix:**
+
+To allow `appuser` to write to `/tmp`, you can add a command to the Dockerfile to change the ownership of `/tmp` to `appuser:appgroup`. This should be placed after the `adduser` command.
+
+**Recommended Code:**
+
+```dockerfile
+RUN chown appuser:appgroup /tmp
+```
+
+**Alternative (Better Practice):**
+
+It is generally better practice to modify the Python script (`rss/run.py` or wherever `merge_feeds.py` is invoked) to write its output to a directory where `appuser` already has explicit write permissions, such as `/data/feed/` or `/app/`. This avoids relying on `/tmp` for persistent output and aligns with Docker best practices for data management.
 
 ## Recommended Fixes
 

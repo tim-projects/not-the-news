@@ -12,7 +12,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 feed_dir = os.path.join(SCRIPT_DIR, "../data/feed/")
 merged_file = os.path.join(feed_dir, "merged_feed.xml")
-merged_log_file = os.path.join(SCRIPT_DIR, "/tmp/merged_feeds.log")
+merged_log_file = os.path.join(feed_dir, "merged_feeds.log")
 filtered_file = os.path.join(feed_dir, "filtered_feed.xml")
 final_feed_file = os.path.join(feed_dir, "feed.xml")
 feeds_path = os.path.join(SCRIPT_DIR, "../data/config/feeds.txt")
