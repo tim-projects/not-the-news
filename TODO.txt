@@ -1,4 +1,11 @@
 # TODO
+- improve repo structure for ai
+
+I want you to review the entire codebase and create a report - FUNCTIONS-MAP.md. In this file I want you to create a human readible log of each file and the        │
+│   functions it contains. As part of this process, I want you to record how manage lines of code each function uses. My goal here is to eventually rewrite the         │
+│   codebase to ensure that each file aims to be a maximum 300 lines. But it should make sense with which function is stored where. So I need this                      │
+│   FUNCTIONS-MAP.md so that I can think of a new repo structure
+
 - major db/sync refactor
 
 https://aistudio.google.com/prompts/1Zr4CNOgZljxBPtA3nLkx_XtkHsQXDQq2

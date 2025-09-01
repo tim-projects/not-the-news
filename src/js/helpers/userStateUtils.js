@@ -4,10 +4,11 @@ import {
     loadSimpleState,
     saveSimpleState,
     loadArrayState,
+    saveArrayState, // <-- Add this import directly
     queueAndAttemptSyncOperation,
     updateArrayState,
     overwriteArrayAndSyncChanges
-} from '../data/database.js';
+} from '../data/dbUserState.js'; // <-- Change import path
 
 import { isOnline } from '../utils/connectivity.js';
 import { createStatusBarMessage } from '../ui/uiUpdaters.js';

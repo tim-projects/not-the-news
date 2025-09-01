@@ -270,13 +270,19 @@ export function rssApp() {
             return this.hidden.some(e => e.guid === guid);
         },
         toggleStar: async function(guid) {
+            console.log('toggleStar: Before toggleItemStateAndSync', { guid, starred: this.starred.length });
             await toggleItemStateAndSync(this, guid, 'starred');
+            console.log('toggleStar: After toggleItemStateAndSync, before _loadAndManageAllData', { guid, starred: this.starred.length });
             await this._loadAndManageAllData();
+            console.log('toggleStar: After _loadAndManageAllData', { guid, starred: this.starred.length });
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
+            console.log('toggleHidden: Before toggleItemStateAndSync', { guid, hidden: this.hidden.length });
             await toggleItemStateAndSync(this, guid, 'hidden');
+            console.log('toggleHidden: After toggleItemStateAndSync, before _loadAndManageAllData', { guid, hidden: this.hidden.length });
             await this._loadAndManageAllData();
+            console.log('toggleHidden: After _loadAndManageAllData', { guid, hidden: this.hidden.length });
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
@@ -322,9 +328,10 @@ export function rssApp() {
             this.isOnline = isOnline();
         },
         
-        _loadAndManageAllData: async function() {
+                _loadAndManageAllData: async function() {
+            console.log('_loadAndManageAllData: START');
             await this.loadFeedItemsFromDB();
-            console.log(`[DB] Loaded ${this.entries.length} feed items into app state.`);
+            console.log(`_loadAndManageAllData: After loadFeedItemsFromDB. Entries: ${this.entries.length}`);
 
             this.progressMessage = 'Loading user state from storage...';
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
@@ -333,26 +340,31 @@ export function rssApp() {
                 loadCurrentDeck(),
                 loadShuffleState()
             ]);
-            console.log("Loaded starred state:", starredState.value); //debug
+            console.log("_loadAndManageAllData: Loaded starred state:", starredState.value); //debug
 
             this.starred = Array.isArray(starredState.value) ? starredState.value : [];
             this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
     
             this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
-            console.log(`[app] Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
+            console.log(`_loadAndManageAllData: Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
     
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
             this.progressMessage = 'Pruning hidden items...';
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
+            console.log(`_loadAndManageAllData: After loadAndPruneHiddenItems. Hidden count: ${this.hidden.length}`);
             console.log("[deckManager] Starting deck management with all data loaded.");
 
             this.progressMessage = 'Managing today\'s deck...';
+            console.log('_loadAndManageAllData: Before manageDailyDeck', { hiddenCount: this.hidden.length, currentDeckGuidsCount: this.currentDeckGuids.length });
             await manageDailyDeck(this);
+            console.log('_loadAndManageAllData: After manageDailyDeck. Deck size:', this.deck.length);
             await this.loadAndDisplayDeck();
+            console.log('_loadAndManageAllData: After loadAndDisplayDeck. Deck size:', this.deck.length);
 
             this.updateAllUI();
+            console.log('_loadAndManageAllData: END');
         },
 
         updateAllUI: function() {

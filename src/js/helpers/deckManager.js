@@ -42,9 +42,13 @@ const getGuid = item => (typeof item === 'object' && item.guid ? item.guid : ite
  * @returns {Object} Updated deck state
  */
 export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffledOutItems, shuffleCount, filterMode = 'unread', lastShuffleResetDate = null) => {
+    console.log('manageDailyDeck: START');
+    console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, hiddenItemsCount: hiddenItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate });
+
     // Defensive checks to ensure all necessary data is in a valid state.
     if (!Array.isArray(entries) || entries.length === 0) {
         console.log('[deckManager] Skipping deck management: entries is empty.');
+        console.log('manageDailyDeck: END (skipped)');
         return {
             deck: [],
             currentDeckGuids: [],
@@ -63,6 +67,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     // Load current deck from storage
     const { loadCurrentDeck } = await import('./userStateUtils.js');
     const currentDeckItems = await loadCurrentDeck();
+    console.log('manageDailyDeck: Loaded currentDeckItems count:', currentDeckItems.length);
 
     // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
     const hiddenGuidsSet = new Set(hiddenItemsArray.map(getGuid));
@@ -84,6 +89,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     // deck is *effectively* empty from the user's perspective.
     const visibleItemsInCurrentDeck = currentDeckItems.filter(item => !hiddenGuidsSet.has(getGuid(item)));
     const isDeckEffectivelyEmpty = visibleItemsInCurrentDeck.length === 0;
+    console.log('manageDailyDeck: isDeckEffectivelyEmpty:', isDeckEffectivelyEmpty, 'visibleItemsInCurrentDeck count:', visibleItemsInCurrentDeck.length);
     // --- END: FIX ---
 
     let newDeck = [];
@@ -93,6 +99,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     let newLastShuffleResetDate = lastShuffleResetDate || today;
 
     // Use the new, smarter variable in the condition
+    console.log('manageDailyDeck: Condition check:', { isNewDay, isDeckEffectivelyEmpty, filterModeIsNotUnread: filterMode !== 'unread' });
     if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${filterMode}).`);
 
@@ -105,6 +112,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
             MAX_DECK_SIZE,
             filterMode
         );
+        console.log('manageDailyDeck: generateNewDeck returned count:', newDeckItems.length);
 
         const timestamp = new Date().toISOString();
         newCurrentDeckGuids = (newDeckItems || []).map(item => ({
@@ -131,10 +139,6 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
             // Increment shuffle count when deck is exhausted, up to DAILY_SHUFFLE_LIMIT
             newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
             await saveShuffleState(newShuffleCount, lastShuffleResetDate);
-        } else if (isDeckEffectivelyEmpty && filterMode === 'unread') {
-            // Increment shuffle count when deck is exhausted, up to DAILY_SHUFFLE_LIMIT
-            newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
-            await saveShuffleState(newShuffleCount, lastShuffleResetDate);
         }
     } else {
         console.log(`[deckManager] Retaining existing deck. Visible items: ${visibleItemsInCurrentDeck.length}.`);
@@ -149,6 +153,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     }
 
     console.log(`[deckManager] Deck management complete. Final deck size: ${newDeck.length}.`);
+    console.log('manageDailyDeck: END');
     
     return {
         deck: newDeck,
