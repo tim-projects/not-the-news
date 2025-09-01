@@ -14,7 +14,7 @@ export const USER_STATE_DEFS = {
     imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
     syncEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
     keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: true, default: [] },
-    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: true, default: [] },
+    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: false, default: [] },
     shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: true, default: [] },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
 };
