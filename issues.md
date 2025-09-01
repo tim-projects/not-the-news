@@ -111,208 +111,98 @@ RUN chown appuser:appgroup /tmp
 
 It is generally better practice to modify the Python script (`rss/run.py` or wherever `merge_feeds.py` is invoked) to write its output to a directory where `appuser` already has explicit write permissions, such as `/data/feed/` or `/app/`. This avoids relying on `/tmp` for persistent output and aligns with Docker best practices for data management.
 
-## Recommended Fixes
+### 8. Insufficient Fallback for Empty Unread Deck
 
-### 1. Re-add Data Loading after State Changes
+*   **File:** `src/js/helpers/dataUtils.js`
+*   **Lines:** 189-216 (the fallback logic block)
 
-To ensure new decks are generated when items are hidden, re-add the calls to `_loadAndManageAllData()` after `toggleItemStateAndSync` in `src/app.js`.
+**Description:**
 
-**Original Code (from previous `issues.md`):**
+When the primary filtering for "unread" items results in an empty `filteredItems` array (e.g., all items are hidden), the current fallback logic attempts to resurface "oldest hidden/shuffled items." However, if all available items are *recently* hidden, or if the conditions for `validCandidates` are too strict, the deck can still remain empty. This leads to a blank unread feed even when there are items that could be displayed (albeit hidden).
 
-```javascript
-        toggleStar: async function(guid) {
-            await toggleItemStateAndSync(this, guid, 'starred');
-            this.updateSyncStatusMessage();
-        },
-        toggleHidden: async function(guid) {
-            await toggleItemStateAndSync(this, guid, 'hidden');
-            this.updateSyncStatusMessage();
-        },
-```
+**Recommended Fix:**
 
-**Recommended Code:**
+Enhance the fallback logic to ensure that if `nextDeckItems` is still less than `MAX_DECK_SIZE` after the initial filtering and category-based additions, it will fill the remaining slots with *any* available items from `allFeedItems` that are not already in `nextDeckItems`, prioritizing those that are hidden or shuffled out, and then simply taking the oldest available if needed.
+
+**Original Code (relevant part within `generateNewDeck`):**
 
 ```javascript
-        toggleStar: async function(guid) {
-            await toggleItemStateAndSync(this, guid, 'starred');
-            await this._loadAndManageAllData();
-            this.updateSyncStatusMessage();
-        },
-        toggleHidden: async function(guid) {
-            await toggleItemStateAndSync(this, guid, 'hidden');
-            await this._loadAndManageAllData();
-            this.updateSyncStatusMessage();
-        },
-```
+        // [FIX] START: Fallback logic to prevent an empty deck.
+        // This block runs if the deck is still not full, which happens when
+        // the initial 'unread' pool is empty.
+        if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
+            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest hidden/shuffled items.");
 
-### 2. Fix Synchronization Logic
+            const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
+            const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
 
-To fix the second issue, update the race condition check in `_pullSingleStateKey` in `src/js/data/dbSyncOperations.js` to also check for `simpleUpdate` operations for `currentDeckGuids`.
+            // Combine hidden and shuffled items into a pool of candidates for resurfacing.
+            const resurfaceCandidates = [
+                ...hiddenItems.filter(item => typeof item === 'object' && item.guid),
+                ...shuffledOutItems.filter(item => typeof item === 'object' && item.guid)
+            ];
 
-**Original Code:**
+            // Filter out items already in the deck or that no longer exist, then sort by timestamp (oldest first).
+            const validCandidates = resurfaceCandidates
+                .filter(candidate => !guidsInDeck.has(candidate.guid) && allItemsMap.has(candidate.guid))
+                .sort((a, b) => {
+                    const timeA = new Date(a.hiddenAt || a.shuffledAt || 0).getTime();
+                    const timeB = new Date(b.hiddenAt || b.shuffledAt || 0).getTime();
+                    return timeA - timeB; // Sort ascending to get the oldest items first.
+                });
 
-```javascript
-    const hasPendingOperations = allPendingOps.some(op => 
-        op.key === key || 
-        (op.type === 'starDelta' && key === 'starred') ||
-        (op.type === 'hiddenDelta' && key === 'hidden')
-    );
-```
-
-**Recommended Code:**
-
-```javascript
-    const hasPendingOperations = allPendingOps.some(op => 
-        op.key === key || 
-        (op.type === 'starDelta' && key === 'starred') ||
-        (op.type === 'hiddenDelta' && key === 'hidden') ||
-        (op.type === 'simpleUpdate' && op.key === 'currentDeckGuids')
-    );
-```
-
-### 3. Use Correct Synchronization Method
-
-To fix the third issue, modify the `saveCurrentDeck` function in `src/js/helpers/userStateUtils.js` to use `overwriteArrayAndSyncChanges` instead of `saveArrayState` and `queueAndAttemptSyncOperation`.
-
-**Original Code:**
-
-```javascript
-export async function saveCurrentDeck(deckObjects) {
-    if (!Array.isArray(deckObjects)) {
-         console.error("[saveCurrentDeck] Invalid input: expected an array of objects.");
-         return;
-    }
-    
-    // Validate that we are working with objects that have a valid GUID.
-    const validDeckObjects = deckObjects.filter(item => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid);
-
-    if (validDeckObjects.length !== deckObjects.length) {
-        console.warn("[saveCurrentDeck] Filtered out invalid items from the generated deck.");
-    }
-
-    console.log("[saveCurrentDeck] Saving", validDeckObjects.length, "deck objects.");
-
-    try {
-        // Step 1: Sanitize the deck objects to remove any non-cloneable properties.
-        const sanitizedDeckObjects = validDeckObjects.map(item => sanitizeForIndexedDB(item));
-
-        // Step 2: Save the sanitized objects to the local database.
-        await saveArrayState('currentDeckGuids', sanitizedDeckObjects);
-
-        // Step 3: Queue the sanitized objects for synchronization.
-        // The server needs the full objects, so we pass the sanitized version.
-        await queueAndAttemptSyncOperation({
-            type: 'simpleUpdate',
-            key: 'currentDeckGuids',
-            value: sanitizedDeckObjects 
-        });
-    } catch (e) {
-        console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
-    }
-}
-```
-
-**Recommended Code:**
-
-```javascript
-import { overwriteArrayAndSyncChanges } from '../data/dbUserState.js';
-
-export async function saveCurrentDeck(deckObjects) {
-    if (!Array.isArray(deckObjects)) {
-         console.error("[saveCurrentDeck] Invalid input: expected an array of objects.");
-         return;
-    }
-    
-    // Validate that we are working with objects that have a valid GUID.
-    const validDeckObjects = deckObjects.filter(item => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid);
-
-    if (validDeckObjects.length !== deckObjects.length) {
-        console.warn("[saveCurrentDeck] Filtered out invalid items from the generated deck.");
-    }
-
-    console.log("[saveCurrentDeck] Saving", validDeckObjects.length, "deck objects.");
-
-    try {
-        // Sanitize the deck objects to remove any non-cloneable properties.
-        const sanitizedDeckObjects = validDeckObjects.map(item => sanitizeForIndexedDB(item));
-
-        // Overwrite the local database and queue the changes for synchronization.
-        await overwriteArrayAndSyncChanges('currentDeckGuids', sanitizedDeckObjects);
-    } catch (e) {
-        console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
-    }
-}
-```
-
-### 4. Fix Flawed Deck Generation Logic for "Unread" Filter
-
-To fix the fourth issue, modify the `generateNewDeck` function in `src/js/helpers/dataUtils.js` to remove `currentDeckGuidsSet` from the filtering condition for "unread" mode.
-
-**Original Code:**
-
-```javascript
-            case 'unread':
-            default:
-                filteredItems = allFeedItems.filter(item =>
-                    !hiddenGuidsSet.has(item.guid) &&
-                    !shuffledOutGuidsSet.has(item.guid) &&
-                    !currentDeckGuidsSet.has(item.guid)
-                );
-                break;
-```
-
-**Recommended Code:**
-
-```javascript
-            case 'unread':
-            default:
-                filteredItems = allFeedItems.filter(item =>
-                    !hiddenGuidsSet.has(item.guid) &&
-                    !shuffledOutGuidsSet.has(item.guid)
-                );
-                break;
-```
-
-### 5. Correct Shuffle Count Management
-
-To fix the fifth issue, modify the `manageDailyDeck` function in `src/js/helpers/deckManager.js` to increment `shuffleCount` when a new deck is generated due to the current deck being exhausted (all items hidden).
-
-**Original Code (relevant part within `manageDailyDeck`):**
-
-```javascript
-    let newShuffleCount = shuffleCount || DAILY_SHUFFLE_LIMIT;
-    // ...
-    if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
-        // ... deck generation logic ...
-        if (isNewDay) {
-            newShuffledOutGuids = [];
-            await saveArrayState('shuffledOutGuids', []);
-            newShuffleCount = DAILY_SHUFFLE_LIMIT;
-            await saveShuffleState(newShuffleCount, today);
-            newLastShuffleResetDate = today;
-            await saveSimpleState('lastShuffleResetDate', today);
+            // Add the oldest valid candidates to the deck until it's full.
+            for (const candidate of validCandidates) {
+                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
+                const fullItem = allItemsMap.get(candidate.guid);
+                if (fullItem) {
+                    nextDeckItems.push(fullItem);
+                }
+            }
         }
-    }
+        // [FIX] END: Fallback logic.
 ```
 
-**Recommended Code (relevant part within `manageDailyDeck`):**
+**Recommended Code (relevant part within `generateNewDeck`):**
 
 ```javascript
-    let newShuffleCount = shuffleCount || DAILY_SHUFFLE_LIMIT;
-    // ...
-    if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
-        // ... deck generation logic ...
-        if (isNewDay) {
-            newShuffledOutGuids = [];
-            await saveArrayState('shuffledOutGuids', []);
-            newShuffleCount = DAILY_SHUFFLE_LIMIT;
-            await saveShuffleState(newShuffleCount, today);
-            newLastShuffleResetDate = today;
-            await saveSimpleState('lastShuffleResetDate', today);
-        } else if (isDeckEffectivelyEmpty && filterMode === 'unread') {
-            // Increment shuffle count when deck is exhausted, up to DAILY_SHUFFLE_LIMIT
-            newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
-            await saveShuffleState(newShuffleCount, lastShuffleResetDate);
+        // [FIX] START: Fallback logic to prevent an empty deck.
+        // This block runs if the deck is still not full, which happens when
+        // the initial 'unread' pool is empty.
+        if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
+            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest hidden/shuffled items.");
+
+            const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
+            const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
+
+            // Combine hidden and shuffled items into a pool of candidates for resurfacing.
+            const resurfaceCandidates = allFeedItems.filter(item =>
+                (hiddenGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)) &&
+                !guidsInDeck.has(item.guid)
+            );
+
+            // Sort candidates by their original timestamp (oldest first) to prioritize older content.
+            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
+
+            // Add the oldest valid candidates to the deck until it's full.
+            for (const candidate of resurfaceCandidates) {
+                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
+                nextDeckItems.push(candidate);
+                guidsInDeck.add(candidate.guid); // Add to guidsInDeck to prevent duplicates
+            }
+
+            // If still not full, add any remaining items from allFeedItems (oldest first)
+            // that are not already in the deck. This acts as a final catch-all.
+            if (nextDeckItems.length < MAX_DECK_SIZE) {
+                const remainingAllItems = allFeedItems.filter(item => !guidsInDeck.has(item.guid));
+                remainingAllItems.sort((a, b) => a.timestamp - b.timestamp); // Sort by original timestamp
+
+                for (const item of remainingAllItems) {
+                    if (nextDeckItems.length >= MAX_DECK_SIZE) break;
+                    nextDeckItems.push(item);
+                    guidsInDeck.add(item.guid);
+                }
+            }
         }
-    }
+        // [FIX] END: Fallback logic.
 ```

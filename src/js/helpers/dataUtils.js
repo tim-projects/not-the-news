@@ -283,26 +283,31 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
             const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
 
             // Combine hidden and shuffled items into a pool of candidates for resurfacing.
-            const resurfaceCandidates = [
-                ...hiddenItems.filter(item => typeof item === 'object' && item.guid),
-                ...shuffledOutItems.filter(item => typeof item === 'object' && item.guid)
-            ];
+            const resurfaceCandidates = allFeedItems.filter(item =>
+                (hiddenGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)) &&
+                !guidsInDeck.has(item.guid)
+            );
 
-            // Filter out items already in the deck or that no longer exist, then sort by timestamp (oldest first).
-            const validCandidates = resurfaceCandidates
-                .filter(candidate => !guidsInDeck.has(candidate.guid) && allItemsMap.has(candidate.guid))
-                .sort((a, b) => {
-                    const timeA = new Date(a.hiddenAt || a.shuffledAt || 0).getTime();
-                    const timeB = new Date(b.hiddenAt || b.shuffledAt || 0).getTime();
-                    return timeA - timeB; // Sort ascending to get the oldest items first.
-                });
+            // Sort candidates by their original timestamp (oldest first) to prioritize older content.
+            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
             // Add the oldest valid candidates to the deck until it's full.
-            for (const candidate of validCandidates) {
+            for (const candidate of resurfaceCandidates) {
                 if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                const fullItem = allItemsMap.get(candidate.guid);
-                if (fullItem) {
-                    nextDeckItems.push(fullItem);
+                nextDeckItems.push(candidate);
+                guidsInDeck.add(candidate.guid); // Add to guidsInDeck to prevent duplicates
+            }
+
+            // If still not full, add any remaining items from allFeedItems (oldest first)
+            // that are not already in the deck. This acts as a final catch-all.
+            if (nextDeckItems.length < MAX_DECK_SIZE) {
+                const remainingAllItems = allFeedItems.filter(item => !guidsInDeck.has(item.guid));
+                remainingAllItems.sort((a, b) => a.timestamp - b.timestamp); // Sort by original timestamp
+
+                for (const item of remainingAllItems) {
+                    if (nextDeckItems.length >= MAX_DECK_SIZE) break;
+                    nextDeckItems.push(item);
+                    guidsInDeck.add(item.guid);
                 }
             }
         }
