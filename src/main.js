@@ -13,7 +13,6 @@ import './css/status.css';
 // Refactored JS: concise, modern, functional, same output.
 
 import {
-    getDb,
     performFeedSync,
     performFullSync,
     pullUserState,
