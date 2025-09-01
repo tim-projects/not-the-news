@@ -7,6 +7,7 @@ data/config/filter_keywords.txt
 data/feed/*
 www/feed.xml
 backup
+node_modules
 __pycache__
 *.pyc
 
