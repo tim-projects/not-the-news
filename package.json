@@ -18,6 +18,8 @@
   },
   "homepage": "https://github.com/tim-projects/not-the-news#readme",
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "playwright": "^1.55.0",
     "vite": "^7.0.6",
     "vite-plugin-pwa": "^1.0.2"
   },

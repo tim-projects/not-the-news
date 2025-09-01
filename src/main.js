@@ -74,43 +74,34 @@ export function rssApp() {
         entries: [],
         hidden: [],
         starred: [],
-        currentDeckGuids: [], // Correctly named: stores objects {guid, addedAt}
-        shuffledOutItems: [], // Was shuffledOutGuids, now stores objects {guid, shuffledAt}
+        currentDeckGuids: [],
+        shuffledOutItems: [],
         errorMessage: '',
         isOnline: isOnline(),
         deckManaged: false,
-
         syncStatusMessage: '',
         showSyncStatus: false,
-        
         theme: 'dark',
         rssSaveMessage: '',
         keywordSaveMessage: '',
-
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
-        _initComplete: false, // Add flag to track initialization
-        
+        _initComplete: false,
         staleItemObserver: null,
         _isSyncing: false,
 
         // --- Core Methods ---
         initApp: async function() {
             if (window.appInitialized) return;
-
             try {
-                // --- PHASE 1: RENDER UI FROM CACHE IMMEDIATELY ---
                 console.log('Starting app initialization...');
-                
                 this.progressMessage = 'Connecting to database...';
                 this.db = await initDb();
                 console.log('Database initialized');
-                
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 console.log('Initial state loaded');
-                
                 this.progressMessage = 'Initializing UI components...';
                 initTheme(this);
                 initSyncToggle(this);
@@ -118,45 +109,32 @@ export function rssApp() {
                 initConfigPanelListeners(this);
                 attachScrollToTopHandler();
                 console.log('UI components initialized');
-                
                 this.progressMessage = 'Loading existing data...';
                 await this.loadFeedItemsFromDB();
                 await this._loadAndManageAllData();
                 this.updateAllUI();
                 console.log('Initial UI rendered from local cache.');
-
-                // --- HIDE THE LOADING SCREEN NOW ---
                 this.loading = false;
                 this.progressMessage = '';
                 console.log('App is visible. Proceeding with background sync.');
-                
-                // --- PHASE 2: SYNC WITH SERVER IN THE BACKGROUND ---
                 if (this.isOnline && this.syncEnabled) {
-                    // We can reuse the background sync logic. It will silently update the UI.
                     await this.performBackgroundSync();
                 }
-
-                // --- PHASE 3: FINAL SETUP ---
                 this._initComplete = true;
                 window.appInitialized = true;
-                
                 this._setupWatchers();
                 this._setupEventListeners();
                 this._initObservers();
                 this._startPeriodicSync();
-                
                 await this.$nextTick();
                 this._initScrollObserver();
-                
                 console.log('App initialization and background sync complete.');
-                
                 try {
                     createStatusBarMessage("App ready", "success");
                 } catch (statusError) {
                     console.log("Status bar not ready yet, but initialization complete");
                 }
                 this.updateSyncStatusMessage();
-                
             } catch (error) {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
@@ -167,14 +145,13 @@ export function rssApp() {
 
         performBackgroundSync: async function() {
             if (this._isSyncing || !this.isOnline || !this.syncEnabled) return;
-
             this._isSyncing = true;
             console.log('[Sync] Starting background sync...');
             try {
                 await processPendingOperations();
                 await pullUserState();
                 await performFeedSync(this);
-                await this.loadFeedItemsFromDB(); // Reload DB items after feed sync
+                await this.loadFeedItemsFromDB();
                 await this._reconcileAndRefreshUI();
                 console.log('[Sync] Background sync completed successfully.');
             } catch (error) {
@@ -188,24 +165,19 @@ export function rssApp() {
         _reconcileAndRefreshUI: async function() {
             console.log('[UI] Reconciling UI after sync...');
             const MIN_ACTIVE_DECK_SIZE = 5;
-
             this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
             this.starred = (await loadArrayState('starred')).value || [];
-            
             const correctDeckResult = await manageDailyDeck(
                 this.entries, this.hidden, this.starred, this.shuffledOutItems,
                 this.shuffleCount, this.filterMode, this.lastShuffleResetDate
             );
             const correctDeck = correctDeckResult.deck;
             const correctGuids = new Set(correctDeck.map(item => item.guid));
-            
-            const activeItemCount = this.deck.filter(item => correctGuids.has(item.guid)).length;
+            const activeItemCount = this.deck.filter(item => correctGuids.has(item.guid) && !item.isStale).length;
             console.log(`[UI] Active items in current view: ${activeItemCount}. Threshold: ${MIN_ACTIVE_DECK_SIZE}`);
-
             let anchorElement = null;
             let anchorTop = 0;
             const feedContainer = document.querySelector('#items');
-            
             if (feedContainer) {
                 const visibleElements = Array.from(feedContainer.querySelectorAll('.item-card:not(.is-stale)'));
                 for (const itemEl of visibleElements) {
@@ -217,7 +189,6 @@ export function rssApp() {
                     }
                 }
             }
-
             if (activeItemCount <= MIN_ACTIVE_DECK_SIZE) {
                 console.log('[UI] Active items below threshold. Performing immediate, anchored refresh.');
                 this.deck = correctDeck;
@@ -247,7 +218,6 @@ export function rssApp() {
                 }
                 const newItems = correctDeck.filter(item => !currentlyDisplayedGuids.has(item.guid));
                 this.deck = [...newItems, ...reconciledDeck];
-
                 if (anchorElement) {
                     await this.$nextTick();
                     const newRect = anchorElement.getBoundingClientRect();
@@ -277,15 +247,8 @@ export function rssApp() {
             const online = isOnline();
             let message = '';
             let show = false;
-
-            if (!online) {
-                message = 'Offline.';
-                show = true;
-            } else if (!this.syncEnabled) {
-                message = 'Sync is disabled.';
-                show = true;
-            }
-
+            if (!online) { message = 'Offline.'; show = true; } 
+            else if (!this.syncEnabled) { message = 'Sync is disabled.'; show = true; }
             this.syncStatusMessage = message;
             this.showSyncStatus = show;
         },
@@ -293,13 +256,11 @@ export function rssApp() {
         loadAndDisplayDeck: async function() {
             try {
                 console.log('Loading and displaying deck...');
-                // Business logic extracts GUIDs from the state objects
                 const guidsToDisplay = this.currentDeckGuids.map(item => item.guid);
                 const items = [];
                 const hiddenSet = new Set(this.hidden.map(h => h.guid));
                 const starredSet = new Set(this.starred.map(s => s.guid));
                 const seenGuidsForDeck = new Set();
-
                 for (const guid of guidsToDisplay) {
                     if (typeof guid !== 'string' || !guid) continue;
                     const item = this.feedItems[guid];
@@ -324,18 +285,13 @@ export function rssApp() {
                 console.log('Loading feed items from database...');
                 if (!this.db) {
                     console.warn('Database not available');
-                    this.entries = [];
-                    this.feedItems = {};
-                    return;
+                    this.entries = []; this.feedItems = {}; return;
                 }
-                
                 const rawItemsFromDb = await getAllFeedItems();
                 console.log(`Retrieved ${rawItemsFromDb.length} raw items from DB`);
-                
                 this.feedItems = {};
                 const uniqueEntries = [];
                 const seenGuids = new Set();
-
                 rawItemsFromDb.forEach(item => {
                     if (item && item.guid && !seenGuids.has(item.guid)) {
                         this.feedItems[item.guid] = item;
@@ -343,13 +299,11 @@ export function rssApp() {
                         seenGuids.add(item.guid);
                     }
                 });
-
                 this.entries = mapRawItems(uniqueEntries, formatDate) || [];
                 console.log(`Processed ${this.entries.length} unique entries`);
             } catch (error) {
                 console.error('Error loading feed items from DB:', error);
-                this.entries = [];
-                this.feedItems = {};
+                this.entries = []; this.feedItems = {};
             }
         },
         
@@ -359,46 +313,25 @@ export function rssApp() {
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }
-
             let filtered = [];
             const hiddenMap = new Map(this.hidden.map(h => [h.guid, h.hiddenAt]));
             const starredMap = new Map(this.starred.map(s => [s.guid, s.starredAt]));
-
             switch (this.filterMode) {
-                case "unread":
-                    filtered = this.deck.filter(item => !hiddenMap.has(item.guid));
-                    break;
-                case "all":
-                    filtered = this.entries;
-                    break;
-                case "hidden":
-                    filtered = this.entries.filter(e => hiddenMap.has(e.guid))
-                        .sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime());
-                    break;
-                case "starred":
-                    filtered = this.entries.filter(e => starredMap.has(e.guid))
-                        .sort((a, b) => new Date(starredMap.get(b.guid)).getTime() - new Date(starredMap.get(a.guid)).getTime());
-                    break;
+                case "unread": filtered = this.deck.filter(item => !item.isStale && !hiddenMap.has(item.guid)); break;
+                case "all": filtered = this.entries; break;
+                case "hidden": filtered = this.entries.filter(e => hiddenMap.has(e.guid)).sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime()); break;
+                case "starred": filtered = this.entries.filter(e => starredMap.has(e.guid)).sort((a, b) => new Date(starredMap.get(b.guid)).getTime() - new Date(starredMap.get(a.guid)).getTime()); break;
             }
-
-            filtered = filtered.map(e => ({
-                ...e,
-                isHidden: hiddenMap.has(e.guid),
-                isStarred: starredMap.has(e.guid)
-            }));
-
-            const keywordBlacklist = (this.keywordBlacklistInput ?? '')
-                .split(/\r?\n/)
-                .map(kw => kw.trim().toLowerCase())
-                .filter(kw => kw.length > 0);
-            
+            if (this.filterMode !== 'unread') {
+                filtered = filtered.map(e => ({ ...e, isHidden: hiddenMap.has(e.guid), isStarred: starredMap.has(e.guid) }));
+            }
+            const keywordBlacklist = (this.keywordBlacklistInput ?? '').split(/\r?\n/).map(kw => kw.trim().toLowerCase()).filter(kw => kw.length > 0);
             if (keywordBlacklist.length > 0) {
                 filtered = filtered.filter(item => {
                     const searchable = `${item.title} ${item.description}`.toLowerCase();
                     return !keywordBlacklist.some(keyword => searchable.includes(keyword));
                 });
             }
-            
             this._cachedFilteredEntries = filtered;
             this._lastFilterHash = currentHash;
             return filtered;
@@ -407,15 +340,11 @@ export function rssApp() {
         isStarred: function(guid) { return this.starred.some(e => e.guid === guid); },
         isHidden: function(guid) { return this.hidden.some(e => e.guid === guid); },
         
+        // --- FIX: Centralize UI updates ---
         toggleStar: async function(guid) {
             try {
                 await toggleItemStateAndSync(this, guid, 'starred');
-                const deckResult = await manageDailyDeck(
-                    this.entries, this.hidden, this.starred, this.shuffledOutItems,
-                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate
-                );
-                this.deck = deckResult.deck;
-                this.currentDeckGuids = deckResult.currentDeckGuids;
+                await this._reconcileAndRefreshUI(); // Use the master UI update function
                 this.updateSyncStatusMessage();
             } catch (error) {
                 console.error('Error toggling star:', error);
@@ -423,15 +352,11 @@ export function rssApp() {
             }
         },
         
+        // --- FIX: Centralize UI updates ---
         toggleHidden: async function(guid) {
             try {
                 await toggleItemStateAndSync(this, guid, 'hidden');
-                const deckResult = await manageDailyDeck(
-                    this.entries, this.hidden, this.starred, this.shuffledOutItems,
-                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate
-                );
-                this.deck = deckResult.deck;
-                this.currentDeckGuids = deckResult.currentDeckGuids;
+                await this._reconcileAndRefreshUI(); // Use the master UI update function
                 this.updateSyncStatusMessage();
             } catch (error) {
                 console.error('Error toggling hidden:', error);
@@ -555,9 +480,7 @@ export function rssApp() {
                 if (Array.isArray(rawStarredState.value)) {
                     for (const item of rawStarredState.value) {
                         const guid = (typeof item === 'string') ? item : item?.guid;
-                        if (guid) {
-                            sanitizedStarred.push({ guid, starredAt: item?.starredAt || new Date().toISOString() });
-                        }
+                        if (guid) sanitizedStarred.push({ guid, starredAt: item?.starredAt || new Date().toISOString() });
                     }
                 }
                 this.starred = [...new Map(sanitizedStarred.map(item => [item.guid, item])).values()];
@@ -566,9 +489,7 @@ export function rssApp() {
                 if (Array.isArray(rawShuffledOutState.value)) {
                      for (const item of rawShuffledOutState.value) {
                         const guid = (typeof item === 'string') ? item : item?.guid;
-                        if (guid) {
-                            sanitizedShuffled.push({ guid, shuffledAt: item?.shuffledAt || new Date().toISOString() });
-                        }
+                        if (guid) sanitizedShuffled.push({ guid, shuffledAt: item?.shuffledAt || new Date().toISOString() });
                     }
                 }
                 this.shuffledOutItems = [...new Map(sanitizedShuffled.map(item => [item.guid, item])).values()];
@@ -585,13 +506,8 @@ export function rssApp() {
                 }
                 
                 const deckResult = await manageDailyDeck(
-                    this.entries,
-                    this.hidden,
-                    this.starred,
-                    this.shuffledOutItems,
-                    this.shuffleCount,
-                    this.filterMode,
-                    this.lastShuffleResetDate
+                    this.entries, this.hidden, this.starred, this.shuffledOutItems,
+                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate
                 );
                 
                 this.deck = deckResult.deck;
@@ -604,21 +520,14 @@ export function rssApp() {
                 console.log('Data management complete - final deck size:', this.deck.length);
             } catch (error) {
                 console.error('Error loading and managing data:', error);
-                this.starred = [];
-                this.shuffledOutItems = [];
-                this.currentDeckGuids = [];
-                this.shuffleCount = 0;
-                this.hidden = [];
-                this.deck = [];
+                this.starred = []; tis.shuffledOutItems = []; this.currentDeckGuids = [];
+                this.shuffleCount = 0; this.hidden = []; this.deck = [];
             }
         },
 
         updateAllUI: function() { 
-            try {
-                this.updateCounts(); 
-            } catch (error) {
-                console.error('Error updating UI:', error);
-            }
+            try { this.updateCounts(); } 
+            catch (error) { console.error('Error updating UI:', error); }
         },
 
         _setupWatchers: function() {
