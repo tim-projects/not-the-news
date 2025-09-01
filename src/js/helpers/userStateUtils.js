@@ -4,9 +4,9 @@ import {
     loadSimpleState,
     saveSimpleState,
     loadArrayState,
-    saveArrayState,
     queueAndAttemptSyncOperation,
-    updateArrayState
+    updateArrayState,
+    overwriteArrayAndSyncChanges
 } from '../data/database.js';
 
 import { isOnline } from '../utils/connectivity.js';
@@ -197,19 +197,11 @@ export async function saveCurrentDeck(deckObjects) {
     console.log("[saveCurrentDeck] Saving", validDeckObjects.length, "deck objects.");
 
     try {
-        // Step 1: Sanitize the deck objects to remove any non-cloneable properties.
+        // Sanitize the deck objects to remove any non-cloneable properties.
         const sanitizedDeckObjects = validDeckObjects.map(item => sanitizeForIndexedDB(item));
 
-        // Step 2: Save the sanitized objects to the local database.
-        await saveArrayState('currentDeckGuids', sanitizedDeckObjects);
-
-        // Step 3: Queue the sanitized objects for synchronization.
-        // The server needs the full objects, so we pass the sanitized version.
-        await queueAndAttemptSyncOperation({
-            type: 'simpleUpdate',
-            key: 'currentDeckGuids',
-            value: sanitizedDeckObjects 
-        });
+        // Overwrite the local database and queue the changes for synchronization.
+        await overwriteArrayAndSyncChanges('currentDeckGuids', sanitizedDeckObjects);
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
     }

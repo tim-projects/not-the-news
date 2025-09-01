@@ -127,6 +127,10 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
             await saveShuffleState(newShuffleCount, today);
             newLastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
+        } else if (isDeckEffectivelyEmpty && filterMode === 'unread') {
+            // Increment shuffle count when deck is exhausted, up to DAILY_SHUFFLE_LIMIT
+            newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
+            await saveShuffleState(newShuffleCount, lastShuffleResetDate);
         }
     } else {
         console.log(`[deckManager] Retaining existing deck. Visible items: ${visibleItemsInCurrentDeck.length}.`);

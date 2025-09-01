@@ -190,7 +190,8 @@ async function _pullSingleStateKey(key, def) {
     const hasPendingOperations = allPendingOps.some(op => 
         op.key === key || 
         (op.type === 'starDelta' && key === 'starred') ||
-        (op.type === 'hiddenDelta' && key === 'hidden')
+        (op.type === 'hiddenDelta' && key === 'hidden') ||
+        (op.type === 'simpleUpdate' && op.key === 'currentDeckGuids')
     );
 
     if (hasPendingOperations) {

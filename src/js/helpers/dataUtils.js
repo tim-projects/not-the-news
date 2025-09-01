@@ -130,8 +130,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
             default:
                 filteredItems = allFeedItems.filter(item =>
                     !hiddenGuidsSet.has(item.guid) &&
-                    !shuffledOutGuidsSet.has(item.guid) &&
-                    !currentDeckGuidsSet.has(item.guid)
+                    !shuffledOutGuidsSet.has(item.guid)
                 );
                 break;
         }
