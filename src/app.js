@@ -271,10 +271,12 @@ export function rssApp() {
         },
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
+            await this._loadAndManageAllData();
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
+            await this._loadAndManageAllData();
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {

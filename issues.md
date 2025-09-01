@@ -15,16 +15,14 @@ Finally, a `PermissionError` was encountered when `merge_feeds.py` attempted to 
 
 ## Issues Found
 
-### 1. Redundant Data Loading and Race Condition
+### 1. Redundant Data Loading and Race Condition (Re-evaluated)
 
 *   **File:** `src/app.js`
 *   **Lines:** 309-317
 
 **Description:**
 
-The `toggleStar` and `toggleHidden` functions in `src/app.js` both call `_loadAndManageAllData()` immediately after calling `toggleItemStateAndSync`. The `toggleItemStateAndSync` function already updates the local application state, so the call to `_loadAndManageAllData()` is redundant and inefficient.
-
-More importantly, this creates a race condition. If the database operation in `toggleItemStateAndSync` has not completed by the time `_loadAndManageAllData` is called, the UI will be updated with stale data, and the user's action will appear to have been ignored.
+The `toggleStar` and `toggleHidden` functions in `src/app.js` call `_loadAndManageAllData()` immediately after calling `toggleItemStateAndSync`. While this was initially identified as a redundant call causing a race condition, its removal inadvertently broke the immediate triggering of new deck generation when items are hidden. The `_loadAndManageAllData()` call is necessary to re-evaluate the deck state and potentially generate a new deck after an item's hidden status changes. The race condition should be mitigated by ensuring `toggleItemStateAndSync` completes its database operations before `_loadAndManageAllData` is called, and by the robust synchronization logic in `dbSyncOperations.js`.
 
 ### 2. Flawed Synchronization Logic for `currentDeckGuids`
 
@@ -115,21 +113,19 @@ It is generally better practice to modify the Python script (`rss/run.py` or whe
 
 ## Recommended Fixes
 
-### 1. Remove Redundant Data Loading
+### 1. Re-add Data Loading after State Changes
 
-To fix the first issue, remove the calls to `_loadAndManageAllData()` from the `toggleStar` and `toggleHidden` functions in `src/app.js`.
+To ensure new decks are generated when items are hidden, re-add the calls to `_loadAndManageAllData()` after `toggleItemStateAndSync` in `src/app.js`.
 
-**Original Code:**
+**Original Code (from previous `issues.md`):**
 
 ```javascript
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
-            await this._loadAndManageAllData();
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
-            await this._loadAndManageAllData();
             this.updateSyncStatusMessage();
         },
 ```
@@ -139,10 +135,12 @@ To fix the first issue, remove the calls to `_loadAndManageAllData()` from the `
 ```javascript
         toggleStar: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'starred');
+            await this._loadAndManageAllData();
             this.updateSyncStatusMessage();
         },
         toggleHidden: async function(guid) {
             await toggleItemStateAndSync(this, guid, 'hidden');
+            await this._loadAndManageAllData();
             this.updateSyncStatusMessage();
         },
 ```

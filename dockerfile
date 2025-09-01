@@ -99,7 +99,8 @@ COPY src/api.py /app/www/api.py
 
 COPY data/ /data/feed/
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && chown appuser:appgroup /tmp
 
 ##############################################################################
 # 6. Build entrypoint
