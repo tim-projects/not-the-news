@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Not The News</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg); /* Use CSS variable */
+      color: var(--fg);     /* Use CSS variable */
+    }
+
+    .login-container {
+      text-align: center;
+      width: 100%;
+      padding: 20px;
+    }
+
+    .ntn-title {
+      margin-bottom: 2rem;
+    }
+
+    #login-form {
+      background: var(--card-bg);
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    #login-form input {
+      width: -webkit-fill-available;
+      padding: 12px;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: var(--card-bg);
+      color: var(--fg);
+      font-size: large;
+    }
+
+    #login-form button {
+      width: 100%;
+      padding: 12px;
+      color: var(--fg); /* Default text color for the button */
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: large;
+      /* Add transitions for smooth effects across all states */
+      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    #login-form button:hover {
+      background-color: var(--primary); /* The hover background */
+      color: white; /* Ensure text contrasts with --secondary */
+    }
+
+    #login-form button:focus {
+      /* Provide a clear focus indicator for keyboard users */
+      outline: none; /* Remove default browser outline */
+      box-shadow: 0 0 0 3px var(--secondary), /* A custom outline based on --secondary */
+                  0 2px 10px rgba(0, 0, 0, 0.1); /* Keep original shadow */
+      background-color: var(--secondary); /* Optional: Make focus background like hover */
+      color: var(--fg); /* Optional: Make focus text like hover */
+    }
+
+    #login-form button:active {
+      /* Give visual feedback when the button is being pressed */
+      background-color: var(--primary-darker, hsl(var(--primary-hue, 200), var(--primary-saturation, 100%), calc(var(--primary-lightness, 50%) - 10%))); /* A slightly darker primary */
+      box-shadow: inset 0 1px 5px rgba(0,0,0,0.2); /* Inset shadow for "pressed" look */
+      transform: translateY(1px); /* Slight push down */
+    }
+  </style>
+  <script>
+    // Get theme from local storage
+    let t = localStorage.getItem('theme');
+
+    // Default to dark mode unless 'light' is explicitly stored.
+    // If 't' is 'light', add 'light' class.
+    // Otherwise (t is 'dark' or null), add 'dark' class.
+    if (t === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <link rel="stylesheet" crossorigin href="/assets/modal-CYB6LbDG.css">
+<link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+
+<body>
+  <div class="login-container">
+          <div id="ntn-title">
+        <h2>Not The News</h2>
+      </div>
+    <form id="login-form">
+      <p>Please log in below. Enter the password you used when building the docker container:</p>
+      <input type="password" placeholder="Enter password" required id="pw">
+      <button type="submit">Login</button>
+    </form>
+  </div>
+  <script>
+    // This script is for the login form submission, not theme initialization.
+    document.getElementById("login-form").addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target;
+      const btn = form.querySelector('button');
+      const pwInput = document.getElementById("pw");
+      const pw = pwInput.value.trim();
+
+      if (!pw) {
+        alert("Please enter a password");
+        return;
+      }
+
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pw })
+        });
+        if (res.status === 200) {
+          window.location.href = "/";
+        } else {
+          pwInput.value = "";
+          alert("Invalid password");
+        }
+      } catch (error) {
+        alert("Network error, please try again");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

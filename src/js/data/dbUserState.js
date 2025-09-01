@@ -243,3 +243,5 @@ export async function saveArrayState(storeName, objects) {
         await tx.done;
     });
 }
+
+export { queueAndAttemptSyncOperation };
