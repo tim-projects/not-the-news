@@ -1,7 +1,0 @@
-# rename to feeds.txt
-# rss feed urls go here
-# one feed per line
-# e.g.
-https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en
-https://www.hotukdeals.com/rss/all
-https://hnrss.org/best

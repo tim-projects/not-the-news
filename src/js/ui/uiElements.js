@@ -29,8 +29,16 @@ export const getKeywordsSettingsBlock = () => document.getElementById('keywords-
 export const getBackButton = () => document.getElementById('back-button');
 
 // Textarea elements within the settings panels
-export const getRssFeedsTextarea = () => document.getElementById("rss-feeds-textarea");
-export const getKeywordsBlacklistTextarea = () => document.getElementById("keywords-blacklist-textarea");
+export const getRssFeedsTextarea = () => {
+    const el = document.querySelector('#rss-settings-block textarea');
+    console.log('[DEBUG] getRssFeedsTextarea called. Element:', el);
+    return el;
+};
+export const getKeywordsBlacklistTextarea = () => {
+    const el = document.querySelector('#keywords-settings-block textarea');
+    console.log('[DEBUG] getKeywordsBlacklistTextarea called. Element:', el);
+    return el;
+};
 
 // Buttons for navigating and saving configuration
 export const getConfigureRssButton = () => document.getElementById('configure-rss-feeds-btn');

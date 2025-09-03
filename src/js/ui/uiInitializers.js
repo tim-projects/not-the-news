@@ -10,6 +10,11 @@ import {
 } from '../data/database.js';
 
 import {
+    loadUserState,
+    saveUserState
+} from '../helpers/apiUtils.js';
+
+import {
     getSyncToggle,
     getImagesToggle,
     getThemeToggle,
@@ -176,12 +181,50 @@ export async function initScrollPosition(app) {
 async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButton, app) {
     const configBtn = getConfigButton();
     const saveBtn = getSaveButton();
+    console.log(`[DEBUG] setupTextareaPanel for key: ${key}. configBtn:`, configBtn, `saveBtn:`, saveBtn); // Added debug log
     if (!configBtn || !saveBtn) return;
 
     configBtn.addEventListener('click', async () => {
         // Data is now loaded here, when the user intends to configure.
-        const { value } = await loadSimpleState(key);
-        const content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
+        let value;
+        if (key === 'rssFeeds' || key === 'keywordBlacklist') {
+            try {
+                const response = await loadUserState(key);
+                console.log(`[DEBUG] loadUserState response for ${key}:`, response); // Added debug log
+                value = response.value;
+            } catch (error) {
+                console.error(`Error loading ${key} from server:`, error);
+                value = (key === 'rssFeeds') ? '' : []; // Default to empty string or array on error
+            }
+        } else {
+            const result = await loadSimpleState(key);
+            value = result.value;
+        }
+
+        console.log(`[DEBUG] Value before setting app input for ${key}:`, value); // Added debug log
+        let content;
+        if (key === 'rssFeeds' && value && typeof value === 'object') {
+            let allRssUrls = [];
+            for (const category in value) {
+                if (typeof value[category] === 'object') {
+                    for (const subcategory in value[category]) {
+                        if (Array.isArray(value[category][subcategory])) {
+                            value[category][subcategory].forEach(feed => {
+                                if (feed && feed.url) {
+                                    allRssUrls.push(feed.url);
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+            content = allRssUrls.join('\n');
+        } else {
+            content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
+        }
+        console.log(`[DEBUG] Content for ${key} input:`, content); // Added debug log
+        console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
+        console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
         app[`${key}Input`] = content;
         app.modalView = key; // Switch to the correct view
     });
@@ -189,10 +232,15 @@ async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButt
     saveBtn.addEventListener("click", async () => {
         const textarea = getTextarea();
         const content = textarea?.value ?? app[`${key}Input`];
-        const keywordsArray = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const dataToSave = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+
         try {
-            await saveSimpleState(key, keywordsArray);
-            app[`${key}Input`] = keywordsArray.sort().join("\n");
+            if (key === 'rssFeeds' || key === 'keywordBlacklist') {
+                await saveUserState(key, dataToSave);
+            } else {
+                await saveSimpleState(key, dataToSave);
+            }
+            app[`${key}Input`] = dataToSave.sort().join("\n");
             createStatusBarMessage(`${key} saved.`, 'success');
         } catch (err) {
             console.error(err);
@@ -202,6 +250,7 @@ async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButt
 }
 
 export async function initConfigPanelListeners(app) {
+    console.log("[DEBUG] initConfigPanelListeners called."); // Added debug log
     const backBtn = getBackButton();
     backBtn?.addEventListener('click', () => {
         app.modalView = 'main';

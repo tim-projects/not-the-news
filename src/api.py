@@ -1,19 +1,33 @@
 # @filepath: src/api.py
 
+import os
+import shutil
+import json
+import secrets
+import logging, html
+import tempfile
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
 from email.utils import parsedate_to_datetime
 from werkzeug.middleware.proxy_fix import ProxyFix
-import os
-import json
-import secrets
-import logging, html
-import tempfile
+from logging.handlers import RotatingFileHandler
+
+# Configure file-based logging
+log_file = '/tmp/api_debug.log'
+api_logger = logging.getLogger('api_logger')
+api_logger.setLevel(logging.DEBUG)
+handler = RotatingFileHandler(log_file, maxBytes=100000, backupCount=5)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+api_logger.addHandler(handler)
+
+api_logger.debug("DEBUG: api.py script started.")
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
+# Keep Flask's default logger for general info/warnings, but use api_logger for specific debugs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 app.logger.setLevel(logging.DEBUG) # Keep DEBUG for development, INFO for production
 
@@ -45,9 +59,27 @@ USER_STATE_SERVER_DEFAULTS = {
     'theme': {'type': 'simple', 'default': 'light'},
     'lastFeedSync': {'type': 'simple', 'default': None},
     'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
-    'rssFeeds': {'type': 'array', 'default': []},
+    'rssFeeds': {'type': 'nested_object', 'default': {}},
     'keywordBlacklist': {'type': 'array', 'default': []},
 }
+
+def _seed_initial_configs():
+    app.logger.info("Checking for initial config seeding...")
+    config_files = ["rssFeeds.json", "keywordBlacklist.json"]
+
+    for filename in config_files:
+        source_path = os.path.join(CONFIG_DIR, filename)
+        destination_path = os.path.join(USER_STATE_DIR, filename)
+
+        if not os.path.exists(destination_path) and os.path.exists(source_path):
+            app.logger.info(f"Seeding initial config: {filename} from {source_path} to {destination_path}")
+            try:
+                shutil.copy2(source_path, destination_path)
+                app.logger.info(f"Successfully seeded {filename}.")
+            except Exception as e:
+                app.logger.error(f"Failed to seed {filename}: {e}")
+
+_seed_initial_configs() # Call seeding function early
 
 def _atomic_write(filepath, content, mode='w', encoding='utf-8'):
     """
@@ -101,8 +133,6 @@ def login():
         return jsonify({"error": "Internal server error"}), 500
 
 def _load_feed_items():
-    app.logger.debug("Attempting to parse feed.xml")
-
     if not os.path.exists(FEED_XML):
         app.logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
         return {}
@@ -260,20 +290,50 @@ def _load_state(key):
             'shuffledOut': 'shuffledAt'
         }
 
+        # Specific migration for rssFeeds from string array to object array with genre
+        # Specific migration for rssFeeds from string array to object array with genre
+        # This is the old migration, now it needs to handle the new nested structure
+        if key == 'rssFeeds' and isinstance(value, list): # Check if it's the old flat array of objects
+            app.logger.info(f"Migrating data format for key '{key}' from flat array to nested object (with default category/subcategory).")
+            nested_feeds = {}
+            default_category = "Uncategorized"
+            default_subcategory = "Default"
+            nested_feeds[default_category] = {}
+            nested_feeds[default_category][default_subcategory] = []
+
+            for item in value:
+                if isinstance(item, dict) and 'url' in item:
+                    # If genre exists, use it as category, otherwise default
+                    category = item.get('genre', default_category)
+                    if category not in nested_feeds:
+                        nested_feeds[category] = {}
+                    if default_subcategory not in nested_feeds[category]:
+                        nested_feeds[category][default_subcategory] = []
+                    nested_feeds[category][default_subcategory].append({"url": item['url']})
+                elif isinstance(item, str): # Handle case where it might still be a string array from very old data
+                    if default_category not in nested_feeds:
+                        nested_feeds[default_category] = {}
+                    if default_subcategory not in nested_feeds[default_category]:
+                        nested_feeds[default_category][default_subcategory] = []
+                    nested_feeds[default_category][default_subcategory].append({"url": item})
+
+            new_last_modified = _save_state(key, nested_feeds)
+            return {"value": nested_feeds, "lastModified": new_last_modified}
+
         if key in array_keys_to_migrate and isinstance(value, list) and value and isinstance(value[0], str):
             app.logger.info(f"Migrating data format for key '{key}' from string array to object array.")
             timestamp_key = array_keys_to_migrate[key]
             # Use the file's last modified time as a consistent default for all migrated items
             default_timestamp = last_modified or datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-            
+
             new_value = [{"guid": guid, timestamp_key: default_timestamp} for guid in value]
-            
+
             # Atomically save the migrated data and get the new timestamp
             new_last_modified = _save_state(key, new_value)
             return {"value": new_value, "lastModified": new_last_modified}
 
         return {"value": value, "lastModified": last_modified}
-    except (json.JSONDecodeError, KeyError, FileNotFoundError):
+    except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
         # If file is corrupt or missing after checks, return a clean state
         return {"value": None, "lastModified": None}
 
@@ -298,7 +358,7 @@ def get_single_user_state_key(key):
         abort(404, description=f"User state key '{key}' not found.")
 
     if_none_match = request.headers.get("If-None-Match")
-    if state_data["lastModified"] and if_none_match == state_data["lastModified"]:
+    if state_data["lastModified"] and if_none_match == state_data["lastModified"] and request.method == "GET":
         return make_response("", 304)
 
     resp = jsonify(state_data)
@@ -308,6 +368,10 @@ def get_single_user_state_key(key):
 
 @app.route("/api/user-state", methods=["POST"])
 def post_user_state():
+    # Direct file write for debugging
+    with open('/tmp/api_debug.log', 'a') as f:
+        f.write(f"DEBUG: post_user_state() received request. JSON: {request.get_json(silent=True)}\n")
+
     operations = request.get_json(silent=True)
     if not isinstance(operations, list):
         return jsonify({"error": "Invalid JSON body, expected a list of operations"}), 400

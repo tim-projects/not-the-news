@@ -1,8 +1,0 @@
-# rename to filter-keywords.txt
-# Enter keywords you want to filter here
-# One per line, spaces are okay
-# e.g.
-Trump
-politics
-football
-/r/pictures

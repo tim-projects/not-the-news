@@ -1,30 +1,10 @@
 # TODO
-- improve repo structure for ai
-
-I want you to review the entire codebase and create a report - FUNCTIONS-MAP.md. In this file I want you to create a human readible log of each file and the        │
-│   functions it contains. As part of this process, I want you to record how manage lines of code each function uses. My goal here is to eventually rewrite the         │
-│   codebase to ensure that each file aims to be a maximum 300 lines. But it should make sense with which function is stored where. So I need this                      │
-│   FUNCTIONS-MAP.md so that I can think of a new repo structure
-
-- major db/sync refactor
-
-https://aistudio.google.com/prompts/1Zr4CNOgZljxBPtA3nLkx_XtkHsQXDQq2
-
-You are trying to untangle a branching issue.
-you are in better-sync-hotfix. You need to get that up to date with the recent changes you made to better-sync - but you broke something along the way
-
-On better-sync the thing you were currently doing was getting the ui to load instantly. Really that should be in it's own branch. Make sure the theme fix and sync fixes are there then merge to better-sync, then branch for the ui stuff.
-
-Once you get better-sync-hotfix working and up to date with better-sync, then merge it and close the branch.
-
-You still need to fix loading configs to and from the server, and make sure the shuffle is working properly
-
-
 
 -----
 
 III. Verification and Testing Plan
 After implementing these changes, thorough testing will be critical:
+Write and run tests for all the following. Fix any issues that arise.
 
 Core App Initialization & Data Loading:
 
@@ -60,9 +40,23 @@ Sync Behavior:
 - fix the wrong url on reddit/wired titles
 - implement a hidden pop up bar and flash a toast message when syncing, if something went wrong saving the state, or when syncing/internet disconnected. This should cover the top header while it's active, and hide after 1 second of inactivity.
 
+- improve repo structure for ai
+
+I want you to review the entire codebase and create a report - FUNCTIONS-MAP.md. In this file I want you to create a human readible log of each file and the        │
+│   functions it contains. As part of this process, I want you to record how manage lines of code each function uses. My goal here is to eventually rewrite the         │
+│   codebase to ensure that each file aims to be a maximum 300 lines. But it should make sense with which function is stored where. So I need this                      │
+│   FUNCTIONS-MAP.md so that I can think of a new repo structure
+
+- major db/sync refactor
+
+You still need to fix loading configs to and from the server, and make sure the shuffle is working properly
 
 # LATER
-- Add a custom theme styling box in the settings.
+- If the user clears 3 decks in a day, before showing the 4th deck, pick a random starred card, show them it and encourage them to expunge it (i.e. set it to unstarred and hidden). offer a button under the card to skip the expunge and continue as normal - i.e. generate a new currentdeck.
+- When an item is hidden, imediatelly show an undo button in tbe bottom left for 5 seconds, which when pressed would restore unhidden status of that item and place it back in the deck. After 5 seconds of not being pressed the button would fade out and disappear, or if pressed disappear immediately.
+- insyead of just dark/light themes  Create a drop down and offer the user afew themes of each (but still default the the existing dark theme).
+- Add a custom theme option to the theme dropdown. When selected a configure button appears in the settings. Pressing this button opens a new test area showing a custom editable style sheet. This would overwrite the root variables in the stylesheet by default. The custom style sheet would be saved for the user, and enabled as long as the theme dropdown is set to custome theme.
+- Add a locally stored setting to increase or decrease the global font size (this doesn't need to be syncd because its device specific), but it night be better to store it globally with a device fingerprint so it could be restored later. The global font size setting would be in a percentage ranging from 50% to 200% and add a modifier to all fonts to change their relative sizings..
 
 - Keyword whitelist. 
 This is a list of keywords that override your blacklist. This feature can be used to ensure that if you do need to catch current or timely events that you have a way to do so.

@@ -9,11 +9,9 @@ export const USER_STATE_DEFS = {
     hidden: { store: 'hidden', type: 'array', localOnly: false, default: [] },
     lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
     lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
-    rssFeeds: { store: 'userSettings', type: 'simple', localOnly: true, default: '' },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
     imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
     syncEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
-    keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: true, default: [] },
     currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: false, default: [] },
     shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: true, default: [] },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
@@ -68,6 +66,7 @@ const getTimestampKey = (storeName) => {
  * Loads all items from a store, performing data migration if necessary.
  */
 export async function loadArrayState(storeName) {
+    console.log(`ENTERING loadArrayState for ${storeName}`);
     return withDb(async (db) => {
         try {
             const allItems = await db.getAll(storeName);

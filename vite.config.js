@@ -32,6 +32,7 @@ export default defineConfig({
       // The fix is here: Change srcDir to '' or '.'
       srcDir: '.',
       filename: 'sw.js',
+      
       injectManifest: {
         globPatterns: [
           '**/*.{js,css,html,ico,png,svg,json}',

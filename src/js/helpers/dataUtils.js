@@ -70,14 +70,29 @@ export function mapRawItem(item, fmtFn) {
 }
 
 export function mapRawItems(rawList, fmtFn) {
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
+    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
     if (!Array.isArray(rawList)) {
         console.warn("mapRawItems received a non-array input. Returning empty array.");
         return [];
     }
-    return rawList
+    const mappedAndFiltered = rawList
         .map(item => mapRawItem(item, fmtFn))
         .filter(item => item !== null)
         .sort((a, b) => b.timestamp - a.timestamp);
+    console.log(`EXITING mapRawItems. Returning length: ${mappedAndFiltered.length}`);
+    return mappedAndFiltered;
 }
 
 /**
@@ -93,6 +108,7 @@ export function mapRawItems(rawList, fmtFn) {
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of full item objects for the new deck.
  */
 export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, shuffledOutItems, currentDeckItems, count, filterMode) {
+    console.log("ENTERING generateNewDeck");
     try {
         const MAX_DECK_SIZE = 10;
 
@@ -119,6 +135,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
         const currentDeckGuidsSet = getGuidSet(currentDeckItems);
 
         let filteredItems = [];
+        console.log(`[generateNewDeck] Initial filteredItems count: ${filteredItems.length}`);
         switch (filterMode) {
             case 'hidden':
                 filteredItems = allFeedItems.filter(item => hiddenGuidsSet.has(item.guid));
@@ -137,6 +154,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
 
         if (filterMode === 'hidden' || filterMode === 'starred') {
             filteredItems.sort((a, b) => b.timestamp - a.timestamp);
+            console.log(`[generateNewDeck] Filtered items for ${filterMode}: ${filteredItems.length}`);
             // ARCHITECTURE CHANGE: Return full objects instead of just GUIDs.
             return filteredItems;
         }
@@ -176,27 +194,35 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
 
             const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
             addItemsFromCategory(recentItems, 2);
+            console.log(`[generateNewDeck] After recentItems: ${nextDeckItems.length}`);
 
             const itemsWithLinks = filteredItems.filter(hasHyperlink);
             addItemsFromCategory(itemsWithLinks, 1);
+            console.log(`[generateNewDeck] After itemsWithLinks: ${nextDeckItems.length}`);
 
             const itemsWithQuestionTitle = filteredItems.filter(hasQuestionMarkInTitle);
             addItemsFromCategory(itemsWithQuestionTitle, 1);
+            console.log(`[generateNewDeck] After itemsWithQuestionTitle: ${nextDeckItems.length}`);
 
             const itemsWithQuestionFirst150 = filteredItems.filter(hasQuestionMarkInDescriptionFirst150);
             addItemsFromCategory(itemsWithQuestionFirst150, 1);
+            console.log(`[generateNewDeck] After itemsWithQuestionFirst150: ${nextDeckItems.length}`);
 
             const itemsWithQuestionLast150 = filteredItems.filter(hasQuestionMarkInDescriptionLast150);
             addItemsFromCategory(itemsWithQuestionLast150, 1);
+            console.log(`[generateNewDeck] After itemsWithQuestionLast150: ${nextDeckItems.length}`);
 
             const itemsWithImages = filteredItems.filter(hasImage);
             addItemsFromCategory(itemsWithImages, 1);
+            console.log(`[generateNewDeck] After itemsWithImages: ${nextDeckItems.length}`);
 
             const longItems = filteredItems.filter(isLongItem);
             addItemsFromCategory(longItems, 1);
+            console.log(`[generateNewDeck] After longItems: ${nextDeckItems.length}`);
             
             const shortItems = filteredItems.filter(isShortItem);
             addItemsFromCategory(shortItems, 1);
+            console.log(`[generateNewDeck] After shortItems: ${nextDeckItems.length}`);
 
             const trulyRemainingItems = filteredItems.filter(item => !selectedIds.has(item.guid));
             const shuffledRemaining = shuffleArray([...trulyRemainingItems]);
@@ -205,6 +231,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
                 if (nextDeckItems.length >= MAX_DECK_SIZE) break;
                 tryAddItemToDeck(item);
             }
+            console.log(`[generateNewDeck] After shuffledRemaining: ${nextDeckItems.length}`);
             
             if (nextDeckItems.length < MAX_DECK_SIZE) {
                 const resurfaceCandidates = allFeedItems.filter(item =>
@@ -212,10 +239,11 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
                 );
                 resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
-                for (const item of resurfaceCandidates) {
+                for (const candidate of resurfaceCandidates) {
                     if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                    tryAddItemToDeck(item);
+                    tryAddItemToDeck(candidate);
                 }
+                console.log(`[generateNewDeck] After resurfaceCandidates: ${nextDeckItems.length}`);
             }
         } else {
             // Offline fallback
@@ -294,9 +322,9 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
             // Add the oldest valid candidates to the deck until it's full.
             for (const candidate of resurfaceCandidates) {
                 if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                nextDeckItems.push(candidate);
-                guidsInDeck.add(candidate.guid); // Add to guidsInDeck to prevent duplicates
+                tryAddItemToDeck(candidate);
             }
+            console.log(`[generateNewDeck] After resurfaceCandidates: ${nextDeckItems.length}`);
 
             // If still not full, add any remaining items from allFeedItems (oldest first)
             // that are not already in the deck. This acts as a final catch-all.
@@ -309,6 +337,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
                     nextDeckItems.push(item);
                     guidsInDeck.add(item.guid);
                 }
+                console.log(`[generateNewDeck] After remainingAllItems: ${nextDeckItems.length}`);
             }
         }
         // [FIX] END: Fallback logic.

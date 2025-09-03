@@ -1,143 +1,23 @@
-# Issues Found in Starring, Closing, and Syncing Items
+### 15. Entire Deck Vanishes After Closing Item
 
-## Summary
+*   **Description:** When a user closes an item in the unread deck, the entire current deck vanishes from the UI. This indicates an issue with how the deck state is being managed after an item is hidden or removed.
+*   **Status:** Unresolved.
 
-Furthermore, the deck generation logic has a flaw that prevents a new deck from being generated when all current items are hidden, and the shuffle count mechanism is not working as intended.
 
-## Issues Found
+## Offline Loading Issue
 
-### 8. Insufficient Fallback for Empty Unread Deck
+**Issue:** The application no longer loads when offline. This is a regression, as the app is a PWA and should function offline.
 
-*   **File:** `src/js/helpers/dataUtils.js`
-*   **Lines:** 189-216 (the fallback logic block)
+**Efforts:**
+1.  **Service Worker Analysis:** Examined `www/sw.js` (a minified Workbox service worker) to understand its precaching strategy. It appeared to be caching essential HTML, CSS, and JS assets.
+2.  **Vite PWA Configuration Investigation:** Analyzed `vite.config.js` to understand how the service worker is generated using `vite-plugin-pwa`.
+3.  **Configuration Attempts:** Attempted various configurations for `srcDir` and `filename` within the `VitePWA` plugin to correctly point to the service worker source file (`src/sw.js`) and ensure proper asset caching relative to the build output (`www` directory). The following combinations were tried:
+    *   `srcDir: 'www'`, `filename: 'src/sw.js'`
+    *   `srcDir: 'src'`, `filename: 'sw.js'`
+    *   `srcDir: '.'`, `filename: 'src/sw.js'`
+    *   Moving `src/sw.js` to `public/sw.js` and removing `srcDir` and `filename` (relying on defaults).
+    *   `srcDir: 'public'`, `filename: 'sw.js'`
+4.  **Build Attempts:** After each configuration change, `npm run build` was executed to rebuild the application and generate the service worker.
 
-**Description:**
-
-When the primary filtering for "unread" items results in an empty `filteredItems` array (e.g., all items are hidden), the current fallback logic attempts to resurface "oldest hidden/shuffled items." However, if all available items are *recently* hidden, or if the conditions for `validCandidates` are too strict, the deck can still remain empty. This leads to a blank unread feed even when there are items that could be displayed (albeit hidden).
-
-**Recommended Fix:**
-
-Enhance the fallback logic to ensure that if `nextDeckItems` is still less than `MAX_DECK_SIZE` after the initial filtering and category-based additions, it will fill the remaining slots with *any* available items from `allFeedItems` that are not already in `nextDeckItems`, prioritizing those that are hidden or shuffled out, and then simply taking the oldest available if needed.
-
-**Original Code (relevant part within `generateNewDeck`):**
-
-```javascript
-        // [FIX] START: Fallback logic to prevent an empty deck.
-        // This block runs if the deck is still not full, which happens when
-        // the initial 'unread' pool is empty.
-        if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
-            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest hidden/shuffled items.");
-
-            const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
-            const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
-
-            // Combine hidden and shuffled items into a pool of candidates for resurfacing.
-            const resurfaceCandidates = [
-                ...hiddenItems.filter(item => typeof item === 'object' && item.guid),
-                ...shuffledOutItems.filter(item => typeof item === 'object' && item.guid)
-            ];
-
-            // Filter out items already in the deck or that no longer exist, then sort by timestamp (oldest first).
-            const validCandidates = resurfaceCandidates
-                .filter(candidate => !guidsInDeck.has(candidate.guid) && allItemsMap.has(candidate.guid))
-                .sort((a, b) => {
-                    const timeA = new Date(a.hiddenAt || a.shuffledAt || 0).getTime();
-                    const timeB = new Date(b.hiddenAt || b.shuffledAt || 0).getTime();
-                    return timeA - timeB; // Sort ascending to get the oldest items first.
-                });
-
-            // Add the oldest valid candidates to the deck until it's full.
-            for (const candidate of validCandidates) {
-                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                const fullItem = allItemsMap.get(candidate.guid);
-                if (fullItem) {
-                    nextDeckItems.push(fullItem);
-                }
-            }
-        }
-        // [FIX] END: Fallback logic.
-```
-
-**Recommended Code (relevant part within `generateNewDeck`):**
-
-```javascript
-        // [FIX] START: Fallback logic to prevent an empty deck.
-        // This block runs if the deck is still not full, which happens when
-        // the initial 'unread' pool is empty.
-        if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
-            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest hidden/shuffled items.");
-
-            const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
-            const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
-
-            // Combine hidden and shuffled items into a pool of candidates for resurfacing.
-            const resurfaceCandidates = allFeedItems.filter(item =>
-                (hiddenGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)) &&
-                !guidsInDeck.has(item.guid)
-            );
-
-            // Sort candidates by their original timestamp (oldest first) to prioritize older content.
-            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
-
-            // Add the oldest valid candidates to the deck until it's full.
-            for (const candidate of resurfaceCandidates) {
-                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                nextDeckItems.push(candidate);
-                guidsInDeck.add(candidate.guid); // Add to guidsInDeck to prevent duplicates
-            }
-
-            // If still not full, add any remaining items from allFeedItems (oldest first)
-            // that are not already in the deck. This acts as a final catch-all.
-            if (nextDeckItems.length < MAX_DECK_SIZE) {
-                const remainingAllItems = allFeedItems.filter(item => !guidsInDeck.has(item.guid));
-                remainingAllItems.sort((a, b) => a.timestamp - b.timestamp); // Sort by original timestamp
-
-                for (const item of remainingAllItems) {
-                    if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                    nextDeckItems.push(item);
-                    guidsInDeck.add(item.guid);
-                }
-            }
-        }
-        // [FIX] END: Fallback logic.
-```
-
-### 9. `saveArrayState` ReferenceError
-
-*   **File:** `src/js/helpers/userStateUtils.js`
-*   **Lines:** 5-10 (the import statement)
-
-**Description:**
-
-A `ReferenceError: saveArrayState is not defined` occurs within `loadAndPruneHiddenItems`, even though `saveArrayState` is exported from `dbUserState.js` and re-exported through `database.js`. This suggests a potential bundling or circular dependency issue where `saveArrayState` is not fully available when `loadAndPruneHiddenItems` attempts to call it.
-
-**Recommended Fix:**
-
-Import `saveArrayState` directly from `dbUserState.js` into `userStateUtils.js` to ensure its availability.
-
-**Original Code (in `src/js/helpers/userStateUtils.js`):**
-
-```javascript
-import {
-    loadSimpleState,
-    saveSimpleState,
-    loadArrayState,
-    queueAndAttemptSyncOperation,
-    updateArrayState,
-    overwriteArrayAndSyncChanges
-} from '../data/database.js';
-```
-
-**Recommended Code (in `src/js/helpers/userStateUtils.js`):**
-
-```javascript
-import {
-    loadSimpleState,
-    saveSimpleState,
-    loadArrayState,
-    saveArrayState, // <-- Add this import directly
-    queueAndAttemptSyncOperation,
-    updateArrayState,
-    overwriteArrayAndSyncChanges
-} from '../data/dbUserState.js'; // <-- Change import path
-```
+**Stuck Point:**
+Despite numerous attempts and consulting the `vite-plugin-pwa` documentation, the build consistently failed with the error: `Could not resolve entry module "src/src/sw.js"` (or similar variations depending on the `srcDir` and `filename` combination). It appears that the `root` directory (`src/`) is being prepended to the `filename` path, regardless of the `srcDir` setting, leading to an incorrect module resolution path for the service worker source file. I was unable to find a configuration that resolves this build error. Inspect the Caddyfile to ensure this isn't causing the problem.

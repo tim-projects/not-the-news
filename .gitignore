@@ -12,3 +12,6 @@ __pycache__
 *.pyc
 
 .aider*
+./keywordBlacklist.json
+./rssFeeds.json
+.gemini*

@@ -71,7 +71,7 @@ def generate_feed():
 
         # Stream output line by line
         for line in process.stdout:
-            print(line, end="")  # print to screen
+            
             log_file.write(line)  # write to file
 
         process.wait()

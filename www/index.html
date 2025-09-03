@@ -45,7 +45,7 @@
             opacity: 1;
         }
     </style>
-  <script type="module" crossorigin src="/assets/main-C1O-Gkho.js"></script>
+  <script type="module" crossorigin src="/assets/main-CU2I_xtU.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/main-RBJ47ymD.css">
   <link rel="stylesheet" crossorigin href="/assets/modal-CYB6LbDG.css">
 <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
@@ -116,8 +116,8 @@
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>
                     
                     <hr>
-                    <div class="settings-option"><span>RSS Feeds</span><button class="configure-button" @click="modalView = 'rss'">Configure</button></div>
-                    <div class="settings-option"><span>Keyword Blacklist</span><button class="configure-button" @click="modalView = 'keywords'">Configure</button></div>
+                    <div class="settings-option"><span>RSS Feeds</span><button id="configure-rss-feeds-btn" class="configure-button" @click="modalView = 'rss'">Configure</button></div>
+                    <div class="settings-option"><span>Keyword Blacklist</span><button id="configure-keyword-blacklist-btn" class="configure-button" @click="modalView = 'keywords'">Configure</button></div>
                     <hr>
                     <div class="settings-option"><label for="install-button">Install as App</label><button id="install-button" class="configure-button">Install</button></div>
                 </div>
@@ -126,7 +126,7 @@
                     <h2>Configure RSS Feeds</h2>
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
-                        <button class="settings-button" @click="saveRssFeeds()">Save Feeds</button>
+                        <button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save Feeds</button>
                         <span class="save-message" x-show="rssSaveMessage" x-text="rssSaveMessage"></span>
                     </div>
                 </div>
@@ -135,7 +135,7 @@
                     <h2>Configure Keyword Blacklist</h2>
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
-                        <button class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
+                        <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
                         <span class="save-message" x-show="keywordSaveMessage" x-text="keywordSaveMessage"></span>
                     </div>
                 </div>

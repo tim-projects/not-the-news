@@ -84,3 +84,38 @@ export const saveConfigFile = async (filename, content) => {
     });
     return handleResponse(response, filename);
 };
+
+/**
+ * Loads a specific user state key from the server.
+ * @async
+ * @param {string} key - The user state key to load (e.g., 'rssFeeds', 'keywordBlacklist').
+ * @returns {Promise<object>} A promise that resolves to the user state data.
+ * @throws {Error} If the network request fails or the server returns an error status.
+ */
+export const loadUserState = async (key) => {
+    const response = await fetch(`/api/user-state/${key}`);
+    if (!response.ok) {
+        throw new Error(`Failed to load user state for key '${key}': ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+};
+
+/**
+ * Saves a simple user state key-value pair to the server.
+ * @async
+ * @param {string} key - The user state key to save.
+ * @param {any} value - The value to save for the given key.
+ * @returns {Promise<object>} A promise that resolves to the server's response.
+ * @throws {Error} If the network request fails or the server returns an error status.
+ */
+export const saveUserState = async (key, value) => {
+    const response = await fetch('/api/user-state', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([{ type: "simpleUpdate", key: key, value: value }]),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to save user state for key '${key}': ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+};

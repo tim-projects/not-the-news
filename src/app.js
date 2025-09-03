@@ -290,7 +290,9 @@ export function rssApp() {
             this.updateCounts();
         },
         saveRssFeeds: async function() {
-            await saveSimpleState('rssFeeds', this.rssFeedsInput);
+            // Parse the multi-line string into an array of strings, one URL per line
+            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
+            await saveSimpleState('rssFeeds', rssFeedsArray); // Send the array to the backend
             createStatusBarMessage('RSS Feeds saved!', 'success');
             this.loading = true;
             this.progressMessage = 'Saving feeds and performing full sync...';

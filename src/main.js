@@ -58,9 +58,9 @@ export function rssApp() {
     return {
         // --- State Properties ---
         loading: true,
-        progressMessage: 'Initializing...',
+        progressMessage: 'Initializing...', 
         deck: [],
-        feedItems: {},
+        feedItems: {}, 
         filterMode: 'unread',
         openSettings: false,
         modalView: 'main',
@@ -105,11 +105,15 @@ export function rssApp() {
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
-                initConfigPanelListeners(this);
+                console.log('[DEBUG] Calling initConfigPanelListeners...'); // Added debug log
+                this.$nextTick(() => { // Wrap in $nextTick to ensure DOM is ready
+                    initConfigPanelListeners(this);
+                });
                 attachScrollToTopHandler();
                 console.log('UI components initialized');
                 this.progressMessage = 'Loading existing data...';
                 await this.loadFeedItemsFromDB();
+                this.entries = mapRawItems(Object.values(this.feedItems), formatDate) || [];
                 await this._loadAndManageAllData();
                 this.updateAllUI();
                 console.log('Initial UI rendered from local cache.');
@@ -374,29 +378,35 @@ export function rssApp() {
             }
         },
         
-        async saveRssFeeds() {
-            try {
-                await saveSimpleState('rssFeeds', this.rssFeedsInput);
-                this.rssSaveMessage = 'Feeds saved! Syncing...';
-                createStatusBarMessage('RSS Feeds saved!', 'success');
-                this.loading = true;
-                this.progressMessage = 'Saving feeds and performing full sync...';
-                await performFullSync(this);
-                await this.loadFeedItemsFromDB();
-                const deckResult = await manageDailyDeck(
-                    this.entries, this.hidden, this.starred, this.shuffledOutItems,
-                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate
-                );
-                this.deck = deckResult.deck;
-                this.currentDeckGuids = deckResult.currentDeckGuids;
-                this.progressMessage = '';
-                this.loading = false;
-            } catch (error) {
-                console.error('Error saving RSS feeds:', error);
-                this.progressMessage = `Error: ${error.message}`;
-                this.loading = false;
-                createStatusBarMessage("Error saving feeds", "error");
-            }
+                saveRssFeeds: async function() {
+            const feedsData = {};
+            const defaultCategory = "Uncategorized";
+            const defaultSubcategory = "Default";
+
+            feedsData[defaultCategory] = {};
+            feedsData[defaultCategory][defaultSubcategory] = [];
+
+            this.rssFeedsInput.split(/\r?\n/)
+                .map(url => url.trim())
+                .filter(Boolean)
+                .forEach(url => {
+                    feedsData[defaultCategory][defaultSubcategory].push({ url: url });
+                });
+
+            await saveSimpleState('rssFeeds', feedsData); // Send the nested object to the backend
+            createStatusBarMessage('RSS Feeds saved!', 'success');
+            this.loading = true;
+            this.progressMessage = 'Saving feeds and performing full sync...';
+            await performFullSync(this);
+            await this.loadFeedItemsFromDB();
+            const deckResult = await manageDailyDeck(
+                this.entries, this.hidden, this.starred, this.shuffledOutItems,
+                this.shuffleCount, this.filterMode, this.lastShuffleResetDate
+            );
+            this.deck = deckResult.deck;
+            this.currentDeckGuids = deckResult.currentDeckGuids;
+            this.progressMessage = '';
+            this.loading = false;
         },
         
         async saveKeywordBlacklist() {
@@ -413,19 +423,19 @@ export function rssApp() {
         },
         
         updateCounts: function() { 
-            try {
+            try { 
                 updateCounts(this); 
-            } catch (error) {
-                console.error('Error updating counts:', error);
-            }
+            } catch (error) { 
+                console.error('Error updating counts:', error); 
+            } 
         },
         
         scrollToTop: function() { 
-            try {
+            try { 
                 scrollToTop(); 
-            } catch (error) {
-                console.error('Error scrolling to top:', error);
-            }
+            } catch (error) { 
+                console.error('Error scrolling to top:', error); 
+            } 
         },
         
         _loadInitialState: async function() {
@@ -448,7 +458,24 @@ export function rssApp() {
                     loadSimpleState('rssFeeds'),
                     loadSimpleState('keywordBlacklist')
                 ]);
-                this.rssFeedsInput = rssFeeds.value || '';
+                // Convert nested object of categories/subcategories to multi-line string of URLs
+                let allRssUrls = [];
+                if (rssFeeds.value && typeof rssFeeds.value === 'object') {
+                    for (const category in rssFeeds.value) {
+                        if (typeof rssFeeds.value[category] === 'object') {
+                            for (const subcategory in rssFeeds.value[category]) {
+                                if (Array.isArray(rssFeeds.value[category][subcategory])) {
+                                    rssFeeds.value[category][subcategory].forEach(feed => {
+                                        if (feed && feed.url) {
+                                            allRssUrls.push(feed.url);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                this.rssFeedsInput = allRssUrls.join('\n');
                 this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
                     ? keywordBlacklist.value.join('\n') 
                     : '';
@@ -526,11 +553,11 @@ export function rssApp() {
 
         updateAllUI: function() { 
             try { this.updateCounts(); } 
-            catch (error) { console.error('Error updating UI:', error); }
+            catch (error) { console.error('Error updating UI:', error); } 
         },
 
         _setupWatchers: function() {
-            if (!this._initComplete) return;
+            if (!this._initComplete) return; 
             
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {

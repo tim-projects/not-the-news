@@ -97,36 +97,20 @@ COPY rss/ /rss/
 COPY --from=frontend-builder /app/www/ /app/www/
 COPY src/api.py /app/www/api.py
 
+# Copy initial configuration files into the image
+COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
+COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
+
 COPY data/ /data/feed/
+
+COPY build_entrypoint.sh /build_entrypoint.sh
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
     && chown appuser:appgroup /tmp
 
 ##############################################################################
 # 6. Build entrypoint
-RUN mkdir -p /usr/local/bin && \
-    echo '#!/usr/bin/env bash' > /usr/local/bin/docker-entrypoint.sh && \
-    echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'mkdir -p /data/feed /data/user_state /data/config' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'chown -R appuser:appgroup /data/user_state /data/feed /app /rss' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'mkdir -p /data/redis && chown redis:redis /data/redis' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'cat <<EOF > /etc/redis.conf' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'dir /data/redis' >> /etc/redis.conf && \
-    echo 'save 900 1' >> /etc/redis.conf && \
-    echo 'save 300 10' >> /etc/redis.conf && \
-    echo 'appendonly yes' >> /etc/redis.conf && \
-    echo 'appendfsync always' >> /etc/redis.conf && \
-    echo 'appendfilename "appendonly.aof"' >> /etc/redis.conf && \
-    echo 'appenddirname "appendonlydir"' >> /etc/redis.conf && \
-    echo 'EOF' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'redis-server /etc/redis.conf --daemonize yes &' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'gosu appuser /venv/bin/gunicorn --chdir /app/www --bind 127.0.0.1:4575 --workers 1 --threads 3 api:app &' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'gosu appuser python3 /rss/run.py --daemon &' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'if ! caddy run --config /etc/caddy/Caddyfile --adapter caddyfile; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '  echo "Falling back to Let''s Encrypt staging CA"' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '  export ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '  exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
+RUN cp /build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh && \
     chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ##############################################################################

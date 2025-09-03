@@ -11,6 +11,62 @@ import pprint
 import hashlib
 import redis
 import re
+import os
+import json
+import logging
+
+# Define paths (adjust if necessary based on where these scripts are run from)
+DATA_DIR = "/data"
+USER_STATE_DIR = os.path.join(DATA_DIR, "user_state")
+RSS_FEEDS_JSON = os.path.join(USER_STATE_DIR, "rssFeeds.json")
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def load_rss_feeds():
+    if not os.path.exists(RSS_FEEDS_JSON):
+        logging.warning(f"RSS feeds JSON file not found: {RSS_FEEDS_JSON}")
+        return []
+    try:
+        with open(RSS_FEEDS_JSON, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            nested_feeds_data = data.get('value', {}) # Expect a dictionary for nested structure
+            
+            all_urls = []
+            if isinstance(nested_feeds_data, dict):
+                for category, subcategories in nested_feeds_data.items():
+                    if isinstance(subcategories, dict):
+                        for subcategory, feeds_list in subcategories.items():
+                            if isinstance(feeds_list, list):
+                                for feed_item in feeds_list:
+                                    if isinstance(feed_item, dict) and 'url' in feed_item:
+                                        url = feed_item['url']
+                                        if isinstance(url, str) and is_valid_url(url):
+                                            all_urls.append(url)
+                                        else:
+                                            logging.warning(f"Invalid or malformed RSS feed URL skipped: {url} (from item: {feed_item})")
+                                    else:
+                                        logging.warning(f"Invalid or malformed RSS feed item skipped: {feed_item}")
+                            else:
+                                logging.warning(f"Expected list of feeds for subcategory '{subcategory}', but got: {feeds_list}")
+                    else:
+                        logging.warning(f"Expected dictionary of subcategories for category '{category}', but got: {subcategories}")
+            else:
+                logging.warning(f"Expected dictionary for nested feeds data, but got: {nested_feeds_data}")
+
+            return all_urls
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding RSS feeds JSON: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Error loading RSS feeds: {e}")
+        return []
+
+def is_valid_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
 
 # ─── Redis client for caching raw feed bytes ─────────────────────────────────
 r = redis.Redis(host="localhost", port=6379, db=0)
@@ -191,10 +247,7 @@ def merge_feeds(feeds_file, output_file):
     fg.generator("python-feedgen")
 
     # Read the list of feed URLs
-    with open(feeds_file, "r") as f:
-        feed_urls = [
-            line.strip() for line in f if line.strip() and not line.startswith("#")
-        ]
+    feed_urls = load_rss_feeds()
 
     # Sort feed URLs by their domain
     domain_cache = {}

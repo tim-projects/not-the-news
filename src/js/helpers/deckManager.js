@@ -140,16 +140,6 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
             newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
             await saveShuffleState(newShuffleCount, lastShuffleResetDate);
         }
-    } else {
-        console.log(`[deckManager] Retaining existing deck. Visible items: ${visibleItemsInCurrentDeck.length}.`);
-
-        newDeck = allItems
-            .filter(item => currentDeckGuidsSet.has(item.guid))
-            .map(item => ({
-                ...item,
-                isHidden: hiddenGuidsSet.has(item.guid),
-                isStarred: starredGuidsSet.has(item.guid)
-            }));
     }
 
     console.log(`[deckManager] Deck management complete. Final deck size: ${newDeck.length}.`);

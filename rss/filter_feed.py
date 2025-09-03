@@ -2,6 +2,33 @@ import feedparser
 import xml.etree.ElementTree as ET
 import argparse
 import xml.dom.minidom
+import json
+import os
+import logging
+
+# Define paths (adjust if necessary based on where these scripts are run from)
+DATA_DIR = "/data"
+USER_STATE_DIR = os.path.join(DATA_DIR, "user_state")
+KEYWORD_BLACKLIST_JSON = os.path.join(USER_STATE_DIR, "keywordBlacklist.json")
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def load_keyword_blacklist():
+    if not os.path.exists(KEYWORD_BLACKLIST_JSON):
+        logging.warning(f"Keyword blacklist JSON file not found: {KEYWORD_BLACKLIST_JSON}")
+        return []
+    try:
+        with open(KEYWORD_BLACKLIST_JSON, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            keywords = data.get('value', [])
+            # Ensure all keywords are strings and convert to lowercase for matching
+            return [str(kw).lower() for kw in keywords if isinstance(kw, (str, int, float))]
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding keyword blacklist JSON: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Error loading keyword blacklist: {e}")
+        return []
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description="Filter an RSS feed based on keywords.")
@@ -25,16 +52,7 @@ print(f"Output RSS file: {output_rss_file}")
 print(f"Keywords file: {keywords_file}")
 
 
-def load_filter_keywords(file_path):
-    """Load keywords from a file, stripping whitespace and converting to lowercase."""
-    try:
-        with open(file_path, "r") as f:
-            keywords = [line.strip().lower() for line in f if line.strip()]
-        print(f"Loaded {len(keywords)} keywords from {file_path}.")
-        return keywords
-    except FileNotFoundError:
-        print(f"Error: Keywords file {file_path} not found.")
-        exit(1)
+
 
 
 def save_pretty_xml(output_file, tree):
@@ -53,7 +71,7 @@ def save_pretty_xml(output_file, tree):
 def filter_rss_entries(input_file, output_file, keywords_file):
     """Filter RSS feed entries based on keywords."""
     # Load filter keywords
-    keywords = load_filter_keywords(keywords_file)
+    keywords = load_keyword_blacklist()
 
     # Parse the RSS feed
     print(f"Parsing RSS feed from {input_file}...")
