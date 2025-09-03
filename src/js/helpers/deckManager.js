@@ -44,6 +44,8 @@ const getGuid = item => (typeof item === 'object' && item.guid ? item.guid : ite
 export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffledOutItems, shuffleCount, filterMode = 'unread', lastShuffleResetDate = null) => {
     console.log('manageDailyDeck: START');
     console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, hiddenItemsCount: hiddenItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate });
+    console.log('[deckManager] DEBUG: Array.isArray(entries):', Array.isArray(entries), 'entries.length:', entries.length);
+    console.log('[deckManager] DEBUG: Array.isArray(entries):', Array.isArray(entries), 'entries.length:', entries.length);
 
     // Defensive checks to ensure all necessary data is in a valid state.
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -52,9 +54,9 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
         return {
             deck: [],
             currentDeckGuids: [],
-            shuffledOutGuids: shuffledOutItems || [],
-            shuffleCount: shuffleCount || DAILY_SHUFFLE_LIMIT,
-            lastShuffleResetDate: lastShuffleResetDate || new Date().toDateString()
+            shuffledOutGuids: Array.isArray(shuffledOutItems) ? shuffledOutItems : [],
+            shuffleCount: typeof shuffleCount === 'number' ? shuffleCount : DAILY_SHUFFLE_LIMIT,
+            lastShuffleResetDate: typeof lastShuffleResetDate === 'string' ? lastShuffleResetDate : new Date().toDateString()
         };
     }
 
@@ -75,22 +77,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
     const currentDeckGuidsSet = new Set(currentDeckItems.map(getGuid));
 
-    console.log(`[deckManager] DEBUG: allItems count: ${allItems.length}`);
-    console.log(`[deckManager] DEBUG: hiddenGuids count: ${hiddenGuidsSet.size}`);
-    console.log(`[deckManager] DEBUG: shuffledOutGuids count: ${shuffledOutGuidsSet.size}`);
-    console.log(`[deckManager] DEBUG: currentDeck count: ${currentDeckItems.length}`);
     
-    const today = new Date().toDateString();
-    const isNewDay = lastShuffleResetDate !== today;
-
-    // --- START: FIX ---
-    // The original `isDeckEmpty` check was flawed. It didn't account for items
-    // being hidden after the deck was created. This new logic checks if the
-    // deck is *effectively* empty from the user's perspective.
-    const visibleItemsInCurrentDeck = currentDeckItems.filter(item => !hiddenGuidsSet.has(getGuid(item)));
-    const isDeckEffectivelyEmpty = visibleItemsInCurrentDeck.length === 0;
-    console.log('manageDailyDeck: isDeckEffectivelyEmpty:', isDeckEffectivelyEmpty, 'visibleItemsInCurrentDeck count:', visibleItemsInCurrentDeck.length);
-    // --- END: FIX ---
 
     let newDeck = [];
     let newCurrentDeckGuids = currentDeckItems;
@@ -100,6 +87,9 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
 
     // Use the new, smarter variable in the condition
     console.log('manageDailyDeck: Condition check:', { isNewDay, isDeckEffectivelyEmpty, filterModeIsNotUnread: filterMode !== 'unread' });
+    console.log('manageDailyDeck: isNewDay:', isNewDay);
+    console.log('manageDailyDeck: isDeckEffectivelyEmpty:', isDeckEffectivelyEmpty);
+    console.log('manageDailyDeck: filterMode:', filterMode);
     if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${filterMode}).`);
 
@@ -146,11 +136,11 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     console.log('manageDailyDeck: END');
     
     return {
-        deck: newDeck,
-        currentDeckGuids: newCurrentDeckGuids,
-        shuffledOutGuids: newShuffledOutGuids,
-        shuffleCount: newShuffleCount,
-        lastShuffleResetDate: newLastShuffleResetDate
+        deck: newDeck || [],
+        currentDeckGuids: newCurrentDeckGuids || [],
+        shuffledOutGuids: newShuffledOutGuids || [],
+        shuffleCount: typeof newShuffleCount === 'number' ? newShuffleCount : DAILY_SHUFFLE_LIMIT,
+        lastShuffleResetDate: typeof newLastShuffleResetDate === 'string' ? newLastShuffleResetDate : new Date().toDateString()
     };
 };
 

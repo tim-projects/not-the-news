@@ -13,6 +13,7 @@ export default defineConfig({
     // Output everything to the 'www' directory, which is outside the 'src' folder
     outDir: '../www',
     emptyOutDir: true,
+    minify: false, // Add this line to disable minification
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'src/index.html'),

@@ -74,6 +74,7 @@
                         <button class="close" @click="toggleHidden(entry.guid)" :class="{ 'hidden': isHidden(entry.guid) }" aria-label="Close">✕</button>
                         <div x-html="entry.title"></div>
                         <button class="star" @click="toggleStar(entry.guid)" :class="{'starred': isStarred(entry.guid)}" aria-label="Star">★</button>
+                        <button class="read-toggle" @click="toggleRead(entry.guid)" :class="{'read': isRead(entry.guid)}" aria-label="Mark as Read/Unread">✓</button>
                     </div>
                     <div class="itemdescription" x-init="handleEntryLinks($el)">
                         <div class="itemfrom">

@@ -7,6 +7,7 @@ import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
 export const USER_STATE_DEFS = {
     starred: { store: 'starred', type: 'array', localOnly: false, default: [] },
     hidden: { store: 'hidden', type: 'array', localOnly: false, default: [] },
+    read: { store: 'read', type: 'array', localOnly: false, default: [] },
     lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
     lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
@@ -56,6 +57,7 @@ const getTimestampKey = (storeName) => {
     switch (storeName) {
         case 'starred': return 'starredAt';
         case 'hidden': return 'hiddenAt';
+        case 'read': return 'readAt';
         case 'currentDeckGuids': return 'addedAt';
         case 'shuffledOutGuids': return 'shuffledAt';
         default: return 'updatedAt';
@@ -147,6 +149,7 @@ export async function updateArrayState(storeName, item, add) {
         let opType = '';
         if (storeName === 'starred') opType = 'starDelta';
         if (storeName === 'hidden') opType = 'hiddenDelta';
+        if (storeName === 'read') opType = 'readDelta';
         
         if (opType) {
             await queueAndAttemptSyncOperation({
@@ -181,6 +184,7 @@ export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
     let opType = '';
     if (storeName === 'starred') opType = 'starDelta';
     if (storeName === 'hidden') opType = 'hiddenDelta';
+    if (storeName === 'read') opType = 'readDelta';
 
     if (!opType) return; // Nothing to do if we can't determine the operation type
 

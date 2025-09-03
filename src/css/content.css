@@ -166,3 +166,13 @@ span.shuffle-count {
   margin-left: -0.15em;
   margin-top: -0.15em;
 }
+
+/* Styles for read items */
+.item.entry.read {
+    opacity: 0.6;
+    background-color: var(--read-item-bg);
+}
+
+.read-toggle.read {
+    color: var(--read-toggle-color);
+}

@@ -31,10 +31,7 @@
 
    # API endpoints with authentication
    handle /api/login* {
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
+     reverse_proxy 127.0.0.1:4575
    }
 
    @protected_api {
@@ -51,10 +48,7 @@
      }
      respond @unauth "Unauthorized" 401
      
-     reverse_proxy 127.0.0.1:4575 {
-       header_up X-Forwarded-Proto https
-       header_up Host {host}
-     }
+     reverse_proxy 127.0.0.1:4575
    }
 
    # Handle feed.xml (accessible without auth)

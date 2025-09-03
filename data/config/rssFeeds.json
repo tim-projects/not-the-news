@@ -1,8 +1,18 @@
 {
-  "value": [
-    "https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en",
-    "https://www.hotukdeals.com/rss/all",
-    "https://hnrss.org/best"
-  ],
+  "value": {
+    "Miscellaneous": {
+      "Default": [
+        {
+          "url": "https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en"
+        },
+        {
+          "url": "https://www.hotukdeals.com/rss/all"
+        },
+        {
+          "url": "https://hnrss.org/best"
+        }
+      ]
+    }
+  },
   "lastModified": "2025-09-01T12:00:00.000Z"
 }

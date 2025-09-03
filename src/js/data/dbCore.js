@@ -4,7 +4,7 @@ import { openDB } from '../libs/idb.js';
 
 const DB_NAME = 'not-the-news-db';
 // Increment the version to trigger the necessary schema upgrade.
-const DB_VERSION = 28;
+const DB_VERSION = 29;
 
 let _dbInstance = null;
 let _dbInitPromise = null;
@@ -26,6 +26,11 @@ export const OBJECT_STORES_SCHEMA = [{
     indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
     name: 'hidden',
+    keyPath: 'id',
+    options: { autoIncrement: true },
+    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
+}, {
+    name: 'read',
     keyPath: 'id',
     options: { autoIncrement: true },
     indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]

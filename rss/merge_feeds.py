@@ -248,6 +248,7 @@ def merge_feeds(feeds_file, output_file):
 
     # Read the list of feed URLs
     feed_urls = load_rss_feeds()
+    logging.info(f"Loaded {len(feed_urls)} RSS feed URLs.")
 
     # Sort feed URLs by their domain
     domain_cache = {}
@@ -255,12 +256,15 @@ def merge_feeds(feeds_file, output_file):
 
     for url in feed_urls:
         if not validate_url(url):
-            print(f"Skipping invalid URL: {url}")
+            logging.warning(f"Skipping invalid URL: {url}")
             continue
 
         feed = fetch_with_backoff(url)
-        if not feed or not feed.entries:
-            print(f"No entries for {url}, skipping.")
+        if not feed:
+            logging.warning(f"Failed to fetch feed for {url}, skipping.")
+            continue
+        if not feed.entries:
+            logging.warning(f"No entries found in feed for {url}, skipping.")
             continue
 
         ts = datetime.now().strftime("%H:%M:%S")

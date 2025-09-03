@@ -1,1 +1,4 @@
-timeout 2m sudo docker logs -f ntn | tail -n 100 &
+sudo docker logs -f ntn &
+pid=$!
+sleep 60
+kill $pid

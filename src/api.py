@@ -50,6 +50,7 @@ USER_STATE_SERVER_DEFAULTS = {
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
     'starred': {'type': 'array', 'default': []},               # Array of { guid, starredAt }
     'hidden': {'type': 'array', 'default': []},                # Array of { guid, hiddenAt }
+    'read': {'type': 'array', 'default': []},                 # Array of { guid, readAt }
     'filterMode': {'type': 'simple', 'default': 'unread'},
     'syncEnabled': {'type': 'simple', 'default': True},
     'imagesEnabled': {'type': 'simple', 'default': True},
@@ -140,6 +141,7 @@ def _load_feed_items():
     try:
         with open(FEED_XML, 'r', encoding='utf-8') as f:
             feed_content = f.read()
+        app.logger.debug(f"Read feed.xml content, length: {len(feed_content)}")
         root = ET.fromstring(feed_content)
         app.logger.debug("Successfully parsed feed.xml")
     except (FileNotFoundError, ET.ParseError) as e:
@@ -183,6 +185,7 @@ def _load_feed_items():
             "description": unescaped_description,
         }
         items[guid] = data
+    app.logger.debug(f"Found {len(items)} items in feed.xml")
     return items
 
 @app.route("/api/time", methods=["GET"])
@@ -392,12 +395,12 @@ def post_user_state():
                 new_last_modified = _save_state(key, op.get("value"))
                 results.append({"id": op_id, "key": key, "status": "success", "lastModified": new_last_modified})
 
-            elif op_type in ["starDelta", "hiddenDelta"]:
+            elif op_type in ["starDelta", "hiddenDelta", "readDelta"]:
                 # --- FIX: Read from the top-level 'op' object, not a nested 'data' object ---
                 item_guid = op.get("guid")
                 action = op.get("action")
-                state_key = "starred" if op_type == "starDelta" else "hidden"
-                timestamp_key = "starredAt" if op_type == "starDelta" else "hiddenAt"
+                state_key = "starred" if op_type == "starDelta" else ("hidden" if op_type == "hiddenDelta" else "read")
+                timestamp_key = "starredAt" if op_type == "starDelta" else ("hiddenAt" if op_type == "hiddenDelta" else "readAt")
                 timestamp = op.get("timestamp", server_time) # Match client's 'timestamp' key
 
                 if not item_guid or action not in ["add", "remove"]:

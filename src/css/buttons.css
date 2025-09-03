@@ -84,30 +84,66 @@ button.star:active {
   color: var(--secondary);
 }
 
+button.read-toggle {
+  font-size: 1.75rem;
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 0 20px 0 0;
+  opacity: 0.6;
+  box-shadow: 2px -2px 0 1px var(--card-shadow-color);
+  float: left;
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  margin: 0;
+  padding: 0 1rem 0 1rem;
+  cursor: pointer;
+}
+
+button.read-toggle:hover {
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+button.read-toggle:focus {
+  box-shadow: 2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary);
+  color: var(--secondary);
+  background: var(--primary);
+}
+
+button.read-toggle:active {
+  background-color: var(--primary);
+  color: var(--secondary);
+}
+
 button.star.starred,
-button.close.hidden {
-  color: gold;
+button.close.hidden,
+button.read-toggle.read {
+  color: var(--primary); /* Or a distinct color for read */
   opacity: 1;
   background: transparent;
 }
 
 button.star.starred:hover,
-button.close.hidden:hover {
-  background-color: rgba(255, 215, 0, 0.1);
-  color: gold;
+button.close.hidden:hover,
+button.read-toggle.read:hover {
+  background-color: rgba(var(--primary-rgb), 0.1); /* Use rgba for hover effect */
+  color: var(--primary);
 }
 
 button.star.starred:focus,
-button.close.hidden:focus {
-  box-shadow: 0 0 0 3px gold, inset 0 0 0 1px gold;
-  color: gold;
-  background-color: rgba(255, 215, 0, 0.1);
+button.close.hidden:focus,
+button.read-toggle.read:focus {
+  box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary);
+  color: var(--primary);
+  background-color: rgba(var(--primary-rgb), 0.1);
 }
 
 button.star.starred:active,
-button.close.hidden:active {
-  background-color: rgba(255, 215, 0, 0.2);
-  color: gold;
+button.close.hidden:active,
+button.read-toggle.read:active {
+  background-color: rgba(var(--primary-rgb), 0.2);
+  color: var(--primary);
 }
 
 #scroll-to-top {
