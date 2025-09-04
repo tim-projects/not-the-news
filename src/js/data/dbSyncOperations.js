@@ -315,12 +315,15 @@ export async function performFeedSync(app) {
         }
         if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-guids`);
 
-        const { guids: serverGuidsList, serverTime } = await response.json();
+        const responseData = await response.json();
+        console.log('[DB] /api/feed-guids response:', responseData);
+        const { guids: serverGuidsList, serverTime } = responseData;
         const serverGuids = new Set(serverGuidsList);
         const localItems = await getAllFeedItems();
         const localGuids = new Set(localItems.map(item => item.guid));
 
         const guidsToFetch = [...serverGuids].filter(guid => !localGuids.has(guid));
+        console.log(`[DB] GUIDs to fetch: ${guidsToFetch.length}`, guidsToFetch);
         const guidsToDelete = [...localGuids].filter(guid => !serverGuids.has(guid));
 
         console.log(`[DB] New GUIDs: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
@@ -338,7 +341,9 @@ export async function performFeedSync(app) {
                 });
 
                 if (itemsResponse.ok) {
-                    newItems.push(...await itemsResponse.json());
+                    const fetchedItems = await itemsResponse.json();
+                    console.log(`[DB] Fetched batch of ${fetchedItems.length} items:`, fetchedItems);
+                    newItems.push(...fetchedItems);
                 } else {
                     console.error(`[DB] Failed to fetch a batch of feed items. Status: ${itemsResponse.status}`);
                 }

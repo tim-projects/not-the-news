@@ -1,27 +1,39 @@
-## Current Task: Implement a feature to allow users to mark items as read/unread.
+# Current Task
 
-**Progress so far:**
-*   Identified that the core `toggleRead` functionality and database interactions are largely in place.
-*   Added CSS for visual feedback of read/unread items.
-*   Attempted to write Playwright tests to verify the functionality.
-*   Encountered and resolved several issues:
-    *   `net::ERR_SSL_PROTOCOL_ERROR` (due to incorrect `APP_URL` and `APP_PASSWORD` in tests).
-    *   `ReferenceError: Cannot access '_' before initialization` (due to a problematic `console.log` and then duplicate variable declarations in `deckManager.js`).
-*   Disabled minification in `vite.config.js` to aid debugging.
+**Task:** Add a new feature to allow users to mark items as 'read' or 'unread'.
 
-**Current Blocking Issue:**
-The Playwright tests are still failing because the `#items` element is not becoming visible, and the `deck` array in the application remains empty, even though `loadFeedItemsFromDB()` successfully retrieves items. This indicates a logical issue in how the `deck` is populated and rendered.
+**Goal:** Implement a mechanism for users to toggle the read/unread status of news items.
 
-**Analysis of the problem:**
-The `manageDailyDeck` function in `src/js/helpers/deckManager.js` is responsible for generating the `deck` and `currentDeckGuids`. The `newDeck` and `newCurrentDeckGuids` are populated within an `if` condition (`isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread'`). If this condition is false, the deck remains empty.
+**Sub-tasks:**
+1.  **Frontend (UI):** Add a visual indicator and a clickable element (e.g., a button or icon) to each news item in the UI.
+    *   **Status:** Complete. The `read-toggle` button and `isRead` function are in place, and `src/css/content.css` contains styles for `.item.entry.read` and `.read-toggle.read` to provide visual feedback.
+2.  **Frontend (Logic):** Implement JavaScript to handle click events, update the UI, and send the status change to the backend.
+    *   **Status:** Complete. The `toggleRead` function in `src/main.js` handles the click event, updates the state, and calls `toggleItemStateAndSync` which is responsible for syncing with the backend.
+3.  **Backend (API):** Create or modify an API endpoint to receive the read/unread status and update the database.
+    *   **Status:** Complete. The `post_user_state` endpoint in `src/api.py` already handles `readDelta` operations, and the `get_single_user_state_key` endpoint serves the `read` state.
+4.  **Database:** Add a field to the news item schema to store the read/unread status.
+    *   **Status:** Complete. The backend uses `read.json` in `/data/user_state` to store the 'read' status, consistent with other user states.
+5.  **Testing:** Write Playwright tests to ensure the feature works correctly.
+    *   **Status:** In Progress (Blocked).
 
-The `console.log` statements I tried to add to `deckManager.js` to debug the `if` condition are not being applied correctly due to repeated `replace` failures. I could try using sed
+**Progress:**
+- Frontend UI: Complete
+- Frontend Logic: Complete
+- Backend API: Complete
+- Database: Complete
+- Testing: Blocked - Playwright tests are timing out because no feed items are loading in the application under test.
 
-**Plan to proceed:**
-1.  **Clean `src/js/helpers/deckManager.js`:** Manually ensure `src/js/helpers/deckManager.js` is in a clean state, free of duplicate code blocks and problematic `console.log` statements. I will read the file, then construct a single `replace` operation to restore it to a known good state (the state before I started modifying it for debugging the `ReferenceError`).
-2.  **Re-add targeted logging:** Add *only* the necessary `console.log` statements to `src/js/helpers/deckManager.js` to debug the `if` condition (`isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread'`).
-3.  **Rebuild Docker container:** Rebuild the Docker container to ensure the latest changes are applied.
-4.  **Run Playwright tests:** Run the Playwright tests again and analyze the new console logs to understand why the `if` condition is not being met or why `generateNewDeck` is returning an empty array.
-5.  **Continue debugging `deck` population:** Based on the new logs, identify and fix the issue preventing the `deck` from being populated.
-6.  **Re-enable second test case:** Once the first test passes, re-enable the second test case (`should mark an item as read and unread`) and fix any issues.
-7.  **Re-enable minification:** Once all tests pass, re-enable minification in `vite.config.js` and rebuild.
+**Identified Problem (Refined):**
+- The application under test is not loading any feed items, causing the Playwright tests to time out while waiting for elements that depend on loaded data.
+- `feed.xml` exists and contains data on the backend.
+- The frontend's `performBackgroundSync()` function (which fetches feed data) is not being executed.
+- The `console.log` added inside the `if (this.isOnline && this.syncEnabled)` block in `initApp` (in `src/main.js`) did not appear in the previous test run, indicating the condition `(this.isOnline && this.syncEnabled)` is `false`.
+- A `console.log` has been added *before* the `if (this.isOnline && this.syncEnabled)` condition in `initApp` (in `src/main.js`) to explicitly log the values of `this.isOnline` and `this.syncEnabled` right before the check.
+
+**Next Steps:**
+1.  Run Playwright tests again to capture this new log output.
+2.  Based on the log output, determine the root cause (e.g., `navigator.onLine` returning `false` in the test environment, or `syncEnabled` being unexpectedly `false`).
+3.  Implement a fix to ensure feed items are loaded in the test environment. This might involve:
+    *   Forcing `navigator.onLine` to `true` in Playwright.
+    *   Ensuring `syncEnabled` is always `true` for tests.
+    *   Mocking the API calls to `/api/feed-guids` and `/api/feed-items` in Playwright to provide dummy data, bypassing the actual backend if network issues are suspected in the test environment.

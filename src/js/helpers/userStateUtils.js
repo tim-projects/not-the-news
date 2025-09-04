@@ -78,6 +78,8 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
         createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
     } else if (stateKey === 'starred') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unstarred.' : 'Item starred.', 'info');
+    } else if (stateKey === 'read') {
+        createStatusBarMessage(isCurrentlyActive ? 'Item marked unread.' : 'Item marked read.', 'info');
     }
 
     // Update UI counts

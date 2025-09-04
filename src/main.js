@@ -92,7 +92,7 @@ export function rssApp() {
 
         // --- Core Methods ---
         initApp: async function() {
-            if (window.appInitialized) return;
+            
             try {
                 console.log('Starting app initialization...');
                 this.progressMessage = 'Connecting to database...';
@@ -121,8 +121,10 @@ export function rssApp() {
                 this.loading = false;
                 this.progressMessage = '';
                 console.log('App is visible. Proceeding with background sync.');
+                console.log(`[Sync Check] Before conditional sync: isOnline=${this.isOnline}, syncEnabled=${this.syncEnabled}`);
                 if (this.isOnline && this.syncEnabled) {
-                    // await this.performBackgroundSync(); // Comment out this line
+                    console.log(`[Sync] isOnline: ${this.isOnline}, syncEnabled: ${this.syncEnabled}. Calling performBackgroundSync.`);
+                    await this.performBackgroundSync();
                 }
                 this._initComplete = true;
                 window.appInitialized = true;
@@ -148,6 +150,7 @@ export function rssApp() {
         },
 
         performBackgroundSync: async function() {
+            console.log('[Sync] Entering performBackgroundSync.');
             console.log('[Sync] performBackgroundSync: _isSyncing:', this._isSyncing, 'isOnline:', this.isOnline, 'syncEnabled:', this.syncEnabled);
             if (this._isSyncing || !this.isOnline || !this.syncEnabled) return;
             this._isSyncing = true;
@@ -656,10 +659,10 @@ export function rssApp() {
                     return;
                 }
                 try {
-                    // await performFeedSync(this); // Comment out this line
-                    // await pullUserState(); // Comment out this line
-                    // await this._loadAndManageAllData(); // Comment out this line
-                    // this.deckManaged = true; // Comment out this line
+                    await performFeedSync(this);
+                    await pullUserState();
+                    await this._loadAndManageAllData();
+                    this.deckManaged = true;
                 } catch (error) {
                     console.error('Periodic sync failed:', error);
                 }

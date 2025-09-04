@@ -45,7 +45,6 @@ test('should display unread items', async ({ page }) => {
     expect(unreadItems).toBeGreaterThan(0);
   });
 
-  /*
   test('should mark an item as read and unread', async ({ page }) => {
     // Wait for the loading screen to disappear
     await page.waitForSelector('#loading-screen', { state: 'hidden' });
@@ -97,5 +96,4 @@ test('should display unread items', async ({ page }) => {
     await expect(itemInUnreadView).toBeVisible();
     await expect(itemInUnreadView).not.toHaveClass(/.*read/);
   });
-  */
 });
