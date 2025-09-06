@@ -91,10 +91,10 @@ export async function initSyncToggle(app) {
             if (!app.currentDeckGuids?.length && app.entries?.length) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
                 const now = new Date().toISOString();
-                const hiddenGuids = new Set(app.hidden.map(h => h.guid));
+                const readGuids = new Set(app.read.map(h => h.guid));
                 const shuffledOutGuids = new Set(app.shuffledOutItems.map(s => s.guid));
                 app.currentDeckGuids = app.entries
-                    .filter(item => !hiddenGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
+                    .filter(item => !readGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
                     .map(item => ({
                         guid: item.guid,
                         addedAt: now
@@ -158,7 +158,7 @@ export async function initScrollPosition(app) {
 
         // REFINED LOGIC: Check if the item to scroll to is actually in the current deck.
         // This is the most reliable check, as it represents what's currently on screen.
-        // It implicitly handles items that are hidden or have been shuffled out.
+        // It implicitly handles items that are read or have been shuffled out.
         const itemIsInDeck = app.deck.some(item => item.guid === lastViewedItemId);
 
         if (itemIsInDeck) {

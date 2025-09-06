@@ -74,7 +74,7 @@
             <template x-for="entry in filteredEntries" :key="entry.guid">
                 <div class="item entry" :data-guid="entry.guid" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="transform scale-100 opacity-100" x-transition:leave-end="transform scale-95 opacity-0">
                     <div class="itemtitle">
-                        <button class="close" @click="toggleHidden(entry.guid)" :class="{ 'hidden': isHidden(entry.guid) }" aria-label="Close">✕</button>
+                        <button class="close" @click="toggleRead(entry.guid)" :class="{ 'read': isRead(entry.guid) }" aria-label="Close">✕</button>
                         <div x-html="entry.title"></div>
                         <button class="star" @click="toggleStar(entry.guid)" :class="{'starred': isStarred(entry.guid)}" aria-label="Star">★</button>
                     </div>
@@ -104,7 +104,7 @@
                         <select id="filter-selector" x-model="filterMode" class="filter-select">
                             <option value="unread">Unread</option>
                             <option value="starred" x-text="`Starred (${starred.length})`"></option>
-                            <option value="hidden" x-text="`Hidden (${hidden.length})`"></option>
+                            <option value="read" x-text="`Read (${read.length})`"></option>
                             <option value="all">All</option>
                         </select>
                     </div>

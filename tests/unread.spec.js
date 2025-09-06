@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+const { test, expect } = require('@playwright/test');
 
 test.describe('Unread Items', () => {
   test.use({ ignoreHTTPSErrors: true });
@@ -17,6 +17,41 @@ test.describe('Unread Items', () => {
 
     // Wait for navigation to the main page
     await page.waitForURL(APP_URL);
+
+    // Clear the deck on the server
+    await page.request.post(`${APP_URL}/api/user-state`, {
+      data: [{
+        type: 'simpleUpdate',
+        key: 'currentDeckGuids',
+        value: []
+      }]
+    });
+
+    await page.evaluate(() => {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('not-the-news-db');
+        request.onsuccess = (event) => {
+          const db = event.target.result;
+          const transaction = db.transaction(['currentDeckGuids'], 'readwrite');
+          const objectStore = transaction.objectStore('currentDeckGuids');
+          const clearRequest = objectStore.clear();
+          clearRequest.onsuccess = () => {
+            resolve();
+          };
+          clearRequest.onerror = (event) => {
+            reject(event.target.error);
+          };
+        };
+        request.onerror = (event) => {
+          reject(event.target.error);
+        };
+      });
+    });
+
+    await page.reload();
+
+    // Open settings
+    await page.click('#settings-button');
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -35,7 +70,7 @@ test('should display unread items', async ({ page }) => {
     page.on('console', msg => console.log(msg.text()));
 
     // Wait for the loading screen to disappear
-    await page.waitForSelector('#loading-screen', { state: 'hidden' });
+    await page.waitForSelector('#loading-screen', { state: 'read' });
 
     // Wait for the feed to load
     await page.waitForSelector('#items');
@@ -47,13 +82,15 @@ test('should display unread items', async ({ page }) => {
 
   test('should mark an item as read and unread', async ({ page }) => {
     // Wait for the loading screen to disappear
-    await page.waitForSelector('#loading-screen', { state: 'hidden' });
+    await page.waitForSelector('#loading-screen', { state: 'read' });
 
     // Wait for the feed to load
     await page.waitForSelector('#items');
 
     // Ensure we are in the "Unread" filter mode initially
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.selectOption('#filter-selector', 'unread');
+    await page.click('.modal .close');
     await page.waitForTimeout(500); // Give UI time to update
 
     // Find the first unread item
@@ -63,12 +100,13 @@ test('should display unread items', async ({ page }) => {
 
     // Mark the item as read
     await firstUnreadItem.locator('.read-toggle').click();
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500); // Give UI time to update
 
     // Verify visual change: item should have 'read' class
-    await expect(firstUnreadItem).toHaveClass(/.*read/);
+    await expect(page.locator(`#items > .item[data-guid="${initialGuid}"].read`)).toBeVisible();
 
-    // Verify item disappears from "Unread" view (it should still be in the DOM but hidden by filter)
+    // Verify item disappears from "Unread" view (it should still be in the DOM but read by filter)
     // We can't directly check visibility if it's filtered out, so we'll check its presence in the 'all' view later.
 
     // Change filter to "All"
@@ -77,15 +115,15 @@ test('should display unread items', async ({ page }) => {
 
     // Find the item again in "All" view and verify it's marked as read
     const itemInAllView = page.locator(`#items > .item[data-guid="${initialGuid}"]`);
-    await expect(itemInAllView).toBeVisible();
-    await expect(itemInAllView).toHaveClass(/.*read/);
+    await expect(page.locator(`#items > .item[data-guid="${initialGuid}"].read`)).toBeVisible();
 
     // Mark the item as unread
     await itemInAllView.locator('.read-toggle').click();
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500); // Give UI time to update
 
     // Verify visual change: item should NOT have 'read' class
-    await expect(itemInAllView).not.toHaveClass(/.*read/);
+    await expect(page.locator(`#items > .item[data-guid="${initialGuid}"]:not(.read)`)).toBeVisible();
 
     // Change filter back to "Unread"
     await page.selectOption('#filter-selector', 'unread');
@@ -93,7 +131,6 @@ test('should display unread items', async ({ page }) => {
 
     // Verify item reappears in "Unread" view
     const itemInUnreadView = page.locator(`#items > .item[data-guid="${initialGuid}"]`);
-    await expect(itemInUnreadView).toBeVisible();
-    await expect(itemInUnreadView).not.toHaveClass(/.*read/);
+    await expect(page.locator(`#items > .item[data-guid="${initialGuid}"]:not(.read)`)).toBeVisible();
   });
 });

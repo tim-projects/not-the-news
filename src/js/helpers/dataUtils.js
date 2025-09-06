@@ -99,15 +99,15 @@ export function mapRawItems(rawList, fmtFn) {
  * Generates a new deck of feed items based on the provided data and filters.
  *
  * @param {Array<Object>} allFeedItems - An array of all available feed items.
- * @param {Array<Object|string>} hiddenItems - An array of hidden item objects (or GUIDs for legacy data).
+ * @param {Array<Object|string>} readItems - An array of read item objects (or GUIDs for legacy data).
  * @param {Array<Object|string>} starredItems - An array of starred item objects (or GUIDs for legacy data).
  * @param {Array<Object|string>} shuffledOutItems - An array of shuffled-out item objects (or GUIDs for legacy data).
  * @param {Array<Object|string>} currentDeckItems - An array of the current deck's item objects (or GUIDs for legacy data).
  * @param {number} count - The desired size of the deck.
- * @param {string} filterMode - The current filter mode ('unread', 'hidden', 'starred').
+ * @param {string} filterMode - The current filter mode ('unread', 'read', 'starred').
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of full item objects for the new deck.
  */
-export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, shuffledOutItems, currentDeckItems, count, filterMode) {
+export async function generateNewDeck(allFeedItems, readItems, starredItems, shuffledOutItems, currentDeckItems, count, filterMode) {
     console.log("ENTERING generateNewDeck");
     try {
         const MAX_DECK_SIZE = 10;
@@ -129,7 +129,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
         const allFeedGuidsSet = new Set(allFeedItems.map(item => item.guid));
 
         // Create GUID sets for efficient lookups, pruning GUIDs that no longer exist in the main feed.
-        const hiddenGuidsSet = new Set([...getGuidSet(hiddenItems)].filter(guid => allFeedGuidsSet.has(guid)));
+        const readGuidsSet = new Set([...getGuidSet(readItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const starredGuidsSet = new Set([...getGuidSet(starredItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const shuffledOutGuidsSet = new Set([...getGuidSet(shuffledOutItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const currentDeckGuidsSet = getGuidSet(currentDeckItems);
@@ -137,8 +137,8 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
         let filteredItems = [];
         console.log(`[generateNewDeck] Initial filteredItems count: ${filteredItems.length}`);
         switch (filterMode) {
-            case 'hidden':
-                filteredItems = allFeedItems.filter(item => hiddenGuidsSet.has(item.guid));
+            case 'read':
+                filteredItems = allFeedItems.filter(item => readGuidsSet.has(item.guid));
                 break;
             case 'starred':
                 filteredItems = allFeedItems.filter(item => starredGuidsSet.has(item.guid));
@@ -146,13 +146,13 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
             case 'unread':
             default:
                 filteredItems = allFeedItems.filter(item =>
-                    !hiddenGuidsSet.has(item.guid) &&
+                    !readGuidsSet.has(item.guid) &&
                     !shuffledOutGuidsSet.has(item.guid)
                 );
                 break;
         }
 
-        if (filterMode === 'hidden' || filterMode === 'starred') {
+        if (filterMode === 'read' || filterMode === 'starred') {
             filteredItems.sort((a, b) => b.timestamp - a.timestamp);
             console.log(`[generateNewDeck] Filtered items for ${filterMode}: ${filteredItems.length}`);
             // ARCHITECTURE CHANGE: Return full objects instead of just GUIDs.
@@ -235,7 +235,7 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
             
             if (nextDeckItems.length < MAX_DECK_SIZE) {
                 const resurfaceCandidates = allFeedItems.filter(item =>
-                    shuffledOutGuidsSet.has(item.guid) && !hiddenGuidsSet.has(item.guid) && !selectedIds.has(item.guid)
+                    shuffledOutGuidsSet.has(item.guid) && !readGuidsSet.has(item.guid) && !selectedIds.has(item.guid)
                 );
                 resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -305,14 +305,14 @@ export async function generateNewDeck(allFeedItems, hiddenItems, starredItems, s
         // This block runs if the deck is still not full, which happens when
         // the initial 'unread' pool is empty.
         if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
-            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest hidden/shuffled items.");
+            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest read/shuffled items.");
 
             const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
             const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
 
-            // Combine hidden and shuffled items into a pool of candidates for resurfacing.
+            // Combine read and shuffled items into a pool of candidates for resurfacing.
             const resurfaceCandidates = allFeedItems.filter(item =>
-                (hiddenGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)) &&
+                (readGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)) &&
                 !guidsInDeck.has(item.guid)
             );
 

@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Configuration Buttons', () => {
-  const APP_URL = 'https://news.loveopenly.net';
-  const APP_PASSWORD = 'SmjHH2Hd'; // From run.sh
+  const APP_URL = process.env.APP_URL || 'https://news.loveopenly.net';
+  const APP_PASSWORD = process.env.APP_PASSWORD;
 
   test.beforeEach(async ({ page }) => {
     // Navigate to the login page
+    await page.waitForTimeout(5000);
     await page.goto(`${APP_URL}/login.html`);
 
     // Fill the password and click login
@@ -52,10 +53,8 @@ test.describe('Configuration Buttons', () => {
     await page.waitForFunction(() => {
       const textarea = document.querySelector('#rss-settings-block textarea');
       return textarea && textarea.value.length > 0;
-    }, { timeout: 10000 }); // Increased timeout for robustness
+    }, { timeout: 30000 }); // Increased timeout for robustness
 
-    // Wait for a short period to allow logs to appear
-    await page.waitForTimeout(1000);
 
     // Click the "Back" button to return to the main settings view
     console.log('Clicking "Back" button...');
@@ -74,10 +73,8 @@ test.describe('Configuration Buttons', () => {
     await page.waitForFunction(() => {
       const textarea = document.querySelector('#keywords-settings-block textarea');
       return textarea && textarea.value.length > 0;
-    }, { timeout: 10000 }); // Increased timeout for robustness
+    }, { timeout: 30000 }); // Increased timeout for robustness
 
-    // Wait for a short period to allow logs to appear
-    await page.waitForTimeout(1000);
 
     // Wait for the specific console messages to appear
     const rssFeedsLog = await rssFeedsContentLogPromise;

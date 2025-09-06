@@ -7,6 +7,8 @@ This document guides the agent's interaction with the project.
 - Avoid over-engineering.
 - Ask for clarification instead of guessing.
 - Use the `@refactor-directive` to refactor JavaScript code to be concise, modern, and functional while maintaining the same output.
+- do not create your own environments. Use what is ptovided.
+- do not rename variables without asking.
 
 ### Project Commands
 - **Run Application:** To build and run the Docker container, use `bash run.sh`.

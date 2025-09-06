@@ -20,8 +20,8 @@ import {
     loadCurrentDeck,
     saveCurrentDeck,
     toggleItemStateAndSync,
-    pruneStaleHidden, // This function is now a pure utility.
-    loadAndPruneHiddenItems, // <-- NEW: Use this for startup!
+    pruneStaleRead, // This function is now a pure utility.
+    loadAndPruneReadItems, // <-- NEW: Use this for startup!
     saveShuffleState,
     loadShuffleState,
     setFilterMode,
@@ -62,7 +62,7 @@ export function rssApp() {
         rssFeedsInput: '',
         keywordBlacklistInput: '',
         entries: [],
-        hidden: [],
+        read: [],
         starred: [],
         currentDeckGuids: [],
         shuffledOutGuids: [],
@@ -154,7 +154,7 @@ export function rssApp() {
             console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
 
             const items = [];
-            const hiddenSet = new Set(this.hidden.map(h => h.guid));
+            const readSet = new Set(this.read.map(h => h.guid));
             const starredSet = new Set(this.starred.map(s => s.guid));
             const seenGuidsForDeck = new Set();
 
@@ -168,7 +168,7 @@ export function rssApp() {
                 if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
                     const mappedItem = mapRawItem(item, formatDate);
                     
-                    mappedItem.isHidden = hiddenSet.has(mappedItem.guid);
+                    mappedItem.isRead = readSet.has(mappedItem.guid);
                     mappedItem.isStarred = starredSet.has(mappedItem.guid);
                     items.push(mappedItem);
                     seenGuidsForDeck.add(mappedItem.guid);
@@ -213,25 +213,25 @@ export function rssApp() {
         // --- Getters ---
         get filteredEntries() {
             if (!Array.isArray(this.deck)) this.deck = [];
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.hidden.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }
 
             let filtered = [];
-            const hiddenMap = new Map(this.hidden.map(h => [h.guid, h.hiddenAt]));
+            const readMap = new Map(this.read.map(h => [h.guid, h.readAt]));
             const starredMap = new Map(this.starred.map(s => [s.guid, s.starredAt]));
 
             switch (this.filterMode) {
                 case "unread":
-                    filtered = this.deck.filter(item => !hiddenMap.has(item.guid));
+                    filtered = this.deck.filter(item => !readMap.has(item.guid));
                     break;
                 case "all":
                     filtered = this.entries;
                     break;
-                case "hidden":
-                    filtered = this.entries.filter(e => hiddenMap.has(e.guid))
-                        .sort((a, b) => new Date(hiddenMap.get(b.guid)).getTime() - new Date(hiddenMap.get(a.guid)).getTime());
+                case "read":
+                    filtered = this.entries.filter(e => readMap.has(e.guid))
+                        .sort((a, b) => new Date(readMap.get(b.guid)).getTime() - new Date(readMap.get(a.guid)).getTime());
                     break;
                 case "starred":
                     filtered = this.entries.filter(e => starredMap.has(e.guid))
@@ -241,7 +241,7 @@ export function rssApp() {
 
             filtered = filtered.map(e => ({
                 ...e,
-                isHidden: hiddenMap.has(e.guid),
+                isRead: readMap.has(e.guid),
                 isStarred: starredMap.has(e.guid)
             }));
 
@@ -266,8 +266,8 @@ export function rssApp() {
         isStarred: function(guid) {
             return this.starred.some(e => e.guid === guid);
         },
-        isHidden: function(guid) {
-            return this.hidden.some(e => e.guid === guid);
+        isRead: function(guid) {
+            return this.read.some(e => e.guid === guid);
         },
         toggleStar: async function(guid) {
             console.log('toggleStar: Before toggleItemStateAndSync', { guid, starred: this.starred.length });
@@ -277,12 +277,12 @@ export function rssApp() {
             console.log('toggleStar: After _loadAndManageAllData', { guid, starred: this.starred.length });
             this.updateSyncStatusMessage();
         },
-        toggleHidden: async function(guid) {
-            console.log('toggleHidden: Before toggleItemStateAndSync', { guid, hidden: this.hidden.length });
-            await toggleItemStateAndSync(this, guid, 'hidden');
-            console.log('toggleHidden: After toggleItemStateAndSync, before _loadAndManageAllData', { guid, hidden: this.hidden.length });
+        toggleRead: async function(guid) {
+            console.log('toggleRead: Before toggleItemStateAndSync', { guid, read: this.read.length });
+            await toggleItemStateAndSync(this, guid, 'read');
+            console.log('toggleRead: After toggleItemStateAndSync, before _loadAndManageAllData', { guid, read: this.read.length });
             await this._loadAndManageAllData();
-            console.log('toggleHidden: After _loadAndManageAllData', { guid, hidden: this.hidden.length });
+            console.log('toggleRead: After _loadAndManageAllData', { guid, read: this.read.length });
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
@@ -353,13 +353,13 @@ export function rssApp() {
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            this.progressMessage = 'Pruning hidden items...';
-            this.hidden = await loadAndPruneHiddenItems(Object.values(this.feedItems));
-            console.log(`_loadAndManageAllData: After loadAndPruneHiddenItems. Hidden count: ${this.hidden.length}`);
+            this.progressMessage = 'Pruning read items...';
+            this.read = await loadAndPruneReadItems(Object.values(this.feedItems));
+            console.log(`_loadAndManageAllData: After loadAndPruneReadItems. Read count: ${this.read.length}`);
             console.log("[deckManager] Starting deck management with all data loaded.");
 
             this.progressMessage = 'Managing today\'s deck...';
-            console.log('_loadAndManageAllData: Before manageDailyDeck', { hiddenCount: this.hidden.length, currentDeckGuidsCount: this.currentDeckGuids.length });
+            console.log('_loadAndManageAllData: Before manageDailyDeck', { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length });
             await manageDailyDeck(this);
             console.log('_loadAndManageAllData: After manageDailyDeck. Deck size:', this.deck.length);
             await this.loadAndDisplayDeck();
@@ -407,7 +407,7 @@ export function rssApp() {
             });
             
             this.$watch('entries', () => this.updateCounts());
-            this.$watch('hidden', () => this.updateCounts());
+            this.$watch('read', () => this.updateCounts());
             this.$watch('starred', () => this.updateCounts());
             this.$watch('currentDeckGuids', () => this.updateCounts());
         },
@@ -452,7 +452,7 @@ export function rssApp() {
 
             setInterval(async () => {
                 const now = Date.now();
-                if (!this.isOnline || this.openSettings || !this.syncEnabled || document.hidden || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
+                if (!this.isOnline || this.openSettings || !this.syncEnabled || document.read || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
                     return;
                 }
                 console.log('Starting scheduled background sync...');

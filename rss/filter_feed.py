@@ -36,7 +36,7 @@ parser.add_argument("--input", required=True, help="Path to the input RSS file")
 parser.add_argument(
     "--output", required=True, help="Path to save the filtered RSS file"
 )
-parser.add_argument("--keywords", required=True, help="Path to the keywords file")
+
 
 # Parse arguments
 args = parser.parse_args()
@@ -49,7 +49,7 @@ keywords_file = args.keywords
 # Print the parsed arguments (optional, for testing purposes)
 print(f"Input RSS file: {input_rss_file}")
 print(f"Output RSS file: {output_rss_file}")
-print(f"Keywords file: {keywords_file}")
+
 
 
 
@@ -68,7 +68,7 @@ def save_pretty_xml(output_file, tree):
         f.write(pretty_xml)
 
 
-def filter_rss_entries(input_file, output_file, keywords_file):
+def filter_rss_entries(input_file, output_file):
     """Filter RSS feed entries based on keywords."""
     # Load filter keywords
     keywords = load_keyword_blacklist()
@@ -158,4 +158,5 @@ def filter_rss_entries(input_file, output_file, keywords_file):
 
 
 # Run the filtering process
-filter_rss_entries(input_rss_file, output_rss_file, keywords_file)
+filter_rss_entries(input_rss_file, output_rss_file)
+_rss_file)

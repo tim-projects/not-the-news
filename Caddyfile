@@ -112,3 +112,111 @@
      Expires "0"
    }
 }
+
+http://localhost {
+   # CRITICAL: Service worker must be first and accessible without any auth
+   @service_worker {
+     path_regexp ^/sw\.js$
+   }
+   handle @service_worker {
+     root * /app/www
+     file_server
+   }
+
+   # Other critical static files (no auth required)
+   @static_files {
+     path /login.html
+     path /manifest.json
+     path_regexp ^.*\.(css|js|svg|ttf|woff|woff2|png|jpg|jpeg|gif|ico|webp)$
+     path /js/*
+     path /images/*
+     path /assets/*
+   }
+   handle @static_files {
+     root * /app/www
+     file_server
+   }
+
+   # API endpoints with authentication
+   handle /api/login* {
+     reverse_proxy 127.0.0.1:4575
+   }
+
+   @protected_api {
+     path /api/user-state*
+     path /api/load-config*
+     path /api/save-config*
+     path /api/time*
+     path /api/feed-guids*
+     path /api/feed-items*
+   }
+   handle @protected_api {
+     @unauth {
+       not header Cookie auth*
+     }
+     respond @unauth "Unauthorized" 401
+     
+     reverse_proxy 127.0.0.1:4575
+   }
+
+   # Handle feed.xml (accessible without auth)
+   @feed {
+     path /feed.xml
+   }
+   handle @feed {
+     root * /data/feed
+     header {
+       Access-Control-Allow-Origin   *
+       Access-Control-Expose-Headers ETag, Last-Modified
+     }
+     file_server
+   }
+
+   # Main application with auth redirect for everything else
+   handle {
+     @unauth {
+       not header Cookie auth*
+       not path /sw.js
+       not path /login.html
+       not path /manifest.json
+       not path_regexp ^.*\.(css|js|svg|ttf|woff|woff2|png|jpg|jpeg|gif|ico|webp)$
+       not path /js/*
+       not path /images/*
+       not path /assets/*
+       not path /feed.xml
+     }
+     redir @unauth /login.html 302
+
+     root * /app/www
+     try_files {path} /index.html
+     file_server
+   }
+
+   # Global encoding directive
+   encode {
+     br 11
+     gzip 5
+     match {
+       header Content-Type text/html
+       header Content-Type text/css
+       header Content-Type application/javascript
+       header Content-Type application/rss+xml
+       header Content-Type application/xml
+       header Content-Type text/xml
+       header Content-Type application/json
+     }
+     minimum_length 512
+   }
+
+   # API no-cache headers
+   @api_nocache {
+     path /api/load-config*
+     path /api/save-config*
+     path /api/user-state*
+   }
+   header @api_nocache {
+     Cache-Control "no-cache, no-store, must-revalidate"
+     Pragma "no-cache"
+     Expires "0"
+   }
+}

@@ -12,7 +12,7 @@
  * behavior or provide global settings for the client.
  *
  * It is important to distinguish these configuration files from dynamic user state
- * (like starred/hidden items or deck GUIDs) which are managed through separate,
+ * (like starred/read items or deck GUIDs) which are managed through separate,
  * potentially more granular, user-state specific API endpoints.
  *
  * Note: This file currently uses standard `fetch` for network requests.

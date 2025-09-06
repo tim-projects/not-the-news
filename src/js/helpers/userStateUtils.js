@@ -74,12 +74,10 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     }
     
     // Display status message to the user
-    if (stateKey === 'hidden') {
-        createStatusBarMessage(isCurrentlyActive ? 'Item unhidden.' : 'Item hidden.', 'info');
+    if (stateKey === 'read') {
+        createStatusBarMessage(isCurrentlyActive ? 'Item unread.' : 'Item read.', 'info');
     } else if (stateKey === 'starred') {
         createStatusBarMessage(isCurrentlyActive ? 'Item unstarred.' : 'Item starred.', 'info');
-    } else if (stateKey === 'read') {
-        createStatusBarMessage(isCurrentlyActive ? 'Item marked unread.' : 'Item marked read.', 'info');
     }
 
     // Update UI counts
@@ -96,24 +94,24 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     await queueAndAttemptSyncOperation(pendingOp);
 }
 
-export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
-    if (!Array.isArray(hiddenItems)) return [];
-    if (!Array.isArray(feedItems) || feedItems.length === 0) return hiddenItems;
+export async function pruneStaleRead(feedItems, readItems, currentTS) {
+    if (!Array.isArray(readItems)) return [];
+    if (!Array.isArray(feedItems) || feedItems.length === 0) return readItems;
 
     const validFeedGuids = new Set(feedItems.filter(e => e && e.guid).map(e => e.guid.trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-    return hiddenItems.filter(item => {
+    return readItems.filter(item => {
         if (!item || !item.guid) return false;
 
         const normalizedGuid = String(item.guid).trim().toLowerCase();
         if (validFeedGuids.has(normalizedGuid)) return true;
 
         // Use the timestamp on the object for pruning logic
-        if (item.hiddenAt) {
-            const hiddenAtTS = new Date(item.hiddenAt).getTime();
-            if (!isNaN(hiddenAtTS)) {
-                return (currentTS - hiddenAtTS) < THIRTY_DAYS_MS;
+        if (item.readAt) {
+            const readAtTS = new Date(item.readAt).getTime();
+            if (!isNaN(readAtTS)) {
+                return (currentTS - readAtTS) < THIRTY_DAYS_MS;
             }
         }
         // If an item somehow has no timestamp, don't prune it.
@@ -121,8 +119,8 @@ export async function pruneStaleHidden(feedItems, hiddenItems, currentTS) {
     });
 }
 
-export async function loadAndPruneHiddenItems(feedItems) {
-    const { value: rawItems } = await loadArrayState('hidden');
+export async function loadAndPruneReadItems(feedItems) {
+    const { value: rawItems } = await loadArrayState('read');
     let needsResave = false;
     
     // Data migration and normalization logic
@@ -132,12 +130,12 @@ export async function loadAndPruneHiddenItems(feedItems) {
         for (const item of rawItems) {
             if (typeof item === 'string' && item) {
                 // Legacy string data: migrate to object
-                normalizedItems.push({ guid: item, hiddenAt: defaultTimestamp });
+                normalizedItems.push({ guid: item, readAt: defaultTimestamp });
                 needsResave = true;
             } else if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) {
                 // Modern object data: ensure timestamp exists
-                if (!item.hiddenAt) {
-                    item.hiddenAt = defaultTimestamp;
+                if (!item.readAt) {
+                    item.readAt = defaultTimestamp;
                     needsResave = true;
                 }
                 normalizedItems.push(item);
@@ -145,7 +143,7 @@ export async function loadAndPruneHiddenItems(feedItems) {
         }
     }
 
-    const prunedItems = await pruneStaleHidden(feedItems, normalizedItems, Date.now());
+    const prunedItems = await pruneStaleRead(feedItems, normalizedItems, Date.now());
 
     if (prunedItems.length !== normalizedItems.length) {
         needsResave = true;
@@ -153,10 +151,10 @@ export async function loadAndPruneHiddenItems(feedItems) {
 
     if (needsResave) {
         try {
-            await saveArrayState('hidden', prunedItems);
-            console.log(`Sanitized, pruned, or migrated hidden items. Original count: ${rawItems.length}, New count: ${prunedItems.length}`);
+            await saveArrayState('read', prunedItems);
+            console.log(`Sanitized, pruned, or migrated read items. Original count: ${rawItems.length}, New count: ${prunedItems.length}`);
         } catch (error) {
-            console.error("Error saving pruned hidden items:", error);
+            console.error("Error saving pruned read items:", error);
         }
     }
 

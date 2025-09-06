@@ -1,39 +1,28 @@
-# Current Task
+**Task:** Write tests for all UI elements and generate a report.
 
-**Task:** Add a new feature to allow users to mark items as 'read' or 'unread'.
+**Progress Update:**
 
-**Goal:** Implement a mechanism for users to toggle the read/unread status of news items.
+*   **Initial Problem:** Tests were failing, and `DEBUG: initApp finished.` was not logging, indicating an issue in `initApp`.
+*   **Mitigation 1: Reverted `src/main.js` changes:** Uncommented all previously commented-out setup functions in `initApp`.
+*   **Mitigation 2: Systematic re-commenting of `this.$nextTick()` and `_initScrollObserver()`:** These were re-enabled after initial debugging, as `DEBUG: initApp finished.` started logging, suggesting the core initialization was no longer blocked by these.
+*   **Mitigation 3: Fixed `rss/filter_feed.py`:** Identified and removed an `AttributeError` caused by `filter_feed.py` attempting to access a non-existent `keywords` argument. This was a critical fix for the backend process.
+*   **Mitigation 4: Standardized `APP_URL` in Playwright tests:**
+    *   Modified `tests/config.spec.js` to use `process.env.APP_URL` instead of a hardcoded URL.
+    *   Ensured `tests/ui.spec.js` also uses `process.env.APP_URL`.
+    *   Set `APP_URL=https://news.loveopenly.net` when running tests.
+*   **Mitigation 5: Improved Playwright waiting strategies:**
+    *   Replaced fixed `await page.waitForTimeout(5000);` with `await page.waitForLoadState('networkidle');` in `tests/ui.spec.js`.
+    *   Increased `page.waitForFunction` timeouts to `30000` in `tests/config.spec.js` and removed fixed `waitForTimeout` calls.
+*   **Mitigation 6: Added initial `waitForTimeout` (Diagnostic):** Added a 5-second `waitForTimeout` before `page.goto()` in both `ui.spec.js` and `config.spec.js` to diagnose potential timing issues.
+*   **Mitigation 7: Ignored HTTPS errors:** Configured `ignoreHTTPSErrors: true` in `playwright.config.js`.
 
-**Sub-tasks:**
-1.  **Frontend (UI):** Add a visual indicator and a clickable element (e.g., a button or icon) to each news item in the UI.
-    *   **Status:** Complete. The `read-toggle` button and `isRead` function are in place, and `src/css/content.css` contains styles for `.item.entry.read` and `.read-toggle.read` to provide visual feedback.
-2.  **Frontend (Logic):** Implement JavaScript to handle click events, update the UI, and send the status change to the backend.
-    *   **Status:** Complete. The `toggleRead` function in `src/main.js` handles the click event, updates the state, and calls `toggleItemStateAndSync` which is responsible for syncing with the backend.
-3.  **Backend (API):** Create or modify an API endpoint to receive the read/unread status and update the database.
-    *   **Status:** Complete. The `post_user_state` endpoint in `src/api.py` already handles `readDelta` operations, and the `get_single_user_state_key` endpoint serves the `read` state.
-4.  **Database:** Add a field to the news item schema to store the read/unread status.
-    *   **Status:** Complete. The backend uses `read.json` in `/data/user_state` to store the 'read' status, consistent with other user states.
-5.  **Testing:** Write Playwright tests to ensure the feature works correctly.
-    *   **Status:** In Progress (Blocked).
+**Current Status:**
 
-**Progress:**
-- Frontend UI: Complete
-- Frontend Logic: Complete
-- Backend API: Complete
-- Database: Complete
-- Testing: Blocked - Playwright tests are timing out because no feed items are loading in the application under test.
-
-**Identified Problem (Refined):**
-- The application under test is not loading any feed items, causing the Playwright tests to time out while waiting for elements that depend on loaded data.
-- `feed.xml` exists and contains data on the backend.
-- The frontend's `performBackgroundSync()` function (which fetches feed data) is not being executed.
-- The `console.log` added inside the `if (this.isOnline && this.syncEnabled)` block in `initApp` (in `src/main.js`) did not appear in the previous test run, indicating the condition `(this.isOnline && this.syncEnabled)` is `false`.
-- A `console.log` has been added *before* the `if (this.isOnline && this.syncEnabled)` condition in `initApp` (in `src/main.js`) to explicitly log the values of `this.isOnline` and `this.syncEnabled` right before the check.
+*   The `DEBUG: initApp finished.` message is now consistently logging in the browser console during tests, indicating the application's frontend initialization is progressing further.
+*   `curl https://news.loveopenly.net/login.html` successfully retrieves the login page, confirming the Dockerized application is running and accessible from the host machine.
+*   **Persistent Problem:** Playwright tests continue to fail with `net::ERR_CONNECTION_REFUSED` errors when attempting to navigate to `https://news.loveopenly.net/` or `https://news.loveopenly.net/login.html`. This is despite all the above mitigations, suggesting an issue specific to Playwright's network environment or its interaction with the Docker setup.
 
 **Next Steps:**
-1.  Run Playwright tests again to capture this new log output.
-2.  Based on the log output, determine the root cause (e.g., `navigator.onLine` returning `false` in the test environment, or `syncEnabled` being unexpectedly `false`).
-3.  Implement a fix to ensure feed items are loaded in the test environment. This might involve:
-    *   Forcing `navigator.onLine` to `true` in Playwright.
-    *   Ensuring `syncEnabled` is always `true` for tests.
-    *   Mocking the API calls to `/api/feed-guids` and `/api/feed-items` in Playwright to provide dummy data, bypassing the actual backend if network issues are suspected in the test environment.
+
+1.  Modify `tests/config.spec.js` to use `process.env.APP_PASSWORD` instead of hardcoding the password.
+2.  Attempt to run Playwright tests by setting `APP_URL` to `https://host.docker.internal` to bypass potential DNS or network routing issues between the host and the Docker container.

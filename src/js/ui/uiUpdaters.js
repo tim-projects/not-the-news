@@ -106,12 +106,12 @@ export const createStatusBarMessage = (() => {
  * @param {object} app The Alpine.js app state object.
 */
 export function updateCounts(app) {
-    if (!app?.entries?.length || !app.hidden || !app.starred || !app.currentDeckGuids) {
+    if (!app?.entries?.length || !app.read || !app.starred || !app.currentDeckGuids) {
         console.warn("Attempted to update counts with an invalid app object. Skipping.");
         return;
     }
 
-    const hiddenSet = new Set(app.hidden.map(item => item.guid));
+    const readSet = new Set(app.read.map(item => item.guid));
     const starredSet = new Set(app.starred.map(item => item.guid));
     // CHANGE: Per the new architecture, `app.currentDeckGuids` is an array of objects.
     // We must extract the `guid` from each object before creating the Set.
@@ -119,14 +119,14 @@ export function updateCounts(app) {
     const entries = app.entries;
 
     const allC = entries.length;
-    const hiddenC = entries.filter(e => hiddenSet.has(e.guid)).length;
+    const readC = entries.filter(e => readSet.has(e.guid)).length;
     const starredC = entries.filter(e => starredSet.has(e.guid)).length;
-    const unreadInDeckC = entries.filter(e => deckGuidsSet.has(e.guid) && !hiddenSet.has(e.guid)).length;
+    const unreadInDeckC = entries.filter(e => deckGuidsSet.has(e.guid) && !readSet.has(e.guid)).length;
 
     const selector = getFilterSelector();
     if (!selector) return;
 
-    const counts = { all: allC, hidden: hiddenC, starred: starredC, unread: unreadInDeckC };
+    const counts = { all: allC, read: readC, starred: starredC, unread: unreadInDeckC };
     Array.from(selector.options).forEach(opt => {
         // Retain the filter name (e.g., "All") and update the count
         const filterName = opt.text.split(' ')[0];

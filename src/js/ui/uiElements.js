@@ -20,7 +20,7 @@ export const getShuffleCountDisplay = () => document.getElementById('shuffle-cou
 export const getFilterSelector = () => document.getElementById('filter-selector');
 export const getScrollToTopButton = () => document.getElementById("scroll-to-top");
 export const getNtnTitleH2 = () => document.querySelector('#ntn-title h2');
-export const getMessageContainer = () => document.getElementById('status-bar-message');
+export const getMessageContainer = () => document.getElementById('status-message-container');
 
 // Settings panel and button elements
 export const getMainSettingsBlock = () => document.getElementById('main-settings');

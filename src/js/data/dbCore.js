@@ -25,7 +25,7 @@ export const OBJECT_STORES_SCHEMA = [{
     options: { autoIncrement: true },
     indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
-    name: 'hidden',
+    name: 'read',
     keyPath: 'id',
     options: { autoIncrement: true },
     indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]

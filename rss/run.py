@@ -15,8 +15,7 @@ merged_file = os.path.join(feed_dir, "merged_feed.xml")
 merged_log_file = os.path.join(feed_dir, "merged_feeds.log")
 filtered_file = os.path.join(feed_dir, "filtered_feed.xml")
 final_feed_file = os.path.join(feed_dir, "feed.xml")
-feeds_path = os.path.join(SCRIPT_DIR, "../data/config/feeds.txt")
-keywords_path = os.path.join(SCRIPT_DIR, "../data/config/filter_keywords.txt")
+
 
 # --- Ensure feed directory exists ---
 if not os.path.exists(feed_dir):
@@ -58,8 +57,6 @@ def generate_feed():
             [
                 "python3",
                 "merge_feeds.py",
-                "--feeds",
-                feeds_path,
                 "--output",
                 merged_file,
             ],
@@ -88,8 +85,6 @@ def generate_feed():
             merged_file,
             "--output",
             filtered_file,
-            "--keywords",
-            keywords_path,
         ],
         check=True,
         cwd=SCRIPT_DIR,

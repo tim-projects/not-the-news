@@ -6,7 +6,7 @@ import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
 // --- User State Definitions ---
 export const USER_STATE_DEFS = {
     starred: { store: 'starred', type: 'array', localOnly: false, default: [] },
-    hidden: { store: 'hidden', type: 'array', localOnly: false, default: [] },
+    read: { store: 'read', type: 'array', localOnly: false, default: [] },
     read: { store: 'read', type: 'array', localOnly: false, default: [] },
     lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
     lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
@@ -56,7 +56,7 @@ export async function saveSimpleState(key, value, storeName = 'userSettings') {
 const getTimestampKey = (storeName) => {
     switch (storeName) {
         case 'starred': return 'starredAt';
-        case 'hidden': return 'hiddenAt';
+        case 'read': return 'readAt';
         case 'read': return 'readAt';
         case 'currentDeckGuids': return 'addedAt';
         case 'shuffledOutGuids': return 'shuffledAt';
@@ -148,7 +148,7 @@ export async function updateArrayState(storeName, item, add) {
     if (defEntry && !defEntry[1].localOnly) {
         let opType = '';
         if (storeName === 'starred') opType = 'starDelta';
-        if (storeName === 'hidden') opType = 'hiddenDelta';
+        if (storeName === 'read') opType = 'readDelta';
         if (storeName === 'read') opType = 'readDelta';
         
         if (opType) {
@@ -183,7 +183,7 @@ export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
     
     let opType = '';
     if (storeName === 'starred') opType = 'starDelta';
-    if (storeName === 'hidden') opType = 'hiddenDelta';
+    if (storeName === 'read') opType = 'readDelta';
     if (storeName === 'read') opType = 'readDelta';
 
     if (!opType) return; // Nothing to do if we can't determine the operation type
@@ -204,11 +204,11 @@ export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
 }
 
 /**
- * Re-implements the 30-day grace period pruning for hidden items.
+ * Re-implements the 30-day grace period pruning for read items.
  */
-export async function pruneStaleHiddenItems(hiddenItems, feedItems) {
-    if (!Array.isArray(hiddenItems) || !Array.isArray(feedItems)) {
-        console.warn('[DB] pruneStaleHiddenItems skipped due to invalid input.');
+export async function pruneStaleReadItems(readItems, feedItems) {
+    if (!Array.isArray(readItems) || !Array.isArray(feedItems)) {
+        console.warn('[DB] pruneStaleReadItems skipped due to invalid input.');
         return;
     }
 
@@ -216,18 +216,18 @@ export async function pruneStaleHiddenItems(hiddenItems, feedItems) {
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
     const now = Date.now();
 
-    const prunedHiddenItems = hiddenItems.filter(item => {
+    const prunedReadItems = readItems.filter(item => {
         if (validFeedGuids.has(item.guid)) return true;
-        const hiddenAtTimestamp = new Date(item.hiddenAt).getTime();
-        return (now - hiddenAtTimestamp) < THIRTY_DAYS_MS;
+        const readAtTimestamp = new Date(item.readAt).getTime();
+        return (now - readAtTimestamp) < THIRTY_DAYS_MS;
     });
 
-    if (prunedHiddenItems.length < hiddenItems.length) {
-        const itemsRemoved = hiddenItems.length - prunedHiddenItems.length;
-        console.log(`[DB] Pruning ${itemsRemoved} stale hidden items.`);
-        await overwriteArrayAndSyncChanges('hidden', prunedHiddenItems);
+    if (prunedReadItems.length < readItems.length) {
+        const itemsRemoved = readItems.length - prunedReadItems.length;
+        console.log(`[DB] Pruning ${itemsRemoved} stale read items.`);
+        await overwriteArrayAndSyncChanges('read', prunedReadItems);
     } else {
-        console.log('[DB] No stale hidden items to prune.');
+        console.log('[DB] No stale read items to prune.');
     }
 }
 

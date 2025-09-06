@@ -33,7 +33,7 @@ const getGuid = item => (typeof item === 'object' && item.guid ? item.guid : ite
 /**
  * Manages the daily deck of news items.
  * @param {Array} entries Array of all feed entries
- * @param {Array} hiddenItems Array of hidden items
+ * @param {Array} readItems Array of read items
  * @param {Array} starredItems Array of starred items  
  * @param {Array} shuffledOutItems Array of shuffled out items
  * @param {number} shuffleCount Current shuffle count
@@ -41,9 +41,9 @@ const getGuid = item => (typeof item === 'object' && item.guid ? item.guid : ite
  * @param {string} lastShuffleResetDate Last shuffle reset date (optional)
  * @returns {Object} Updated deck state
  */
-export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffledOutItems, shuffleCount, filterMode = 'unread', lastShuffleResetDate = null) => {
+export const manageDailyDeck = async (entries, readItems, starredItems, shuffledOutItems, shuffleCount, filterMode = 'unread', lastShuffleResetDate = null) => {
     console.log('manageDailyDeck: START');
-    console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, hiddenItemsCount: hiddenItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate });
+    console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, readItemsCount: readItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate });
     console.log('[deckManager] DEBUG: Array.isArray(entries):', Array.isArray(entries), 'entries.length:', entries.length);
     console.log('[deckManager] DEBUG: Array.isArray(entries):', Array.isArray(entries), 'entries.length:', entries.length);
 
@@ -62,7 +62,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
 
     // Standardize data arrays to handle potential inconsistencies.
     const allItems = entries;
-    const hiddenItemsArray = Array.isArray(hiddenItems) ? hiddenItems : [];
+    const readItemsArray = Array.isArray(readItems) ? readItems : [];
     const starredItemsArray = Array.isArray(starredItems) ? starredItems : [];
     const shuffledOutItemsArray = Array.isArray(shuffledOutItems) ? shuffledOutItems : [];
     
@@ -72,12 +72,14 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
     console.log('manageDailyDeck: Loaded currentDeckItems count:', currentDeckItems.length);
 
     // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
-    const hiddenGuidsSet = new Set(hiddenItemsArray.map(getGuid));
+    const readGuidsSet = new Set(readItemsArray.map(getGuid));
     const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
     const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
     const currentDeckGuidsSet = new Set(currentDeckItems.map(getGuid));
 
-    
+    const today = new Date().toDateString();
+    const isNewDay = lastShuffleResetDate !== today;
+    const isDeckEffectivelyEmpty = !currentDeckItems || currentDeckItems.length === 0 || currentDeckItems.every(item => readGuidsSet.has(getGuid(item)));
 
     let newDeck = [];
     let newCurrentDeckGuids = currentDeckItems;
@@ -95,7 +97,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
 
         const newDeckItems = await generateNewDeck(
             allItems,
-            hiddenItemsArray,
+            readItemsArray,
             starredItemsArray,
             shuffledOutItemsArray,
             currentDeckItems,
@@ -112,7 +114,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
 
         newDeck = (newDeckItems || []).map(item => ({
             ...item,
-            isHidden: hiddenGuidsSet.has(item.guid),
+            isRead: readGuidsSet.has(item.guid),
             isStarred: starredGuidsSet.has(item.guid)
         }));
         
@@ -151,7 +153,7 @@ export const manageDailyDeck = async (entries, hiddenItems, starredItems, shuffl
 export const manageDailyDeckLegacy = async (app) => {
     const result = await manageDailyDeck(
         app.entries,
-        app.hidden,
+        app.read,
         app.starred, 
         app.shuffledOutItems || app.shuffledOutGuids,
         app.shuffleCount,
@@ -208,7 +210,7 @@ export async function processShuffle(app) {
     // Use the new manageDailyDeck function
     const result = await manageDailyDeck(
         app.entries,
-        app.hidden,
+        app.read,
         app.starred,
         app.shuffledOutItems,
         app.shuffleCount,

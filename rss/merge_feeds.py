@@ -233,7 +233,7 @@ def safe_xml(text):
         return ""
     return re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', text)
 
-def merge_feeds(feeds_file, output_file):
+def merge_feeds(output_file):
     """Fetch multiple RSS/Atom feeds, merge entries, and write to an output file."""
     total_entries = 0
     seen_entries = set()  # Store keys we've seen (link or fallback ID)
@@ -338,11 +338,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Merge multiple RSS/Atom feeds into one."
     )
-    parser.add_argument(
-        "--feeds", required=True, help="Path to the text file listing feed URLs."
-    )
+    
     parser.add_argument(
         "--output", required=True, help="Path to save the merged feed XML."
     )
     args = parser.parse_args()
-    merge_feeds(args.feeds, args.output)
+    merge_feeds(args.output)
