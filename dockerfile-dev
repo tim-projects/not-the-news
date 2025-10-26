@@ -37,7 +37,7 @@ RUN npm run build
 
 ##############################################################################
 # 1. Base image (now main Caddy stage)
-FROM caddy:2-alpine
+FROM docker.io/library/caddy:2-alpine
 
 # Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
 RUN apk add --no-cache brotli-libs redis
@@ -72,7 +72,7 @@ RUN apk add --no-cache \
     && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" \
     && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" \
     && export GNUPGHOME="$(mktemp -d)" \
-    && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+    && curl -sSL "https://keys.openpgp.org/vks/v1/by-fingerprint/B42F6819007F00F88E364FD4036A9C25BF357DD4" | gpg --batch --import \
     && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
     && rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
     && chmod +x /usr/local/bin/gosu
