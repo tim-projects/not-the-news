@@ -1,4 +1,1 @@
-sudo docker logs -f ntn &
-pid=$!
-sleep 60
-kill $pid
+sudo podman logs ntn-dev

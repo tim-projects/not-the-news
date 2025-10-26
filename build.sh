@@ -35,9 +35,9 @@ echo "Validating arguments..."
 
 # Docker volume setup
 echo "Checking Docker volume..."
-sudo docker volume inspect not-the-news_volume >/dev/null 2>&1 || {
+sudo podman volume inspect not-the-news_volume >/dev/null 2>&1 || {
     echo "Creating volume..."
-    sudo docker volume create not-the-news_volume
+    sudo podman volume create not-the-news_volume
 }
 
 # Build arguments
@@ -62,18 +62,18 @@ fi
 # Build process
 echo "Starting build process..."
 (
-    set -x  # Show git/docker commands
+    set -x  # Show git/podman commands
     #git pull && \
-    sudo docker rm -f ntn && \
-    sudo docker container prune -f && \
-    sudo docker buildx build "${BUILD_ARGS[@]}" -t not-the-news . && \
-    sudo docker run -d -p 80:80 -p 443:443 -v not-the-news_volume:/data --name ntn not-the-news
+    sudo podman rm -f ntn && \
+    sudo podman container prune -f && \
+    sudo podman build "${BUILD_ARGS[@]}" -t not-the-news . && \
+    sudo podman run -d -p 80:80 -p 443:443 -v not-the-news_volume:/data --name ntn not-the-news
 ) || {
     echo "Build failed!" >&2
     exit 1
 }
 
 # Optional Cleanup
-# sudo docker image prune -f
-# sudo docker builder prune -f
-# docker buildx rm caddy-builder --force
+# sudo podman image prune -f
+# sudo podman builder prune -f
+# podman buildx rm caddy-builder --force
