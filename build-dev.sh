@@ -26,15 +26,31 @@ done
 DOMAIN="localhost"
 EMAIL="dev@localhost.com"
 echo "Set DOMAIN: $DOMAIN (dev mode)"
-echo "Set EMAIL: $EMAIL (dev mode)
+echo "Set EMAIL: $EMAIL (dev mode)"
 
+# Docker volume setup - using a named volume for persistent storage
+VOLUME_NAME="ntn-dev-data"
+echo "Ensuring Docker volume '$VOLUME_NAME' exists..."
+sudo podman volume create "$VOLUME_NAME" || true # Create if it doesn't exist
 
-# Docker volume setup
-echo "Checking Docker volume..."
-sudo docker volume inspect not-the-news_volume >/dev/null 2>&1 || {
-    echo "Creating volume..."
-    sudo docker volume create not-the-news_volume
-}
+# Ensure the Docker volume is cleaned up on exit (optional, for dev convenience)
+# trap "echo 'Cleaning up Docker volume: $VOLUME_NAME'; sudo podman volume rm -f $VOLUME_NAME" EXIT
+
+# Populate the volume with test data
+ARCHIVE_PATH="/mnt/host_shares/data/home/tim/git/not-the-news/backup/ntn-test-data.tar.gz"
+CONTAINER_MOUNT_PATH="/data" # This is where the volume is mounted in the container
+HOST_BACKUP_DIR="/mnt/host_shares/data/home/tim/git/not-the-news/backup"
+
+echo "Populating volume '$VOLUME_NAME' with data from '$ARCHIVE_PATH'..."
+sudo podman run --rm \
+    -v "$VOLUME_NAME:$CONTAINER_MOUNT_PATH" \
+    -v "$HOST_BACKUP_DIR:/host_backup" \
+    alpine:latest sh -c "\
+        apk add --no-cache tar gzip && \
+        cp /host_backup/ntn-test-data.tar.gz $CONTAINER_MOUNT_PATH/ && \
+        tar -xzf $CONTAINER_MOUNT_PATH/ntn-test-data.tar.gz -C $CONTAINER_MOUNT_PATH && \
+        rm $CONTAINER_MOUNT_PATH/ntn-test-data.tar.gz\
+    "
 
 # Build arguments
 echo "Configuring build arguments:"
@@ -58,18 +74,18 @@ fi
 # Build process
 echo "Starting build process..."
 (
-    set -x  # Show git/docker commands
+    set -x  # Show git/podman commands
     #git pull && \
-    sudo docker rm -f ntn-dev && \
-    sudo docker container prune -f && \
-    sudo docker buildx build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
-    sudo docker run -d -p 8080:80 -p 8443:443 -v not-the-news_volume:/data --name ntn-dev not-the-news-dev
+    sudo podman rm -f ntn-dev && \
+    sudo podman container prune -f && \
+    sudo podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
+    sudo podman run -d -p 8080:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
     exit 1
 }
 
 # Optional Cleanup
-# sudo docker image prune -f
-# sudo docker builder prune -f
-# docker buildx rm caddy-builder --force
+# sudo podman image prune -f
+# sudo podman builder prune -f
+# podman buildx rm caddy-builder --force
