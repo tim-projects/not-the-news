@@ -60,10 +60,10 @@ echo "Starting build process..."
 (
     set -x  # Show git/docker commands
     #git pull && \
-    sudo docker rm -f ntn && \
+    sudo docker rm -f ntn-dev && \
     sudo docker container prune -f && \
     sudo docker buildx build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
-    sudo docker run -d -p 80:80 -p 443:443 -v not-the-news_volume:/data --name ntn-dev not-the-news-dev
+    sudo docker run -d -p 8080:80 -p 8443:443 -v not-the-news_volume:/data --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
     exit 1

@@ -111,7 +111,7 @@
    }
 }
 
-http://localhost:80, https://localhost:443 {
+http://localhost:8080, https://localhost:8443 {
    # CRITICAL: Service worker must be first and accessible without any auth
    @service_worker {
      path_regexp ^/sw\.js$
