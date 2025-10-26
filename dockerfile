@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 ##############################################################################
 # Build caddy with brotli compression support
-FROM caddy:builder-alpine AS caddy-builder
+FROM docker.io/library/caddy:builder-alpine AS caddy-builder
 
 # Enable cgo for compiling the Brotli plugin
 ENV CGO_ENABLED=1
