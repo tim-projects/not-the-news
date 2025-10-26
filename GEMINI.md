@@ -15,9 +15,11 @@ This document guides the agent's interaction with the project.
 - **View Logs:** To view logs from the `ntn` Docker container, use `bash dockerlogs.sh`. Avoid viewing logs in realtime.
   - **Note:** Ensure `dockerlogs.sh` exists and contains `docker logs ntn`.
 
-### Testing
-- **Run Playwright:** Execute `npx playwright test tests/config.spec.js`.
-- **Install Playwright:** If needed, install browser executables with `npx playwright install`.
+### Building the container
+- dev version: build-dev.sh
+
+### Testing in dev container
+- **Run Playwright to get the console logs:** Execute `sudo podman exec ntn-dev npx playwright test tests/console.spec.js'
 - **Testing Workflow:**
   1.  Create a specific Playwright test for the functionality.
   2.  Run the test and analyze the output.
