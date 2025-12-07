@@ -4,7 +4,8 @@ module.exports = {
   use: {
     ignoreHTTPSErrors: true,
     launchOptions: {
-      args: ['--allow-insecure-localhost'],
+      executablePath: '/usr/bin/chromium-browser',
+      args: ['--no-sandbox', '--allow-insecure-localhost'],
     },
   },
 };

@@ -44,7 +44,7 @@ args = parser.parse_args()
 # Assign parsed arguments to variables
 input_rss_file = args.input
 output_rss_file = args.output
-keywords_file = args.keywords
+
 
 # Print the parsed arguments (optional, for testing purposes)
 print(f"Input RSS file: {input_rss_file}")
@@ -159,4 +159,3 @@ def filter_rss_entries(input_file, output_file):
 
 # Run the filtering process
 filter_rss_entries(input_rss_file, output_rss_file)
-_rss_file)

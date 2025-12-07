@@ -156,7 +156,8 @@ COPY rss/ /rss/
 COPY --from=frontend-builder /app/www/ /app/www/
 RUN npm install @playwright/test
 COPY src/api.py /app/www/api.py
-COPY tests/console.spec.js /app/tests/console.spec.js
+COPY playwright.config.js /app/playwright.config.js
+COPY tests/ /app/tests/
 
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json

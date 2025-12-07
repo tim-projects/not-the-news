@@ -1,12 +1,24 @@
 import { test, expect } from '@playwright/test';
 
+const APP_URL = process.env.APP_URL || 'https://localhost';
+const APP_PASSWORD = process.env.APP_PASSWORD;
+
 test.describe('UI Elements and Interactions', () => {
     test.beforeEach(async ({ page }) => {
-        await page.waitForTimeout(5000);
-        await page.goto(process.env.APP_URL);
-        // Wait for the app to load and the loading screen to disappear
+        // Navigate to the login page
+        await page.goto(`${APP_URL}/login.html`);
+
+        // Fill the password and click login
+        await page.fill('#pw', APP_PASSWORD);
+        await page.click('button[type="submit"]');
+
+        // Wait for navigation to the main page and for the loading screen to disappear
+        await page.waitForURL(APP_URL);
         await page.waitForLoadState('networkidle');
         await expect(page.locator('#loading-screen')).not.toBeVisible();
+
+        // Pause here for debugging
+        await page.pause();
     });
 
     test('should display header elements', async ({ page }) => {

@@ -1,1 +1,1 @@
-sudo podman logs --tail 50 --no-stream ntn-dev
+podman logs --tail 50 ntn-dev

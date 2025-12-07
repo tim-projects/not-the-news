@@ -12,9 +12,9 @@ usage() {
 
 # Parse arguments with debug
 echo "Parsing arguments..."
-while getopts ":p:hn" opt; do
+while getopts ":hn" opt; do
     case $opt in
-        p) PASSWORD="$OPTARG"; echo "Set PASSWORD: [redacted]" ;;
+
         n) NO_CACHE=1; echo "Disabling cache" ;;
         h) usage ;;
         \?) echo "Invalid option -$OPTARG" >&2; usage ;;
@@ -25,8 +25,10 @@ done
 # Hardcode DOMAIN and EMAIL for dev mode
 DOMAIN="localhost"
 EMAIL="dev@localhost.com"
+PASSWORD="devtest%!" # Hardcoded password for dev environment
 echo "Set DOMAIN: $DOMAIN (dev mode)"
 echo "Set EMAIL: $EMAIL (dev mode)"
+echo "Set PASSWORD: [redacted] (dev mode)"
 
 # --- Pre-load local images if available ---
 LOCAL_IMAGES_DIR="docker-images"
@@ -85,7 +87,7 @@ BUILD_ARGS=(
 )
 
 if [ -n "$PASSWORD" ]; then
-    echo "Adding password argument..."
+    echo "Adding hardcoded password argument..."
     ESCAPED_PWD=$(printf '%q' "$PASSWORD")
     BUILD_ARGS+=("--build-arg" "APP_PASSWORD=$ESCAPED_PWD")
 fi
@@ -100,7 +102,7 @@ echo "Starting build process..."
 (
     set -x  # Show git/podman commands
     #git pull && \
-    #podman rm -f ntn-dev && \
+    podman rm -f ntn-dev && \
     #podman container prune -f && \
     podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
     podman run -d -p 8085:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
