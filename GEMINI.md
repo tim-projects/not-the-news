@@ -19,7 +19,9 @@ This document guides the agent's interaction with the project.
 - dev version: build-dev.sh
 
 ### Testing in dev container
-- **Run Playwright to get the console logs:** Execute `sudo podman exec ntn-dev npx playwright test tests/console.spec.js'
+**Note:** All testing from this point forward should be performed within the `ntn-dev` Podman container, which is built and run using `bash build-dev.sh`.
+
+- **Run Playwright to get the console logs:** Execute `podman exec ntn-dev npx playwright test tests/console.spec.js'
 - **Testing Workflow:**
   1.  Create a specific Playwright test for the functionality.
   2.  Run the test and analyze the output.

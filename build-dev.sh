@@ -28,6 +28,30 @@ EMAIL="dev@localhost.com"
 echo "Set DOMAIN: $DOMAIN (dev mode)"
 echo "Set EMAIL: $EMAIL (dev mode)"
 
+# --- Pre-load local images if available ---
+LOCAL_IMAGES_DIR="docker-images"
+IMAGE_TARBALLS=(
+    "caddy-builder-alpine.tar"
+    "node-slim.tar"
+    "caddy-alpine.tar"
+)
+
+echo "Checking for local image tarballs in '$LOCAL_IMAGES_DIR'..."
+for tarball in "${IMAGE_TARBALLS[@]}"; do
+    tarball_path="$LOCAL_IMAGES_DIR/$tarball"
+    if [ -f "$tarball_path" ]; then
+        echo "Found local image $tarball, loading into podman..."
+        if podman load -i "$tarball_path"; then
+            echo "Successfully loaded $tarball."
+        else
+            echo "Warning: Failed to load $tarball." >&2
+        fi
+    else
+        echo "Local image $tarball not found, will pull from remote registry if needed."
+    fi
+done
+# --- End of Pre-load section ---
+
 # Docker volume setup - using a named volume for persistent storage
 VOLUME_NAME="ntn-dev-data"
 echo "Ensuring Docker volume '$VOLUME_NAME' exists..."
@@ -79,7 +103,7 @@ echo "Starting build process..."
     #podman rm -f ntn-dev && \
     #podman container prune -f && \
     podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
-    podman run -d -p 8080:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
+    podman run -d -p 8085:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
     exit 1
