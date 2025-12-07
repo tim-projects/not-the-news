@@ -31,18 +31,18 @@ echo "Set EMAIL: $EMAIL (dev mode)"
 # Docker volume setup - using a named volume for persistent storage
 VOLUME_NAME="ntn-dev-data"
 echo "Ensuring Docker volume '$VOLUME_NAME' exists..."
-sudo podman volume create "$VOLUME_NAME" || true # Create if it doesn't exist
+podman volume create "$VOLUME_NAME" || true # Create if it doesn't exist
 
 # Ensure the Docker volume is cleaned up on exit (optional, for dev convenience)
-# trap "echo 'Cleaning up Docker volume: $VOLUME_NAME'; sudo podman volume rm -f $VOLUME_NAME" EXIT
+# trap "echo 'Cleaning up Docker volume: $VOLUME_NAME'; podman volume rm -f $VOLUME_NAME" EXIT
 
 # Populate the volume with test data
-ARCHIVE_PATH="/mnt/host_shares/data/home/tim/git/not-the-news/backup/ntn-test-data.tar.gz"
+HOST_BACKUP_DIR="$(pwd)/backup"
+ARCHIVE_PATH="$HOST_BACKUP_DIR/ntn-test-data.tar.gz"
 CONTAINER_MOUNT_PATH="/data" # This is where the volume is mounted in the container
-HOST_BACKUP_DIR="/mnt/host_shares/data/home/tim/git/not-the-news/backup"
 
 echo "Populating volume '$VOLUME_NAME' with data from '$ARCHIVE_PATH'..."
-sudo podman run --rm \
+podman run --rm \
     -v "$VOLUME_NAME:$CONTAINER_MOUNT_PATH" \
     -v "$HOST_BACKUP_DIR:/host_backup" \
     alpine:latest sh -c "\
@@ -76,16 +76,16 @@ echo "Starting build process..."
 (
     set -x  # Show git/podman commands
     #git pull && \
-    #sudo podman rm -f ntn-dev && \
-    #sudo podman container prune -f && \
-    sudo podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
-    sudo podman run -d -p 8080:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
+    #podman rm -f ntn-dev && \
+    #podman container prune -f && \
+    podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
+    podman run -d -p 8080:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
     exit 1
 }
 
 # Optional Cleanup
-# sudo podman image prune -f
-# sudo podman builder prune -f
+# podman image prune -f
+# podman builder prune -f
 # podman buildx rm caddy-builder --force
