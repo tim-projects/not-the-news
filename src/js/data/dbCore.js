@@ -30,11 +30,6 @@ export const OBJECT_STORES_SCHEMA = [{
     options: { autoIncrement: true },
     indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
 }, {
-    name: 'read',
-    keyPath: 'id',
-    options: { autoIncrement: true },
-    indexes: [{ name: 'guid', keyPath: 'guid', options: { unique: true } }]
-}, {
     name: 'currentDeckGuids', // NOTE: This store now holds full objects, not just GUIDs.
     keyPath: 'id',
     options: { autoIncrement: true },

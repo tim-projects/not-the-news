@@ -26,18 +26,78 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # Use npm ci for clean install if package-lock.json exists, otherwise npm install
 RUN npm ci || npm install
+# Install Playwright dependencies and browsers
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm-dev \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libxss1 \
+    libxtst6 \
+    libappindicator3-1 \
+    libdbus-glib-1-2 \
+    libgconf-2-4 \
+    libnotify4 \
+    libsecret-1-0 \
+    libvulkan1 \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && npx playwright install chromium --with-deps
 # Copy all source files required for the build (e.g., src/, public/ if any)
 COPY . .
-# Run the Vite build command to generate the 'www' directory
-# This uses the `build` script we added to your package.json
-RUN npm run build
-#RUN mv /app/www/src/index.html /app/www/ && \
-#    mv /app/www/src/login.html /app/www/ && \
-#    rm -r /app/www/src
 
 ##############################################################################
 # 1. Base image (now main Caddy stage)
 FROM docker.io/library/caddy:2-alpine
+
+# Install Node.js and npm for Playwright
+RUN apk add --no-cache nodejs npm
+
+# Install Playwright dependencies and browsers (Alpine-specific)
+# These are the minimal dependencies for Chromium on Alpine as per Playwright documentation
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    icu-libs \
+    libwebp \
+    libxml2 \
+    libxslt \
+    ttf-freefont \
+    fontconfig \
+    gobject-introspection \
+    gtk+3.0 \
+    pango \
+    cairo \
+    cups-libs \
+    dbus-libs \
+    gdk-pixbuf \
+    glib \
+    libxcomposite \
+    libxdamage \
+    libxext \
+    libxfixes \
+    libxrandr \
+    libxrender \
+    mesa-dri-gallium \
+    # Removed wayland-libs and xkbcommon-libs as they are not found in Alpine
+    # Added libstdc++ for general compatibility
+    libstdc++ \
+    && npm install -g playwright \
+    && npx playwright install
 
 # Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
 RUN apk add --no-cache brotli-libs redis
@@ -94,7 +154,9 @@ COPY rss/ /rss/
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
+RUN npm install @playwright/test
 COPY src/api.py /app/www/api.py
+COPY tests/console.spec.js /app/tests/console.spec.js
 
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json

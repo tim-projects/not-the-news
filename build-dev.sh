@@ -76,8 +76,8 @@ echo "Starting build process..."
 (
     set -x  # Show git/podman commands
     #git pull && \
-    sudo podman rm -f ntn-dev && \
-    sudo podman container prune -f && \
+    #sudo podman rm -f ntn-dev && \
+    #sudo podman container prune -f && \
     sudo podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
     sudo podman run -d -p 8080:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
 ) || {
