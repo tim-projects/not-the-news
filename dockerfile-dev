@@ -67,37 +67,7 @@ RUN apk add --no-cache nodejs npm
 
 # Install Playwright dependencies and browsers (Alpine-specific)
 # These are the minimal dependencies for Chromium on Alpine as per Playwright documentation
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    icu-libs \
-    libwebp \
-    libxml2 \
-    libxslt \
-    ttf-freefont \
-    fontconfig \
-    gobject-introspection \
-    gtk+3.0 \
-    pango \
-    cairo \
-    cups-libs \
-    dbus-libs \
-    gdk-pixbuf \
-    glib \
-    libxcomposite \
-    libxdamage \
-    libxext \
-    libxfixes \
-    libxrandr \
-    libxrender \
-    mesa-dri-gallium \
-    # Removed wayland-libs and xkbcommon-libs as they are not found in Alpine
-    # Added libstdc++ for general compatibility
-    libstdc++ \
-    && npm install -g playwright \
-    && npx playwright install
+RUN apk add --no-cache     chromium     nss     freetype     harfbuzz     icu-libs     libwebp     libxml2     libxslt     ttf-freefont     fontconfig     gobject-introspection     gtk+3.0     pango     cairo     cups-libs     dbus-libs     gdk-pixbuf     glib     libxcomposite     libxdamage     libxext     libxfixes     libxrandr     libxrender     mesa-dri-gallium     libstdc++     && npm install -g playwright     && npx playwright install chromium
 
 # Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
 RUN apk add --no-cache brotli-libs redis
@@ -157,6 +127,8 @@ COPY --from=frontend-builder /app/www/ /app/www/
 RUN npm install @playwright/test
 COPY src/api.py /app/www/api.py
 COPY playwright.config.js /app/playwright.config.js
+# Ensure clean copy of ui.spec.js by removing any old version first
+RUN rm -f /app/tests/ui.spec.js
 COPY tests/ /app/tests/
 
 # Copy initial configuration files into the image

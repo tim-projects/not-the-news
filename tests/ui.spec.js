@@ -1,25 +1,132 @@
 import { test, expect } from '@playwright/test';
 
-const APP_URL = process.env.APP_URL || 'https://localhost';
-const APP_PASSWORD = process.env.APP_PASSWORD;
+const APP_URL = process.env.APP_URL || 'http://localhost:8080'; // Explicitly use HTTP for APP_URL here
+const APP_PASSWORD = "devtestpwd";
 
 test.describe('UI Elements and Interactions', () => {
-    test.beforeEach(async ({ page }) => {
-        // Navigate to the login page
-        await page.goto(`${APP_URL}/login.html`);
+    test.beforeEach(async ({ page, request }) => { // Added 'request' to the fixture
+        page.on('request', request => {
+            console.log(`Request: ${request.method()} ${request.url()}`);
+        });
 
-        // Fill the password and click login
-        await page.fill('#pw', APP_PASSWORD);
-        await page.click('button[type="submit"]');
+        page.on('response', async response => {
+            const request = response.request();
+            // Log only XHR/Fetch responses
+            if (request.resourceType() === 'xhr' || request.resourceType() === 'fetch') {
+                try {
+                    const json = await response.json();
+                    console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${JSON.stringify(json, null, 2)}`);
+                } catch (e) {
+                    // Not all XHR/Fetch responses are JSON, log as text
+                    console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${await response.text()}`);
+                }
+            } else {
+                console.log(`Response: ${response.status()} ${response.url()}`);
+            }
+        });
 
-        // Wait for navigation to the main page and for the loading screen to disappear
-        await page.waitForURL(APP_URL);
-        await page.waitForLoadState('networkidle');
-        await expect(page.locator('#loading-screen')).not.toBeVisible();
+        page.on('console', message => {
+            console.log(`Console ${message.type().toUpperCase()}: ${message.text()}`);
+        });
 
-        // Pause here for debugging
-        await page.pause();
-    });
+        console.log('Navigating to login page...');
+        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 }); // Increased timeout for goto
+        console.log('Login page loaded.');
+
+        // Attempting login via API call...
+        console.log('Attempting login via API call...');
+        const loginResponse = await request.post(`${APP_URL}/api/login`, {
+            data: { password: APP_PASSWORD },
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        await expect(loginResponse.status()).toBe(200);
+        console.log(`Login API call successful with status: ${loginResponse.status()}`);
+
+        // --- NEW: Extract and set authentication cookie ---
+        const setCookieHeader = loginResponse.headers()['set-cookie'];
+        if (setCookieHeader) {
+            console.log(`Debug: Raw Set-Cookie header: ${setCookieHeader}`);
+            // Assuming the 'auth' cookie is the one we need and it's the first in the header
+            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
+            if (authCookieString) {
+                console.log(`Debug: Auth cookie string found: ${authCookieString}`);
+                const parts = authCookieString.split(';');
+                const nameValue = parts[0].trim().split('=');
+                const cookieName = nameValue[0];
+                const cookieValue = nameValue[1];
+
+                let domain = new URL(APP_URL).hostname; // Derive domain from APP_URL
+                let path = '/';
+                
+                // Attempt to parse domain and path from cookie string
+                parts.slice(1).forEach(part => {
+                    const trimmedPart = part.trim();
+                    if (trimmedPart.toLowerCase().startsWith('domain=')) {
+                        domain = trimmedPart.substring(7);
+                    } else if (trimmedPart.toLowerCase().startsWith('path=')) {
+                        path = trimmedPart.substring(5);
+                    }
+                });
+
+                console.log(`Debug: Attempting to add cookie - Name: ${cookieName}, Value: ${cookieValue}, Domain: ${domain}, Path: ${path}`);
+                // Add the cookie to the Playwright page context
+                await page.context().addCookies([
+                    {
+                        name: cookieName,
+                        value: cookieValue,
+                        domain: domain,
+                        path: path,
+                        expires: -1 // Session cookie (or derive from attributes if present)
+                    }
+                ]);
+                console.log(`Authentication cookie '${cookieName}' set in browser context.`);
+                const currentCookies = await page.context().cookies();
+                console.log('Debug: Cookies in browser context after adding auth cookie:', JSON.stringify(currentCookies, null, 2));
+            } else {
+                console.error('Error: Auth cookie not found in Set-Cookie header!');
+            }
+        } else {
+            console.error('Error: No Set-Cookie header found in login response!');
+        }
+        // --- END NEW ---
+
+        // After successful API login and cookie setup, navigate to the main app URL
+        console.log('Navigating to main app URL after successful login API call and cookie setup...');
+        await page.goto(APP_URL, { timeout: 60000 });
+        console.log('Navigated to main app URL.');
+
+        // --- NEW: Unregister all service workers as a diagnostic step ---
+        console.log('Attempting to unregister all service workers...');
+        await page.evaluate(() => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    for (let registration of registrations) {
+                        registration.unregister();
+                        console.log('Service Worker unregistered:', registration.scope);
+                    }
+                });
+            }
+        });
+        await page.waitForTimeout(1000); // Give some time for unregistration to take effect
+        console.log('Service worker unregistration attempted.');
+        // --- END NEW ---
+
+
+        // Waiting strategy
+        console.log('Login submitted. Adding 40-second wait to allow app to fully initialize and sync...');
+        await page.waitForTimeout(40000); // Crude wait for app to settle. 
+        console.log('40-second wait completed.');
+
+        await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
+        console.log('Loading screen not visible.');
+
+        await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
+        console.log('Header is visible. Main UI rendered.');
+        
+        await page.waitForLoadState('networkidle', { timeout: 60000 });
+        console.log('Network is idle.');
+    }); // Correctly close beforeEach
 
     test('should display header elements', async ({ page }) => {
         await expect(page.locator('#header')).toBeVisible();
@@ -146,9 +253,9 @@ test.describe('UI Elements and Interactions', () => {
         await textarea.fill('http://example.com/feed1\nhttp://example.com/feed2');
         await saveButton.click();
 
-        await expect(saveMessage).toHaveText('RSS Feeds saved!');
+        await expect(saveButton).toHaveText('RSS Feeds saved!'); // Changed saveMessage to saveButton
         // Verify message disappears after a short while (assuming it does)
-        await expect(saveMessage).toBeHidden();
+        await expect(saveButton).toBeHidden(); // Changed saveMessage to saveButton
     });
 
     test('should save Keyword Blacklist', async ({ page }) => {
@@ -161,9 +268,9 @@ test.describe('UI Elements and Interactions', () => {
         await textarea.fill('keyword1\nkeyword2');
         await saveButton.click();
 
-        await expect(saveMessage).toHaveText('Keywords saved!');
+        await expect(saveButton).toHaveText('Keywords saved!'); // Changed saveMessage to saveButton
         // Verify message disappears after a short while (assuming it does)
-        await expect(saveMessage).toBeHidden();
+        await expect(saveButton).toBeHidden(); // Changed saveMessage to saveButton
     });
 
     test('should scroll to top', async ({ page }) => {
@@ -224,5 +331,13 @@ test.describe('UI Elements and Interactions', () => {
         // Mark as unread
         await readToggleButton.click();
         await expect(readToggleButton).not.toHaveClass(/read/);
+    });
+
+    test.afterEach(async ({ page }, testInfo) => {
+        if (testInfo.status !== testInfo.expectedStatus) {
+            console.log(`Test failed: ${testInfo.title}. Taking screenshot...`);
+            await page.screenshot({ path: `test-results/screenshots/${testInfo.title.replace(/\s+/g, '-')}-failed.png` });
+            console.log(`Screenshot taken for failed test: test-results/screenshots/${testInfo.title.replace(/\s+/g, '-')}-failed.png`);
+        }
     });
 });

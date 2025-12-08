@@ -2,9 +2,285 @@
 
 ```yaml
 - generic [ref=e2]:
-  - heading "Not The News" [level=2] [ref=e4]
-  - generic [ref=e5]:
-    - paragraph [ref=e6]: "Please log in below. Enter the password you used when building the docker container:"
-    - textbox "Enter password" [ref=e7]
-    - button "Login" [ref=e8] [cursor=pointer]
+  - banner [ref=e3]:
+    - heading "Not The News" [level=2] [ref=e4]
+    - generic [ref=e5]:
+      - button "2" [ref=e6] [cursor=pointer]:
+        - img [ref=e7]
+        - generic [ref=e13]: "2"
+      - button "Settings" [active] [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - button "Close" [ref=e21] [cursor=pointer]: ✕
+        - heading "She didn't forget the Cherry on Top!" [level=1] [ref=e23]:
+          - link "She didn't forget the Cherry on Top!" [ref=e24] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Unexpected/comments/1kjlei6/she_didnt_forget_the_cherry_on_top/
+        - button "Star" [ref=e25] [cursor=pointer]: ★
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - paragraph [ref=e28]: "Source: reddit.com/r/Unexpected"
+          - paragraph [ref=e29]: Sat, 10 May 2025, 21:54
+        - generic [ref=e30]:
+          - text: submitted by
+          - link "/u/Better-Turnip-226" [ref=e31] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Better-Turnip-226
+          - text: to
+          - link "r/Unexpected" [ref=e32] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Unexpected/
+          - link "[link]" [ref=e34] [cursor=pointer]:
+            - /url: https://v.redd.it/lvmwcuyd010f1
+          - link "[comments]" [ref=e36] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Unexpected/comments/1kjlei6/she_didnt_forget_the_cherry_on_top/
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - button "Close" [ref=e39] [cursor=pointer]: ✕
+        - heading "Maybe you would see her thoughts too" [level=1] [ref=e41]:
+          - link "Maybe you would see her thoughts too" [ref=e42] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/technicallythetruth/comments/1kjiumf/maybe_you_would_see_her_thoughts_too/
+        - button "Star" [ref=e43] [cursor=pointer]: ★
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - paragraph [ref=e46]: "Source: reddit.com/r/technicallythetruth"
+          - paragraph [ref=e47]: Sat, 10 May 2025, 19:57
+        - generic [ref=e48]:
+          - link:
+            - /url: https://old.reddit.com/r/technicallythetruth/comments/1kjiumf/maybe_you_would_see_her_thoughts_too/
+          - link:
+            - /url: https://preview.redd.it/l5s2rmrgf00f1.png?width=640&crop=smart&auto=webp&s=d4a6187ca204c8c6ac73009bbb274a8508be15b7
+          - text: submitted by
+          - link "/u/Key_Associate7476" [ref=e49] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Key_Associate7476
+          - text: to
+          - link "r/technicallythetruth" [ref=e50] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/technicallythetruth/
+          - link "[link]" [ref=e52] [cursor=pointer]:
+            - /url: https://i.redd.it/l5s2rmrgf00f1.png
+          - link "[comments]" [ref=e54] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/technicallythetruth/comments/1kjiumf/maybe_you_would_see_her_thoughts_too/
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - button "Close" [ref=e57] [cursor=pointer]: ✕
+        - heading "Truly \"Nothing else needs to be said\"" [level=1] [ref=e59]:
+          - link "Truly \"Nothing else needs to be said\"" [ref=e60] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/comments/1kjh9sf/truly_nothing_else_needs_to_be_said/
+        - button "Star" [ref=e61] [cursor=pointer]: ★
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: "Source: reddit.com/r/RealTwitterAccounts"
+          - paragraph [ref=e65]: Sat, 10 May 2025, 18:44
+        - generic [ref=e66]:
+          - link:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/comments/1kjh9sf/truly_nothing_else_needs_to_be_said/
+          - link:
+            - /url: https://preview.redd.it/ani222ai200f1.png?width=640&crop=smart&auto=webp&s=a2984904feb87a4f3eb3c2f4685a92a003b29649
+          - text: submitted by
+          - link "/u/Upper_Brief681" [ref=e67] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Upper_Brief681
+          - text: to
+          - link "r/RealTwitterAccounts" [ref=e68] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/
+          - link "[link]" [ref=e70] [cursor=pointer]:
+            - /url: https://i.redd.it/ani222ai200f1.png
+          - link "[comments]" [ref=e72] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/comments/1kjh9sf/truly_nothing_else_needs_to_be_said/
+    - generic [ref=e73]:
+      - generic [ref=e74]:
+        - button "Close" [ref=e75] [cursor=pointer]: ✕
+        - heading "Salvia trip" [level=1] [ref=e77]:
+          - link "Salvia trip" [ref=e78] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Salvia/comments/1kjadkd/salvia_trip/
+        - button "Star" [ref=e79] [cursor=pointer]: ★
+      - generic [ref=e80]:
+        - generic [ref=e81]:
+          - paragraph [ref=e82]: "Source: reddit.com/r/Salvia"
+          - paragraph [ref=e83]: Sat, 10 May 2025, 13:31
+        - generic [ref=e84]:
+          - paragraph [ref=e86]: I took some Salvia last night, it’s illegal in my state so idk if it was legit or not. But I basically just turned into a tree except my perception of time was weird. There was no day or night just kind of this in between state, and I think I might have been there for 100 years or something. But the time perception was weird so it didn’t feel like a hundred years, it felt like closer to maybe 5 years. But I started as a seed that fell to the ground and I rooted myself in the ground and start growing, my roots felt like tentacles moving around in the ground looking for water and nutrients constantly, and I could consciously move them around. Eventually I started to feel this growing “aching” pain and started losing control of different roots and branches and then I just opened my eyes and I was in my garage again
+          - text: submitted by
+          - link "/u/Hot_Sherbert7586" [ref=e87] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Hot_Sherbert7586
+          - link "[link]" [ref=e89] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Salvia/comments/1kjadkd/salvia_trip/
+          - link "[comments]" [ref=e91] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Salvia/comments/1kjadkd/salvia_trip/
+    - generic [ref=e92]:
+      - generic [ref=e93]:
+        - button "Close" [ref=e94] [cursor=pointer]: ✕
+        - heading "Strange creature/figure spotted in the water at night off the coast of Sicily. Diver with headlamp or bioluminescent creature?" [level=1] [ref=e96]:
+          - link "Strange creature/figure spotted in the water at night off the coast of Sicily. Diver with headlamp or bioluminescent creature?" [ref=e97] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/HighStrangeness/comments/1kj98uf/strange_creaturefigure_spotted_in_the_water_at/
+        - button "Star" [ref=e98] [cursor=pointer]: ★
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - paragraph [ref=e101]: "Source: reddit.com/r/HighStrangeness"
+          - paragraph [ref=e102]: Sat, 10 May 2025, 12:34
+        - generic [ref=e103]:
+          - link:
+            - /url: https://old.reddit.com/r/HighStrangeness/comments/1kj98uf/strange_creaturefigure_spotted_in_the_water_at/
+          - link:
+            - /url: https://external-preview.redd.it/d2J3YjAyemo4eXplMe-dGVITcW-8hW-CV1iKQsFJLCgmsB_7nhVEtMXKlUmu.png?width=320&crop=smart&auto=webp&s=65fa134a0088463169a0e8163a7018de8c51a19b
+          - paragraph [ref=e105]: A friend showed me this video a few days ago while we were at the same spot on the coast in Scopello, Sicily. It was shown to her two years ago by a traveller she had met at the same location. The light immediately makes me think it’s a person diving at night with a torch, but the serpent shaped body and what seems like a spine along the back makes me question everything. What the hell is this?
+          - text: submitted by
+          - link "/u/wehaveavisual" [ref=e106] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/wehaveavisual
+          - link "[link]" [ref=e108] [cursor=pointer]:
+            - /url: https://v.redd.it/rnc6b1dk8yze1
+          - link "[comments]" [ref=e110] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/HighStrangeness/comments/1kj98uf/strange_creaturefigure_spotted_in_the_water_at/
+    - generic [ref=e111]:
+      - generic [ref=e112]:
+        - button "Close" [ref=e113] [cursor=pointer]: ✕
+        - heading "I did it! 1 day without porn" [level=1] [ref=e115]:
+          - link "I did it! 1 day without porn" [ref=e116] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/addiction/comments/1kivdi9/i_did_it_1_day_without_porn/
+        - button "Star" [ref=e117] [cursor=pointer]: ★
+      - generic [ref=e118]:
+        - generic [ref=e119]:
+          - paragraph [ref=e120]: "Source: reddit.com/r/addiction"
+          - paragraph [ref=e121]: Fri, 9 May 2025, 22:38
+        - generic [ref=e122]:
+          - link:
+            - /url: https://old.reddit.com/r/addiction/comments/1kivdi9/i_did_it_1_day_without_porn/
+          - link:
+            - /url: https://preview.redd.it/86i11l7c3uze1.jpeg?width=640&crop=smart&auto=webp&s=23a924feb394dcab57af4a7641e78aa3175c4a43
+          - paragraph [ref=e124]: I really made it and I didn’t watch porn for a day after 1 month streak but unfortunately it didn’t last long I did find my self watching porn 15 min ago 😥
+          - text: submitted by
+          - link "/u/Exhorte" [ref=e125] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Exhorte
+          - link "[link]" [ref=e127] [cursor=pointer]:
+            - /url: https://i.redd.it/86i11l7c3uze1.jpeg
+          - link "[comments]" [ref=e129] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/addiction/comments/1kivdi9/i_did_it_1_day_without_porn/
+    - generic [ref=e130]:
+      - generic [ref=e131]:
+        - button "Close" [ref=e132] [cursor=pointer]: ✕
+        - heading "I’ve spent $127k on Upwork. AMA." [level=1] [ref=e134]:
+          - link "I’ve spent $127k on Upwork. AMA." [ref=e135] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Upwork/comments/1k28f64/ive_spent_127k_on_upwork_ama/
+        - button "Star" [ref=e136] [cursor=pointer]: ★
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - paragraph [ref=e139]: "Source: reddit.com/r/Upwork"
+          - paragraph [ref=e140]: Fri, 18 Apr 2025, 15:59
+        - generic [ref=e141]:
+          - link:
+            - /url: https://old.reddit.com/r/Upwork/comments/1k28f64/ive_spent_127k_on_upwork_ama/
+          - link:
+            - /url: https://preview.redd.it/dosl6bc09mve1.jpeg?width=320&crop=smart&auto=webp&s=ca4b71beb1df83101944f7dc62110887c319e991
+          - generic [ref=e142]:
+            - paragraph [ref=e143]: Our agency consistently hires talent on Upwork for a range of roles (Web dev, video editors, graphic designers, 3D artists, VA’s, etc.) and I’m surprised by how bad the quality of proposals has gotten over the past year. Most applicants are clearly using AI for their responses and many times they don’t even make sense given the role.
+            - paragraph [ref=e144]: I ask within each job post to tell me what your favorite color is to know you read through the post and I’d say 50-60% don’t answer this question. Even if your portfolio is amazing, I won’t move forward with an application who doesn’t read everything and respond accordingly.
+            - paragraph [ref=e145]: "Here is what I look for in posts: 1: You clearly read the post (and not just an AI regurgitation of the post in the first line) 2: Answer what the post asks. If the post is for a “UGC video editor” and we are looking for specific examples, don’t just sent a link to your website that has a million different types of creative you’ve edited. Be intention in what you send. I’ve hired people instantly when they show us exactly what we are looking for. 3: I’d favor a 4 line response that tells me everything I need to know then a generic 1000 word template that has a ton of emojis, no clear direction and language that is so broad its meaningless."
+            - paragraph [ref=e146]: I understand on the Freelancer side its a numbers game but the lack of effort in proposals is wild to me.
+            - paragraph [ref=e147]: I was on the Freelancer side ~5 years ago and I’m happy to answer any questions to help you win more jobs.
+            - paragraph [ref=e148]: I can provide proof if it’s really needed and no I am not selling anything.
+          - text: submitted by
+          - link "/u/ad_tilt" [ref=e149] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/ad_tilt
+          - link "[link]" [ref=e151] [cursor=pointer]:
+            - /url: https://i.redd.it/dosl6bc09mve1.jpeg
+          - link "[comments]" [ref=e153] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Upwork/comments/1k28f64/ive_spent_127k_on_upwork_ama/
+    - generic [ref=e154]:
+      - generic [ref=e155]:
+        - button "Close" [ref=e156] [cursor=pointer]: ✕
+        - heading "Fashion Metaverse" [level=1] [ref=e158]:
+          - link "Fashion Metaverse" [ref=e159] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/metaverse/comments/1jz4ex8/fashion_metaverse/
+        - button "Star" [ref=e160] [cursor=pointer]: ★
+      - generic [ref=e161]:
+        - generic [ref=e162]:
+          - paragraph [ref=e163]: "Source: reddit.com/r/metaverse"
+          - paragraph [ref=e164]: Mon, 14 Apr 2025, 17:20
+        - generic [ref=e165]:
+          - paragraph [ref=e167]: Are there people here who buy clothes for metaverse at dressx?
+          - text: submitted by
+          - link "/u/MamaDesaster" [ref=e168] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/MamaDesaster
+          - link "[link]" [ref=e170] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/metaverse/comments/1jz4ex8/fashion_metaverse/
+          - link "[comments]" [ref=e172] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/metaverse/comments/1jz4ex8/fashion_metaverse/
+    - generic [ref=e173]:
+      - generic [ref=e174]:
+        - button "Close" [ref=e175] [cursor=pointer]: ✕
+        - heading "The Quantum Apocalypse Is Coming. Be Very Afraid" [level=1] [ref=e177]:
+          - link "The Quantum Apocalypse Is Coming. Be Very Afraid" [ref=e178] [cursor=pointer]:
+            - /url: https://www.wired.com/story/q-day-apocalypse-quantum-computers-encryption/
+        - button "Star" [ref=e179] [cursor=pointer]: ★
+      - generic [ref=e180]:
+        - generic [ref=e181]:
+          - paragraph [ref=e182]: "Source: removepaywalls.com"
+          - paragraph [ref=e183]: Mon, 24 Mar 2025, 10:00
+        - paragraph [ref=e185]: What happens when quantum computers can finally crack encryption and break into the world’s best-kept secrets? It’s called Q-Day—the worst holiday maybe ever.
+    - generic [ref=e186]:
+      - generic [ref=e187]:
+        - button "Close" [ref=e188] [cursor=pointer]: ✕
+        - heading "This subreddit is closed for new posts and comments. For future updates, announcements, and news related to Reddit Inc. and the platform, please visit r/reddit." [level=1] [ref=e190]:
+          - link "This subreddit is closed for new posts and comments. For future updates, announcements, and news related to Reddit Inc. and the platform, please visit r/reddit." [ref=e191] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/announcements/comments/t93ec3/this_subreddit_is_closed_for_new_posts_and/
+        - button "Star" [ref=e192] [cursor=pointer]: ★
+      - generic [ref=e193]:
+        - generic [ref=e194]:
+          - paragraph [ref=e195]: "Source: reddit.com/r/announcements"
+          - paragraph [ref=e196]: Tue, 8 Mar 2022, 00:02
+        - generic [ref=e197]:
+          - text: submitted by
+          - link "/u/kethryvis" [ref=e198] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/kethryvis
+          - link "[link]" [ref=e200] [cursor=pointer]:
+            - /url: https://www.reddit.com/r/reddit/
+          - link "[comments]" [ref=e202] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/announcements/comments/t93ec3/this_subreddit_is_closed_for_new_posts_and/
+  - generic [ref=e204]:
+    - button "✕" [ref=e205] [cursor=pointer]
+    - generic [ref=e206]:
+      - heading "APP" [level=2] [ref=e207]
+      - generic [ref=e208]:
+        - generic [ref=e209]: "Filter View:"
+        - combobox "Filter View:" [ref=e210] [cursor=pointer]:
+          - option "Unread" [selected]
+          - option "Starred (6)"
+          - option "Read (5)"
+          - option "All"
+      - heading "SETTINGS" [level=2] [ref=e211]
+      - generic [ref=e212]:
+        - generic [ref=e213]: Auto-Sync Feed
+        - generic [ref=e214]:
+          - generic [ref=e215]: "On"
+          - generic [ref=e216]:
+            - checkbox "Auto-Sync Feed" [checked]
+      - generic [ref=e218]:
+        - generic [ref=e219]: Theme
+        - generic [ref=e220]:
+          - generic [ref=e221]: dark
+          - generic [ref=e222]:
+            - checkbox "Theme" [checked]
+      - generic [ref=e224]:
+        - generic [ref=e225]: Show Images
+        - generic [ref=e226]:
+          - generic [ref=e227]: "On"
+          - generic [ref=e228]:
+            - checkbox "Show Images" [checked]
+      - generic [ref=e230]:
+        - generic [ref=e231]: Open Links in New Tab
+        - generic [ref=e232]:
+          - generic [ref=e233]: "Yes"
+          - generic [ref=e234]:
+            - checkbox "Open Links in New Tab" [checked]
+      - separator [ref=e236]
+      - generic [ref=e237]:
+        - generic [ref=e238]: RSS Feeds
+        - button "Configure" [ref=e239] [cursor=pointer]
+      - generic [ref=e240]:
+        - generic [ref=e241]: Keyword Blacklist
+        - button "Configure" [ref=e242] [cursor=pointer]
+      - separator [ref=e243]
+      - generic [ref=e244]:
+        - generic [ref=e245]: Install as App
+        - button "Install as App" [ref=e246] [cursor=pointer]: Install
+  - button "Scroll to top" [ref=e247] [cursor=pointer]:
+    - img [ref=e248]
 ```

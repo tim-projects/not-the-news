@@ -16,3 +16,9 @@ __pycache__
 ./rssFeeds.json
 .gemini*
 docker-images
+test-results/
+playwright_session.log
+playwright_test_output.log
+podman_full_logs.log
+screenshot.png
+screenshot2.png

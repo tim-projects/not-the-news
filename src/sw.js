@@ -63,3 +63,11 @@ registerRoute(
     ],
   })
 );
+
+// --- NEW: Add a route to bypass the service worker for API calls ---
+import { NetworkOnly } from 'workbox-strategies';
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/'),
+  new NetworkOnly()
+);
+// --- END NEW ---

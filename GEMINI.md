@@ -21,11 +21,13 @@ This document guides the agent's interaction with the project.
 ### Testing in dev container
 **Note:** All testing from this point forward should be performed within the `ntn-dev` Podman container, which is built and run using `bash build-dev.sh`.
 
-- **Run Playwright to get the console logs:** Execute `podman exec ntn-dev npx playwright test tests/console.spec.js'
-- **Testing Workflow:**
-  1.  Create a specific Playwright test for the functionality.
-  2.  Run the test and analyze the output.
-  3.  Only ask for user confirmation if the behavior is ambiguous.
+- **Run Playwright tests within the dev container:**
+  1.  Execute your Playwright test command (e.g., `podman exec ntn-dev npx playwright test tests/ui.spec.js`) to run tests and generate results.
+- **Download Test Results to Host:**
+  1.  After running tests, execute `bash download_test_results.sh` to copy all generated test artifacts (screenshots, logs) to your host machine, ensuring correct file structure.
+- **Analyze Output:**
+  1.  Review the downloaded test results, particularly the screenshots in `test-results/screenshots/` and the console log in `playwright_test_output.log`.
+  2.  Only ask for user confirmation if the behavior is ambiguous or requires further investigation.
 
 ### Workflow Management
 - **Issues:** Log new issues in `issues.md`. Work through them one by one. Resolved issues should be moved to `tasks-completed.md`.

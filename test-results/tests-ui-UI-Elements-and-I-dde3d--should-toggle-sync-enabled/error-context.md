@@ -2,9 +2,299 @@
 
 ```yaml
 - generic [ref=e2]:
-  - heading "Not The News" [level=2] [ref=e4]
-  - generic [ref=e5]:
-    - paragraph [ref=e6]: "Please log in below. Enter the password you used when building the docker container:"
-    - textbox "Enter password" [ref=e7]
-    - button "Login" [ref=e8] [cursor=pointer]
+  - banner [ref=e3]:
+    - heading "Not The News" [level=2] [ref=e4]
+    - generic [ref=e5]:
+      - button "2" [ref=e6] [cursor=pointer]:
+        - img [ref=e7]
+        - generic [ref=e13]: "2"
+      - button "Settings" [active] [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - button "Close" [ref=e21] [cursor=pointer]: ✕
+        - heading "She didn't forget the Cherry on Top!" [level=1] [ref=e23]:
+          - link "She didn't forget the Cherry on Top!" [ref=e24] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Unexpected/comments/1kjlei6/she_didnt_forget_the_cherry_on_top/
+        - button "Star" [ref=e25] [cursor=pointer]: ★
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - paragraph [ref=e28]: "Source: reddit.com/r/Unexpected"
+          - paragraph [ref=e29]: Sat, 10 May 2025, 21:54
+        - generic [ref=e30]:
+          - text: submitted by
+          - link "/u/Better-Turnip-226" [ref=e31] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Better-Turnip-226
+          - text: to
+          - link "r/Unexpected" [ref=e32] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Unexpected/
+          - link "[link]" [ref=e34] [cursor=pointer]:
+            - /url: https://v.redd.it/lvmwcuyd010f1
+          - link "[comments]" [ref=e36] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Unexpected/comments/1kjlei6/she_didnt_forget_the_cherry_on_top/
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - button "Close" [ref=e39] [cursor=pointer]: ✕
+        - heading "Maybe you would see her thoughts too" [level=1] [ref=e41]:
+          - link "Maybe you would see her thoughts too" [ref=e42] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/technicallythetruth/comments/1kjiumf/maybe_you_would_see_her_thoughts_too/
+        - button "Star" [ref=e43] [cursor=pointer]: ★
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - paragraph [ref=e46]: "Source: reddit.com/r/technicallythetruth"
+          - paragraph [ref=e47]: Sat, 10 May 2025, 19:57
+        - generic [ref=e48]:
+          - link:
+            - /url: https://old.reddit.com/r/technicallythetruth/comments/1kjiumf/maybe_you_would_see_her_thoughts_too/
+          - link:
+            - /url: https://preview.redd.it/l5s2rmrgf00f1.png?width=640&crop=smart&auto=webp&s=d4a6187ca204c8c6ac73009bbb274a8508be15b7
+          - text: submitted by
+          - link "/u/Key_Associate7476" [ref=e49] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Key_Associate7476
+          - text: to
+          - link "r/technicallythetruth" [ref=e50] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/technicallythetruth/
+          - link "[link]" [ref=e52] [cursor=pointer]:
+            - /url: https://i.redd.it/l5s2rmrgf00f1.png
+          - link "[comments]" [ref=e54] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/technicallythetruth/comments/1kjiumf/maybe_you_would_see_her_thoughts_too/
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - button "Close" [ref=e57] [cursor=pointer]: ✕
+        - heading "Truly \"Nothing else needs to be said\"" [level=1] [ref=e59]:
+          - link "Truly \"Nothing else needs to be said\"" [ref=e60] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/comments/1kjh9sf/truly_nothing_else_needs_to_be_said/
+        - button "Star" [ref=e61] [cursor=pointer]: ★
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: "Source: reddit.com/r/RealTwitterAccounts"
+          - paragraph [ref=e65]: Sat, 10 May 2025, 18:44
+        - generic [ref=e66]:
+          - link:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/comments/1kjh9sf/truly_nothing_else_needs_to_be_said/
+          - link:
+            - /url: https://preview.redd.it/ani222ai200f1.png?width=640&crop=smart&auto=webp&s=a2984904feb87a4f3eb3c2f4685a92a003b29649
+          - text: submitted by
+          - link "/u/Upper_Brief681" [ref=e67] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Upper_Brief681
+          - text: to
+          - link "r/RealTwitterAccounts" [ref=e68] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/
+          - link "[link]" [ref=e70] [cursor=pointer]:
+            - /url: https://i.redd.it/ani222ai200f1.png
+          - link "[comments]" [ref=e72] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/RealTwitterAccounts/comments/1kjh9sf/truly_nothing_else_needs_to_be_said/
+    - generic [ref=e73]:
+      - generic [ref=e74]:
+        - button "Close" [ref=e75] [cursor=pointer]: ✕
+        - heading "Salvia trip" [level=1] [ref=e77]:
+          - link "Salvia trip" [ref=e78] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Salvia/comments/1kjadkd/salvia_trip/
+        - button "Star" [ref=e79] [cursor=pointer]: ★
+      - generic [ref=e80]:
+        - generic [ref=e81]:
+          - paragraph [ref=e82]: "Source: reddit.com/r/Salvia"
+          - paragraph [ref=e83]: Sat, 10 May 2025, 13:31
+        - generic [ref=e84]:
+          - paragraph [ref=e86]: I took some Salvia last night, it’s illegal in my state so idk if it was legit or not. But I basically just turned into a tree except my perception of time was weird. There was no day or night just kind of this in between state, and I think I might have been there for 100 years or something. But the time perception was weird so it didn’t feel like a hundred years, it felt like closer to maybe 5 years. But I started as a seed that fell to the ground and I rooted myself in the ground and start growing, my roots felt like tentacles moving around in the ground looking for water and nutrients constantly, and I could consciously move them around. Eventually I started to feel this growing “aching” pain and started losing control of different roots and branches and then I just opened my eyes and I was in my garage again
+          - text: submitted by
+          - link "/u/Hot_Sherbert7586" [ref=e87] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Hot_Sherbert7586
+          - link "[link]" [ref=e89] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Salvia/comments/1kjadkd/salvia_trip/
+          - link "[comments]" [ref=e91] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/Salvia/comments/1kjadkd/salvia_trip/
+    - generic [ref=e92]:
+      - generic [ref=e93]:
+        - button "Close" [ref=e94] [cursor=pointer]: ✕
+        - heading "Strange creature/figure spotted in the water at night off the coast of Sicily. Diver with headlamp or bioluminescent creature?" [level=1] [ref=e96]:
+          - link "Strange creature/figure spotted in the water at night off the coast of Sicily. Diver with headlamp or bioluminescent creature?" [ref=e97] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/HighStrangeness/comments/1kj98uf/strange_creaturefigure_spotted_in_the_water_at/
+        - button "Star" [ref=e98] [cursor=pointer]: ★
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - paragraph [ref=e101]: "Source: reddit.com/r/HighStrangeness"
+          - paragraph [ref=e102]: Sat, 10 May 2025, 12:34
+        - generic [ref=e103]:
+          - link:
+            - /url: https://old.reddit.com/r/HighStrangeness/comments/1kj98uf/strange_creaturefigure_spotted_in_the_water_at/
+          - link:
+            - /url: https://external-preview.redd.it/d2J3YjAyemo4eXplMe-dGVITcW-8hW-CV1iKQsFJLCgmsB_7nhVEtMXKlUmu.png?width=320&crop=smart&auto=webp&s=65fa134a0088463169a0e8163a7018de8c51a19b
+          - paragraph [ref=e105]: A friend showed me this video a few days ago while we were at the same spot on the coast in Scopello, Sicily. It was shown to her two years ago by a traveller she had met at the same location. The light immediately makes me think it’s a person diving at night with a torch, but the serpent shaped body and what seems like a spine along the back makes me question everything. What the hell is this?
+          - text: submitted by
+          - link "/u/wehaveavisual" [ref=e106] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/wehaveavisual
+          - link "[link]" [ref=e108] [cursor=pointer]:
+            - /url: https://v.redd.it/rnc6b1dk8yze1
+          - link "[comments]" [ref=e110] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/HighStrangeness/comments/1kj98uf/strange_creaturefigure_spotted_in_the_water_at/
+    - generic [ref=e111]:
+      - generic [ref=e112]:
+        - button "Close" [ref=e113] [cursor=pointer]: ✕
+        - heading "I did it! 1 day without porn" [level=1] [ref=e115]:
+          - link "I did it! 1 day without porn" [ref=e116] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/addiction/comments/1kivdi9/i_did_it_1_day_without_porn/
+        - button "Star" [ref=e117] [cursor=pointer]: ★
+      - generic [ref=e118]:
+        - generic [ref=e119]:
+          - paragraph [ref=e120]: "Source: reddit.com/r/addiction"
+          - paragraph [ref=e121]: Fri, 9 May 2025, 22:38
+        - generic [ref=e122]:
+          - link:
+            - /url: https://old.reddit.com/r/addiction/comments/1kivdi9/i_did_it_1_day_without_porn/
+          - link:
+            - /url: https://preview.redd.it/86i11l7c3uze1.jpeg?width=640&crop=smart&auto=webp&s=23a924feb394dcab57af4a7641e78aa3175c4a43
+          - paragraph [ref=e124]: I really made it and I didn’t watch porn for a day after 1 month streak but unfortunately it didn’t last long I did find my self watching porn 15 min ago 😥
+          - text: submitted by
+          - link "/u/Exhorte" [ref=e125] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/Exhorte
+          - link "[link]" [ref=e127] [cursor=pointer]:
+            - /url: https://i.redd.it/86i11l7c3uze1.jpeg
+          - link "[comments]" [ref=e129] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/addiction/comments/1kivdi9/i_did_it_1_day_without_porn/
+    - generic [ref=e130]:
+      - generic [ref=e131]:
+        - button "Close" [ref=e132] [cursor=pointer]: ✕
+        - heading "Deep plane face and neck lift plus upper bleph" [level=1] [ref=e134]:
+          - link "Deep plane face and neck lift plus upper bleph" [ref=e135] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/PlasticSurgery/comments/1kgr4ss/deep_plane_face_and_neck_lift_plus_upper_bleph/
+        - button "Star" [ref=e136] [cursor=pointer]: ★
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - paragraph [ref=e139]: "Source: reddit.com/r/PlasticSurgery"
+          - paragraph [ref=e140]: Wed, 7 May 2025, 07:02
+        - generic [ref=e141]:
+          - paragraph [ref=e143]: I had a deep plane neck and face lift plus upper bleph 16 days ago. I am 53. I took photos of the first few days so you can see the process. My experience was absolutely amazing. I had no pain relief from the second or third day and my recovery has been great. I also had dental work done while I was recovering which has improved my teeth. I went to Medharbour Thailand (look them up on fb aka DGB Clinic) and the cost was $9650 Australian which included my accommodation for 14 days and a majority of meals. It is a small clinic with its own operating rooms so you get really personal care and the staff were just wonderful. I was very clear that I just wanted to look fresher - not pulled back and they really listened to me. Around my eyes and upper cheeks I am still swollen but I am thrilled with the results so far particularly my neck/around my mouth. I will also get Rejuran around my eyes once I am a bit more healed.
+          - text: submitted by
+          - link "/u/MyDelilah71" [ref=e144] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/MyDelilah71
+          - link "[link]" [ref=e146] [cursor=pointer]:
+            - /url: https://www.reddit.com/gallery/1kgr4ss
+          - link "[comments]" [ref=e148] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/PlasticSurgery/comments/1kgr4ss/deep_plane_face_and_neck_lift_plus_upper_bleph/
+    - generic [ref=e149]:
+      - generic [ref=e150]:
+        - button "Close" [ref=e151] [cursor=pointer]: ✕
+        - heading "The “no sacrifice” Henrys in the FIRE community need to stop telling people to not sacrifice." [level=1] [ref=e153]:
+          - link "The “no sacrifice” Henrys in the FIRE community need to stop telling people to not sacrifice." [ref=e154] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/leanfire/comments/1kftf62/the_no_sacrifice_henrys_in_the_fire_community/
+        - button "Star" [ref=e155] [cursor=pointer]: ★
+      - generic [ref=e156]:
+        - generic [ref=e157]:
+          - paragraph [ref=e158]: "Source: reddit.com/r/leanfire"
+          - paragraph [ref=e159]: Tue, 6 May 2025, 02:07
+        - generic [ref=e160]:
+          - generic [ref=e161]:
+            - paragraph [ref=e162]: There is absolutely nothing wrong with being a Henry who can have the rich lifestyle and FIRE at the same time.
+            - paragraph [ref=e163]: However, the original concept of FIRE was ordinary income people being smart with their money so that they could retire early.
+            - paragraph [ref=e164]: I’m irritated at the number of incidents where someone with a Middle Class income will try to celebrate reaching FIRE, through sacrifice, frugality, minimalism, or over employment, and get dragged by some HENRY saying that they didn’t need to make sacrifices to retire and OP wasted their life.
+            - paragraph [ref=e165]: It basically pushes all the Middle Class people out of the main FIRE subreddit.
+            - paragraph [ref=e166]: Also it’s a show of bad social skills.
+            - paragraph [ref=e167]: What are your thoughts?
+            - paragraph [ref=e168]: (Henry= High Earner Not Rich Yet)
+          - text: submitted by
+          - link "/u/3rdthrow" [ref=e169] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/3rdthrow
+          - link "[link]" [ref=e171] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/leanfire/comments/1kftf62/the_no_sacrifice_henrys_in_the_fire_community/
+          - link "[comments]" [ref=e173] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/leanfire/comments/1kftf62/the_no_sacrifice_henrys_in_the_fire_community/
+    - generic [ref=e174]:
+      - generic [ref=e175]:
+        - button "Close" [ref=e176] [cursor=pointer]: ✕
+        - heading "I saw my brother in the astral" [level=1] [ref=e178]:
+          - link "I saw my brother in the astral" [ref=e179] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/AstralProjection/comments/1k9uhz5/i_saw_my_brother_in_the_astral/
+        - button "Star" [ref=e180] [cursor=pointer]: ★
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - paragraph [ref=e183]: "Source: reddit.com/r/AstralProjection"
+          - paragraph [ref=e184]: Mon, 28 Apr 2025, 12:37
+        - generic [ref=e185]:
+          - generic [ref=e186]:
+            - paragraph [ref=e187]: I AP’d the other day (using a guided meditation to get started) and went to a handful of amazing places - but the most impactful part was visiting my brother, who passed away 6 months ago.
+            - paragraph [ref=e188]: I was with my guide, and I asked if I could see my brother. We floated up into the sky, really high up. We landed in a room - similar to a waiting room or lobby - with blue walls and clouds all around us. There were windows, doors, and chairs, just like a normal room. I couldn’t see anything outside of the windows because it was pure bright light. There were other people in the room, too, but I didn’t take note of what they looked like.
+            - paragraph [ref=e189]: A door across from me opened and there was my brother, smiling. I felt happiness, excitement, relief, and love. I ran over to him and hugged him for a long time. He looked great.
+            - paragraph [ref=e190]: We sat together for a while and talked telepathically. I asked what he was doing up there and he said he was learning and exploring different cultures in the spirit realm. In life, he loved studying languages and geography, so this made sense. He said there was a lot to explore, and he was enjoying it.
+            - paragraph [ref=e191]: I asked if he was spending time with my grandparents, and he said sometimes, but they were doing their own thing, too.
+            - paragraph [ref=e192]: He said he was really happy and at peace, and he felt sad that I was grieving. He told me I could come visit him whenever I wanted, and we can meet in that room.
+            - paragraph [ref=e193]: When I knew it was time to go, I hugged him for a long time and said goodbye, feeling peace with the knowledge that I can come back again.
+            - paragraph [ref=e194]: After this, my guide asked me where I wanted to go next. I asked “can you teach me something?” He took me higher into space, until we were out of the Milky Way. We sat in space and he pointed out all of the galaxies around us - I could see hundreds, like stars speckled in the night sky.
+            - paragraph [ref=e195]: He talked to me about having a higher-view perspective on my life. I asked how this was all created, and he said it wasn’t created, it just “is.” And I asked, “How is that possible? It had to start from something.” And he said the best way he can explain it to me with my current understanding was that it started from love.
+            - paragraph [ref=e196]: He pulled out a book (which I understand to be the Akashic Records) and showed me two of my past lives, and things that might happen in my current life. There were lessons from my previous lives that I wasn’t incorporating into this one, so it was helpful to review those with him.
+            - paragraph [ref=e197]: When I came back into my body, I’d been crying, which I didn’t expect. Roughly an hour had passed.
+            - paragraph [ref=e198]:
+              - text: "Edit: this is the YT meditation I used:"
+              - link "https://youtu.be/qmtLndsIuQU?si=pi0kYLRbLa0iEZr4" [ref=e199] [cursor=pointer]:
+                - /url: https://youtu.be/qmtLndsIuQU?si=pi0kYLRbLa0iEZr4
+            - paragraph [ref=e200]: I found equal (or greater) success listening to Hz frequencies on YT in the past, but I’m out of practice, so the guided meditation helped.
+          - text: submitted by
+          - link "/u/aphaesh" [ref=e201] [cursor=pointer]:
+            - /url: https://old.reddit.com/user/aphaesh
+          - link "[link]" [ref=e203] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/AstralProjection/comments/1k9uhz5/i_saw_my_brother_in_the_astral/
+          - link "[comments]" [ref=e205] [cursor=pointer]:
+            - /url: https://old.reddit.com/r/AstralProjection/comments/1k9uhz5/i_saw_my_brother_in_the_astral/
+    - generic [ref=e206]:
+      - generic [ref=e207]:
+        - button "Close" [ref=e208] [cursor=pointer]: ✕
+        - heading "The Quantum Apocalypse Is Coming. Be Very Afraid" [level=1] [ref=e210]:
+          - link "The Quantum Apocalypse Is Coming. Be Very Afraid" [ref=e211] [cursor=pointer]:
+            - /url: https://www.wired.com/story/q-day-apocalypse-quantum-computers-encryption/
+        - button "Star" [ref=e212] [cursor=pointer]: ★
+      - generic [ref=e213]:
+        - generic [ref=e214]:
+          - paragraph [ref=e215]: "Source: removepaywalls.com"
+          - paragraph [ref=e216]: Mon, 24 Mar 2025, 10:00
+        - paragraph [ref=e218]: What happens when quantum computers can finally crack encryption and break into the world’s best-kept secrets? It’s called Q-Day—the worst holiday maybe ever.
+  - generic [ref=e220]:
+    - button "✕" [ref=e221] [cursor=pointer]
+    - generic [ref=e222]:
+      - heading "APP" [level=2] [ref=e223]
+      - generic [ref=e224]:
+        - generic [ref=e225]: "Filter View:"
+        - combobox "Filter View:" [ref=e226] [cursor=pointer]:
+          - option "Unread" [selected]
+          - option "Starred (6)"
+          - option "Read (5)"
+          - option "All"
+      - heading "SETTINGS" [level=2] [ref=e227]
+      - generic [ref=e228]:
+        - generic [ref=e229]: Auto-Sync Feed
+        - generic [ref=e230]:
+          - generic [ref=e231]: "On"
+          - generic [ref=e232]:
+            - checkbox "Auto-Sync Feed" [checked]
+      - generic [ref=e234]:
+        - generic [ref=e235]: Theme
+        - generic [ref=e236]:
+          - generic [ref=e237]: dark
+          - generic [ref=e238]:
+            - checkbox "Theme" [checked]
+      - generic [ref=e240]:
+        - generic [ref=e241]: Show Images
+        - generic [ref=e242]:
+          - generic [ref=e243]: "On"
+          - generic [ref=e244]:
+            - checkbox "Show Images" [checked]
+      - generic [ref=e246]:
+        - generic [ref=e247]: Open Links in New Tab
+        - generic [ref=e248]:
+          - generic [ref=e249]: "Yes"
+          - generic [ref=e250]:
+            - checkbox "Open Links in New Tab" [checked]
+      - separator [ref=e252]
+      - generic [ref=e253]:
+        - generic [ref=e254]: RSS Feeds
+        - button "Configure" [ref=e255] [cursor=pointer]
+      - generic [ref=e256]:
+        - generic [ref=e257]: Keyword Blacklist
+        - button "Configure" [ref=e258] [cursor=pointer]
+      - separator [ref=e259]
+      - generic [ref=e260]:
+        - generic [ref=e261]: Install as App
+        - button "Install as App" [ref=e262] [cursor=pointer]: Install
+  - button "Scroll to top" [ref=e263] [cursor=pointer]:
+    - img [ref=e264]
 ```

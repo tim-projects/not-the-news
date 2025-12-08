@@ -25,7 +25,7 @@ done
 # Hardcode DOMAIN and EMAIL for dev mode
 DOMAIN="localhost"
 EMAIL="dev@localhost.com"
-PASSWORD="devtest%!" # Hardcoded password for dev environment
+PASSWORD="devtestpwd" # Hardcoded password for dev environment
 echo "Set DOMAIN: $DOMAIN (dev mode)"
 echo "Set EMAIL: $EMAIL (dev mode)"
 echo "Set PASSWORD: [redacted] (dev mode)"
