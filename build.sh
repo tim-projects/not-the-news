@@ -35,9 +35,9 @@ echo "Validating arguments..."
 
 # Docker volume setup
 echo "Checking Docker volume..."
-sudo podman volume inspect not-the-news_volume >/dev/null 2>&1 || {
+podman volume inspect not-the-news_volume >/dev/null 2>&1 || {
     echo "Creating volume..."
-    sudo podman volume create not-the-news_volume
+    podman volume create not-the-news_volume
 }
 
 # Build arguments
@@ -55,25 +55,33 @@ if [ -n "$PASSWORD" ]; then
 fi
 # Build arguments
 [ -n "$NO_CACHE" ] && {
-    echo "Adding no-cache flag..."
+    echo "Adding no-cache flag and performing system prune..."
     BUILD_ARGS+=("--no-cache")
+    podman system prune -f # Added for --no-cache builds
 }
 
 # Build process
 echo "Starting build process..."
 (
     set -x  # Show git/podman commands
-    #git pull && \
-    sudo podman rm -f ntn && \
-    sudo podman container prune -f && \
-    sudo podman build "${BUILD_ARGS[@]}" -t not-the-news . && \
-    sudo podman run -d -p 80:80 -p 443:443 -v not-the-news_volume:/data --name ntn not-the-news
+
+    # Check if custom caddy image exists, if not, instruct user to build it
+    if ! podman image inspect not-the-news-caddy &> /dev/null; then
+        echo "Error: Custom Caddy image 'not-the-news-caddy' not found." >&2
+        echo "Please build it first by running 'bash build-caddy.sh'." >&2
+        exit 1
+    fi
+
+    podman rm -f ntn && \
+    podman container prune -f && \
+    podman build "${BUILD_ARGS[@]}" -t not-the-news . && \
+    podman run -d -p 80:80 -p 443:443 -v not-the-news_volume:/data --name ntn not-the-news
 ) || {
     echo "Build failed!" >&2
     exit 1
 }
 
 # Optional Cleanup
-# sudo podman image prune -f
-# sudo podman builder prune -f
+# podman image prune -f
+# podman builder prune -f
 # podman buildx rm caddy-builder --force

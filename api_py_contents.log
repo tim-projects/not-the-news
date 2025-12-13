@@ -141,37 +141,7 @@ def _seed_initial_configs():
 
 _seed_initial_configs() # Call seeding function early
 
-@app.route("/api/login", methods=["POST"])
 def login():
-    try:
-        if not request.is_json:
-            app.logger.warning("Login: Missing JSON in request")
-            return jsonify({"error": "Missing JSON in request"}), 400
-        data = request.get_json()
-        submitted_pw = data.get("password")
-        if not submitted_pw:
-            app.logger.warning("Login: Password not provided")
-            return jsonify({"error": "Password required"}), 400
-
-        app_password = os.environ.get("APP_PASSWORD")
-
-        if not app_password:
-            app.logger.error("Login: Server misconfigured, APP_PASSWORD not set")
-            return jsonify({"error": "Server misconfigured"}), 500
-
-        if submitted_pw != app_password:
-            app.logger.info("Login: Invalid password attempt")
-            return jsonify({"error": "Invalid password"}), 401
-
-        auth_token = secrets.token_urlsafe(32)
-        resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
-        app.logger.info("Login: Successful authentication")
-        return resp
-    except Exception as e:
-        app.logger.exception(f"Login error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-
     try:
         if not request.is_json:
             app.logger.warning("Login: Missing JSON in request")

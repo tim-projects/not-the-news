@@ -66,12 +66,10 @@ def generate_feed():
             text=True,  # to get strings instead of bytes
         )
 
-        # Stream output line by line
-        for line in process.stdout:
-            
-            log_file.write(line)  # write to file
+        stdout, stderr = process.communicate() # Capture all output
 
-        process.wait()
+        if stdout: # Only write if there's actual output
+            log_file.write(stdout)
 
         if process.returncode != 0:
             raise subprocess.CalledProcessError(process.returncode, process.args)

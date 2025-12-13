@@ -1,10 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('Unread Items', () => {
-  test.use({ ignoreHTTPSErrors: true });
+  // test.use({ ignoreHTTPSErrors: true }); // Handled globally in playwright.config.js
 
-  const APP_URL = 'https://news.loveopenly.net';
-  const APP_PASSWORD = 'SmjHH2Hd'; // From run.sh
+  const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+  const APP_PASSWORD = "devtestpwd"; // Consistent with other tests
 
   test.beforeEach(async ({ page }) => {
     test.setTimeout(60000); // Increase timeout to 60 seconds

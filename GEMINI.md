@@ -14,6 +14,7 @@ This document guides the agent's interaction with the project.
 - **Run Application:** To build and run the Docker container, use `bash run.sh`.
 - **View Logs:** To view logs from the `ntn` Docker container, use `bash dockerlogs.sh`. Avoid viewing logs in realtime.
   - **Note:** Ensure `dockerlogs.sh` exists and contains `docker logs ntn`.
+- **Cleanup Podman Resources:** To reclaim disk space from unused Podman images, containers, and volumes, use `podman system prune -f`.
 
 ### Building the container
 - dev version: build-dev.sh

@@ -1,22 +1,3 @@
-# syntax=docker/dockerfile:1.4
-##############################################################################
-# Build caddy with brotli compression support
-FROM docker.io/library/caddy:builder-alpine AS caddy-builder
-
-# Enable cgo for compiling the Brotli plugin
-ENV CGO_ENABLED=1
-
-# Install C toolchain, Brotli and redis plugin dependencies
-RUN apk add --no-cache \
-    brotli-dev \
-    pkgconfig \
-    git \
-    build-base \
-  && xcaddy build \
-      --with github.com/dunglas/caddy-cbrotli \
-      --with github.com/caddyserver/cache-handler@latest \
-      --with github.com/pberkel/caddy-storage-redis
-
 ##############################################################################
 # Stage 0: Frontend Assets Builder with Vite
 # This stage builds your Vite assets (www folder)
@@ -37,13 +18,10 @@ RUN npm run build
 
 ##############################################################################
 # 1. Base image (now main Caddy stage)
-FROM caddy:2-alpine
+FROM not-the-news-caddy
 
 # Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
 RUN apk add --no-cache brotli-libs redis
-
-# 1.1 Replace core caddy binary with our custom-built one
-COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 
 ##############################################################################
 # 2. Build args & env
@@ -96,6 +74,11 @@ COPY rss/ /rss/
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
 COPY src/api.py /app/www/api.py
+
+# Copy the reconstruction script and run it to fix api.py
+COPY reconstruct_api.py /tmp/reconstruct_api.py
+RUN /venv/bin/python3 /tmp/reconstruct_api.py
+RUN rm /tmp/reconstruct_api.py
 
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json

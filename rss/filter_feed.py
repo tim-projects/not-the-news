@@ -5,6 +5,7 @@ import xml.dom.minidom
 import json
 import os
 import logging
+import sys
 
 # Define paths (adjust if necessary based on where these scripts are run from)
 DATA_DIR = "/data"
@@ -74,11 +75,11 @@ def filter_rss_entries(input_file, output_file):
     keywords = load_keyword_blacklist()
 
     # Parse the RSS feed
-    print(f"Parsing RSS feed from {input_file}...")
+    logging.info(f"Parsing RSS feed from {input_file}...")
     feed = feedparser.parse(input_file)
     if not feed.entries:
-        print(f"Warning: No entries found in the RSS feed.")
-        exit(1)
+        logging.error(f"Error: No entries found in the RSS feed from {input_file}. Exiting.")
+        sys.exit(1)
 
     # Filter entries based on keywords
     filtered_entries = []
@@ -92,11 +93,11 @@ def filter_rss_entries(input_file, output_file):
         if matched is None:
             filtered_entries.append(entry)
         else:
-            print(
+            logging.info(
                 f"Excluding entry with keyword match: "
                 f"{matched}: {getattr(entry, 'title', 'No title')}"
             )
-    print(f"Filtered {len(filtered_entries)} entries out of {len(feed.entries)}.")
+    logging.info(f"Filtered {len(filtered_entries)} entries out of {len(feed.entries)}.")
 
     # Create a new XML tree for the filtered feed, declaring media namespace
     filtered_root = ET.Element(
@@ -151,10 +152,10 @@ def filter_rss_entries(input_file, output_file):
     # Save the filtered feed to a new RSS file using the pretty print function
     try:
         save_pretty_xml(output_file, filtered_tree)
-        print(f"Filtered RSS feed saved to {output_file}.")
+        logging.info(f"Filtered RSS feed saved to {output_file}.")
     except Exception as e:
-        print(f"Error saving filtered feed: {e}")
-        exit(1)
+        logging.error(f"Error saving filtered feed: {e}")
+        sys.exit(1)
 
 
 # Run the filtering process

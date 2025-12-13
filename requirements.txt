@@ -1,0 +1,11 @@
+feedparser
+feedgen
+requests
+python-dateutil
+Flask==2.2.5
+Werkzeug==2.3.7
+bleach
+markdown
+gunicorn
+Flask-Caching
+redis

@@ -63,115 +63,8 @@ USER_STATE_SERVER_DEFAULTS = {
     'lastFeedSync': {'type': 'simple', 'default': None},
     'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
     'rssFeeds': {'type': 'nested_object', 'default': {}},
-    'keywordBlacklist': {'type': 'array', 'default': []},
-}
 
-def _atomic_write(filepath, content, mode='w', encoding='utf-8'):
-    '''
-    Writes content to a file in an atomic way.
-    It writes to a temporary file first and then renames it.
-    '''
-    dir_name, file_name = os.path.split(filepath)
-    with tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, delete=False, dir=dir_name, prefix=f"{file_name}.") as temp_file:
-        try:
-            temp_file.write(content)
-            temp_file.flush()
-            os.fsync(temp_file.fileno())
-            temp_path = temp_file.name
-        except Exception:
-            os.unlink(temp_file.name)
-            raise
-    os.rename(temp_path, filepath)
-
-def _user_state_path(key):
-    return os.path.join(USER_STATE_DIR, f"{key}.json")
-
-def _save_state(key, value):
-    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-    data = {"value": value, "lastModified": now}
-    path = _user_state_path(key)
-    try:
-        json_content = json.dumps(data, indent=2)
-        _atomic_write(path, json_content)
-        return now
-    except Exception as e:
-        app.logger.exception(f"Error saving user state for key '{key}': {e}")
-        raise
-
-app.logger.info("Calling _seed_initial_configs() now...")
-def _seed_initial_configs():
-    app.logger.info("Inside _seed_initial_configs() function.")
-    app.logger.info("Checking for initial config seeding...")
-
-    feeds_txt_source_path = os.path.join(CONFIG_DIR, "feeds.txt")
-    rss_feeds_json_dest_path = os.path.join(USER_STATE_DIR, "rssFeeds.json")
-    app.logger.info(f"Checking feeds_txt_source_path: {feeds_txt_source_path}, exists: {os.path.exists(feeds_txt_source_path)}")
-    if os.path.exists(feeds_txt_source_path):
-        app.logger.info(f"Seeding rssFeeds.json from {feeds_txt_source_path}...")
-        try:
-            with open(feeds_txt_source_path, 'r', encoding='utf-8') as f:
-                urls = [line.strip() for line in f if line.strip()]
-
-            nested_feeds = {}
-            default_category = "Miscellaneous"
-            default_subcategory = "Default"
-            nested_feeds[default_category] = {}
-            nested_feeds[default_category][default_subcategory] = [{"url": url} for url in urls]
-
-            _save_state("rssFeeds", nested_feeds)
-            app.logger.info(f"Successfully seeded rssFeeds.json from feeds.txt.")
-        except Exception as e:
-            app.logger.error(f"Failed to seed rssFeeds.json from feeds.txt: {e}")
-            app.logger.exception("Exception during rssFeeds seeding:")
-
-    keywords_txt_source_path = os.path.join(CONFIG_DIR, "filter_keywords.txt")
-    keyword_blacklist_json_dest_path = os.path.join(USER_STATE_DIR, "keywordBlacklist.json")
-    app.logger.info(f"Checking keywords_txt_source_path: {keywords_txt_source_path}, exists: {os.path.exists(keywords_txt_source_path)}")
-    if os.path.exists(keywords_txt_source_path):
-        app.logger.info(f"Seeding keywordBlacklist.json from {keywords_txt_source_path}...")
-        try:
-            with open(keywords_txt_source_path, 'r', encoding='utf-8') as f:
-                keywords = [line.strip() for line in f if line.strip()]
-
-            _save_state("keywordBlacklist", keywords)
-            app.logger.info(f"Successfully seeded keywordBlacklist.json from filter_keywords.txt.")
-        except Exception as e:
-            app.logger.error(f"Failed to seed keywordBlacklist.json from filter_keywords.txt: {e}")
-            app.logger.exception("Exception during keywordBlacklist seeding:")
-
-_seed_initial_configs() # Call seeding function early
-
-@app.route("/api/login", methods=["POST"])
 def login():
-    try:
-        if not request.is_json:
-            app.logger.warning("Login: Missing JSON in request")
-            return jsonify({"error": "Missing JSON in request"}), 400
-        data = request.get_json()
-        submitted_pw = data.get("password")
-        if not submitted_pw:
-            app.logger.warning("Login: Password not provided")
-            return jsonify({"error": "Password required"}), 400
-
-        app_password = os.environ.get("APP_PASSWORD")
-
-        if not app_password:
-            app.logger.error("Login: Server misconfigured, APP_PASSWORD not set")
-            return jsonify({"error": "Server misconfigured"}), 500
-
-        if submitted_pw != app_password:
-            app.logger.info("Login: Invalid password attempt")
-            return jsonify({"error": "Invalid password"}), 401
-
-        auth_token = secrets.token_urlsafe(32)
-        resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
-        app.logger.info("Login: Successful authentication")
-        return resp
-    except Exception as e:
-        app.logger.exception(f"Login error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-
     try:
         if not request.is_json:
             app.logger.warning("Login: Missing JSON in request")
@@ -316,8 +209,7 @@ def feed_items():
 
     return jsonify(result_items), 200
 
-def _user_state_path(key):
-    return os.path.join(USER_STATE_DIR, f"{key}.json")
+
 
 def _load_state(key):
     # --- MIGRATION: Handle renaming of legacy state files ---
@@ -408,17 +300,7 @@ def _load_state(key):
         # If file is corrupt or missing after checks, return a clean state
         return {"value": None, "lastModified": None}
 
-def _save_state(key, value):
-    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-    data = {"value": value, "lastModified": now}
-    path = _user_state_path(key)
-    try:
-        json_content = json.dumps(data, indent=2)
-        # _atomic_write(path, json_content) # Temporarily commented out
-        return now
-    except Exception as e:
-        app.logger.exception(f"Error saving user state for key '{key}': {e}")
-        raise
+
 
 @app.route("/api/user-state/<key>", methods=["GET"])
 def get_single_user_state_key(key):

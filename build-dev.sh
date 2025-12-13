@@ -15,10 +15,10 @@ echo "Parsing arguments..."
 while getopts ":hn" opt; do
     case $opt in
 
-        n) NO_CACHE=1; echo "Disabling cache" ;;
-        h) usage ;;
-        \?) echo "Invalid option -$OPTARG" >&2; usage ;;
-        :) echo "Option -$OPTARG requires an argument" >&2; usage ;;
+        n) NO_CACHE=1; echo "Disabling cache" ;; 
+        h) usage ;; 
+        \?) echo "Invalid option -$OPTARG" >&2; usage ;; 
+        :) echo "Option -$OPTARG requires an argument" >&2; usage ;; 
     esac
 done
 
@@ -33,12 +33,10 @@ echo "Set PASSWORD: [redacted] (dev mode)"
 # --- Pre-load local images if available ---
 LOCAL_IMAGES_DIR="docker-images"
 IMAGE_TARBALLS=(
-    "caddy-builder-alpine.tar"
-    "node-slim.tar"
-    "caddy-alpine.tar"
+    "node-20-slim.tar"  # New entry for Debian-based Node.js slim
 )
 
-echo "Checking for local image tarballs in '$LOCAL_IMAGES_DIR'..."
+echo "Checking for local image tarballs in '$LOCAL_IMAGES_DIR' நான"
 for tarball in "${IMAGE_TARBALLS[@]}"; do
     tarball_path="$LOCAL_IMAGES_DIR/$tarball"
     if [ -f "$tarball_path" ]; then
@@ -67,16 +65,7 @@ HOST_BACKUP_DIR="$(pwd)/backup"
 ARCHIVE_PATH="$HOST_BACKUP_DIR/ntn-test-data.tar.gz"
 CONTAINER_MOUNT_PATH="/data" # This is where the volume is mounted in the container
 
-echo "Populating volume '$VOLUME_NAME' with data from '$ARCHIVE_PATH'..."
-podman run --rm \
-    -v "$VOLUME_NAME:$CONTAINER_MOUNT_PATH" \
-    -v "$HOST_BACKUP_DIR:/host_backup" \
-    alpine:latest sh -c "\
-        apk add --no-cache tar gzip && \
-        cp /host_backup/ntn-test-data.tar.gz $CONTAINER_MOUNT_PATH/ && \
-        tar -xzf $CONTAINER_MOUNT_PATH/ntn-test-data.tar.gz -C $CONTAINER_MOUNT_PATH && \
-        rm $CONTAINER_MOUNT_PATH/ntn-test-data.tar.gz\
-    "
+
 
 # Build arguments
 echo "Configuring build arguments:"
@@ -92,20 +81,26 @@ if [ -n "$PASSWORD" ]; then
     BUILD_ARGS+=("--build-arg" "APP_PASSWORD=$ESCAPED_PWD")
 fi
 # Build arguments
-[ -n "$NO_CACHE" ] && {
-    echo "Adding no-cache flag..."
+[ -n "$NO_CACHE" ] && { 
+    echo "Adding no-cache flag and performing system prune..."
     BUILD_ARGS+=("--no-cache")
+    podman system prune -f # Added for --no-cache builds
 }
 
 # Build process
 echo "Starting build process..."
 (
     set -x  # Show git/podman commands
-    #git pull && \
+
     podman rm -f ntn-dev && \
-    #podman container prune -f && \
     podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
-    podman run -d -p 8085:80 -p 8443:443 -v "$VOLUME_NAME":/data --name ntn-dev not-the-news-dev
+    podman run -d -p 8085:80 -p 8443:443 \
+        -v "$VOLUME_NAME":/data \
+        -v "$(pwd)":/app \
+        -v "$(pwd)"/reconstruct_api.py:/tmp/reconstruct_api.py \
+        -v "$(pwd)"/build_entrypoint.sh:/usr/local/bin/docker-entrypoint.sh \
+        -v "$(pwd)"/Caddyfile-dev:/etc/caddy/Caddyfile \
+        --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
     exit 1

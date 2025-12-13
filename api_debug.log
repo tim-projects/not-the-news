@@ -1,0 +1,7 @@
+2025-12-13 17:53:07,313 - api_logger - DEBUG - DEBUG: api.py script started.
+2025-12-13 17:53:07,314 - src.api - INFO - Flask app logger configured to write to api_debug.log
+2025-12-13 17:53:07,315 - src.api - INFO - Calling _seed_initial_configs() now...
+2025-12-13 17:53:07,315 - src.api - INFO - Inside _seed_initial_configs() function.
+2025-12-13 17:53:07,315 - src.api - INFO - Checking for initial config seeding...
+2025-12-13 17:53:07,319 - src.api - INFO - Checking feeds_txt_source_path: /data/config/feeds.txt, exists: False
+2025-12-13 17:53:07,320 - src.api - INFO - Checking keywords_txt_source_path: /data/config/filter_keywords.txt, exists: False

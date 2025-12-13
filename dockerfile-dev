@@ -11,30 +11,6 @@ COPY package.json package-lock.json ./
 RUN npm ci || npm install
 # Install Playwright dependencies and browsers
 RUN apt-get update && apt-get install -y \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm-dev \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxss1 \
-    libxtst6 \
-    libappindicator3-1 \
-    libdbus-glib-1-2 \
-    libgconf-2-4 \
-    libnotify4 \
-    libsecret-1-0 \
-    libvulkan1 \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 # Copy all source files required for the build (e.g., src/, public/ if any)
@@ -45,36 +21,8 @@ COPY . .
 FROM node:20-slim
 
 # Install Caddy from apt, and other general system dependencies
-RUN apt-get update && apt-get install -y \
+RUN for i in $(seq 1 5); do apt-get clean && apt-get update --fix-missing && apt-get install -y \
     caddy \
-    nodejs \
-    npm \
-    # Playwright Chromium dependencies (copied from frontend-builder stage)
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm-dev \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxss1 \
-    libxtst6 \
-    libappindicator3-1 \
-    libdbus-glib-1-2 \
-    libgconf-2-4 \
-    libnotify4 \
-    libsecret-1-0 \
-    libvulkan1 \
-    --no-install-recommends \
     \
     bash \
     procps \
@@ -90,7 +38,13 @@ RUN apt-get update && apt-get install -y \
     redis-tools \
     brotli \
     ca-certificates \
+    # Add retry for robust apt-get operations
+    retry \
+    && break || sleep 10; done \
     && rm -rf /var/lib/apt/lists/*
+
+# Create /rss/ directory for volume mounting
+RUN mkdir -p /rss/
 
 # Create appuser and appgroup early for permissions
 RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup \
@@ -127,8 +81,6 @@ RUN chown -R appuser:appgroup /app/www
 # COPY rss/ /rss/
 # COPY src/api.py /app/www/api.py
 # COPY reconstruct_api.py /tmp/reconstruct_api.py
-# COPY playwright.config.js /app/playwright.config.js
-# COPY tests/ /app/tests/
 # COPY build_entrypoint.sh /build_entrypoint.sh
 
 # Ensure clean copy of ui.spec.js by removing any old version first
@@ -137,11 +89,10 @@ RUN rm -f /app/tests/ui.spec.js
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
 COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
+COPY ./data/config/feeds.txt /data/config/feeds.txt
+COPY ./data/config/filter_keywords.txt /data/config/filter_keywords.txt
 COPY data/ /data/feed/
 
-
-RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup \
-    && chown appuser:appgroup /tmp # Ensure /tmp is writable for non-root user
 
 ##############################################################################
 # 5. Build entrypoint

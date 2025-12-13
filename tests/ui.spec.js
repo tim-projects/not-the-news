@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8080'; // Explicitly use HTTP for APP_URL here
+const APP_URL = process.env.APP_URL || 'http://localhost:8085'; // Explicitly use HTTP for APP_URL here
 const APP_PASSWORD = "devtestpwd";
 
 test.describe('UI Elements and Interactions', () => {

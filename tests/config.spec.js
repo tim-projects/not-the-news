@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Configuration Buttons', () => {
-  const APP_URL = process.env.APP_URL || 'https://localhost';
+  const APP_URL = process.env.APP_URL || 'http://localhost:8085';
   const APP_PASSWORD = process.env.APP_PASSWORD;
 
   test.beforeEach(async ({ page }) => {

@@ -17,8 +17,8 @@ import logging
 
 # Define paths (adjust if necessary based on where these scripts are run from)
 DATA_DIR = "/data"
-USER_STATE_DIR = os.path.join(DATA_DIR, "user_state")
-RSS_FEEDS_JSON = os.path.join(USER_STATE_DIR, "rssFeeds.json")
+# USER_STATE_DIR = os.path.join(DATA_DIR, "user_state") # Not needed, direct path
+RSS_FEEDS_JSON = os.path.join(DATA_DIR, "config", "rssFeeds.json")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -69,7 +69,7 @@ def is_valid_url(url):
         return False
 
 # ─── Redis client for caching raw feed bytes ─────────────────────────────────
-r = redis.Redis(host="localhost", port=6379, db=0)
+r = redis.Redis(host="localhost", port=6380, db=0)
 
 # ─── Global backoff & rate-limit settings ─────────────────────────────────────
 
@@ -248,7 +248,7 @@ def merge_feeds(output_file):
 
     # Read the list of feed URLs
     feed_urls = load_rss_feeds()
-    logging.info(f"Loaded {len(feed_urls)} RSS feed URLs.")
+    logging.info(f"Loaded {len(feed_urls)} RSS feed URLs: {feed_urls}")
 
     # Sort feed URLs by their domain
     domain_cache = {}
