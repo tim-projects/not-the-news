@@ -18,8 +18,8 @@ redis-server /etc/redis.conf &
 gosu appuser /venv/bin/python3 /tmp/reconstruct_api.py
 gosu appuser /venv/bin/gunicorn --chdir /app --bind 127.0.0.1:4575 --workers 1 --threads 3 --access-logfile /tmp/gunicorn_access.log --error-logfile /tmp/gunicorn_error.log --reload src.api:app &
 gosu appuser python3 /rss/run.py --daemon > /tmp/rss_run.log 2>&1 &
-if ! strace -f -o /tmp/caddy_strace_1.log caddy run --config /etc/caddy/Caddyfile --adapter caddyfile; then
-  echo "Falling back to Let's Encrypt staging CA"
-  export ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory
-  exec strace -f -o /tmp/caddy_strace_2.log caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
-fi
+# Start Caddy in the background
+strace -f -o /tmp/caddy_strace_1.log caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
+
+# Wait for all background processes to finish
+wait
