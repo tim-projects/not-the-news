@@ -1,21 +1,4 @@
 # syntax=docker/dockerfile:1.4
-##############################################################################
-# Build caddy with brotli compression support
-FROM docker.io/library/caddy:builder-alpine AS caddy-builder
-
-# Enable cgo for compiling the Brotli plugin
-ENV CGO_ENABLED=1
-
-# Install C toolchain, Brotli and redis plugin dependencies
-RUN apk add --no-cache \
-    brotli-dev \
-    pkgconfig \
-    git \
-    build-base \
-  && xcaddy build \
-      --with github.com/dunglas/caddy-cbrotli \
-      --with github.com/caddyserver/cache-handler@latest \
-      --with github.com/pberkel/caddy-storage-redis
 
 ##############################################################################
 # Stage 0: Frontend Assets Builder with Vite
@@ -41,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     libgbm1 \
     libasound2 \
-    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
     libgtk-3-0 \
     libx11-xcb1 \
     libxss1 \
@@ -53,27 +36,66 @@ RUN apt-get update && apt-get install -y \
     libsecret-1-0 \
     libvulkan1 \
     --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && npx playwright install chromium --with-deps
+    && rm -rf /var/lib/apt/lists/*
 # Copy all source files required for the build (e.g., src/, public/ if any)
 COPY . .
 
 ##############################################################################
-# 1. Base image (now main Caddy stage)
-FROM docker.io/library/caddy:2-alpine
+# 1. Main Development Container (now based on node:20-slim again)
+FROM node:20-slim
 
-# Install Node.js and npm for Playwright
-RUN apk add --no-cache nodejs npm
+# Install Caddy from apt, and other general system dependencies
+RUN apt-get update && apt-get install -y \
+    caddy \
+    nodejs \
+    npm \
+    # Playwright Chromium dependencies (copied from frontend-builder stage)
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm-dev \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libxss1 \
+    libxtst6 \
+    libappindicator3-1 \
+    libdbus-glib-1-2 \
+    libgconf-2-4 \
+    libnotify4 \
+    libsecret-1-0 \
+    libvulkan1 \
+    --no-install-recommends \
+    \
+    bash \
+    procps \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    gnupg \
+    gosu \
+    strace \
+    git \
+    redis-server \
+    redis-tools \
+    brotli \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright dependencies and browsers (Alpine-specific)
-# These are the minimal dependencies for Chromium on Alpine as per Playwright documentation
-RUN apk add --no-cache     chromium     nss     freetype     harfbuzz     icu-libs     libwebp     libxml2     libxslt     ttf-freefont     fontconfig     gobject-introspection     gtk+3.0     pango     cairo     cups-libs     dbus-libs     gdk-pixbuf     glib     libxcomposite     libxdamage     libxext     libxfixes     libxrandr     libxrender     mesa-dri-gallium     libstdc++     && npm install -g playwright     && npx playwright install chromium
+# Create appuser and appgroup early for permissions
+RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup \
+    && chown appuser:appgroup /tmp # Ensure /tmp is writable for non-root user
 
-# Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
-RUN apk add --no-cache brotli-libs redis
-
-# 1.1 Replace core caddy binary with our custom-built one
-COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 
 ##############################################################################
 # 2. Build args & env
@@ -85,78 +107,58 @@ ENV DOMAIN=${DOMAIN} \
     APP_PASSWORD=${APP_PASSWORD}
 
 ##############################################################################
-# 3. System deps
-RUN apk add --no-cache \
-      bash procps python3 py3-pip py3-virtualenv ca-certificates \
-      curl \
-      gnupg \
-    && update-ca-certificates \
-    && GOSU_VERSION="1.16" \
-    && ALPINE_ARCH="$(apk --print-arch)" \
-    && case "${ALPINE_ARCH}" in \
-        x86_64) GOSU_ARCH="amd64" ;; \
-        aarch64) GOSU_ARCH="arm64" ;; \
-        armhf) GOSU_ARCH="armhf" ;; \
-        *) echo "Unsupported architecture: ${ALPINE_ARCH}"; exit 1 ;; \
-       esac \
-    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" \
-    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" \
-    && export GNUPGHOME="$(mktemp -d)" \
-    && curl -sSL "https://keys.openpgp.org/vks/v1/by-fingerprint/B42F6819007F00F88E364FD4036A9C25BF357DD4" | gpg --batch --import \
-    && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
-    && rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
-    && chmod +x /usr/local/bin/gosu
-
-##############################################################################
-# 4. Python venv & packages
+# 3. Python venv & packages
 RUN python3 -m venv /venv
 ENV PATH="/venv/bin:$PATH"
-RUN pip install \
-      feedparser feedgen requests python-dateutil \
-      Flask==2.2.5 Werkzeug==2.3.7 bleach markdown \
-      gunicorn Flask-Caching redis \
+COPY requirements.txt .
+RUN pip install -r requirements.txt \
     && rm -rf /root/.cache/pip
 
 ##############################################################################
-# 5. Copy code & initial data
+# 4. Copy code & initial data
 WORKDIR /app
-COPY rss/ /rss/
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
-RUN npm install @playwright/test
-COPY src/api.py /app/www/api.py
-COPY playwright.config.js /app/playwright.config.js
+# Ensure appuser has read/write access to the frontend assets
+RUN chown -R appuser:appgroup /app/www
+
+# These files/folders will be mounted as volumes during development
+# COPY rss/ /rss/
+# COPY src/api.py /app/www/api.py
+# COPY reconstruct_api.py /tmp/reconstruct_api.py
+# COPY playwright.config.js /app/playwright.config.js
+# COPY tests/ /app/tests/
+# COPY build_entrypoint.sh /build_entrypoint.sh
+
 # Ensure clean copy of ui.spec.js by removing any old version first
 RUN rm -f /app/tests/ui.spec.js
-COPY tests/ /app/tests/
 
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
 COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
-
 COPY data/ /data/feed/
 
-COPY build_entrypoint.sh /build_entrypoint.sh
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
-    && chown appuser:appgroup /tmp
-
-##############################################################################
-# 6. Build entrypoint
-RUN cp /build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh && \
-    chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup \
+    && chown appuser:appgroup /tmp # Ensure /tmp is writable for non-root user
 
 ##############################################################################
-# 7. copy Caddyfile (persist to /data, allow ACME_CA override)
-COPY Caddyfile-dev /etc/caddy/Caddyfile
+# 5. Build entrypoint
+# The entrypoint script will be mounted as a volume
+# This section remains commented out because build_entrypoint.sh is volume mounted
+# RUN cp /build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh && \
+#     chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ##############################################################################
-# 8. Declare the data volume & expose ports
+
+
+##############################################################################
+# 7. Declare the data volume & expose ports
 VOLUME /data
 EXPOSE 80 443 4575
 
 ##############################################################################
-# 9. Entrypoint + default CMD
+# 8. Entrypoint + default CMD
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
