@@ -20,6 +20,10 @@ COPY . .
 # 1. Main Development Container (now based on node:20-slim again)
 FROM node:20-slim
 
+# First, install 'retry' separately for robust package installations
+RUN for i in $(seq 1 5); do apt-get update --fix-missing && apt-get install -y --no-install-recommends retry && break || sleep 10; done \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Caddy from apt, and other general system dependencies
 RUN for i in $(seq 1 5); do apt-get clean && apt-get update --fix-missing && apt-get install -y \
     caddy \
@@ -38,8 +42,7 @@ RUN for i in $(seq 1 5); do apt-get clean && apt-get update --fix-missing && apt
     redis-tools \
     brotli \
     ca-certificates \
-    # Add retry for robust apt-get operations
-    retry \
+    iproute2 \
     && break || sleep 10; done \
     && rm -rf /var/lib/apt/lists/*
 
@@ -89,8 +92,6 @@ RUN rm -f /app/tests/ui.spec.js
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
 COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
-COPY ./data/config/feeds.txt /data/config/feeds.txt
-COPY ./data/config/filter_keywords.txt /data/config/filter_keywords.txt
 COPY data/ /data/feed/
 
 

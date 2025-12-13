@@ -16,7 +16,7 @@ EOF
 redis-server /etc/redis.conf &
 # Execute reconstruct_api.py after mounting, before Gunicorn starts
 gosu appuser /venv/bin/python3 /tmp/reconstruct_api.py
-gosu appuser /venv/bin/gunicorn --chdir /app --bind 127.0.0.1:4575 --workers 1 --threads 3 --access-logfile /tmp/gunicorn_access.log --error-logfile /tmp/gunicorn_error.log --reload src.api:app &
+gosu appuser /venv/bin/gunicorn --chdir /app --bind 0.0.0.0:4575 --workers 1 --threads 3 --access-logfile /tmp/gunicorn_access.log --error-logfile /tmp/gunicorn_error.log --reload src.api:app &
 gosu appuser python3 /rss/run.py --daemon > /tmp/rss_run.log 2>&1 &
 # Start Caddy in the background
 strace -f -o /tmp/caddy_strace_1.log caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &

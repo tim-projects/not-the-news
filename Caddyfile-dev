@@ -31,7 +31,7 @@ http://:80 {
    handle /api/* {
      # Unauthenticated /api/login endpoint
      handle /api/login {
-       reverse_proxy 127.0.0.1:4575
+       reverse_proxy localhost:4575
      }
 
      # Authenticated API endpoints
@@ -49,7 +49,7 @@ http://:80 {
        }
        respond @unauth_check "Unauthorized" 401
        
-       reverse_proxy 127.0.0.1:4575
+       reverse_proxy localhost:4575
      }
 
      # API no-cache headers (apply to all API routes handled by the proxy)

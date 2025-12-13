@@ -100,6 +100,9 @@ echo "Starting build process..."
         -v "$(pwd)"/reconstruct_api.py:/tmp/reconstruct_api.py \
         -v "$(pwd)"/build_entrypoint.sh:/usr/local/bin/docker-entrypoint.sh \
         -v "$(pwd)"/Caddyfile-dev:/etc/caddy/Caddyfile \
+        -v "$(pwd)"/data/config/feeds.txt:/data/config/feeds.txt \
+        -v "$(pwd)"/data/config/filter_keywords.txt:/data/config/filter_keywords.txt \
+        -v "$(pwd)"/rss/:/rss/ \
         --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
