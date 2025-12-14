@@ -112,12 +112,6 @@ test.describe('UI Elements and Interactions', () => {
         console.log('Service worker unregistration attempted.');
         // --- END NEW ---
 
-
-        // Waiting strategy
-        console.log('Login submitted. Adding 40-second wait to allow app to fully initialize and sync...');
-        await page.waitForTimeout(40000); // Crude wait for app to settle. 
-        console.log('40-second wait completed.');
-
         await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
         console.log('Loading screen not visible.');
 
@@ -126,6 +120,11 @@ test.describe('UI Elements and Interactions', () => {
         
         await page.waitForLoadState('networkidle', { timeout: 60000 });
         console.log('Network is idle.');
+
+        // NEW: Wait for at least one feed item to be visible
+        console.log('Waiting for at least one feed item (.item) to be visible...');
+        await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
+        console.log('At least one feed item is visible.');
     }); // Correctly close beforeEach
 
     test('should display header elements', async ({ page }) => {
@@ -146,6 +145,8 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should change filter mode', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         await expect(page.locator('#filter-selector')).toBeVisible();
 
         // Change to Starred filter
@@ -154,11 +155,14 @@ test.describe('UI Elements and Interactions', () => {
         await page.locator('.modal-content .close').click();
         // Re-open settings to verify selected option
         await page.locator('#settings-button').click();
+        await expect(page.locator('#main-settings')).toBeVisible(); // Re-ensure main settings content is visible
         await expect(page.locator('#filter-selector')).toHaveValue('starred');
     });
 
     test('should toggle sync enabled', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         const syncToggle = page.locator('#sync-toggle');
         const syncText = page.locator('#sync-text');
 
@@ -179,6 +183,8 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should toggle images enabled', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         const imagesToggle = page.locator('#images-toggle');
         const imagesText = page.locator('#images-text');
 
@@ -192,13 +198,15 @@ test.describe('UI Elements and Interactions', () => {
         await expect(imagesToggle).not.toBeChecked();
 
         // Toggle On
-        await syncToggle.check();
+        await imagesToggle.check();
         await expect(imagesText).toHaveText('On');
         await expect(imagesToggle).toBeChecked();
     });
 
     test('should toggle open URLs in new tab', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         const newTabToggle = page.locator('#open-urls-in-new-tab-toggle');
         const newTabText = page.locator('#open-urls-in-new-tab-text');
 
@@ -219,6 +227,8 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should navigate to RSS feeds configuration', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         await page.locator('#configure-rss-feeds-btn').click();
         await expect(page.locator('#rss-settings-block')).toBeVisible();
         await expect(page.locator('#main-settings')).toBeHidden();
@@ -232,6 +242,8 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should navigate to Keyword Blacklist configuration', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         await page.locator('#configure-keyword-blacklist-btn').click();
         await expect(page.locator('#keywords-settings-block')).toBeVisible();
         await expect(page.locator('#main-settings')).toBeHidden();
@@ -245,7 +257,10 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should save RSS feeds', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         await page.locator('#configure-rss-feeds-btn').click();
+        await expect(page.locator('#rss-settings-block')).toBeVisible();
 
         const textarea = page.locator('#rss-settings-block textarea');
         const saveButton = page.locator('#rss-settings-block .save-message');
@@ -260,7 +275,10 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should save Keyword Blacklist', async ({ page }) => {
         await page.locator('#settings-button').click();
+        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
+        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
         await page.locator('#configure-keyword-blacklist-btn').click();
+        await expect(page.locator('#keywords-settings-block')).toBeVisible();
 
         const textarea = page.locator('#keywords-settings-block textarea');
         const saveButton = page.locator('#keywords-settings-block .save-message');
