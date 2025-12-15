@@ -48,7 +48,7 @@ test.describe('Configuration Buttons', () => {
     console.log('Clicking "Configure RSS Feeds" button...');
     await page.click('#configure-rss-feeds-btn');
     console.log('Clicked "Configure RSS Feeds" button.');
-    await page.waitForTimeout(1000); // Temporary delay for debugging
+    await page.waitForSelector('#back-button', { state: 'visible' }); // Wait for back button to be visible
     // Wait for the RSS Feeds textarea to be visible and its value to be populated
     await page.waitForFunction(() => {
       const textarea = document.querySelector('#rss-settings-block textarea');
