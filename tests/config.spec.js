@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Configuration Buttons', () => {
-  const APP_URL = process.env.APP_URL || 'http://localhost:8085';
-  const APP_PASSWORD = process.env.APP_PASSWORD;
+  const APP_URL = 'http://localhost:8085';
+  const APP_PASSWORD = 'devtestpwd';
 
   test.beforeEach(async ({ page }) => {
     // Navigate to the login page
