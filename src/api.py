@@ -28,10 +28,9 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Keep Flask's default logger for general info/warnings, but use api_logger for specific debugs
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # This line can interfere with custom handlers, better to remove or ensure proper hierarchy
 app.logger.setLevel(logging.DEBUG) # Keep DEBUG for development, INFO for production
 app.logger.addHandler(handler) # Add the file handler to Flask's app.logger
-app.logger.info("Flask app logger configured to write to api_debug.log") # Add a confirmation log
+app.logger.info("Flask app logger configured to write to api_debug.log") 
 
 DATA_DIR = "/data"
 FEED_DIR = os.path.join(DATA_DIR, "feed")
@@ -87,91 +86,65 @@ def _user_state_path(key):
     return os.path.join(USER_STATE_DIR, f"{key}.json")
 
 def _save_state(key, value):
+    api_logger.debug(f"Attempting to save state for key: {key}")
     now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     data = {"value": value, "lastModified": now}
     path = _user_state_path(key)
     try:
         json_content = json.dumps(data, indent=2)
-        _atomic_write(path, json_content)
+        # For debugging, using a direct write instead of atomic write
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(json_content)
+        api_logger.debug(f"Successfully saved state for key: {key}")
         return now
     except Exception as e:
-        app.logger.exception(f"Error saving user state for key '{key}': {e}")
+        api_logger.exception(f"Error saving user state for key '{key}': {e}")
         raise
 
-app.logger.info("Calling _seed_initial_configs() now...")
+api_logger.info("Calling _seed_initial_configs() now...")
 def _seed_initial_configs():
-    app.logger.info("Inside _seed_initial_configs() function.")
-    app.logger.info("Checking for initial config seeding...")
+    api_logger.info("Inside _seed_initial_configs() function.")
+    config_files_to_seed = {
+        "rssFeeds.json": "feeds.txt",
+        "keywordBlacklist.json": "filter_keywords.txt"
+    }
 
-    feeds_txt_source_path = os.path.join(CONFIG_DIR, "feeds.txt")
-    rss_feeds_json_dest_path = os.path.join(USER_STATE_DIR, "rssFeeds.json")
-    app.logger.info(f"Checking feeds_txt_source_path: {feeds_txt_source_path}, exists: {os.path.exists(feeds_txt_source_path)}")
-    if os.path.exists(feeds_txt_source_path):
-        app.logger.info(f"Seeding rssFeeds.json from {feeds_txt_source_path}...")
-        try:
-            with open(feeds_txt_source_path, 'r', encoding='utf-8') as f:
-                urls = [line.strip() for line in f if line.strip()]
+    for json_filename, txt_filename in config_files_to_seed.items():
+        dest_path = os.path.join(USER_STATE_DIR, json_filename)
+        source_path = os.path.join(CONFIG_DIR, txt_filename)
+        
+        api_logger.info(f"Checking for seeding of {json_filename}...")
+        api_logger.info(f"Source path: {source_path} (exists: {os.path.exists(source_path)})")
+        api_logger.info(f"Destination path: {dest_path} (exists: {os.path.exists(dest_path)})")
 
-            nested_feeds = {}
-            default_category = "Miscellaneous"
-            default_subcategory = "Default"
-            nested_feeds[default_category] = {}
-            nested_feeds[default_category][default_subcategory] = [{"url": url} for url in urls]
+        if not os.path.exists(dest_path) and os.path.exists(source_path):
+            api_logger.info(f"Seeding required for {json_filename} from {txt_filename}.")
+            try:
+                with open(source_path, 'r', encoding='utf-8') as f:
+                    lines = [line.strip() for line in f if line.strip()]
 
-            _save_state("rssFeeds", nested_feeds)
-            app.logger.info(f"Successfully seeded rssFeeds.json from feeds.txt.")
-        except Exception as e:
-            app.logger.error(f"Failed to seed rssFeeds.json from feeds.txt: {e}")
-            app.logger.exception("Exception during rssFeeds seeding:")
+                if json_filename == "rssFeeds.json":
+                    nested_feeds = {}
+                    default_category = "Miscellaneous"
+                    default_subcategory = "Default"
+                    nested_feeds[default_category] = {}
+                    nested_feeds[default_category][default_subcategory] = [{"url": url} for url in lines]
+                    _save_state("rssFeeds", nested_feeds)
+                else:
+                    _save_state("keywordBlacklist", lines)
+                
+                api_logger.info(f"Successfully seeded and saved {json_filename}.")
 
-    keywords_txt_source_path = os.path.join(CONFIG_DIR, "filter_keywords.txt")
-    keyword_blacklist_json_dest_path = os.path.join(USER_STATE_DIR, "keywordBlacklist.json")
-    app.logger.info(f"Checking keywords_txt_source_path: {keywords_txt_source_path}, exists: {os.path.exists(keywords_txt_source_path)}")
-    if os.path.exists(keywords_txt_source_path):
-        app.logger.info(f"Seeding keywordBlacklist.json from {keywords_txt_source_path}...")
-        try:
-            with open(keywords_txt_source_path, 'r', encoding='utf-8') as f:
-                keywords = [line.strip() for line in f if line.strip()]
-
-            _save_state("keywordBlacklist", keywords)
-            app.logger.info(f"Successfully seeded keywordBlacklist.json from filter_keywords.txt.")
-        except Exception as e:
-            app.logger.error(f"Failed to seed keywordBlacklist.json from filter_keywords.txt: {e}")
-            app.logger.exception("Exception during keywordBlacklist seeding:")
+            except Exception as e:
+                api_logger.error(f"Failed to seed {json_filename} from {txt_filename}: {e}")
+                api_logger.exception("Exception during seeding:")
+        else:
+            api_logger.info(f"Seeding not required for {json_filename}.")
 
 _seed_initial_configs() # Call seeding function early
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    try:
-        if not request.is_json:
-            app.logger.warning("Login: Missing JSON in request")
-            return jsonify({"error": "Missing JSON in request"}), 400
-        data = request.get_json()
-        submitted_pw = data.get("password")
-        if not submitted_pw:
-            app.logger.warning("Login: Password not provided")
-            return jsonify({"error": "Password required"}), 400
-
-        app_password = os.environ.get("APP_PASSWORD")
-
-        if not app_password:
-            app.logger.error("Login: Server misconfigured, APP_PASSWORD not set")
-            return jsonify({"error": "Server misconfigured"}), 500
-
-        if submitted_pw != app_password:
-            app.logger.info("Login: Invalid password attempt")
-            return jsonify({"error": "Invalid password"}), 401
-
-        auth_token = secrets.token_urlsafe(32)
-        resp = make_response(jsonify({"status": "ok"}))
-        resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
-        app.logger.info("Login: Successful authentication")
-        return resp
-    except Exception as e:
-        app.logger.exception(f"Login error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-
     try:
         if not request.is_json:
             app.logger.warning("Login: Missing JSON in request")
@@ -214,6 +187,7 @@ def _load_feed_items():
         app.logger.debug("Successfully parsed feed.xml")
     except (FileNotFoundError, ET.ParseError) as e:
         app.logger.warning(f"Failed to load or parse feed.xml: {e}")
+        api_logger.exception("Exception during feed XML loading:")
         return {}
 
     # Remove namespaces for easier parsing
@@ -316,139 +290,65 @@ def feed_items():
 
     return jsonify(result_items), 200
 
-def _user_state_path(key):
-    return os.path.join(USER_STATE_DIR, f"{key}.json")
-
 def _load_state(key):
-    # --- MIGRATION: Handle renaming of legacy state files ---
-    legacy_key_map = {
-        'currentDeck': 'currentDeckGuids',
-        'shuffledOut': 'shuffledOutGuids'
-    }
-    if key in legacy_key_map:
-        new_path = _user_state_path(key)
-        old_path = _user_state_path(legacy_key_map[key])
-        if not os.path.exists(new_path) and os.path.exists(old_path):
-            app.logger.info(f"Migrating user state file from '{old_path}' to '{new_path}'")
-            os.rename(old_path, new_path)
-    
+    api_logger.debug(f"Loading state for key: '{key}'")
     path = _user_state_path(key)
+    api_logger.debug(f"State file path: {path}")
+
     if not os.path.exists(path):
+        api_logger.warning(f"State file not found for key '{key}'. Creating with default.")
         default_data = USER_STATE_SERVER_DEFAULTS.get(key)
         if default_data:
             initial_value = default_data['default']
-            # Use _save_state to create the initial file atomically with a timestamp
             try:
                 last_modified = _save_state(key, initial_value)
+                api_logger.debug(f"Created default state for '{key}' with value: {initial_value}")
                 return {"value": initial_value, "lastModified": last_modified}
             except Exception as e:
-                app.logger.error(f"Failed to create initial state for '{key}': {e}")
+                api_logger.exception(f"Failed to create initial state for '{key}': {e}")
                 return {"value": None, "lastModified": None}
+        api_logger.warning(f"No server default found for key '{key}'. Returning None.")
         return {"value": None, "lastModified": None}
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        
-        value = data.get("value")
-        last_modified = data.get("lastModified")
-
-        # --- MIGRATION: Convert string arrays to object arrays ---
-        array_keys_to_migrate = {
-            'starred': 'starredAt',
-            'hidden': 'hiddenAt',
-            'currentDeck': 'addedAt',
-            'shuffledOut': 'shuffledAt'
-        }
-
-        # Specific migration for rssFeeds from string array to object array with genre
-        # Specific migration for rssFeeds from string array to object array with genre
-        # This is the old migration, now it needs to handle the new nested structure
-        if key == 'rssFeeds' and isinstance(value, list): # Check if it's the old flat array of objects
-            app.logger.info(f"Migrating data format for key '{key}' from flat array to nested object (with default category/subcategory).")
-            nested_feeds = {}
-            default_category = "Uncategorized"
-            default_subcategory = "Default"
-            nested_feeds[default_category] = {}
-            nested_feeds[default_category][default_subcategory] = []
-
-            for item in value:
-                if isinstance(item, dict) and 'url' in item:
-                    # If genre exists, use it as category, otherwise default
-                    category = item.get('genre', default_category)
-                    if category not in nested_feeds:
-                        nested_feeds[category] = {}
-                    if default_subcategory not in nested_feeds[category]:
-                        nested_feeds[category][default_subcategory] = []
-                    nested_feeds[category][default_subcategory].append({"url": item['url']})
-                elif isinstance(item, str): # Handle case where it might still be a string array from very old data
-                    if default_category not in nested_feeds:
-                        nested_feeds[default_category] = {}
-                    if default_subcategory not in nested_feeds[default_category]:
-                        nested_feeds[default_category][default_subcategory] = []
-                    nested_feeds[default_category][default_subcategory].append({"url": item})
-
-            new_last_modified = _save_state(key, nested_feeds)
-            return {"value": nested_feeds, "lastModified": new_last_modified}
-
-        if key in array_keys_to_migrate and isinstance(value, list) and value and isinstance(value[0], str):
-            app.logger.info(f"Migrating data format for key '{key}' from string array to object array.")
-            timestamp_key = array_keys_to_migrate[key]
-            # Use the file's last modified time as a consistent default for all migrated items
-            default_timestamp = last_modified or datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-
-            new_value = [{"guid": guid, timestamp_key: default_timestamp} for guid in value]
-
-            # Atomically save the migrated data and get the new timestamp
-            new_last_modified = _save_state(key, new_value)
-            return {"value": new_value, "lastModified": new_last_modified}
-
-        return {"value": value, "lastModified": last_modified}
+        api_logger.debug(f"Successfully loaded state for key '{key}'. Data: {data}")
+        return data
     except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
-        # If file is corrupt or missing after checks, return a clean state
+        api_logger.exception(f"Error loading or decoding state file for key '{key}'. Returning None. Error: {e}")
         return {"value": None, "lastModified": None}
-
-def _save_state(key, value):
-    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-    data = {"value": value, "lastModified": now}
-    path = _user_state_path(key)
-    try:
-        json_content = json.dumps(data, indent=2)
-        # _atomic_write(path, json_content) # Temporarily commented out
-        return now
-    except Exception as e:
-        app.logger.exception(f"Error saving user state for key '{key}': {e}")
-        raise
 
 @app.route("/api/user-state/<key>", methods=["GET"])
 def get_single_user_state_key(key):
+    api_logger.debug(f"GET request for user state key: {key}")
     if not key:
         abort(400, description="User state key is required")
     state_data = _load_state(key)
-    if state_data["value"] is None and key not in USER_STATE_SERVER_DEFAULTS:
+    
+    if state_data.get("value") is None and key not in USER_STATE_SERVER_DEFAULTS:
+        api_logger.warning(f"Key '{key}' not found in user state or defaults.")
         abort(404, description=f"User state key '{key}' not found.")
 
     if_none_match = request.headers.get("If-None-Match")
-    if state_data["lastModified"] and if_none_match == state_data["lastModified"] and request.method == "GET":
+    if state_data.get("lastModified") and if_none_match == state_data["lastModified"]:
+        api_logger.debug(f"ETag match for key '{key}'. Returning 304 Not Modified.")
         return make_response("", 304)
 
+    api_logger.debug(f"Returning state for key '{key}'.")
     resp = jsonify(state_data)
-    if state_data["lastModified"]:
+    if state_data.get("lastModified"):
         resp.headers["ETag"] = state_data["lastModified"]
     return resp, 200
 
 @app.route("/api/user-state", methods=["POST"])
 def post_user_state():
-    # Direct file write for debugging
-    with open('/tmp/api_debug.log', 'a') as f:
-        f.write(f"DEBUG: post_user_state() received request. JSON: {request.get_json(silent=True)}\n")
-
+    api_logger.debug(f"POST request to /api/user-state. JSON: {request.get_json(silent=True)}")
     operations = request.get_json(silent=True)
     if not isinstance(operations, list):
         return jsonify({"error": "Invalid JSON body, expected a list of operations"}), 400
 
     results = []
-    # Use a single consistent timestamp for all operations in the batch
     server_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
     for op in operations:
@@ -462,35 +362,10 @@ def post_user_state():
                     continue
                 new_last_modified = _save_state(key, op.get("value"))
                 results.append({"id": op_id, "key": key, "status": "success", "lastModified": new_last_modified})
-
-            elif op_type in ["starDelta", "hiddenDelta", "readDelta"]:
-                # --- FIX: Read from the top-level 'op' object, not a nested 'data' object ---
-                item_guid = op.get("guid")
-                action = op.get("action")
-                state_key = "starred" if op_type == "starDelta" else ("hidden" if op_type == "hiddenDelta" else "read")
-                timestamp_key = "starredAt" if op_type == "starDelta" else ("hiddenAt" if op_type == "hiddenDelta" else "readAt")
-                timestamp = op.get("timestamp", server_time) # Match client's 'timestamp' key
-
-                if not item_guid or action not in ["add", "remove"]:
-                    raise ValueError("Missing 'guid' or invalid 'action'")
-
-                current_state_data = _load_state(state_key)
-                current_list = current_state_data['value'] or []
-
-                if action == "add":
-                    # Remove any existing item with the same guid before adding
-                    current_list = [item for item in current_list if item.get("guid") != item_guid]
-                    current_list.append({"guid": item_guid, timestamp_key: timestamp})
-                elif action == "remove":
-                    current_list = [item for item in current_list if item.get("guid") != item_guid]
-
-                new_last_modified = _save_state(state_key, current_list)
-                results.append({"id": op_id, "status": "success", "lastModified": new_last_modified})
-
             else:
                 results.append({"id": op_id, "status": "skipped", "reason": "Unknown operation type"})
         except Exception as e:
-            app.logger.exception(f"Error processing operation {op_type} for key {key}: {e}")
+            api_logger.exception(f"Error processing operation {op_type} for key {key}: {e}")
             results.append({"id": op_id, "status": "failed", "reason": str(e)})
 
     return jsonify({"status": "ok", "serverTime": server_time, "results": results}), 200

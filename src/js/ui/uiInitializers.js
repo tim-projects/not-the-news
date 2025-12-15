@@ -178,10 +178,10 @@ export async function initScrollPosition(app) {
 /**
  * REFINED: Now loads data when the configure button is clicked, not from a watcher in main.js.
  */
-async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButton, app) {
+async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, getSaveButton, app) {
     const configBtn = getConfigButton();
     const saveBtn = getSaveButton();
-    console.log(`[DEBUG] setupTextareaPanel for key: ${key}. configBtn:`, configBtn, `saveBtn:`, saveBtn); // Added debug log
+    //console.log(`[DEBUG] setupTextareaPanel for key: ${key}. configBtn:`, configBtn, `saveBtn:`, saveBtn); // Added debug log
     if (!configBtn || !saveBtn) return;
 
     configBtn.addEventListener('click', async () => {
@@ -190,7 +190,7 @@ async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButt
         if (key === 'rssFeeds' || key === 'keywordBlacklist') {
             try {
                 const response = await loadUserState(key);
-                console.log(`[DEBUG] loadUserState response for ${key}:`, response); // Added debug log
+                //console.log(`[DEBUG] loadUserState response for ${key}:`, response); // Added debug log
                 value = response.value;
             } catch (error) {
                 console.error(`Error loading ${key} from server:`, error);
@@ -201,7 +201,7 @@ async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButt
             value = result.value;
         }
 
-        console.log(`[DEBUG] Value before setting app input for ${key}:`, value); // Added debug log
+        //console.log(`[DEBUG] Value before setting app input for ${key}:`, value); // Added debug log
         let content;
         if (key === 'rssFeeds' && value && typeof value === 'object') {
             let allRssUrls = [];
@@ -222,9 +222,8 @@ async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButt
         } else {
             content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
         }
-        console.log(`[DEBUG] Content for ${key} input:`, content); // Added debug log
-        console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
-        console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
+        //console.log(`[DEBUG] Content for ${key} input:`, content); // Added debug log
+        //console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
         app[`${key}Input`] = content;
         app.modalView = key; // Switch to the correct view
     });
@@ -250,7 +249,7 @@ async function setupTextareaPanel(key, getConfigButton, getTextarea, getSaveButt
 }
 
 export async function initConfigPanelListeners(app) {
-    console.log("[DEBUG] initConfigPanelListeners called."); // Added debug log
+    //console.log("[DEBUG] initConfigPanelListeners called."); // Added debug log
     const backBtn = getBackButton();
     backBtn?.addEventListener('click', () => {
         app.modalView = 'main';
@@ -259,6 +258,8 @@ export async function initConfigPanelListeners(app) {
     await setupTextareaPanel('rssFeeds', getConfigureRssButton, getRssFeedsTextarea, getSaveRssButton, app);
     await setupTextareaPanel('keywordBlacklist', getConfigureKeywordsButton, getKeywordsBlacklistTextarea, getSaveKeywordsButton, app);
 }
+
+
 
 // The PWA logic is standard and does not require refactoring.
 let deferredPrompt;

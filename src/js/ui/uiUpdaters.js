@@ -4,11 +4,6 @@
 
 import {
     getMainSettingsBlock,
-    getRssSettingsBlock,
-    getKeywordsSettingsBlock,
-    getBackButton,
-    getRssFeedsTextarea,
-    getKeywordsBlacklistTextarea,
     getFilterSelector,
     getNtnTitleH2,
     getMessageContainer
@@ -186,29 +181,4 @@ export async function saveCurrentScrollPosition() {
 
     await saveSimpleState('lastViewedItemId', lastViewedItemId);
     await saveSimpleState('lastViewedItemOffset', lastViewedItemOffset);
-}
-
-/**
- * Manages the display of different settings panels based on the app's modalView state.
- * @param {object} app The Alpine.js app state object.
-*/
-export async function manageSettingsPanelVisibility(app) {
-    const panels = {
-        main: getMainSettingsBlock(),
-        rss: getRssSettingsBlock(),
-        keywords: getKeywordsSettingsBlock()
-    };
-    const backBtn = getBackButton();
-
-    // Hide all panels and the back button
-    Object.values(panels).forEach(el => el && (el.style.display = 'none'));
-    if (backBtn) backBtn.style.display = 'none';
-
-    const panel = panels[app.modalView];
-    if (panel) {
-        panel.style.display = 'block';
-        if (app.modalView !== 'main') {
-            if (backBtn) backBtn.style.display = 'block';
-        }
-    }
 }

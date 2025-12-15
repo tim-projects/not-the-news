@@ -38,7 +38,6 @@ import {
 } from './js/helpers/userStateUtils.js';
 import {
     updateCounts,
-    manageSettingsPanelVisibility,
     scrollToTop,
     attachScrollToTopHandler,
     saveCurrentScrollPosition,
@@ -104,16 +103,15 @@ export function rssApp() {
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
-                console.log('[DEBUG] Calling initConfigPanelListeners...'); // Added debug log
-                // this.$nextTick(() => { // Wrap in $nextTick to ensure DOM is ready
-                //     initConfigPanelListeners(this);
-                // });
+                this.$nextTick(() => { // Wrap in $nextTick to ensure DOM is ready
+                    initConfigPanelListeners(this);
+                });
+
                 attachScrollToTopHandler();
                 console.log('UI components initialized');
                 this.progressMessage = 'Loading existing data...';
                 await this.loadFeedItemsFromDB();
                 this.entries = mapRawItems(Object.values(this.feedItems), formatDate) || [];
-                console.log('[main.js] DEBUG: Array.isArray(this.entries) after assignment:', Array.isArray(this.entries));
                 await this._loadAndManageAllData();
                 this.updateAllUI();
                 console.log('Initial UI rendered from local cache.');
@@ -127,14 +125,14 @@ export function rssApp() {
                 }
                 this._initComplete = true;
                 window.appInitialized = true;
-                // this._setupWatchers();
+                this._setupWatchers();
                 // this._setupEventListeners();
                 // this._initObservers();
                 // this._startPeriodicSync();
                 // // await this.$nextTick();
                 // // //                 this._initScrollObserver();
                 console.log('App initialization and background sync complete.');
-                console.log('DEBUG: initApp finished.');
+
                 try {
                     createStatusBarMessage("App ready", "success");
                 } catch (statusError) {
@@ -396,7 +394,8 @@ export function rssApp() {
                 console.error('Error scrolling to top:', error); 
             } 
         },
-        
+
+
         _loadInitialState: async function() {
             try {
                 const [syncEnabled, imagesEnabled, urlsNewTab, filterMode, themeState] = await Promise.all([
@@ -549,8 +548,8 @@ export function rssApp() {
             
             this.$watch("openSettings", async (isOpen) => {
                 if (isOpen) {
-                    this.modalView = 'main';
-                    await manageSettingsPanelVisibility(this);
+
+                    // await manageSettingsPanelVisibility(this);
                 } else {
                     await saveCurrentScrollPosition();
                 }
@@ -562,7 +561,7 @@ export function rssApp() {
                 });
             });
             
-            this.$watch("modalView", async () => manageSettingsPanelVisibility(this));
+            // this.$watch("modalView", async () => manageSettingsPanelVisibility(this));
             
             this.$watch('filterMode', async (newMode) => {
                 if (!this._initComplete) return;

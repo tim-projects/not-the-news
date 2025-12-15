@@ -103,6 +103,8 @@ echo "Starting build process..."
         -v "$(pwd)"/data/config/feeds.txt:/data/config/feeds.txt \
         -v "$(pwd)"/data/config/filter_keywords.txt:/data/config/filter_keywords.txt \
         -v "$(pwd)"/rss/:/rss/ \
+        -v /etc/ssl/certs/vscode.tail06b521.ts.net.crt:/etc/caddy/certs/vscode.tail06b521.ts.net.crt \
+        -v /etc/ssl/certs/vscode.tail06b521.ts.net.key:/etc/caddy/certs/vscode.tail06b521.ts.net.key \
         --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
