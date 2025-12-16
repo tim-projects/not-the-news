@@ -77,6 +77,9 @@ RUN pip install -r requirements.txt \
 # 4. Copy code & initial data
 WORKDIR /app
 
+# Create logs directory for Gunicorn and other app logs
+RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
+
 # NEW: Copy Python backend files and entrypoint into the image
 COPY src/api.py /app/src/api.py
 COPY rss/ /app/rss/

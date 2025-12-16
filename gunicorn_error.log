@@ -1,5 +1,0 @@
-[2025-12-13 20:57:41 +0000] [19] [INFO] Starting gunicorn 23.0.0
-[2025-12-13 20:57:41 +0000] [19] [INFO] Listening at: http://0.0.0.0:4575 (19)
-[2025-12-13 20:57:41 +0000] [19] [INFO] Using worker: gthread
-[2025-12-13 20:57:41 +0000] [48] [INFO] Booting worker with pid: 48
-[2025-12-13 21:01:15,876] INFO in api: Login: Successful authentication

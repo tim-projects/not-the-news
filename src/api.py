@@ -14,7 +14,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 
 # Configure file-based logging
-log_file = '/tmp/api_debug.log'
+log_file = '/app/logs/api_debug.log'
 api_logger = logging.getLogger('api_logger')
 api_logger.setLevel(logging.DEBUG)
 handler = RotatingFileHandler(log_file, maxBytes=100000, backupCount=5)
