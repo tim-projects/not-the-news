@@ -122,10 +122,9 @@ button.star.starred {
 }
 
 button.read-button.read {
-  color: var(--gold-color);
+  color: var(--gold-color); /* Gold text color */
   opacity: 1;
   background-color: rgba(var(--gold-rgb), 0.1); /* Subtle gold background */
-  box-shadow: 0 0 0 1px var(--gold-color); /* Thin gold border/shadow */
 }
 
 button.star.starred:hover {
