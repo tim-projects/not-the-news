@@ -1,21 +1,30 @@
-**Current Task Status: Debugging Incomplete Features**
+**Current Task Status: TypeScript Migration**
 
-**Progress & Findings:**
-- **RSS Blacklist Display Issue:** **RESOLVED.** User confirmed.
-- **"Weird tick icon" (read-toggle button):** **RESOLVED (Removed).** User confirmed it's gone. Functionality moved to "Read" button.
-- **Gold Color for Starred Items:** **RESOLVED.** User confirmed. (Gold border removed, gold 'x' remains as per user request).
-- **Infrastructure Issues (Docker build, port conflicts, volume mounts):** **RESOLVED.** Docker builds successfully, port conflicts are handled. Frontend changes are being deployed, as evidenced by fixed RSS display and button changes.
+**Goal:** Migrate all JavaScript files to TypeScript (`.ts` or `.tsx`).
 
-**Outstanding Issues:**
-- **"Read items not highlighted":** **RESOLVED.** Gold border removed from read item highlight as per user request.
+**Scope:** All `.js` files within the `src/` directory, EXCLUDING:
+- `src/js/libs/` (third-party libraries)
+- `node_modules/` (installed packages)
+- Files within `www/` (build output directory)
+- `tests/` directory (Playwright scripts - these will remain in JavaScript for now)
+- Configuration files like `vite.config.js` and `playwright.config.js` (these may be converted in a separate, later step if necessary for tooling setup, but are not part of the core application logic migration).
 
-- **"Reset button still does nothing":** **PAUSED - Awaiting Trace Analysis.** The test for this issue is timing out, and I require user assistance to review the Playwright trace file.
-    - **Previous actions:** Added `console.log` at the start of `resetApplicationData` and immediately after the `confirm()` call. Created a Playwright test `tests/reset_button.spec.js` to capture console output, but it times out. A trace file has been generated.
-    - **Needed feedback:** User needs to open the trace file (`npx playwright show-trace test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip`) and report findings on why the test is timing out.
+**Files to be Converted:**
+- ./src/js/helpers/userStateUtils.js
+- ./src/js/helpers/dataUtils.js
+- ./src/js/helpers/apiUtils.js
+- ./src/js/helpers/deckManager.js
+- ./src/js/data/dbUserState.js
+- ./src/js/data/database.js
+- ./src/js/data/dbSyncOperations.js
+- ./src/js/data/dbCore.js
+- ./src/js/utils/connectivity.js
+- ./src/js/ui/uiElements.js
+- ./src/js/ui/uiUpdaters.js
+- ./src/js/ui/uiInitializers.js
+- ./src/sw.js
+- ./src/main.js
+- ./src/app.js
 
-- **"Backup doesn't seem to do anything":** **PAUSED - Awaiting Trace Analysis.** The test for this issue is also timing out, and I require user assistance to review the Playwright trace file.
-    - **Previous actions:** Added `console.log` at the start of `backupConfig` and before the fetch request. Created a Playwright test `tests/backup.spec.js` to capture console output, but it also times out. A trace file has been generated.
-    - **Needed feedback:** User needs to open the trace file (`npx playwright show-trace test-results/tests-backup-Backup-Config-becd1-ate-download-of-config-file/trace.zip`) and report findings on why the test is timing out.
-
-**Mitigation / Next Steps:**
-- **Blocked:** Both the "Reset button" and "Backup button" issues are currently blocked, awaiting crucial trace analysis from the user.
+**Next Steps:**
+- Await further instructions to begin the conversion process.
