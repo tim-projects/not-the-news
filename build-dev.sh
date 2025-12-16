@@ -43,6 +43,9 @@ for tarball in "${IMAGE_TARBALLS[@]}"; do
         echo "Found local image $tarball, loading into podman..."
         if podman load -i "$tarball_path"; then
             echo "Successfully loaded $tarball."
+            # Tag the loaded image for explicit local use
+            podman tag docker.io/library/node:20-slim localhost/local-node:20-slim
+            echo "Tagged docker.io/library/node:20-slim as localhost/local-node:20-slim."
         else
             echo "Warning: Failed to load $tarball." >&2
         fi

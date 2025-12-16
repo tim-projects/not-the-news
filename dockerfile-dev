@@ -3,7 +3,7 @@
 ##############################################################################
 # Stage 0: Frontend Assets Builder with Vite
 # This stage builds your Vite assets (www folder)
-FROM node:20-slim as frontend-builder
+FROM localhost/local-node:20-slim as frontend-builder
 WORKDIR /app
 # Copy package.json and package-lock.json first to leverage Docker cache
 COPY package.json package-lock.json ./
@@ -20,7 +20,7 @@ RUN npm run build
 
 ##############################################################################
 # 1. Main Development Container (now based on node:20-slim again)
-FROM node:20-slim
+FROM localhost/local-node:20-slim
 
 # First, install 'retry' separately for robust package installations
 RUN for i in $(seq 1 5); do apt-get update --fix-missing && apt-get install -y --no-install-recommends retry && break || sleep 10; done \
