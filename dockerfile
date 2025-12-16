@@ -69,6 +69,9 @@ RUN pip install \
 ##############################################################################
 # 5. Copy code & initial data
 WORKDIR /app
+
+# Create logs directory for Gunicorn and other app logs
+RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
 COPY rss/ /rss/
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
