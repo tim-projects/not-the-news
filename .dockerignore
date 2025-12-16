@@ -11,3 +11,4 @@ test-results
 *.bak
 __pycache__
 *.pyc
+backup/

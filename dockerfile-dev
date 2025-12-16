@@ -32,9 +32,9 @@ RUN for i in $(seq 1 5); do apt-get clean && apt-get update --fix-missing && apt
     \
     bash \
     procps \
-    python3 \
+    python3.11 \
     python3-pip \
-    python3-venv \
+    python3.11-venv \
     curl \
     gnupg \
     gosu \
@@ -67,7 +67,7 @@ ENV DOMAIN=${DOMAIN} \
 
 ##############################################################################
 # 3. Python venv & packages
-RUN python3 -m venv /venv
+RUN python3.11 -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install -r requirements.txt \

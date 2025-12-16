@@ -96,7 +96,24 @@ if command -v lsof &> /dev/null; then
 else
     echo "lsof not found. Skipping direct port check. Relying on podman stop/rm."
 fi
-# --- End of port check ---
+# --- End of port check for 8085 ---
+
+# --- Check and kill processes using port 8443 ---
+echo "Checking for processes using port 8443..."
+if command -v lsof &> /dev/null; then
+    PIDS=$(lsof -t -i :8443)
+    if [ -n "$PIDS" ]; then
+        echo "Found processes using port 8443: $PIDS. Attempting to kill them..."
+        kill -9 $PIDS
+        sleep 1 # Give the system a moment to release the port
+        echo "Processes killed. Port 8443 should now be free."
+    else
+        echo "No processes found using port 8443."
+    fi
+else
+    echo "lsof not found. Skipping direct port check. Relying on podman stop/rm."
+fi
+# --- End of port check for 8443 ---
 
 # Build arguments
 [ -n "$NO_CACHE" ] && { 

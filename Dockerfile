@@ -70,6 +70,9 @@ RUN pip install \
 # 5. Copy code & initial data
 WORKDIR /app
 
+# Create appuser and appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup -h /app -D
+
 # Create logs directory for Gunicorn and other app logs
 RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
 COPY rss/ /rss/
@@ -90,9 +93,6 @@ COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
 COPY data/ /data/feed/
 
 COPY build_entrypoint.sh /build_entrypoint.sh
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
-    && chown appuser:appgroup /tmp
 
 ##############################################################################
 # 6. Build entrypoint

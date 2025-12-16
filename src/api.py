@@ -24,45 +24,86 @@ api_logger.addHandler(handler)
 
 api_logger.debug("DEBUG: api.py script started.")
 
+
+
 app = Flask(__name__)
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
+
+
 # Keep Flask's default logger for general info/warnings, but use api_logger for specific debugs
+
 app.logger.setLevel(logging.DEBUG) # Keep DEBUG for development, INFO for production
+
 app.logger.addHandler(handler) # Add the file handler to Flask's app.logger
+
 app.logger.info("Flask app logger configured to write to api_debug.log") 
 
+
+
 DATA_DIR = "/data"
+
 FEED_DIR = os.path.join(DATA_DIR, "feed")
+
 CONFIG_DIR = os.path.join(DATA_DIR, "config")
+
 USER_STATE_DIR = os.path.join(DATA_DIR, "user_state")
 
+
+
 os.makedirs(DATA_DIR, exist_ok=True)
+
 os.makedirs(FEED_DIR, exist_ok=True)
+
 os.makedirs(CONFIG_DIR, exist_ok=True)
+
 os.makedirs(USER_STATE_DIR, exist_ok=True)
+
+
 
 FEED_XML = os.path.join(FEED_DIR, "feed.xml")
 
+
+
 USER_STATE_SERVER_DEFAULTS = {
+
     'currentDeckGuids': {'type': 'array', 'default': []},          # Array of { guid, addedAt }
+
     'lastShuffleResetDate': {'type': 'simple', 'default': None},
+
     'shuffleCount': {'type': 'simple', 'default': 2},
+
     'openUrlsInNewTabEnabled': {'type': 'simple', 'default': True},
+
     'starred': {'type': 'array', 'default': []},               # Array of { guid, starredAt }
+
     'hidden': {'type': 'array', 'default': []},                # Array of { guid, hiddenAt }
+
     'read': {'type': 'array', 'default': []},                 # Array of { guid, readAt }
+
     'filterMode': {'type': 'simple', 'default': 'unread'},
+
     'syncEnabled': {'type': 'simple', 'default': True},
+
     'imagesEnabled': {'type': 'simple', 'default': True},
+
     'lastStateSync': {'type': 'simple', 'default': None},
+
     'lastViewedItemId': {'type': 'simple', 'default': None},
+
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
+
     'theme': {'type': 'simple', 'default': 'light'},
+
     'lastFeedSync': {'type': 'simple', 'default': None},
+
     'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
+
     'rssFeeds': {'type': 'nested_object', 'default': {}},
+
     'keywordBlacklist': {'type': 'array', 'default': []},
+
 }
 
 def _atomic_write(filepath, content, mode='w', encoding='utf-8'):
@@ -462,5 +503,7 @@ def reset_app_data():
         api_logger.exception(f"Error resetting application data: {e}")
         return jsonify({"status": "error", "message": f"Failed to reset application data: {str(e)}"}), 500
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=4575, debug=True)
+# The Flask development server is not used in the Docker container.
+# It is served by Gunicorn.
+# if __name__ == "__main__":
+#     app.run(host="0.0.0.0", port=4575, debug=True)
