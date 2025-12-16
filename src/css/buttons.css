@@ -84,64 +84,62 @@ button.star:active {
   color: var(--secondary);
 }
 
-button.read-toggle {
+button.read-button {
   font-size: 1.75rem;
   background: var(--bg);
   color: var(--fg);
-  border-radius: 0 20px 0 0;
-  opacity: 0.6;
-  box-shadow: 2px -2px 0 1px var(--card-shadow-color);
-  float: left;
+  border-radius: 0 10px 0 20px;
+  opacity: 0.8;
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
   position: absolute;
-  bottom: 2px;
-  left: 0;
+  top: 1px;
+  right: 1px;
   margin: 0;
   padding: 0 1rem 0 1rem;
   cursor: pointer;
 }
 
-button.read-toggle:hover {
+button.read-button:hover {
   color: var(--secondary);
   background: var(--primary);
 }
 
-button.read-toggle:focus {
-  box-shadow: 2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary);
+button.read-button:focus {
+  box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
   color: var(--secondary);
   background: var(--primary);
 }
 
-button.read-toggle:active {
+button.read-button:active {
   background-color: var(--primary);
   color: var(--secondary);
 }
 
-button.star.starred,
-button.close.hidden,
-button.read-toggle.read {
-  color: var(--primary); /* Or a distinct color for read */
+button.star.starred {
+  color: var(--gold-color);
   opacity: 1;
   background: transparent;
 }
 
-button.star.starred:hover,
-button.close.hidden:hover,
-button.read-toggle.read:hover {
+button.read-button.read {
+  color: var(--gold-color);
+  opacity: 1;
+  background-color: rgba(var(--gold-rgb), 0.1); /* Subtle gold background */
+  box-shadow: 0 0 0 1px var(--gold-color); /* Thin gold border/shadow */
+}
+
+button.star.starred:hover {
   background-color: rgba(var(--primary-rgb), 0.1); /* Use rgba for hover effect */
   color: var(--primary);
 }
 
-button.star.starred:focus,
-button.close.hidden:focus,
-button.read-toggle.read:focus {
+button.star.starred:focus {
   box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary);
   color: var(--primary);
   background-color: rgba(var(--primary-rgb), 0.1);
 }
 
-button.star.starred:active,
-button.close.hidden:active,
-button.read-toggle.read:active {
+button.star.starred:active {
   background-color: rgba(var(--primary-rgb), 0.2);
   color: var(--primary);
 }

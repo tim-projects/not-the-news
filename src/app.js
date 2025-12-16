@@ -87,7 +87,7 @@ export function rssApp() {
                 await this._loadInitialState();
                 
                 if (this.isOnline) {
-                    this.progressMessage = 'Performing initial sync...';
+                    this.progressMessage = 'Syncing latest content...'; // Set specific sync message
                     // Pull user state first, as feed items depend on it.
                     await pullUserState();
                     // Then sync feed items.
@@ -95,7 +95,7 @@ export function rssApp() {
                     
                     // Now that both syncs are complete, load all data into app state.
                     await this._loadAndManageAllData();
-                    createStatusBarMessage("Initial sync complete!", "success");
+                    createStatusBarMessage(this, "Initial sync complete!", "success");
                 } else {
                     this.progressMessage = 'Offline mode. Loading local data...';
                     await this._loadAndManageAllData();
@@ -123,7 +123,7 @@ export function rssApp() {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
                 this.progressMessage = `Error: ${error.message}`;
-                this.loading = false;
+                createStatusBarMessage(this, `Could not load feed: ${error.message}`, 'error');
             }
         },
 
@@ -270,19 +270,39 @@ export function rssApp() {
             return this.read.some(e => e.guid === guid);
         },
         toggleStar: async function(guid) {
-            console.log('toggleStar: Before toggleItemStateAndSync', { guid, starred: this.starred.length });
+            const isCurrentlyStarred = this.isStarred(guid);
             await toggleItemStateAndSync(this, guid, 'starred');
-            console.log('toggleStar: After toggleItemStateAndSync, before _loadAndManageAllData', { guid, starred: this.starred.length });
-            await this._loadAndManageAllData();
-            console.log('toggleStar: After _loadAndManageAllData', { guid, starred: this.starred.length });
+            
+            // Directly update the item's starred status in the current deck and entries
+            this.deck = this.deck.map(item =>
+                item.guid === guid ? { ...item, isStarred: !isCurrentlyStarred } : item
+            );
+            this.entries = this.entries.map(item =>
+                item.guid === guid ? { ...item, isStarred: !isCurrentlyStarred } : item
+            );
+            
+            this.updateCounts();
             this.updateSyncStatusMessage();
         },
         toggleRead: async function(guid) {
-            console.log('toggleRead: Before toggleItemStateAndSync', { guid, read: this.read.length });
+            const isCurrentlyRead = this.isRead(guid);
             await toggleItemStateAndSync(this, guid, 'read');
-            console.log('toggleRead: After toggleItemStateAndSync, before _loadAndManageAllData', { guid, read: this.read.length });
-            await this._loadAndManageAllData();
-            console.log('toggleRead: After _loadAndManageAllData', { guid, read: this.read.length });
+            
+            // Directly update the item's read status in the current deck and entries
+            this.deck = this.deck.map(item =>
+                item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
+            );
+            this.entries = this.entries.map(item =>
+                item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
+            );
+
+            if (this.filterMode === 'unread' && !isCurrentlyRead) {
+                // If it was unread and now read, remove it from the deck in unread mode
+                this.deck = this.deck.filter(item => item.guid !== guid);
+            }
+            
+            this.updateCounts();
+            await this._reconcileAndRefreshUI(); // Reconcile to handle potential item removals/animations
             this.updateSyncStatusMessage();
         },
         processShuffle: async function() {
@@ -293,7 +313,7 @@ export function rssApp() {
             // Parse the multi-line string into an array of strings, one URL per line
             const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
             await saveSimpleState('rssFeeds', rssFeedsArray); // Send the array to the backend
-            createStatusBarMessage('RSS Feeds saved!', 'success');
+            createStatusBarMessage(this, 'RSS Feeds saved!', 'success');
             this.loading = true;
             this.progressMessage = 'Saving feeds and performing full sync...';
             await performFullSync(this);
@@ -305,7 +325,7 @@ export function rssApp() {
         saveKeywordBlacklist: async function() {
             const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
             await saveSimpleState('keywordBlacklist', keywordsArray);
-            createStatusBarMessage('Keyword Blacklist saved!', 'success');
+            createStatusBarMessage(this, 'Keyword Blacklist saved!', 'success');
             this.updateCounts();
         },
         updateCounts: function() {
@@ -315,14 +335,181 @@ export function rssApp() {
             scrollToTop();
         },
 
+        // --- New Function: Reset Application Data ---
+        resetApplicationData: async function() {
+            console.log('resetApplicationData called.');
+            const isConfirmed = confirm('Are you sure you want to reset the application? This will clear all local data, cache, and unregister the service worker.');
+            console.log('User confirmed reset:', isConfirmed);
+            if (!isConfirmed) {
+                console.log('Reset cancelled by user.');
+                return;
+            }
+
+            this.loading = true;
+            this.progressMessage = 'Resetting application data...';
+
+            try {
+                // 1. Clear IndexedDB databases
+                console.log('Clearing IndexedDB databases...');
+                const dbNames = await indexedDB.databases();
+                for (const dbInfo of dbNames) {
+                    await new Promise((resolve, reject) => {
+                        const req = indexedDB.deleteDatabase(dbInfo.name);
+                        req.onsuccess = () => {
+                            console.log(`IndexedDB database '${dbInfo.name}' deleted.`);
+                            resolve();
+                        };
+                        req.onerror = (event) => {
+                            console.error(`Error deleting IndexedDB database '${dbInfo.name}':`, event.target.error);
+                            reject(event.target.error);
+                        };
+                        req.onblocked = () => {
+                            // If there are open connections, onblocked will fire.
+                            // User needs to close all tabs for the site.
+                            alert('Please close all other tabs of this application and try again to clear the database.');
+                            reject(new Error('IndexedDB deletion blocked.'));
+                        };
+                    });
+                }
+
+                // 2. Clear localStorage
+                console.log('Clearing localStorage...');
+                localStorage.clear();
+                console.log('localStorage cleared.');
+
+                // 3. Unregister Service Workers
+                console.log('Unregistering service workers...');
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                        console.log('Service Worker unregistered:', registration.scope);
+                    }
+                }
+                console.log('Service workers unregistered.');
+
+                // 4. Call backend to reset server-side data
+                console.log('Calling backend to reset application data...');
+                const response = await fetch('/api/admin/reset-app', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include' // Important for sending cookies
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to reset backend data.');
+                }
+                console.log('Backend application data reset successfully.');
+                createStatusBarMessage(this, 'Application reset complete! Reloading...', 'success');
+
+                // 5. Reload the page to ensure a fresh start
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+
+            } catch (error) {
+                console.error("Error during application reset:", error);
+                this.errorMessage = `Failed to reset application: ${error.message}`;
+                createStatusBarMessage(this, `Failed to reset application: ${error.message}`, 'error');
+                this.loading = false;
+            }
+        },
+
+        backupConfig: async function() {
+            console.log('backupConfig called.');
+            try {
+                this.progressMessage = 'Fetching configuration for backup...';
+                console.log('Fetching config for backup from:', '/api/admin/config-backup');
+                const response = await fetch('/api/admin/config-backup', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch config for backup.');
+                }
+
+                const configData = await response.json();
+                const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `not-the-news-config-backup-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                createStatusBarMessage(this, 'Configuration backed up successfully!', 'success');
+            } catch (error) {
+                console.error("Error during config backup:", error);
+                createStatusBarMessage(this, `Failed to backup configuration: ${error.message}`, 'error');
+            } finally {
+                this.progressMessage = '';
+            }
+        },
+
+        restoreConfig: async function(event) {
+            if (!confirm('Are you sure you want to restore configuration? This will overwrite your current settings and reload the application.')) {
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) {
+                createStatusBarMessage(this, 'No file selected for restoration.', 'info');
+                return;
+            }
+
+            this.loading = true;
+            this.progressMessage = 'Restoring configuration...';
+
+            try {
+                const fileContent = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsText(file);
+                });
+
+                const configToRestore = JSON.parse(fileContent);
+
+                const response = await fetch('/api/admin/config-restore', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(configToRestore),
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to restore backend data.');
+                }
+                console.log('Backend configuration restored successfully.');
+                createStatusBarMessage(this, 'Configuration restored successfully! Reloading...', 'success');
+
+                // Reload the page to apply new settings and re-initialize
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+
+            } catch (error) {
+                console.error("Error during config restoration:", error);
+                createStatusBarMessage(this, `Failed to restore configuration: ${error.message}`, 'error');
+                this.loading = false;
+            } finally {
+                // Clear the file input value so the same file can be selected again
+                event.target.value = '';
+            }
+        },
+
         // --- Private Helper Methods ---
         _loadInitialState: async function() {
             const [syncEnabled, imagesEnabled, urlsNewTab, filterMode] = await Promise.all([
-                loadSimpleState('syncEnabled'),
-                loadSimpleState('imagesEnabled'),
-                loadSimpleState('openUrlsInNewTabEnabled'),
-                loadFilterMode(),
-            ]);
             this.syncEnabled = syncEnabled.value ?? true;
             this.imagesEnabled = imagesEnabled.value ?? true;
             this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
@@ -452,7 +639,7 @@ export function rssApp() {
 
             setInterval(async () => {
                 const now = Date.now();
-                if (!this.isOnline || this.openSettings || !this.syncEnabled || document.read || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
+                if (!this.isOnline || this.openSettings || !this.syncEnabled || (now - lastActivityTimestamp) > INACTIVITY_TIMEOUT_MS) {
                     return;
                 }
                 console.log('Starting scheduled background sync...');

@@ -45,4 +45,3 @@ export const getConfigureRssButton = () => document.getElementById('configure-rs
 export const getConfigureKeywordsButton = () => document.getElementById('configure-keyword-blacklist-btn');
 export const getSaveKeywordsButton = () => document.getElementById("save-keywords-btn");
 export const getSaveRssButton = () => document.getElementById("save-rss-btn");
-export const getReadToggleButton = () => document.querySelector('.read-toggle');

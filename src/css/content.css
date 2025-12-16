@@ -172,7 +172,3 @@ span.shuffle-count {
     opacity: 0.6;
     background-color: var(--read-item-bg);
 }
-
-.read-toggle.read {
-    color: var(--read-toggle-color);
-}

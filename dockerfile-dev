@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 # Copy all source files required for the build (e.g., src/, public/ if any)
 COPY . .
+# NEW STEP: Build the frontend assets using Vite
+RUN npm run build
 
 ##############################################################################
 # 1. Main Development Container (now based on node:20-slim again)
@@ -74,6 +76,12 @@ RUN pip install -r requirements.txt \
 ##############################################################################
 # 4. Copy code & initial data
 WORKDIR /app
+
+# NEW: Copy Python backend files and entrypoint into the image
+COPY src/api.py /app/src/api.py
+COPY rss/ /app/rss/
+COPY build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh # Make the entrypoint executable
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/

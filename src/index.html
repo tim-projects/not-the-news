@@ -71,10 +71,9 @@
             <template x-for="entry in filteredEntries" :key="entry.guid">
                 <div class="item entry" :data-guid="entry.guid" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="transform scale-100 opacity-100" x-transition:leave-end="transform scale-95 opacity-0">
                     <div class="itemtitle">
-                        <button class="close" @click="toggleRead(entry.guid)" :class="{ 'read': isRead(entry.guid) }" aria-label="Close">✕</button>
+                        <button class="read-button" @click="toggleRead(entry.guid)" :class="{ 'read': isRead(entry.guid) }" aria-label="Mark as Read">✕</button>
                         <div x-html="entry.title"></div>
                         <button class="star" @click="toggleStar(entry.guid)" :class="{'starred': isStarred(entry.guid)}" aria-label="Star">★</button>
-                        <button class="read-toggle" data-cy="read-toggle" @click="toggleRead(entry.guid)" :class="{'read': this.read.some(r => r.guid === entry.guid)}" aria-label="Mark as Read/Unread">✓</button>
                     </div>
                     <div class="itemdescription" x-init="handleEntryLinks($el)">
                         <div class="itemfrom">
@@ -118,6 +117,9 @@
                     <div class="settings-option"><span>Keyword Blacklist</span><button id="configure-keyword-blacklist-btn" class="configure-button" @click="modalView = 'keywords'">Configure</button></div>
                     <hr>
                     <div class="settings-option"><label for="install-button">Install as App</label><button id="install-button" class="configure-button">Install</button></div>
+                    <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
+                    <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
+                    <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>
                 </div>
 
                 <div id="rss-settings-block" x-show="modalView === 'rss'">
@@ -144,7 +146,7 @@
              <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z" stroke-width="1.5" /></svg>
         </button>
 
-        <div id="status-message-container"></div>
+        <div id="status-message-container" x-cloak x-show="showSyncStatus" x-text="syncStatusMessage"></div>
     </div>
 
     <!-- Single script tag for Vite build process -->

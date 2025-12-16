@@ -1,24 +1,24 @@
-## UI Bug & Networking Issues
+**Current Task Status: Debugging Incomplete Features**
 
-**Work Done:**
+**Progress & Findings:**
+- **RSS Blacklist Display Issue:** **RESOLVED.** User confirmed.
+- **"Weird tick icon" (read-toggle button):** **RESOLVED (Removed).** User confirmed it's gone. Functionality moved to "Read" button.
+- **Gold Color for Starred Items:** **RESOLVED.** User confirmed.
+- **Infrastructure Issues (Docker build, port conflicts, volume mounts):** **RESOLVED.** Docker builds successfully, port conflicts are handled. Frontend changes are being deployed, as evidenced by fixed RSS display and button changes.
 
-1.  **Networking Issue (HTTPS/Tailscale):**
-    *   Resolved `502 Bad Gateway` and `net::ERR_CONNECTION_RESET` errors when accessing the development application via Tailscale.
-    *   Configured `Caddyfile-dev` to use manually provided Tailscale SSL certificates, explicitly disabling automatic HTTPS (`auto_https off`).
-    *   Addressed persistent Caddy parsing errors by simplifying the `tls` directive and removing the Brotli `encode` module (due to Caddy build limitations).
-    *   Verified certificate file permissions and made necessary adjustments on the host machine.
-    *   Successfully re-enabled the HTTP to HTTPS redirect for the Tailscale domain (`http://vscode.tail06b521.ts.net:80` redirects to `https://vscode.tail06b521.ts.net:8443`).
-    *   Re-added the `http://localhost:80` block for local development access.
-    *   **Status: RESOLVED.** User confirmed `https://vscode.tail06b521.ts.net:8443/login.html` is working, marking a major progress milestone.
-2.  **UI Bug (Settings Modal Disappearing Content):**
-    *   The issue where text fields in the settings modal briefly showed content then disappeared was due to a race condition or incorrect timing in the Playwright test, which clicked the back button before the UI had fully transitioned.
-    *   The underlying fix for the UI (removal of `this.modalView = 'main';` from `src/main.js`) was already in place and correct.
-    *   Modified `tests/config.spec.js` to add a `page.waitForSelector('#back-button', { state: 'visible' });` after clicking the configure RSS feeds button. This ensures Playwright waits for the UI to update and the back button to become visible before attempting to click it.
-    *   **Status: RESOLVED.** Playwright test `tests/config.spec.js` now passes, confirming the login functionality and the settings modal UI bug are fixed.
+**Outstanding Issues Requiring User Feedback:**
+- **"Read items not highlighted":** The "Read" button on read items is still not visually highlighted for the user.
+    - **Previous actions:** Consolidated CSS rules, made highlight more prominent (subtle background, box-shadow), confirmed `isRead(entry.guid)` adds `read` class.
+    - **Needed feedback:** I need the user to **inspect the "Read" button of a read item** using browser developer tools and report:
+        - Is the `read` class present on the `<button>` element?
+        - What CSS rules are applied to `button.read-button.read` (color, background, box-shadow values)?
+        - Are there any overriding CSS rules?
+- **"Reset button still does nothing":** The button is active, but no confirmation dialog appears, and the reset action does not proceed.
+    - **Previous actions:** Added `console.log` at the start of `resetApplicationData` and immediately after the `confirm()` call to log its return value.
+    - **Needed feedback:** I need the user to **report *all* console output** when clicking the "Reset Application" button, including whether the confirmation dialog appears and the value of `User confirmed reset: [true/false]`.
+- **"Backup doesn't seem to do anything":** No file downloads.
+    - **Previous actions:** Added `console.log` at the start of `backupConfig` and before the fetch request.
+    - **Needed feedback:** I need the user to **report *all* console output** when clicking the "Backup Configuration" button, including network errors, and confirm if a file downloads.
 
-**Playwright Test Configuration Update:**
-*   Hardcoded `APP_PASSWORD` (`devtestpwd`) directly into `tests/config.spec.js`.
-*   Attempted to configure Playwright `baseURL` to `https://vscode.tail06b521.ts.net:8443` in `playwright.config.js`. This failed due to `net::ERR_NAME_NOT_RESOLVED` as the hostname could not be resolved by the host machine running Playwright.
-*   Reverted Playwright configuration to use `http://localhost:8085` to ensure tests remain functional.
-
-**All major issues are now resolved.**
+**Mitigation / Next Steps:**
+- Awaiting crucial console output and element inspection details from the user to proceed with debugging the remaining issues.

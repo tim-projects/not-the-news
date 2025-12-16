@@ -225,7 +225,7 @@ async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, g
         //console.log(`[DEBUG] Content for ${key} input:`, content); // Added debug log
         //console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
         app[`${key}Input`] = content;
-        app.modalView = key; // Switch to the correct view
+        app.modalView = viewName; // Switch to the correct view
     });
 
     saveBtn.addEventListener("click", async () => {
@@ -241,9 +241,9 @@ async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, g
             }
             app[`${key}Input`] = dataToSave.sort().join("\n");
             createStatusBarMessage(`${key} saved.`, 'success');
-        } catch (err) {
-            console.error(err);
-            createStatusBarMessage(`Error saving ${key}!`, 'error');
+        } catch (error) {
+            console.error(`Error saving ${key}:`, error);
+            createStatusBarMessage(`Failed to save ${key}: ${error.message}`, 'error');
         }
     });
 }
@@ -255,8 +255,8 @@ export async function initConfigPanelListeners(app) {
         app.modalView = 'main';
     });
 
-    await setupTextareaPanel('rssFeeds', getConfigureRssButton, getRssFeedsTextarea, getSaveRssButton, app);
-    await setupTextareaPanel('keywordBlacklist', getConfigureKeywordsButton, getKeywordsBlacklistTextarea, getSaveKeywordsButton, app);
+    await setupTextareaPanel('rssFeeds', 'rss', getConfigureRssButton, getRssFeedsTextarea, getSaveRssButton, app);
+    await setupTextareaPanel('keywordBlacklist', 'keywords', getConfigureKeywordsButton, getKeywordsBlacklistTextarea, getSaveKeywordsButton, app);
 }
 
 

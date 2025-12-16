@@ -80,6 +80,24 @@ if [ -n "$PASSWORD" ]; then
     ESCAPED_PWD=$(printf '%q' "$PASSWORD")
     BUILD_ARGS+=("--build-arg" "APP_PASSWORD=$ESCAPED_PWD")
 fi
+
+# --- Check and kill processes using port 8085 ---
+echo "Checking for processes using port 8085..."
+if command -v lsof &> /dev/null; then
+    PIDS=$(lsof -t -i :8085)
+    if [ -n "$PIDS" ]; then
+        echo "Found processes using port 8085: $PIDS. Attempting to kill them..."
+        kill -9 $PIDS
+        sleep 1 # Give the system a moment to release the port
+        echo "Processes killed. Port 8085 should now be free."
+    else
+        echo "No processes found using port 8085."
+    fi
+else
+    echo "lsof not found. Skipping direct port check. Relying on podman stop/rm."
+fi
+# --- End of port check ---
+
 # Build arguments
 [ -n "$NO_CACHE" ] && { 
     echo "Adding no-cache flag and performing system prune..."
@@ -92,11 +110,12 @@ echo "Starting build process..."
 (
     set -x  # Show git/podman commands
 
-    podman rm -f ntn-dev && \
+    podman stop ntn-dev || true && \
+    podman rm -f ntn-dev || true && \
+    sleep 2 && \
     podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
     podman run -d -p 8085:80 -p 8443:443 \
         -v "$VOLUME_NAME":/data \
-        -v "$(pwd)":/app \
         -v "$(pwd)"/reconstruct_api.py:/tmp/reconstruct_api.py \
         -v "$(pwd)"/build_entrypoint.sh:/usr/local/bin/docker-entrypoint.sh \
         -v "$(pwd)"/Caddyfile-dev:/etc/caddy/Caddyfile \

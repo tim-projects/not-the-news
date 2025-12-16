@@ -68,33 +68,27 @@ export async function displayTemporaryMessageInTitle(message) {
 }
 
 /**
- * Creates and shows a message in the dedicated status bar area using a closure for cleanup.
+ * Creates and shows a message in the dedicated status bar area using Alpine.js state.
+ * @param {object} app The Alpine.js app state object.
  * @param {string} message The message to display.
  * @param {string} [type='info'] Optional. 'success', 'error', 'info'.
 */
-export const createStatusBarMessage = (() => {
-    let messageTimeoutId;
+let messageTimeoutId;
+export function createStatusBarMessage(app, message, type = 'info') {
+    clearTimeout(messageTimeoutId);
 
-    return (message, type = 'info') => {
-        const messageContainer = getMessageContainer();
-        if (!messageContainer) {
-            console.warn("Message container not found. Cannot display status bar message.");
-            return;
-        }
+    app.syncStatusMessage = message;
+    app.showSyncStatus = true;
+    
+    // Add a class for styling based on message type (optional, can be done with x-bind:class)
+    // For now, we'll keep it simple and just show the message.
+    // The existing CSS for message-container and message-container.visible should handle basic styling.
 
-        clearTimeout(messageTimeoutId);
-
-        messageContainer.className = `message-container message-${type}`;
-        messageContainer.textContent = message;
-        messageContainer.style.display = 'block';
-
-        messageTimeoutId = setTimeout(() => {
-            messageContainer.style.display = 'none';
-            messageContainer.textContent = '';
-            messageContainer.className = 'message-container';
-        }, 3000);
-    };
-})();
+    messageTimeoutId = setTimeout(() => {
+        app.showSyncStatus = false;
+        app.syncStatusMessage = '';
+    }, 3000);
+}
 
 /**
  * Updates the counts displayed on filter options.
