@@ -19,6 +19,6 @@ echo "Running single Playwright test: $TEST_NAME_REGEX in $TEST_FILE"
 # --reporter=line provides a single line per test result
 # grep -E '^\s*(✓|✕)' filters for lines starting with checkmark or cross (test pass/fail)
 # sed 's/^\s*//' removes leading whitespace
-npx playwright test "$TEST_FILE" --grep "$TEST_NAME_REGEX" --reporter=line 2>&1 \
+npx playwright test "$TEST_FILE" --grep "$TEST_NAME_REGEX" --reporter=line --trace on --retries=0 2>&1 \
   | grep -E '^\s*(✓|✕|Error:)' \
   | sed 's/^\s*//'

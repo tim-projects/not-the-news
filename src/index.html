@@ -71,9 +71,9 @@
             <template x-for="entry in filteredEntries" :key="entry.guid">
                 <div class="item entry" :data-guid="entry.guid" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="transform scale-100 opacity-100" x-transition:leave-end="transform scale-95 opacity-0">
                     <div class="itemtitle">
-                        <button class="read-button" @click="toggleRead(entry.guid)" :class="{ 'read': isRead(entry.guid) }" aria-label="Mark as Read">✕</button>
+                        <button class="read-button" @click="toggleRead(entry.guid)" :class="{ 'read': entry.isRead }" aria-label="Mark as Read">✕</button>
                         <div x-html="entry.title"></div>
-                        <button class="star" @click="toggleStar(entry.guid)" :class="{'starred': isStarred(entry.guid)}" aria-label="Star">★</button>
+                        <button class="star" @click="toggleStar(entry.guid)" :class="{'starred': entry.isStarred}" aria-label="Star">★</button>
                     </div>
                     <div class="itemdescription" x-init="handleEntryLinks($el)">
                         <div class="itemfrom">
