@@ -13,17 +13,16 @@ from email.utils import parsedate_to_datetime
 from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
 
-# Configure file-based logging
-log_file = '/app/logs/api_debug.log'
+# Configure logging to stderr for Docker/Gunicorn compatibility
+import sys
 api_logger = logging.getLogger('api_logger')
 api_logger.setLevel(logging.DEBUG)
-handler = RotatingFileHandler(log_file, maxBytes=100000, backupCount=5)
+handler = logging.StreamHandler(sys.stderr)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 api_logger.addHandler(handler)
 
-api_logger.debug("DEBUG: api.py script started.")
-
+api_logger.debug("DEBUG: api.py script started, logging to stderr.")
 
 
 app = Flask(__name__)
@@ -36,9 +35,11 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 app.logger.setLevel(logging.DEBUG) # Keep DEBUG for development, INFO for production
 
-app.logger.addHandler(handler) # Add the file handler to Flask's app.logger
+app.logger.handlers = [] # Remove existing handlers
 
-app.logger.info("Flask app logger configured to write to api_debug.log") 
+app.logger.addHandler(handler) # Add the StreamHandler to Flask's app.logger
+
+app.logger.info("Flask app logger configured to write to stderr.")  
 
 
 
