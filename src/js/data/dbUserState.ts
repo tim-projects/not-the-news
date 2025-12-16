@@ -1,12 +1,25 @@
-// @filepath: src/js/data/dbUserState.js
+//
 
-import { withDb } from './dbCore.js';
-import { queueAndAttemptSyncOperation } from './dbSyncOperations.js';
+import { withDb } from './dbCore.ts';
+
+type IDBPDatabase = any; // Temporarily use 'any' for the IDBPDatabase type to resolve import error
+import { queueAndAttemptSyncOperation } from './dbSyncOperations.ts'; // Will be converted later
+
+// Define interfaces for USER_STATE_DEFS and related types
+interface UserStateDef {
+    store: string;
+    type: 'array' | 'simple';
+    localOnly: boolean;
+    default: any;
+}
+
+interface UserStateDefs {
+    [key: string]: UserStateDef;
+}
 
 // --- User State Definitions ---
-export const USER_STATE_DEFS = {
+export const USER_STATE_DEFS: UserStateDefs = {
     starred: { store: 'starred', type: 'array', localOnly: false, default: [] },
-    read: { store: 'read', type: 'array', localOnly: false, default: [] },
     read: { store: 'read', type: 'array', localOnly: false, default: [] },
     lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
     lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
@@ -18,11 +31,16 @@ export const USER_STATE_DEFS = {
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
 };
 
+interface SimpleStateValue {
+    value: any;
+    lastModified: string | null;
+}
+
 /**
  * Loads a simple key-value state from the specified store.
  */
-export async function loadSimpleState(key, storeName = 'userSettings') {
-    return withDb(async (db) => {
+export async function loadSimpleState(key: string, storeName: string = 'userSettings'): Promise<SimpleStateValue> {
+    return withDb(async (db: IDBPDatabase) => {
         try {
             const record = await db.get(storeName, key);
             return {
@@ -39,7 +57,7 @@ export async function loadSimpleState(key, storeName = 'userSettings') {
 /**
  * Saves a simple key-value state locally AND queues it for synchronization.
  */
-export async function saveSimpleState(key, value, storeName = 'userSettings') {
+export async function saveSimpleState(key: string, value: any, storeName: string = 'userSettings'): Promise<void> {
     await withDb(db => db.put(storeName, { key, value, lastModified: new Date().toISOString() }));
 
     const def = USER_STATE_DEFS[key];
@@ -49,14 +67,13 @@ export async function saveSimpleState(key, value, storeName = 'userSettings') {
             key: key,
             value: value,
             timestamp: new Date().toISOString()
-        });
+        } as QueueOperation);
     }
 }
 
-const getTimestampKey = (storeName) => {
+const getTimestampKey = (storeName: string): string => {
     switch (storeName) {
         case 'starred': return 'starredAt';
-        case 'read': return 'readAt';
         case 'read': return 'readAt';
         case 'currentDeckGuids': return 'addedAt';
         case 'shuffledOutGuids': return 'shuffledAt';
@@ -64,14 +81,18 @@ const getTimestampKey = (storeName) => {
     }
 };
 
+interface ArrayStateValue {
+    value: any[];
+}
+
 /**
  * Loads all items from a store, performing data migration if necessary.
  */
-export async function loadArrayState(storeName) {
+export async function loadArrayState(storeName: string): Promise<ArrayStateValue> {
     console.log(`ENTERING loadArrayState for ${storeName}`);
-    return withDb(async (db) => {
+    return withDb(async (db: IDBPDatabase) => {
         try {
-            const allItems = await db.getAll(storeName);
+            const allItems: any[] = await db.getAll(storeName);
             const needsMigration = allItems.length > 0 && (typeof allItems[0] === 'string' || allItems[0].id === undefined);
 
             if (needsMigration) {
@@ -79,7 +100,7 @@ export async function loadArrayState(storeName) {
                 const timestampKey = getTimestampKey(storeName);
                 const now = new Date().toISOString();
                 // Deduplicate the array before migration to prevent unique constraint errors.
-                const uniqueItems = new Map();
+                const uniqueItems = new Map<string, any>();
                 allItems.forEach(item => {
                     const guid = typeof item === 'string' ? item : item.guid;
                     if (guid && !uniqueItems.has(guid)) {
@@ -113,19 +134,28 @@ export async function loadArrayState(storeName) {
 /**
  * Finds a single object in a store by its GUID.
  */
-export async function findByGuid(storeName, guid) {
-    return withDb(db => db.getFromIndex(storeName, 'guid', guid)).catch(e => {
+export async function findByGuid(storeName: string, guid: string): Promise<any | undefined> {
+    return withDb(db => db.getFromIndex(storeName, 'guid', guid)).catch((e: any) => {
         console.error(`Error finding item by GUID '${guid}' in store '${storeName}':`, e);
         return undefined;
     });
 }
 
+interface QueueOperation {
+    type: string;
+    guid?: string;
+    action?: 'add' | 'remove';
+    timestamp: string;
+    key?: string;
+    value?: any;
+}
+
 /**
  * Adds or removes a single object locally AND queues the change for synchronization.
  */
-export async function updateArrayState(storeName, item, add) {
+export async function updateArrayState(storeName: string, item: { guid: string, [key: string]: any }, add: boolean): Promise<void> {
     // Step 1: Perform the local database operation.
-    await withDb(async (db) => {
+    await withDb(async (db: IDBPDatabase) => {
         const tx = db.transaction(storeName, 'readwrite');
         if (!item || !item.guid) {
             console.error("[DB] updateArrayState requires an item with a guid property.", item);
@@ -149,7 +179,6 @@ export async function updateArrayState(storeName, item, add) {
         let opType = '';
         if (storeName === 'starred') opType = 'starDelta';
         if (storeName === 'read') opType = 'readDelta';
-        if (storeName === 'read') opType = 'readDelta';
         
         if (opType) {
             await queueAndAttemptSyncOperation({
@@ -157,7 +186,7 @@ export async function updateArrayState(storeName, item, add) {
                 guid: item.guid,
                 action: add ? 'add' : 'remove',
                 timestamp: item[getTimestampKey(storeName)] || new Date().toISOString()
-            });
+            } as QueueOperation);
         }
     }
 }
@@ -165,13 +194,13 @@ export async function updateArrayState(storeName, item, add) {
 /**
  * Overwrites an array locally, calculates the changes, and queues them for sync.
  */
-export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
+export async function overwriteArrayAndSyncChanges(storeName: string, newObjects: any[]): Promise<void> {
     const { value: oldObjects } = await loadArrayState(storeName);
-    const oldGuids = new Set(oldObjects.map(item => item.guid));
+    const oldGuids = new Set(oldObjects.map((item: any) => item.guid));
     
     // Step 1: Overwrite the local database. This is the source of truth for the UI.
     await saveArrayState(storeName, newObjects);
-    const newGuids = new Set(newObjects.map(item => item.guid));
+    const newGuids = new Set(newObjects.map((item: any) => item.guid));
 
     // Step 2: Calculate the differences.
     const guidsToRemove = [...oldGuids].filter(guid => !newGuids.has(guid));
@@ -184,7 +213,6 @@ export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
     let opType = '';
     if (storeName === 'starred') opType = 'starDelta';
     if (storeName === 'read') opType = 'readDelta';
-    if (storeName === 'read') opType = 'readDelta';
 
     if (!opType) return; // Nothing to do if we can't determine the operation type
 
@@ -192,13 +220,13 @@ export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
     if (guidsToRemove.length > 0) {
         console.log(`[DB] Queuing ${guidsToRemove.length} 'remove' operations for '${storeName}'.`);
         for (const guid of guidsToRemove) {
-            await queueAndAttemptSyncOperation({ type: opType, guid: guid, action: 'remove', timestamp: new Date().toISOString() });
+            await queueAndAttemptSyncOperation({ type: opType, guid: guid, action: 'remove', timestamp: new Date().toISOString() } as QueueOperation);
         }
     }
     if (guidsToAdd.length > 0) {
         console.log(`[DB] Queuing ${guidsToAdd.length} 'add' operations for '${storeName}'.`);
         for (const guid of guidsToAdd) {
-            await queueAndAttemptSyncOperation({ type: opType, guid: guid, action: 'add', timestamp: new Date().toISOString() });
+            await queueAndAttemptSyncOperation({ type: opType, guid: guid, action: 'add', timestamp: new Date().toISOString() } as QueueOperation);
         }
     }
 }
@@ -206,7 +234,7 @@ export async function overwriteArrayAndSyncChanges(storeName, newObjects) {
 /**
  * Re-implements the 30-day grace period pruning for read items.
  */
-export async function pruneStaleReadItems(readItems, feedItems) {
+export async function pruneStaleReadItems(readItems: { guid: string, readAt: string }[], feedItems: { guid: string }[]): Promise<void> {
     if (!Array.isArray(readItems) || !Array.isArray(feedItems)) {
         console.warn('[DB] pruneStaleReadItems skipped due to invalid input.');
         return;
@@ -234,8 +262,8 @@ export async function pruneStaleReadItems(readItems, feedItems) {
 /**
  * Overwrites a store LOCALLY ONLY.
  */
-export async function saveArrayState(storeName, objects) {
-    return withDb(async (db) => {
+export async function saveArrayState(storeName: string, objects: any[]): Promise<void> {
+    return withDb(async (db: IDBPDatabase) => {
         const tx = db.transaction(storeName, 'readwrite');
         await tx.store.clear();
         for (const item of objects) {

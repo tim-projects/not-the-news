@@ -1,17 +1,58 @@
 // @filepath: src/js/userStateUtils.js
 
+// Define interfaces for the data structures
+interface ReadItem {
+    guid: string;
+    readAt: string; // ISO 8601 date string
+}
+
+interface StarredItem {
+    guid: string;
+    starredAt: string; // ISO 8601 date string
+}
+
+interface DeckItem {
+    guid: string;
+    addedAt: string; // ISO 8601 date string
+}
+
+interface PendingOperation {
+    type: string; // e.g., 'readDelta', 'starredDelta', 'simpleUpdate', 'arrayUpdate'
+    guid?: string; // For delta operations
+    action?: 'add' | 'remove'; // For delta operations
+    timestamp: string;
+    key?: string; // For simpleUpdate/arrayUpdate
+    value?: any; // For simpleUpdate/arrayUpdate
+    items?: any[]; // For arrayUpdate
+}
+
+import { MappedFeedItem } from './dataUtils.ts'; // Import MappedFeedItem
+
+// Minimal AppState for compilation, will be refined as app.ts is converted
+interface AppState {
+    entries: MappedFeedItem[];
+    read: ReadItem[];
+    starred: StarredItem[];
+    currentDeckGuids: DeckItem[];
+    updateCounts: () => void;
+    filterMode: string;
+    showSyncStatus: boolean; // Added for createStatusBarMessage
+    syncStatusMessage: string; // Added for createStatusBarMessage
+    // Add other properties as needed based on how 'app' is used
+    [key: string]: any; // Allow dynamic indexing for app[stateKey]
+}
+
 import {
     loadSimpleState,
     saveSimpleState,
     loadArrayState,
-    saveArrayState, // <-- Add this import directly
+    saveArrayState,
     queueAndAttemptSyncOperation,
     updateArrayState,
     overwriteArrayAndSyncChanges
-} from '../data/dbUserState.js'; // <-- Change import path
+} from '../data/dbUserState.ts';
 
-import { isOnline } from '../utils/connectivity.js';
-import { createStatusBarMessage } from '../ui/uiUpdaters.js';
+import { createStatusBarMessage } from '../ui/uiUpdaters.ts';
 
 /**
  * A helper function to deeply clone an object, sanitizing it for IndexedDB storage.
@@ -19,7 +60,7 @@ import { createStatusBarMessage } from '../ui/uiUpdaters.js';
  * @param {object} obj The object to sanitize.
  * @returns {object} A sanitized, cloneable copy of the object.
  */
-function sanitizeForIndexedDB(obj) {
+function sanitizeForIndexedDB(obj: any): any {
     if (typeof structuredClone === 'function') {
         try {
             return structuredClone(obj);
@@ -30,7 +71,7 @@ function sanitizeForIndexedDB(obj) {
 
     // Fallback for older browsers or complex, non-cloneable data
     // This is a manual recursive check that omits functions.
-    const sanitized = {};
+    const sanitized: { [key: string]: any } = {};
     for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
             const value = obj[key];
@@ -51,14 +92,13 @@ function sanitizeForIndexedDB(obj) {
 }
 
 
-export async function toggleItemStateAndSync(app, guid, stateKey) {
-    const isCurrentlyActive = app[stateKey].some(item => item.guid === guid);
+export async function toggleItemStateAndSync(app: AppState, guid: string, stateKey: 'read' | 'starred'): Promise<void> {
+    const isCurrentlyActive = (app[stateKey] as Array<ReadItem | StarredItem>).some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
-    const timestamp = new Date().toISOString();
-    const actionVerb = stateKey.slice(0, -1); // e.g., 'star' from 'starred'
-
-    // Create the full object that will be used for the database operation and local state.
-    const itemObject = { guid, [`${actionVerb}At`]: timestamp };
+        const timestamp = new Date().toISOString();
+        const itemObject: ReadItem | StarredItem = stateKey === 'read'
+            ? { guid, readAt: timestamp }
+            : { guid, starredAt: timestamp };
 
     // Correctly call updateArrayState with the required arguments:
     // 1. storeName (string)
@@ -68,9 +108,17 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
 
     // Update the local application state to match the database operation
     if (action === 'add') {
-        app[stateKey] = [...app[stateKey], itemObject];
+        if (stateKey === 'read') {
+            app.read = [...app.read, itemObject as ReadItem];
+        } else { // stateKey === 'starred'
+            app.starred = [...app.starred, itemObject as StarredItem];
+        }
     } else {
-        app[stateKey] = app[stateKey].filter(item => item.guid !== guid);
+        if (stateKey === 'read') {
+            app.read = app.read.filter(item => item.guid !== guid);
+        } else { // stateKey === 'starred'
+            app.starred = app.starred.filter(item => item.guid !== guid);
+        }
     }
     
     // Display status message to the user
@@ -85,7 +133,7 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
 
     // Queue the change for server-side synchronization
     const opType = `${stateKey}Delta`;
-    const pendingOp = {
+    const pendingOp: PendingOperation = {
         type: opType,
         guid: guid,
         action: action,
@@ -94,11 +142,11 @@ export async function toggleItemStateAndSync(app, guid, stateKey) {
     await queueAndAttemptSyncOperation(pendingOp);
 }
 
-export async function pruneStaleRead(feedItems, readItems, currentTS) {
+export async function pruneStaleRead(feedItems: any[], readItems: ReadItem[], currentTS: number): Promise<ReadItem[]> {
     if (!Array.isArray(readItems)) return [];
     if (!Array.isArray(feedItems) || feedItems.length === 0) return readItems;
 
-    const validFeedGuids = new Set(feedItems.filter(e => e && e.guid).map(e => e.guid.trim().toLowerCase()));
+    const validFeedGuids = new Set(feedItems.filter(e => e && e.guid).map(e => String(e.guid).trim().toLowerCase()));
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
     return readItems.filter(item => {
@@ -119,12 +167,12 @@ export async function pruneStaleRead(feedItems, readItems, currentTS) {
     });
 }
 
-export async function loadAndPruneReadItems(feedItems) {
+export async function loadAndPruneReadItems(feedItems: any[]): Promise<ReadItem[]> {
     const { value: rawItems } = await loadArrayState('read');
     let needsResave = false;
     
     // Data migration and normalization logic
-    let normalizedItems = [];
+    let normalizedItems: ReadItem[] = [];
     if (Array.isArray(rawItems)) {
         const defaultTimestamp = new Date().toISOString();
         for (const item of rawItems) {
@@ -152,7 +200,7 @@ export async function loadAndPruneReadItems(feedItems) {
     if (needsResave) {
         try {
             await saveArrayState('read', prunedItems);
-            console.log(`Sanitized, pruned, or migrated read items. Original count: ${rawItems.length}, New count: ${prunedItems.length}`);
+            console.log(`Sanitized, pruned, or migrated read items. Original count: ${(rawItems as any[]).length}, New count: ${prunedItems.length}`);
         } catch (error) {
             console.error("Error saving pruned read items:", error);
         }
@@ -161,28 +209,28 @@ export async function loadAndPruneReadItems(feedItems) {
     return prunedItems;
 }
 
-export async function loadCurrentDeck() {
+export async function loadCurrentDeck(): Promise<DeckItem[]> {
     const { value: storedObjects } = await loadArrayState('currentDeckGuids');
     
     // Handle migration for legacy string-based data
     if (storedObjects && storedObjects.length > 0 && typeof storedObjects[0] === 'string') {
         console.log('[loadCurrentDeck] Migrating legacy string-based deck data...');
         const defaultTimestamp = new Date().toISOString();
-        const migratedObjects = storedObjects.map(guid => ({ guid, addedAt: defaultTimestamp }));
+        const migratedObjects: DeckItem[] = storedObjects.map((guid: string) => ({ guid, addedAt: defaultTimestamp }));
         await saveArrayState('currentDeckGuids', migratedObjects); // Resave in the new format
         console.log(`[loadCurrentDeck] Migration complete. Loaded ${migratedObjects.length} objects.`);
         return migratedObjects;
     }
 
-    const deckObjects = Array.isArray(storedObjects)
-        ? storedObjects.filter(item => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid)
+    const deckObjects: DeckItem[] = Array.isArray(storedObjects)
+        ? storedObjects.filter((item: any) => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid)
         : [];
         
     console.log(`[loadCurrentDeck] Loaded ${deckObjects.length} deck objects.`);
     return deckObjects;
 }
 
-export async function saveCurrentDeck(deckObjects) {
+export async function saveCurrentDeck(deckObjects: DeckItem[]): Promise<void> {
     if (!Array.isArray(deckObjects)) {
          console.error("[saveCurrentDeck] Invalid input: expected an array of objects.");
          return;
@@ -211,7 +259,7 @@ export async function saveCurrentDeck(deckObjects) {
 
 // --- Unchanged Functions Below ---
 
-export async function loadShuffleState() {
+export async function loadShuffleState(): Promise<{ shuffleCount: number; lastShuffleResetDate: string; }> {
     const { value: shuffleCount } = await loadSimpleState('shuffleCount');
     const { value: lastShuffleResetDate } = await loadSimpleState('lastShuffleResetDate');
     return {
@@ -220,20 +268,20 @@ export async function loadShuffleState() {
     };
 }
 
-export async function saveShuffleState(count, resetDate) {
+export async function saveShuffleState(count: number, resetDate: string): Promise<void> {
     await saveSimpleState('shuffleCount', count);
     await saveSimpleState('lastShuffleResetDate', resetDate);
-    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'shuffleCount', value: count });
-    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate });
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'shuffleCount', value: count, timestamp: new Date().toISOString() } as PendingOperation);
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate, timestamp: new Date().toISOString() } as PendingOperation);
 }
 
-export async function setFilterMode(app, mode) {
+export async function setFilterMode(app: AppState, mode: string): Promise<void> {
     app.filterMode = mode;
     await saveSimpleState('filterMode', mode);
-    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'filterMode', value: mode });
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'filterMode', value: mode, timestamp: new Date().toISOString() } as PendingOperation);
 }
 
-export async function loadFilterMode() {
+export async function loadFilterMode(): Promise<string> {
     const { value: mode } = await loadSimpleState('filterMode');
     return mode || 'unread';
 }

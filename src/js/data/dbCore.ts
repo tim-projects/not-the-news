@@ -1,20 +1,33 @@
-// @filepath: src/js/data/dbCore.js
+import { openDB } from 'idb';
 
-import { openDB } from '../libs/idb.js';
+type IDBPDatabase = any; // Temporarily use 'any' for the IDBPDatabase type to resolve import error
 
 const DB_NAME = 'not-the-news-db';
 // Increment the version to trigger the necessary schema upgrade.
 const DB_VERSION = 29;
 
-let _dbInstance = null;
-let _dbInitPromise = null;
+let _dbInstance: IDBPDatabase | null = null;
+let _dbInitPromise: Promise<IDBPDatabase> | null = null;
 
 /**
  * A consistent and declarative schema definition.
  * All data object stores now use a numeric, auto-incrementing primary key ('id') for
  * storage efficiency, and a 'guid' index for business logic lookups.
  */
-export const OBJECT_STORES_SCHEMA = [{
+interface IndexSchema {
+    name: string;
+    keyPath: string;
+    options?: IDBIndexParameters;
+}
+
+interface ObjectStoreSchema {
+    name: string;
+    keyPath: string;
+    options?: IDBObjectStoreParameters;
+    indexes?: IndexSchema[];
+}
+
+export const OBJECT_STORES_SCHEMA: ObjectStoreSchema[] = [{
     name: 'feedItems',
     keyPath: 'id',
     options: { autoIncrement: true },
@@ -60,7 +73,7 @@ async function getDb() {
     }
 
     _dbInitPromise = openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion) {
+        upgrade(db: IDBPDatabase, oldVersion: number) {
             console.log(`[DB] Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
             const existingStores = new Set(db.objectStoreNames);
 
@@ -108,7 +121,7 @@ async function getDb() {
 /**
  * Ensures a single, ready database instance is available before a callback is executed.
  */
-export async function withDb(callback) {
+export async function withDb<T>(callback: (db: IDBPDatabase) => T): Promise<T> {
     let dbInstance = await getDb();
     return callback(dbInstance);
 }

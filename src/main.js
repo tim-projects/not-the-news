@@ -35,7 +35,7 @@ import {
     loadShuffleState,
     setFilterMode,
     loadFilterMode
-} from './js/helpers/userStateUtils.js';
+} from './js/helpers/userStateUtils.ts';
 import {
     updateCounts,
     scrollToTop,

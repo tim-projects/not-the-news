@@ -26,7 +26,7 @@ import {
     loadShuffleState,
     setFilterMode,
     loadFilterMode
-} from './js/helpers/userStateUtils.js';
+} from './js/helpers/userStateUtils.ts';
 import {
     updateCounts,
     manageSettingsPanelVisibility,
@@ -42,7 +42,7 @@ import {
     initScrollPosition,
     initConfigPanelListeners
 } from './js/ui/uiInitializers.js';
-import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.js';
+import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { isOnline } from './js/utils/connectivity.js';
 
 export function rssApp() {

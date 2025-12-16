@@ -1,14 +1,32 @@
-// @filepath: src/js/ui/uiUpdaters.js
-
-// Refactored JS: concise, modern, functional, same output.
+//
+import { MappedFeedItem, ReadItem, StarredItem, DeckItem } from '../helpers/dataUtils.ts';
+// Locally declare types that are not exported from their modules
+type SimpleStateValue = any;
 
 import {
-    getMainSettingsBlock,
-    getFilterSelector,
-    getNtnTitleH2,
-    getMessageContainer
-} from './uiElements.js';
-import { saveSimpleState } from '../data/database.js';
+    // @ts-ignore
+    getMainSettingsBlock, 
+    getFilterSelector,    // Will be typed later
+    getNtnTitleH2,        // Will be typed later
+    // @ts-ignore
+    getMessageContainer   
+} from './uiElements.js'; // Will be converted later
+import { saveSimpleState } from '../data/database.js'; // Will be converted later
+
+// Minimal AppState interface for compilation, will be refined as app.ts is converted
+interface AppState {
+    entries: MappedFeedItem[];
+    read: ReadItem[];
+    starred: StarredItem[];
+    currentDeckGuids: DeckItem[];
+    filterMode: string;
+    showSyncStatus: boolean;
+    syncStatusMessage: string;
+    loadFeedItemsFromDB?: () => Promise<void>;
+    loadAndDisplayDeck?: () => Promise<void>;
+    updateCounts?: () => void;
+    [key: string]: any; // Allow dynamic indexing for app[stateKey]
+}
 
 /**
  * Splits a message into two lines if it exceeds a character limit.
@@ -16,11 +34,11 @@ import { saveSimpleState } from '../data/database.js';
  * @param {number} maxCharsPerLine Approximate maximum characters per line.
  * @returns {string[]} An array containing 1 or 2 lines of text.
 */
-function splitMessageIntoLines(message, maxCharsPerLine = 30) {
+function splitMessageIntoLines(message: string, maxCharsPerLine: number = 30): string[] {
     const words = message.split(' ');
-    let line1 = [];
-    let line2 = [];
-    let currentLineLength = 0;
+    let line1: string[] = [];
+    let line2: string[] = [];
+    let currentLineLength: number = 0;
 
     for (const word of words) {
         const wordLength = word.length + (line1.length > 0 ? 1 : 0);
@@ -38,19 +56,19 @@ function splitMessageIntoLines(message, maxCharsPerLine = 30) {
  * Displays a temporary status message in the title and reverts after a delay.
  * @param {string} message The message text to display.
 */
-export async function displayTemporaryMessageInTitle(message) {
+export async function displayTemporaryMessageInTitle(message: string): Promise<void> {
     const titleH2 = getNtnTitleH2();
     if (!titleH2) {
         console.warn("displayTemporaryMessageInTitle: 'ntn-title h2' element not found.");
         return;
     }
 
-    const originalText = "NOT THE NEWS";
-    const lines = splitMessageIntoLines(message);
-    const originalOverflow = titleH2.style.overflow;
-    titleH2.style.overflow = 'visible';
+    const originalText: string = "NOT THE NEWS";
+    const lines: string[] = splitMessageIntoLines(message);
+    const originalOverflow: string = (titleH2 as HTMLElement).style.overflow;
+    (titleH2 as HTMLElement).style.overflow = 'visible'; // Cast to HTMLElement to access style
 
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
     if (lines.length > 0) {
         titleH2.textContent = lines[0];
@@ -64,7 +82,7 @@ export async function displayTemporaryMessageInTitle(message) {
     }
 
     titleH2.textContent = originalText;
-    titleH2.style.overflow = originalOverflow;
+    (titleH2 as HTMLElement).style.overflow = originalOverflow; // Cast to HTMLElement to access style
 }
 
 /**
@@ -73,8 +91,8 @@ export async function displayTemporaryMessageInTitle(message) {
  * @param {string} message The message to display.
  * @param {string} [type='info'] Optional. 'success', 'error', 'info'.
 */
-let messageTimeoutId;
-export function createStatusBarMessage(app, message, type = 'info') {
+let messageTimeoutId: NodeJS.Timeout | undefined;
+export function createStatusBarMessage(app: AppState, message: string, type: 'success' | 'error' | 'info' = 'info'): void {
     clearTimeout(messageTimeoutId);
 
     app.syncStatusMessage = message;
@@ -94,7 +112,7 @@ export function createStatusBarMessage(app, message, type = 'info') {
  * Updates the counts displayed on filter options.
  * @param {object} app The Alpine.js app state object.
 */
-export function updateCounts(app) {
+export function updateCounts(app: AppState): void {
     if (!app?.entries?.length || !app.read || !app.starred || !app.currentDeckGuids) {
         console.warn("Attempted to update counts with an invalid app object. Skipping.");
         return;
@@ -115,8 +133,8 @@ export function updateCounts(app) {
     const selector = getFilterSelector();
     if (!selector) return;
 
-    const counts = { all: allC, read: readC, starred: starredC, unread: unreadInDeckC };
-    Array.from(selector.options).forEach(opt => {
+    const counts: { [key: string]: number } = { all: allC, read: readC, starred: starredC, unread: unreadInDeckC };
+    Array.from((selector as HTMLSelectElement).options as HTMLOptionsCollection).forEach((opt: HTMLOptionElement) => {
         // Retain the filter name (e.g., "All") and update the count
         const filterName = opt.text.split(' ')[0];
         opt.text = `${filterName} (${counts[opt.value] ?? 0})`;
@@ -130,15 +148,15 @@ export function scrollToTop() {
 }
 
 export const attachScrollToTopHandler = (() => {
-    let inactivityTimeout;
-    let previousScrollPosition = 0;
+    let inactivityTimeout: NodeJS.Timeout | undefined;
+    let previousScrollPosition: number = 0;
 
-    return (buttonId = "scroll-to-top") => {
-        const button = document.getElementById(buttonId);
+    return (buttonId: string = "scroll-to-top"): void => {
+        const button = document.getElementById(buttonId) as HTMLElement | null;
         if (!button) return;
 
-        const handleScroll = () => {
-            const currentScrollPosition = window.scrollY;
+        const handleScroll = (): void => {
+            const currentScrollPosition: number = window.scrollY;
             button.classList.toggle("visible", currentScrollPosition < previousScrollPosition && currentScrollPosition > 0);
             previousScrollPosition = currentScrollPosition;
 
@@ -147,7 +165,7 @@ export const attachScrollToTopHandler = (() => {
         };
 
         window.addEventListener("scroll", handleScroll);
-        button.addEventListener("click", e => {
+        button.addEventListener("click", (e: Event) => {
             e.preventDefault();
             scrollToTop();
         });
@@ -157,19 +175,19 @@ export const attachScrollToTopHandler = (() => {
 /**
  * Saves the current scroll position and the first visible item's GUID and offset.
  */
-export async function saveCurrentScrollPosition() {
-    let lastViewedItemId = '';
-    let lastViewedItemOffset = 0;
+export async function saveCurrentScrollPosition(): Promise<void> {
+    let lastViewedItemId: string = '';
+    let lastViewedItemOffset: number = 0;
 
-    const entryElements = document.querySelectorAll('.entry[data-guid]');
-    const firstVisibleEntry = Array.from(entryElements).find(el => {
-        const rect = el.getBoundingClientRect();
+    const entryElements: NodeListOf<HTMLElement> = document.querySelectorAll('.entry[data-guid]');
+    const firstVisibleEntry = Array.from(entryElements).find((el: HTMLElement) => {
+        const rect: DOMRect = el.getBoundingClientRect();
         return rect.top >= 0 && rect.bottom > 0;
     });
 
     if (firstVisibleEntry) {
-        const rect = firstVisibleEntry.getBoundingClientRect();
-        lastViewedItemId = firstVisibleEntry.dataset.guid;
+        const rect: DOMRect = firstVisibleEntry.getBoundingClientRect();
+        lastViewedItemId = (firstVisibleEntry as HTMLElement).dataset.guid || '';
         lastViewedItemOffset = rect.top;
     }
 

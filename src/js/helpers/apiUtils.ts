@@ -28,7 +28,7 @@
  * @returns {Promise<any>} A promise that resolves with the parsed JSON data.
  * @throws {Error} If the response status is not 'ok'.
  */
-const handleResponse = async (response, filename) => {
+const handleResponse = async (response: Response, filename: string): Promise<any> => {
     if (!response.ok) {
         throw new Error(`Failed to process configuration file '${filename}': ${response.status} ${response.statusText}`);
     }
@@ -42,7 +42,7 @@ const handleResponse = async (response, filename) => {
  * @param {string} filename - The name of the configuration file.
  * @returns {URL} A URL object with the filename properly encoded.
  */
-const buildConfigUrl = (endpoint, filename) => {
+const buildConfigUrl = (endpoint: string, filename: string): URL => {
     const url = new URL(`/${endpoint}`, window.location.origin);
     url.searchParams.append('filename', filename);
     return url;
@@ -59,7 +59,7 @@ const buildConfigUrl = (endpoint, filename) => {
  * The response is expected to contain a 'content' field with the file's data.
  * @throws {Error} If the network request fails or the server returns an error status.
  */
-export const loadConfigFile = async (filename) => {
+export const loadConfigFile = async (filename: string): Promise<object> => {
     const response = await fetch(buildConfigUrl('load-config', filename));
     return handleResponse(response, filename);
 };
@@ -76,7 +76,7 @@ export const loadConfigFile = async (filename) => {
  * typically indicating success (e.g., `{status: "ok"}`).
  * @throws {Error} If the network request fails or the server returns an error status.
  */
-export const saveConfigFile = async (filename, content) => {
+export const saveConfigFile = async (filename: string, content: string): Promise<object> => {
     const response = await fetch(buildConfigUrl('save-config', filename), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,7 +92,7 @@ export const saveConfigFile = async (filename, content) => {
  * @returns {Promise<object>} A promise that resolves to the user state data.
  * @throws {Error} If the network request fails or the server returns an error status.
  */
-export const loadUserState = async (key) => {
+export const loadUserState = async (key: string): Promise<object> => {
     const response = await fetch(`/api/user-state/${key}`);
     if (!response.ok) {
         throw new Error(`Failed to load user state for key '${key}': ${response.status} ${response.statusText}`);
@@ -108,7 +108,7 @@ export const loadUserState = async (key) => {
  * @returns {Promise<object>} A promise that resolves to the server's response.
  * @throws {Error} If the network request fails or the server returns an error status.
  */
-export const saveUserState = async (key, value) => {
+export const saveUserState = async (key: string, value: any): Promise<object> => {
     const response = await fetch('/api/user-state', {
         method: "POST",
         headers: { "Content-Type": "application/json" },

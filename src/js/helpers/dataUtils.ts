@@ -2,10 +2,37 @@
 
 // Refactored JS: concise, modern, functional, same output.
 
-export function formatDate(dateStr) {
+export interface RawFeedItem {
+    guid: string;
+    title: string;
+    link: string;
+    pubDate: string;
+    description: string;
+    // Add other properties if they exist in the raw item
+}
+
+export interface MappedFeedItem {
+    guid: string;
+    image: string;
+    title: string;
+    link: string;
+    pubDate: string; // Formatted date string
+    description: string;
+    source: string;
+    timestamp: number; // Unix timestamp
+}
+
+// Assuming ReadItem, StarredItem, DeckItem are defined elsewhere (e.g., in userStateUtils.ts)
+export interface ReadItem { guid: string; readAt: string; }
+export interface StarredItem { guid: string; starredAt: string; }
+export interface DeckItem { guid: string; addedAt: string; }
+export interface ShuffledOutItem { guid: string; shuffledAt: string; }
+
+
+export function formatDate(dateStr: string): string {
     const now = new Date();
     const date = new Date(dateStr);
-    const secs = Math.floor((now - date) / 1000);
+    const secs = Math.floor((now.getTime() - date.getTime()) / 1000); // Use getTime() for comparison
     const TWO_WEEKS_SECS = 2 * 7 * 24 * 60 * 60;
 
     if (secs > TWO_WEEKS_SECS) {
@@ -25,7 +52,7 @@ export function formatDate(dateStr) {
     return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
 }
 
-export function shuffleArray(arr) {
+export function shuffleArray<T>(arr: T[]): T[] {
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -33,7 +60,7 @@ export function shuffleArray(arr) {
     return arr;
 }
 
-export function mapRawItem(item, fmtFn) {
+export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) => string): MappedFeedItem | null {
     if (!item) {
         console.warn("mapRawItem received an undefined or null item. Returning null.");
         return null;
@@ -41,14 +68,14 @@ export function mapRawItem(item, fmtFn) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(item.description || "", "text/html");
 
-    const imgEl = doc.querySelector("img");
+    const imgEl = doc.querySelector("img") as HTMLImageElement | null; // Cast to HTMLImageElement
     const imgSrc = imgEl?.src || "";
     imgEl?.remove();
 
     let sourceUrl = "";
     const sourceEl = doc.querySelector(".source-url") || doc.querySelector("a");
     if (sourceEl) {
-        sourceUrl = sourceEl.textContent.trim();
+        sourceUrl = sourceEl.textContent?.trim() || ""; // Add nullish coalescing
         sourceEl.remove();
     } else {
         sourceUrl = item.link ? new URL(item.link).hostname : "";
@@ -69,7 +96,7 @@ export function mapRawItem(item, fmtFn) {
     };
 }
 
-export function mapRawItems(rawList, fmtFn) {
+export function mapRawItems(rawList: RawFeedItem[], fmtFn: (dateStr: string) => string): MappedFeedItem[] {
     console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
     console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
     console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
@@ -89,7 +116,7 @@ export function mapRawItems(rawList, fmtFn) {
     }
     const mappedAndFiltered = rawList
         .map(item => mapRawItem(item, fmtFn))
-        .filter(item => item !== null)
+        .filter((item): item is MappedFeedItem => item !== null) // Type guard for filter
         .sort((a, b) => b.timestamp - a.timestamp);
     console.log(`EXITING mapRawItems. Returning length: ${mappedAndFiltered.length}`);
     return mappedAndFiltered;
@@ -107,7 +134,13 @@ export function mapRawItems(rawList, fmtFn) {
  * @param {string} filterMode - The current filter mode ('unread', 'read', 'starred').
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of full item objects for the new deck.
  */
-export async function generateNewDeck(allFeedItems, readItems, starredItems, shuffledOutItems, currentDeckItems, count, filterMode) {
+export async function generateNewDeck(
+    allFeedItems: MappedFeedItem[],
+    readItems: (ReadItem | string)[], // Can be ReadItem objects or just GUID strings (legacy)
+    starredItems: (StarredItem | string)[], // Can be StarredItem objects or just GUID strings (legacy)
+    shuffledOutItems: (DeckItem | string | ShuffledOutItem)[], // Can be DeckItem objects or just GUID strings (legacy)
+    filterMode: string
+): Promise<MappedFeedItem[]> {
     console.log("ENTERING generateNewDeck");
     try {
         const MAX_DECK_SIZE = 10;
@@ -118,23 +151,22 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
          * @param {Array<Object|string>} arr - The array to process.
          * @returns {Set<string>} A Set of GUIDs.
          */
-        const getGuidSet = (arr) => {
+                const getGuidSet = (arr: (ReadItem | StarredItem | DeckItem | string | ShuffledOutItem)[]): Set<string> => { // Use union type for array elements
             if (!Array.isArray(arr)) {
                 return new Set();
             }
-            const guids = arr.map(item => (typeof item === 'object' && item.guid ? item.guid : item));
-            return new Set(guids.filter(Boolean)); // Filter out any null/undefined values
+            const guids = arr.map(item => (typeof item === 'object' && 'guid' in item && item.guid ? item.guid : item)); // Check for 'guid' property
+            return new Set(guids.filter((guid): guid is string => typeof guid === 'string' && Boolean(guid))); // Filter out any non-string/empty values
         };
 
         const allFeedGuidsSet = new Set(allFeedItems.map(item => item.guid));
 
-        // Create GUID sets for efficient lookups, pruning GUIDs that no longer exist in the main feed.
         const readGuidsSet = new Set([...getGuidSet(readItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const starredGuidsSet = new Set([...getGuidSet(starredItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const shuffledOutGuidsSet = new Set([...getGuidSet(shuffledOutItems)].filter(guid => allFeedGuidsSet.has(guid)));
-        const currentDeckGuidsSet = getGuidSet(currentDeckItems);
+        // const currentDeckGuidsSet = getGuidSet(currentDeckItems); // Removed as it was unused
 
-        let filteredItems = [];
+        let filteredItems: MappedFeedItem[] = [];
         console.log(`[generateNewDeck] Initial filteredItems count: ${filteredItems.length}`);
         switch (filterMode) {
             case 'read':
@@ -155,14 +187,13 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
         if (filterMode === 'read' || filterMode === 'starred') {
             filteredItems.sort((a, b) => b.timestamp - a.timestamp);
             console.log(`[generateNewDeck] Filtered items for ${filterMode}: ${filteredItems.length}`);
-            // ARCHITECTURE CHANGE: Return full objects instead of just GUIDs.
             return filteredItems;
         }
 
-        let nextDeckItems = [];
-        const selectedIds = new Set();
-        
-        const tryAddItemToDeck = (item) => {
+        let nextDeckItems: MappedFeedItem[] = [];
+        const selectedIds = new Set<string>(); // Set to store GUIDs
+
+        const tryAddItemToDeck = (item: MappedFeedItem): boolean => {
             if (nextDeckItems.length < MAX_DECK_SIZE && item && !selectedIds.has(item.guid)) {
                 nextDeckItems.push(item);
                 selectedIds.add(item.guid);
@@ -171,7 +202,7 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
             return false;
         };
 
-        const addItemsFromCategory = (categoryItems, limit) => {
+        const addItemsFromCategory = (categoryItems: MappedFeedItem[], limit: number) => {
             let count = 0;
             for (const item of categoryItems) {
                 if (count >= limit || nextDeckItems.length >= MAX_DECK_SIZE) break;
@@ -181,16 +212,16 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
 
         if (navigator.onLine) {
             const now = Date.now();
-            const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
-            const hasQuestionMarkInTitle = (item) => item.title?.includes('?');
-            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
-            const hasQuestionMarkInDescriptionLast150 = (item) => {
+            const hasHyperlink = (item: MappedFeedItem) => /<a\s+href=/i.test(item.description);
+            const hasQuestionMarkInTitle = (item: MappedFeedItem) => item.title?.includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item: MappedFeedItem) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInDescriptionLast150 = (item: MappedFeedItem) => {
                 const desc = item.description;
                 return desc?.length >= 150 && desc.substring(desc.length - 150).includes('?');
             };
-            const hasImage = (item) => item.image !== "";
-            const isLongItem = (item) => item.description?.length >= 750;
-            const isShortItem = (item) => item.description?.length < 750;
+            const hasImage = (item: MappedFeedItem) => item.image !== "";
+            const isLongItem = (item: MappedFeedItem) => item.description?.length >= 750;
+            const isShortItem = (item: MappedFeedItem) => item.description?.length < 750;
 
             const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
             addItemsFromCategory(recentItems, 2);
@@ -244,19 +275,31 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
                     tryAddItemToDeck(candidate);
                 }
                 console.log(`[generateNewDeck] After resurfaceCandidates: ${nextDeckItems.length}`);
+
+                if (nextDeckItems.length < MAX_DECK_SIZE) {
+                    const remainingAllItems = allFeedItems.filter(item => !selectedIds.has(item.guid));
+                    remainingAllItems.sort((a, b) => a.timestamp - b.timestamp);
+
+                    for (const item of remainingAllItems) {
+                        if (nextDeckItems.length >= MAX_DECK_SIZE) break;
+                        nextDeckItems.push(item);
+                        selectedIds.add(item.guid);
+                    }
+                    console.log(`[generateNewDeck] After remainingAllItems: ${nextDeckItems.length}`);
+                }
             }
         } else {
             // Offline fallback
-            let offlineFilteredItems = [...filteredItems];
+            let offlineFilteredItems: MappedFeedItem[] = [...filteredItems];
 
-            const hasQuestionMarkInTitle = (item) => item.title?.includes('?');
-            const hasQuestionMarkInDescriptionFirst150 = (item) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
-            const hasQuestionMarkInDescriptionLast150 = (item) => {
+            const hasQuestionMarkInTitle = (item: MappedFeedItem) => item.title?.includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item: MappedFeedItem) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInDescriptionLast150 = (item: MappedFeedItem) => {
                 const desc = item.description;
                 return desc?.length >= 150 && desc.substring(desc.length - 150).includes('?');
             };
-            const hasHyperlink = (item) => /<a\s+href=/i.test(item.description);
-            const hasImage = (item) => item.image !== "";
+            const hasHyperlink = (item: MappedFeedItem) => /<a\s+href=/i.test(item.description);
+            const hasImage = (item: MappedFeedItem) => item.image !== "";
 
             offlineFilteredItems = offlineFilteredItems.filter(item => !hasQuestionMarkInTitle(item));
             offlineFilteredItems = offlineFilteredItems.filter(item => !(item.description && hasQuestionMarkInDescriptionFirst150(item)));
@@ -268,11 +311,11 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
                 let itemsToRestore = filteredItems.filter(item => !offlineFilteredItems.includes(item));
 
                 const restoreOrder = [
-                    (item) => hasImage(item),
-                    (item) => hasHyperlink(item),
-                    (item) => (item.description && hasQuestionMarkInDescriptionLast150(item)),
-                    (item) => (item.description && hasQuestionMarkInDescriptionFirst150(item)),
-                    (item) => hasQuestionMarkInTitle(item)
+                    (item: MappedFeedItem) => hasImage(item),
+                    (item: MappedFeedItem) => hasHyperlink(item),
+                    (item: MappedFeedItem) => (item.description && hasQuestionMarkInDescriptionLast150(item)),
+                    (item: MappedFeedItem) => (item.description && hasQuestionMarkInDescriptionFirst150(item)),
+                    (item: MappedFeedItem) => hasQuestionMarkInTitle(item)
                 ];
 
                 for (const criterion of restoreOrder) {
@@ -289,7 +332,7 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
                 }
 
                 while (offlineFilteredItems.length < 10 && itemsToRestore.length > 0) {
-                    offlineFilteredItems.push(itemsToRestore.shift());
+                    offlineFilteredItems.push(itemsToRestore.shift() as MappedFeedItem); // Cast as MappedFeedItem
                 }
             }
 
@@ -301,51 +344,8 @@ export async function generateNewDeck(allFeedItems, readItems, starredItems, shu
             nextDeckItems = nextDeckItems.concat(remainingItems.slice(0, 10 - nextDeckItems.length));
         }
 
-        // [FIX] START: Fallback logic to prevent an empty deck.
-        // This block runs if the deck is still not full, which happens when
-        // the initial 'unread' pool is empty.
-        if (nextDeckItems.length < MAX_DECK_SIZE && allFeedItems.length > 0) {
-            console.warn("[generateNewDeck] Deck is smaller than desired. Activating fallback to resurface oldest read/shuffled items.");
-
-            const allItemsMap = new Map(allFeedItems.map(item => [item.guid, item]));
-            const guidsInDeck = new Set(nextDeckItems.map(item => item.guid));
-
-            // Combine read and shuffled items into a pool of candidates for resurfacing.
-            const resurfaceCandidates = allFeedItems.filter(item =>
-                (readGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)) &&
-                !guidsInDeck.has(item.guid)
-            );
-
-            // Sort candidates by their original timestamp (oldest first) to prioritize older content.
-            resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
-
-            // Add the oldest valid candidates to the deck until it's full.
-            for (const candidate of resurfaceCandidates) {
-                if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                tryAddItemToDeck(candidate);
-            }
-            console.log(`[generateNewDeck] After resurfaceCandidates: ${nextDeckItems.length}`);
-
-            // If still not full, add any remaining items from allFeedItems (oldest first)
-            // that are not already in the deck. This acts as a final catch-all.
-            if (nextDeckItems.length < MAX_DECK_SIZE) {
-                const remainingAllItems = allFeedItems.filter(item => !guidsInDeck.has(item.guid));
-                remainingAllItems.sort((a, b) => a.timestamp - b.timestamp); // Sort by original timestamp
-
-                for (const item of remainingAllItems) {
-                    if (nextDeckItems.length >= MAX_DECK_SIZE) break;
-                    nextDeckItems.push(item);
-                    guidsInDeck.add(item.guid);
-                }
-                console.log(`[generateNewDeck] After remainingAllItems: ${nextDeckItems.length}`);
-            }
-        }
-        // [FIX] END: Fallback logic.
-
         nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
 
-        // ARCHITECTURE CHANGE: Return the full objects for the deck, not just the GUIDs.
-        // This preserves the object structure as required by the new architecture.
         return nextDeckItems;
 
     } catch (error) {

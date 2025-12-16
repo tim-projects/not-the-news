@@ -1,16 +1,52 @@
-// @filepath: src/js/data/dbSyncOperations.js
+//
 
-import { withDb } from './dbCore.js';
-import { isOnline } from '../utils/connectivity.js';
+import { withDb } from './dbCore.ts';
+import { isOnline } from '../utils/connectivity.js'; // Will be converted later
 import {
     loadSimpleState,
     loadArrayState,
     // NOTE: We no longer import writers like `saveSimpleState` or `updateArrayState`
     // to prevent accidental sync loops. This file manages its own local writes.
     USER_STATE_DEFS
-} from './dbUserState.js';
+} from './dbUserState.ts';
 
-const API_BASE_URL = window.location.origin;
+// Locally declare types that are not exported from their modules
+type IDBPDatabase = any;
+type SimpleStateValue = any;
+type ArrayStateValue = any;
+type UserStateDef = any;
+
+const API_BASE_URL: string = window.location.origin;
+
+interface Operation {
+    id?: number;
+    type: string;
+    key?: string;
+    value?: any;
+    guid?: string;
+    action?: 'add' | 'remove';
+    timestamp: string;
+}
+
+interface SyncResult {
+    id: number;
+    status: 'success' | 'failed';
+    opType: string; // Original operation type
+    reason?: string; // Failure reason
+}
+
+interface SyncResponse {
+    results?: SyncResult[];
+    serverTime?: string;
+}
+
+interface AppState { // Minimal AppState interface needed for performFeedSync
+    loadFeedItemsFromDB?: () => Promise<void>;
+    loadAndDisplayDeck?: () => Promise<void>;
+    updateCounts?: () => Promise<void>;
+}
+
+
 
 /**
  * A private helper to save sync-related metadata directly to IndexedDB
@@ -19,12 +55,12 @@ const API_BASE_URL = window.location.origin;
  * @param {any} value The value to save.
  * @returns {Promise<void>}
  */
-async function _saveSyncMetaState(key, value) {
-    return withDb(async (db) => {
+async function _saveSyncMetaState(key: string, value: any): Promise<void> {
+    return withDb(async (db: IDBPDatabase) => {
         try {
             // Directly use `db.put` to bypass the queueing logic in dbUserState.js
             await db.put('userSettings', { key, value, lastModified: new Date().toISOString() });
-        } catch (e) {
+        } catch (e: any) {
             console.error(`[DB] Failed to save sync metadata for key '${key}':`, e);
         }
     });
@@ -35,17 +71,17 @@ async function _saveSyncMetaState(key, value) {
  * @param {object} operation The operation object to add.
  * @returns {Promise<number>} The ID of the buffered operation.
  */
-async function _addPendingOperationToBuffer(operation) {
-    return withDb(async (db) => {
+async function _addPendingOperationToBuffer(operation: Operation): Promise<number> {
+    return withDb(async (db: IDBPDatabase) => {
         // Ensure we don't try to store an existing primary key.
-        const opToStore = { ...operation };
+        const opToStore: Operation = { ...operation };
         if (opToStore.id) delete opToStore.id;
         try {
             const tx = db.transaction('pendingOperations', 'readwrite');
             const id = await tx.store.add(opToStore);
             await tx.done;
             return id;
-        } catch (e) {
+        } catch (e: any) {
             console.error('[DB] Error buffering operation:', e);
             throw e;
         }
@@ -57,38 +93,38 @@ async function _addPendingOperationToBuffer(operation) {
  * The logic is now generalized and not limited to specific operation types.
  * @param {object} operation The operation object to queue and sync.
  */
-export async function queueAndAttemptSyncOperation(operation) {
+export async function queueAndAttemptSyncOperation(operation: Operation): Promise<void> {
     if (!operation || typeof operation.type !== 'string' || (operation.type === 'simpleUpdate' && (operation.value === null || operation.value === undefined))) {
         console.warn(`[DB] Skipping invalid or empty operation:`, operation);
         return;
     }
 
     try {
-        const generatedId = await _addPendingOperationToBuffer(operation);
+        const generatedId: number = await _addPendingOperationToBuffer(operation);
         console.log(`[DB] Operation buffered with ID: ${generatedId}`, operation);
         
-        const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+        const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
         
         // Generalize the immediate sync check to apply to any operation type.
         if (isOnline() && syncEnabled) {
             console.log(`[DB] Attempting immediate sync for ${operation.type} (ID: ${generatedId}).`);
-            const syncPayload = [{ ...operation, id: generatedId }];
-            const response = await fetch(`${API_BASE_URL}/api/user-state`, {
+            const syncPayload: Operation[] = [{ ...operation, id: generatedId }];
+            const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(syncPayload)
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
+                const errorText: string = await response.text();
                 throw new Error(`HTTP error ${response.status} for immediate sync. Details: ${errorText}`);
             }
 
-            const responseData = await response.json();
-            const result = responseData.results?.find(res => res.id === generatedId);
+            const responseData: SyncResponse = await response.json();
+            const result: SyncResult | undefined = responseData.results?.find((res: SyncResult) => res.id === generatedId);
 
             if (result?.status === 'success') {
-                await withDb(db => db.delete('pendingOperations', generatedId));
+                await withDb((db: IDBPDatabase) => db.delete('pendingOperations', generatedId));
                 console.log(`[DB] Successfully synced and removed immediate op ${generatedId} (${operation.type}).`);
                 if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
 
@@ -103,7 +139,7 @@ export async function queueAndAttemptSyncOperation(operation) {
         } else {
             console.log(`[DB] ${!isOnline() ? 'Offline.' : 'Sync is disabled.'} Buffering op ${generatedId} for later batch sync.`);
         }
-    } catch (networkError) {
+    } catch (networkError: any) {
         console.error(`[DB] Network error during immediate sync for ${operation.type}. Will retry with batch sync.`, networkError);
     }
 }
@@ -111,14 +147,14 @@ export async function queueAndAttemptSyncOperation(operation) {
 /**
  * Processes all pending operations in the buffer and syncs them with the server.
  */
-export async function processPendingOperations() {
-    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+export async function processPendingOperations(): Promise<void> {
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) {
         console.log('[DB] Offline or sync is disabled. Skipping batch sync.');
         return;
     }
     
-    const operations = await withDb(db => db.getAll('pendingOperations')).catch(e => {
+    const operations: Operation[] | null = await withDb((db: IDBPDatabase) => db.getAll('pendingOperations')).catch((e: any) => {
         console.error('[DB] Error fetching pending operations:', e);
         return null;
     });
@@ -131,7 +167,7 @@ export async function processPendingOperations() {
     console.log(`[DB] Sending ${operations.length} batched operations to /api/user-state.`);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/user-state`, {
+        const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(operations)
@@ -141,13 +177,13 @@ export async function processPendingOperations() {
             throw new Error(`HTTP error ${response.status}. Details: ${await response.text()}`);
         }
 
-        const responseData = await response.json();
+        const responseData: SyncResponse = await response.json();
         console.log('[DB] Batch sync successful. Server response:', responseData);
 
         if (responseData.results && Array.isArray(responseData.results)) {
-            await withDb(async (db) => {
+            await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('pendingOperations', 'readwrite');
-                for (const result of responseData.results) {
+                for (const result of responseData.results as SyncResult[]) {
                     if (result.status === 'success' && result.id !== undefined) {
                         await tx.store.delete(result.id);
                     } else {
@@ -167,7 +203,7 @@ export async function processPendingOperations() {
         pullUserState();
         // --- END SOLUTION ---
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[DB] Error during batch synchronization:', error);
     }
 }
@@ -179,15 +215,15 @@ const PULL_DEBOUNCE_MS = 500;
 /**
  * A private helper to pull a single user state key from the server.
  */
-async function _pullSingleStateKey(key, def) {
+async function _pullSingleStateKey(key: string, def: UserStateDef): Promise<{ key: string, status: string | number, timestamp?: string }> {
     // ✅ --- START: RACE CONDITION FIX ---
     // Before fetching from the server, check if there are local changes for this key
     // that are waiting to be synced. If so, we must not overwrite them.
-    const allPendingOps = await withDb(db => db.getAll('pendingOperations')).catch(() => []);
+    const allPendingOps: Operation[] = await withDb((db: IDBPDatabase) => db.getAll('pendingOperations')).catch(() => []);
     
     // Check for operations that match the key directly (e.g., 'simpleUpdate' for 'syncEnabled')
     // or match the operation type related to the key (e.g., 'starDelta' for the 'starred' key).
-    const hasPendingOperations = allPendingOps.some(op => 
+    const hasPendingOperations = allPendingOps.some((op: Operation) => 
         op.key === key || 
         (op.type === 'starDelta' && key === 'starred') ||
         (op.type === 'readDelta' && key === 'read') ||
@@ -200,14 +236,14 @@ async function _pullSingleStateKey(key, def) {
     }
     // ✅ --- END: RACE CONDITION FIX ---
 
-    const { value: localData, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store);
-    const localTimestamp = lastModified || '';
+    const { value: localData, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store) as SimpleStateValue;
+    const localTimestamp: string = lastModified || '';
     
-    const headers = { 'Content-Type': 'application/json' };
+    const headers: { [key: string]: string } = { 'Content-Type': 'application/json' };
     if (localTimestamp) headers['If-None-Match'] = localTimestamp;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/user-state/${key}`, { method: 'GET', headers });
+        const response: Response = await fetch(`${API_BASE_URL}/api/user-state/${key}`, { method: 'GET', headers });
 
         if (response.status === 304) {
             return { key, status: 304, timestamp: localTimestamp };
@@ -216,20 +252,20 @@ async function _pullSingleStateKey(key, def) {
             console.error(`[DB] HTTP error for ${key}: ${response.status}`);
             return { key, status: response.status };
         }
-        const data = await response.json();
+        const data: { value: any, lastModified: string } = await response.json();
         console.log(`[DB] New data received for ${key}.`);
 
         if (def.type === 'array') {
-            const serverObjects = data.value || [];
-            const localObjects = localData || [];
-            const serverGuids = new Set(serverObjects.map(item => item.guid));
-            const localGuids = new Set(localObjects.map(item => item.guid));
+            const serverObjects: any[] = data.value || [];
+            const localObjects: any[] = localData || [];
+            const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
+            const localGuids = new Set(localObjects.map((item: any) => item.guid));
 
-            const objectsToAdd = serverObjects.filter(item => !localGuids.has(item.guid));
-            const objectsToRemove = localObjects.filter(item => !serverGuids.has(item.guid));
+            const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
+            const objectsToRemove = localObjects.filter((item: any) => !serverGuids.has(item.guid));
 
             if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
-                 await withDb(async (db) => {
+                 await withDb(async (db: IDBPDatabase) => {
                     const tx = db.transaction(def.store, 'readwrite');
                     for (const item of objectsToAdd) await tx.store.put(item);
                     for (const item of objectsToRemove) await tx.store.delete(item.id);
@@ -242,7 +278,7 @@ async function _pullSingleStateKey(key, def) {
         }
         
         return { key, status: 200, timestamp: data.lastModified };
-    } catch (error) {
+    } catch (error: any) {
         console.error(`[DB] Failed to pull ${key}:`, error);
         return { key, status: 'error' };
     }
@@ -251,15 +287,15 @@ async function _pullSingleStateKey(key, def) {
 /**
  * Pulls the user state from the server.
  */
-export async function pullUserState() {
-    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+export async function pullUserState(): Promise<void> {
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) {
         if (syncEnabled) console.log('[DB] Offline. Skipping user state pull.');
         return;
     }
     
     if (_isPullingUserState) return;
-    const now = Date.now();
+    const now: number = Date.now();
     if (now - _lastPullAttemptTime < PULL_DEBOUNCE_MS) return;
 
     _lastPullAttemptTime = now;
@@ -267,15 +303,15 @@ export async function pullUserState() {
     console.log('[DB] Pulling user state...');
     
     try {
-        const keysToPull = Object.entries(USER_STATE_DEFS).filter(([, def]) => !def.localOnly);
-        const results = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def)));
+        const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS).filter(([, def]) => !def.localOnly) as [string, UserStateDef][];
+        const results: { key: string, status: string | number, timestamp?: string }[] = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def)));
         
-        const newestOverallTimestamp = results.reduce((newest, result) => {
+        const newestOverallTimestamp: string = results.reduce((newest: string, result: { key: string, status: string | number, timestamp?: string }) => {
             return (result?.timestamp && result.timestamp > newest) ? result.timestamp : newest;
         }, '');
 
         if (newestOverallTimestamp) await _saveSyncMetaState('lastStateSync', newestOverallTimestamp);
-    } catch (error) {
+    } catch (error: any) {
         console.error('[DB] User state pull failed:', error);
     } finally {
         _isPullingUserState = false;
@@ -283,11 +319,16 @@ export async function pullUserState() {
     }
 }
 
+interface FeedItem {
+    guid: string;
+    // Add other properties if they exist in the feed item
+}
+
 /**
  * Retrieves all items from the feedItems store.
  */
-export async function getAllFeedItems() {
-    return withDb(db => db.getAll('feedItems')).catch(e => {
+export async function getAllFeedItems(): Promise<FeedItem[]> {
+    return withDb((db: IDBPDatabase) => db.getAll('feedItems')).catch((e: any) => {
         console.error('Failed to get all feed items:', e);
         return [];
     });
@@ -296,8 +337,8 @@ export async function getAllFeedItems() {
 /**
  * Performs a feed synchronization, fetching new or updated items.
  */
-export async function performFeedSync(app) {
-    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+export async function performFeedSync(app: AppState): Promise<void> {
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) {
         if (syncEnabled) console.log('[DB] Offline. Skipping feed sync.');
         return;
@@ -306,8 +347,8 @@ export async function performFeedSync(app) {
     console.log('[DB] Fetching feed items from server.');
 
     try {
-        const { value: lastFeedSyncTime } = await loadSimpleState('lastFeedSync');
-        const response = await fetch(`${API_BASE_URL}/api/feed-guids?since=${lastFeedSyncTime || ''}`);
+        const { value: lastFeedSyncTime } = await loadSimpleState('lastFeedSync') as SimpleStateValue;
+        const response: Response = await fetch(`${API_BASE_URL}/api/feed-guids?since=${lastFeedSyncTime || ''}`);
 
         if (response.status === 304) {
             console.log('[DB] Feed not modified.');
@@ -315,11 +356,11 @@ export async function performFeedSync(app) {
         }
         if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-guids`);
 
-        const responseData = await response.json();
+        const responseData: { guids: string[], serverTime: string } = await response.json();
         console.log('[DB] /api/feed-guids response:', responseData);
         const { guids: serverGuidsList, serverTime } = responseData;
         const serverGuids = new Set(serverGuidsList);
-        const localItems = await getAllFeedItems();
+        const localItems: FeedItem[] = await getAllFeedItems();
         const localGuids = new Set(localItems.map(item => item.guid));
 
         const guidsToFetch = [...serverGuids].filter(guid => !localGuids.has(guid));
@@ -330,18 +371,18 @@ export async function performFeedSync(app) {
 
         if (guidsToFetch.length > 0) {
             // ✅ STABILITY FIX: Re-introduce batching for fetching item bodies to avoid network errors on large updates.
-            const BATCH_SIZE = 50;
-            const newItems = [];
+            const BATCH_SIZE: number = 50;
+            const newItems: FeedItem[] = [];
             for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
                 const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
-                const itemsResponse = await fetch(`${API_BASE_URL}/api/feed-items`, {
+                const itemsResponse: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ guids: batch })
                 });
 
                 if (itemsResponse.ok) {
-                    const fetchedItems = await itemsResponse.json();
+                    const fetchedItems: FeedItem[] = await itemsResponse.json();
                     console.log(`[DB] Fetched batch of ${fetchedItems.length} items:`, fetchedItems);
                     newItems.push(...fetchedItems);
                 } else {
@@ -349,7 +390,7 @@ export async function performFeedSync(app) {
                 }
             }
             
-            await withDb(async (db) => {
+            await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
                 for (const item of newItems) if (item.guid) await tx.store.put(item);
                 await tx.done;
@@ -357,8 +398,8 @@ export async function performFeedSync(app) {
         }
         
         if (guidsToDelete.length > 0) {
-            const guidToIdMap = new Map(localItems.map(item => [item.guid, item.id]));
-            await withDb(async (db) => {
+            const guidToIdMap = new Map<string, number>(localItems.map(item => [item.guid, (item as any).id])); // Assuming item.id exists and is number
+            await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
                 for (const guid of guidsToDelete) {
                     const id = guidToIdMap.get(guid);
@@ -375,7 +416,7 @@ export async function performFeedSync(app) {
         app?.loadAndDisplayDeck?.();
         app?.updateCounts?.();
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[DB] Failed to synchronize feed:', error);
     }
 }
@@ -383,8 +424,8 @@ export async function performFeedSync(app) {
 /**
  * Performs a full synchronization, pulling user state and feed items.
  */
-export async function performFullSync(app) {
-    const { value: syncEnabled } = await loadSimpleState('syncEnabled');
+export async function performFullSync(app: AppState): Promise<void> {
+    const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) return;
     
     console.log('[DB] Full sync initiated.');
@@ -393,7 +434,7 @@ export async function performFullSync(app) {
         await pullUserState();
         await performFeedSync(app);
         await processPendingOperations(); // Process any items that were queued while offline.
-    } catch (error) {
+    } catch (error: any) {
         console.error('[DB] Full sync failed:', error);
     }
 }
