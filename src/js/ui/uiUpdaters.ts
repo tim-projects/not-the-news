@@ -1,7 +1,5 @@
 //
 import { MappedFeedItem, ReadItem, StarredItem, DeckItem } from '../helpers/dataUtils.ts';
-// Locally declare types that are not exported from their modules
-type SimpleStateValue = any;
 
 import {
     // @ts-ignore
@@ -92,7 +90,7 @@ export async function displayTemporaryMessageInTitle(message: string): Promise<v
  * @param {string} [type='info'] Optional. 'success', 'error', 'info'.
 */
 let messageTimeoutId: NodeJS.Timeout | undefined;
-export function createStatusBarMessage(app: AppState, message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+export function createStatusBarMessage(app: AppState, message: string): void {
     clearTimeout(messageTimeoutId);
 
     app.syncStatusMessage = message;

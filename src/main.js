@@ -73,6 +73,7 @@ export function rssApp() {
         starred: [],
         currentDeckGuids: [],
         shuffledOutItems: [],
+        settingsButtonClicks: 0, // Added for debugging
         errorMessage: '',
         isOnline: isOnline(),
         deckManaged: false,

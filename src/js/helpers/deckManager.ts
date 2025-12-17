@@ -207,7 +207,7 @@ export async function processShuffle(app: AppState): Promise<void> {
     console.log("[deckManager] processShuffle called.");
 
     if (app.shuffleCount <= 0) {
-        createStatusBarMessage(app, 'No shuffles left for today!', 'error'); // createStatusBarMessage also needs app
+        createStatusBarMessage(app, 'No shuffles left for today!');
         return;
     }
 

@@ -13,7 +13,6 @@ import {
 // Locally declare types that are not exported from their modules
 type IDBPDatabase = any;
 type SimpleStateValue = any;
-type ArrayStateValue = any;
 type UserStateDef = any;
 
 const API_BASE_URL: string = window.location.origin;

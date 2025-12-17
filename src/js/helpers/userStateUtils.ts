@@ -123,9 +123,9 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
     
     // Display status message to the user
     if (stateKey === 'read') {
-        createStatusBarMessage(app, isCurrentlyActive ? 'Item unread.' : 'Item read.', 'info');
+        createStatusBarMessage(app, isCurrentlyActive ? 'Item unread.' : 'Item read.');
     } else if (stateKey === 'starred') {
-        createStatusBarMessage(app, isCurrentlyActive ? 'Item unstarred.' : 'Item starred.', 'info');
+        createStatusBarMessage(app, isCurrentlyActive ? 'Item unstarred.' : 'Item starred.');
     }
 
     // Update UI counts
