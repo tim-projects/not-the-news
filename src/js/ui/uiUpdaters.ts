@@ -1,5 +1,5 @@
 //
-import { MappedFeedItem, ReadItem, StarredItem, DeckItem } from '../helpers/dataUtils.ts';
+import { AppState } from '@/types/app.ts';
 
 import {
     // @ts-ignore
@@ -9,22 +9,10 @@ import {
     // @ts-ignore
     getMessageContainer   
 } from './uiElements.js'; // Will be converted later
-import { saveSimpleState } from '../data/database.js'; // Will be converted later
+import { saveSimpleState } from '../data/database.ts'; // Changed to .ts
 
 // Minimal AppState interface for compilation, will be refined as app.ts is converted
-interface AppState {
-    entries: MappedFeedItem[];
-    read: ReadItem[];
-    starred: StarredItem[];
-    currentDeckGuids: DeckItem[];
-    filterMode: string;
-    showSyncStatus: boolean;
-    syncStatusMessage: string;
-    loadFeedItemsFromDB?: () => Promise<void>;
-    loadAndDisplayDeck?: () => Promise<void>;
-    updateCounts?: () => void;
-    [key: string]: any; // Allow dynamic indexing for app[stateKey]
-}
+
 
 /**
  * Splits a message into two lines if it exceeds a character limit.
@@ -90,7 +78,7 @@ export async function displayTemporaryMessageInTitle(message: string): Promise<v
  * @param {string} [type='info'] Optional. 'success', 'error', 'info'.
 */
 let messageTimeoutId: NodeJS.Timeout | undefined;
-export function createStatusBarMessage(app: AppState, message: string): void {
+export function createStatusBarMessage(app: AppState, message: string, type: 'success' | 'error' | 'info' = 'info'): void {
     clearTimeout(messageTimeoutId);
 
     app.syncStatusMessage = message;
@@ -107,10 +95,48 @@ export function createStatusBarMessage(app: AppState, message: string): void {
 }
 
 /**
+ * Manages the visibility of different settings panels based on the current modal view.
+ * @param {object} app The Alpine.js app state object.
+ */
+export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
+    const mainSettings = document.getElementById('main-settings');
+    const rssSettings = document.getElementById('rss-settings-block');
+    const keywordsSettings = document.getElementById('keywords-settings-block');
+
+    if (!mainSettings || !rssSettings || !keywordsSettings) {
+        console.warn('One or more settings panels not found.');
+        return Promise.resolve();
+    }
+
+    // Hide all panels initially
+    mainSettings.style.display = 'none';
+    rssSettings.style.display = 'none';
+    keywordsSettings.style.display = 'none';
+
+    // Show the appropriate panel based on modalView
+    switch (app.modalView) {
+        case 'main':
+            mainSettings.style.display = 'block';
+            break;
+        case 'rss':
+            rssSettings.style.display = 'block';
+            break;
+        case 'keywords':
+            keywordsSettings.style.display = 'block';
+            break;
+        default:
+            console.warn('Unknown modalView:', app.modalView);
+            mainSettings.style.display = 'block'; // Fallback
+    }
+
+    return Promise.resolve();
+}
+
+/**
  * Updates the counts displayed on filter options.
  * @param {object} app The Alpine.js app state object.
 */
-export function updateCounts(app: AppState): void {
+export async function updateCounts(app: AppState): Promise<void> {
     if (!app?.entries?.length || !app.read || !app.starred || !app.currentDeckGuids) {
         console.warn("Attempted to update counts with an invalid app object. Skipping.");
         return;

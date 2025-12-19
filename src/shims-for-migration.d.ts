@@ -11,7 +11,5 @@ declare module '../data/dbUserState.ts' {
 declare module '../utils/connectivity.js' {
     export function isOnline(): boolean;
 }
-declare module '../ui/uiUpdaters.ts' {
-    export function createStatusBarMessage(app: any, message: string, type: string): void;
-    export function updateCounts(app: any): void; // Assuming app is the Alpine.js state
-}
+
+declare module 'alpinejs';

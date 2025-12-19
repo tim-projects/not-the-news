@@ -32,12 +32,12 @@ export const getBackButton = () => document.getElementById('back-button');
 export const getRssFeedsTextarea = () => {
     const el = document.querySelector('#rss-settings-block textarea');
     console.log('[DEBUG] getRssFeedsTextarea called. Element:', el);
-    return el;
+    return el as HTMLTextAreaElement | null;
 };
 export const getKeywordsBlacklistTextarea = () => {
     const el = document.querySelector('#keywords-settings-block textarea');
     console.log('[DEBUG] getKeywordsBlacklistTextarea called. Element:', el);
-    return el;
+    return el as HTMLTextAreaElement | null;
 };
 
 // Buttons for navigating and saving configuration

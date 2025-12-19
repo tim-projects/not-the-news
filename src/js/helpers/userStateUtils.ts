@@ -1,46 +1,6 @@
 // @filepath: src/js/userStateUtils.js
 
-// Define interfaces for the data structures
-interface ReadItem {
-    guid: string;
-    readAt: string; // ISO 8601 date string
-}
-
-interface StarredItem {
-    guid: string;
-    starredAt: string; // ISO 8601 date string
-}
-
-interface DeckItem {
-    guid: string;
-    addedAt: string; // ISO 8601 date string
-}
-
-interface PendingOperation {
-    type: string; // e.g., 'readDelta', 'starredDelta', 'simpleUpdate', 'arrayUpdate'
-    guid?: string; // For delta operations
-    action?: 'add' | 'remove'; // For delta operations
-    timestamp: string;
-    key?: string; // For simpleUpdate/arrayUpdate
-    value?: any; // For simpleUpdate/arrayUpdate
-    items?: any[]; // For arrayUpdate
-}
-
-import { MappedFeedItem } from './dataUtils.ts'; // Import MappedFeedItem
-
-// Minimal AppState for compilation, will be refined as app.ts is converted
-interface AppState {
-    entries: MappedFeedItem[];
-    read: ReadItem[];
-    starred: StarredItem[];
-    currentDeckGuids: DeckItem[];
-    updateCounts: () => void;
-    filterMode: string;
-    showSyncStatus: boolean; // Added for createStatusBarMessage
-    syncStatusMessage: string; // Added for createStatusBarMessage
-    // Add other properties as needed based on how 'app' is used
-    [key: string]: any; // Allow dynamic indexing for app[stateKey]
-}
+import { AppState, PendingOperation, ReadItem, StarredItem, DeckItem } from '@/types/app.ts';
 
 import {
     loadSimpleState,

@@ -26,7 +26,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "vite.config.js", "src/shims-for-migration.d.ts", "src/shims-for-idb.d.ts"],
   "exclude": ["node_modules", "www", "dist", "src/js/libs"]

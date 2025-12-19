@@ -13,17 +13,29 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 // The precache manifest is injected here by vite-plugin-pwa.
 // This is a list of all your build files (including hashed ones) and their revision hashes.
 // Workbox will replace this placeholder with the manifest during the build process.
+/// <reference lib="WebWorker" />
+declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: any[] };
+
 self.__WB_MANIFEST;
 
+type RouteHandlerCallback = ({ event }: { event: FetchEvent }) => Promise<Response>;
+
 // A route for handling navigation requests (offline fallback).
-const navigationHandler = async ({ event }) => {
+const navigationHandler: RouteHandlerCallback = async ({ event }): Promise<Response> => { // Change return type to Promise<Response>
   try {
     // Try to get a response from the network first.
-    return await fetch(event.request);
-  } catch (error) {
+    return await fetch((event as any).request);
+  } catch (error: any) {
     // If the network fails, fall back to the index.html from the cache.
     // This is the single-page application fallback.
-    return caches.match('index.html');
+    const cachedResponse = await caches.match('index.html');
+    if (cachedResponse) {
+        return cachedResponse;
+    }
+    // If index.html is not in cache, return a generic offline response
+    return new Response('<h1>Offline</h1><p>You are currently offline and this page is not available in the cache.</p>', {
+        headers: { 'Content-Type': 'text/html' }
+    });
   }
 };
 
@@ -31,7 +43,7 @@ const navigationHandler = async ({ event }) => {
 // This ensures that when the user is offline and refreshes the page,
 // they get the cached index.html instead of a network error.
 registerRoute(
-  ({ request, url }) => {
+  ({ request }) => {
     return request.mode === 'navigate';
   },
   navigationHandler,

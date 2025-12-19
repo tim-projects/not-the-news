@@ -2,7 +2,9 @@
 
 // Refactored JS: concise, modern, functional, same output.
 
-export interface RawFeedItem {
+import { MappedFeedItem, ReadItem, StarredItem, DeckItem, ShuffledOutItem } from '@/types/app.ts';
+
+interface RawFeedItem {
     guid: string;
     title: string;
     link: string;
@@ -10,23 +12,6 @@ export interface RawFeedItem {
     description: string;
     // Add other properties if they exist in the raw item
 }
-
-export interface MappedFeedItem {
-    guid: string;
-    image: string;
-    title: string;
-    link: string;
-    pubDate: string; // Formatted date string
-    description: string;
-    source: string;
-    timestamp: number; // Unix timestamp
-}
-
-// Assuming ReadItem, StarredItem, DeckItem are defined elsewhere (e.g., in userStateUtils.ts)
-export interface ReadItem { guid: string; readAt: string; }
-export interface StarredItem { guid: string; starredAt: string; }
-export interface DeckItem { guid: string; addedAt: string; }
-export interface ShuffledOutItem { guid: string; shuffledAt: string; }
 
 
 export function formatDate(dateStr: string): string {

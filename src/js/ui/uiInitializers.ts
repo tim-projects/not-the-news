@@ -1,59 +1,125 @@
-// @filepath: src/js/ui/uiInitializers.js
+// @filepath: src/js/ui/uiInitializers.ts
 
 // Refactored JS: concise, modern, functional, same output.
 
+import { AppState } from '../../types/app.ts';
+
 import {
+
     loadSimpleState,
+
     saveSimpleState,
+
     performFullSync,
+
     saveArrayState
-} from '../data/database.js';
+
+} from '../data/database.ts';
+
+
 
 import {
+
     loadUserState,
+
     saveUserState
-} from '../helpers/apiUtils.js';
 
-import {
-    getSyncToggle,
-    getImagesToggle,
-    getThemeToggle,
-    getThemeText,
-    getBackButton,
-    getRssFeedsTextarea,
-    getKeywordsBlacklistTextarea,
-    getConfigureRssButton,
-    getConfigureKeywordsButton,
-    getSaveKeywordsButton,
-    getSaveRssButton
-} from './uiElements.js';
-
-import {
-    createStatusBarMessage
-} from './uiUpdaters.js';
-
-/**
- * Dispatches a custom event to signal that core application data is loaded.
- */
-function dispatchAppDataReady() {
-    document.dispatchEvent(new CustomEvent('app-data-ready', { bubbles: true }));
-    console.log("Dispatched 'app-data-ready' event.");
 }
 
+from '../helpers/apiUtils.ts';
+
+
+
+import {
+
+    getSyncToggle,
+
+    getImagesToggle,
+
+    getThemeToggle,
+
+    getThemeText,
+
+    getBackButton,
+
+    getRssFeedsTextarea,
+
+    getKeywordsBlacklistTextarea,
+
+    getConfigureRssButton,
+
+    getConfigureKeywordsButton,
+
+    getSaveKeywordsButton,
+
+    getSaveRssButton
+
+} from './uiElements.ts';
+
+
+
+import {
+
+    createStatusBarMessage
+
+}
+
+from './uiUpdaters.ts';
+
+
+
+type UpdateCountsCallback = (app: AppState) => Promise<void>;
+
+type GetToggleElementFunction = () => HTMLElement | null;
+
+
+
+
+
 /**
- * Initializes listeners for data readiness to update UI elements.
- * @param {object} app The Alpine.js app state object.
- * @param {Function} updateCountsCb The callback function to update all counts.
+
+ * Dispatches a custom event to signal that core application data is loaded.
+
  */
-export function initDataReadyListener(app, updateCountsCb) {
+
+function dispatchAppDataReady() {
+
+    document.dispatchEvent(new CustomEvent('app-data-ready', { bubbles: true }));
+
+    console.log("Dispatched 'app-data-ready' event.");
+
+}
+
+
+
+/**
+
+ * Initializes listeners for data readiness to update UI elements.
+
+ * @param {object} app The Alpine.js app state object.
+
+ * @param {Function} updateCountsCb The callback function to update all counts.
+
+ */
+
+export function initDataReadyListener(app: AppState, updateCountsCb: UpdateCountsCallback): void {
+
     document.addEventListener('app-data-ready', () => {
+
         if (typeof updateCountsCb === 'function') {
+
             console.log("App data is ready, updating counts now.");
-            updateCountsCb();
+
+            updateCountsCb(app);
+
         } else {
+
             console.error("updateCountsCb function not provided to initDataReadyListener.");
+
         }
+
     });
+
 }
 
 /**
@@ -64,7 +130,7 @@ export function initDataReadyListener(app, updateCountsCb) {
  * @param {string} dbKey The key to use in the 'userSettings' object store.
  * @param {Function} [onToggleCb=() => {}] Optional callback when the toggle changes.
  */
-async function setupBooleanToggle(app, getToggleEl, dbKey, onToggleCb = () => {}) {
+async function setupBooleanToggle(app: AppState, getToggleEl: GetToggleElementFunction, dbKey: string, onToggleCb: (newValue: boolean) => void = () => {}): Promise<void> {
     const toggleEl = getToggleEl();
     if (!toggleEl) return;
 
@@ -72,7 +138,7 @@ async function setupBooleanToggle(app, getToggleEl, dbKey, onToggleCb = () => {}
     // like saving to the database and running side-effect callbacks.
     toggleEl.addEventListener('change', async () => {
         // We read the new value from the app's state, which x-model has just updated.
-        const newValue = app[dbKey];
+        const newValue = (app as any)[dbKey];
         await saveSimpleState(dbKey, newValue);
         onToggleCb(newValue);
     });
@@ -82,17 +148,17 @@ async function setupBooleanToggle(app, getToggleEl, dbKey, onToggleCb = () => {}
  * Initializes the synchronization toggle.
  * @param {object} app The Alpine.js app state object.
  */
-export async function initSyncToggle(app) {
-    await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled) => {
-        app.updateSyncStatusMessage(); // Update the status message on toggle
+export async function initSyncToggle(app: AppState): Promise<void> {
+    await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled: boolean) => {
+        app.updateSyncStatusMessage?.(); // Update the status message on toggle
         if (enabled) {
             console.log("Sync enabled, triggering full sync.");
             await performFullSync(app);
             if (!app.currentDeckGuids?.length && app.entries?.length) {
                 console.log("Deck is empty after sync. Rebuilding from all available items.");
                 const now = new Date().toISOString();
-                const readGuids = new Set(app.read.map(h => h.guid));
-                const shuffledOutGuids = new Set(app.shuffledOutItems.map(s => s.guid));
+                const readGuids = new Set(app.read?.map(h => h.guid));
+                const shuffledOutGuids = new Set(app.shuffledOutGuids?.map(s => s.guid)); // Changed from shuffledOutItems
                 app.currentDeckGuids = app.entries
                     .filter(item => !readGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
                     .map(item => ({
@@ -107,7 +173,7 @@ export async function initSyncToggle(app) {
     });
 }
 
-export async function initImagesToggle(app) {
+export async function initImagesToggle(app: AppState): Promise<void> {
     await setupBooleanToggle(app, getImagesToggle, 'imagesEnabled');
 }
 
@@ -117,17 +183,17 @@ export async function initImagesToggle(app) {
  * This removes all theme-related DOM manipulation from main.js.
  * @param {object} app The Alpine.js app state object.
  */
-export function initTheme(app) {
+export function initTheme(app: AppState): void {
     const htmlEl = document.documentElement;
     const toggle = getThemeToggle();
     const text = getThemeText();
     if (!toggle || !text) return;
 
     // Helper function to apply all theme UI changes in one place.
-    const applyThemeUI = (theme) => {
+    const applyThemeUI = (theme: string) => {
         htmlEl.classList.remove('light', 'dark');
         htmlEl.classList.add(theme);
-        toggle.checked = (theme === 'dark');
+        (toggle as HTMLInputElement).checked = (theme === 'dark');
         text.textContent = theme;
     };
 
@@ -136,7 +202,7 @@ export function initTheme(app) {
 
     // 2. Handle all subsequent user interactions.
     toggle.addEventListener('change', async () => {
-        const newTheme = toggle.checked ? 'dark' : 'light';
+        const newTheme = (toggle as HTMLInputElement).checked ? 'dark' : 'light';
         app.theme = newTheme; // Update the central state
         applyThemeUI(newTheme); // Update all UI elements
         
@@ -145,7 +211,7 @@ export function initTheme(app) {
     });
 }
 
-export async function initScrollPosition(app) {
+export async function initScrollPosition(app: AppState): Promise<void> {
     // This function is now called inside a $nextTick in main.js,
     // which ensures the DOM is ready. The requestAnimationFrame provides
     // an extra layer of certainty that rendering is complete.
@@ -159,7 +225,7 @@ export async function initScrollPosition(app) {
         // REFINED LOGIC: Check if the item to scroll to is actually in the current deck.
         // This is the most reliable check, as it represents what's currently on screen.
         // It implicitly handles items that are read or have been shuffled out.
-        const itemIsInDeck = app.deck.some(item => item.guid === lastViewedItemId);
+        const itemIsInDeck = app.deck.some((item: { guid: string }) => item.guid === lastViewedItemId);
 
         if (itemIsInDeck) {
             const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
@@ -178,7 +244,14 @@ export async function initScrollPosition(app) {
 /**
  * REFINED: Now loads data when the configure button is clicked, not from a watcher in main.js.
  */
-async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, getSaveButton, app) {
+async function setupTextareaPanel(
+    key: string,
+    viewName: string,
+    getConfigButton: () => HTMLElement | null,
+    getTextarea: () => HTMLTextAreaElement | null,
+    getSaveButton: () => HTMLElement | null,
+    app: AppState
+): Promise<void> {
     const configBtn = getConfigButton();
     const saveBtn = getSaveButton();
     //console.log(`[DEBUG] setupTextareaPanel for key: ${key}. configBtn:`, configBtn, `saveBtn:`, saveBtn); // Added debug log
@@ -191,8 +264,8 @@ async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, g
             try {
                 const response = await loadUserState(key);
                 //console.log(`[DEBUG] loadUserState response for ${key}:`, response); // Added debug log
-                value = response.value;
-            } catch (error) {
+                value = (response as any).value;
+            } catch (error: any) {
                 console.error(`Error loading ${key} from server:`, error);
                 value = (key === 'rssFeeds') ? '' : []; // Default to empty string or array on error
             }
@@ -202,14 +275,14 @@ async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, g
         }
 
         //console.log(`[DEBUG] Value before setting app input for ${key}:`, value); // Added debug log
-        let content;
+        let content: string;
         if (key === 'rssFeeds' && value && typeof value === 'object') {
-            let allRssUrls = [];
+            let allRssUrls: string[] = [];
             for (const category in value) {
                 if (typeof value[category] === 'object') {
                     for (const subcategory in value[category]) {
                         if (Array.isArray(value[category][subcategory])) {
-                            value[category][subcategory].forEach(feed => {
+                            value[category][subcategory].forEach((feed: { url?: string }) => {
                                 if (feed && feed.url) {
                                     allRssUrls.push(feed.url);
                                 }
@@ -222,16 +295,15 @@ async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, g
         } else {
             content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
         }
-        //console.log(`[DEBUG] Content for ${key} input:`, content); // Added debug log
         //console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
-        app[`${key}Input`] = content;
+        (app as any)[`${key}Input`] = content;
         app.modalView = viewName; // Switch to the correct view
     });
 
     saveBtn.addEventListener("click", async () => {
         const textarea = getTextarea();
-        const content = textarea?.value ?? app[`${key}Input`];
-        const dataToSave = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const content = textarea?.value ?? (app as any)[`${key}Input`];
+        const dataToSave = content.split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean);
 
         try {
             if (key === 'rssFeeds' || key === 'keywordBlacklist') {
@@ -239,16 +311,16 @@ async function setupTextareaPanel(key, viewName, getConfigButton, getTextarea, g
             } else {
                 await saveSimpleState(key, dataToSave);
             }
-            app[`${key}Input`] = dataToSave.sort().join("\n");
-            createStatusBarMessage(`${key} saved.`, 'success');
-        } catch (error) {
+            (app as any)[`${key}Input`] = dataToSave.sort().join("\n");
+            createStatusBarMessage(app, `${key} saved.`, 'success');
+        } catch (error: any) {
             console.error(`Error saving ${key}:`, error);
-            createStatusBarMessage(`Failed to save ${key}: ${error.message}`, 'error');
+            createStatusBarMessage(app, `Failed to save ${key}: ${error.message}`, 'error');
         }
     });
 }
 
-export async function initConfigPanelListeners(app) {
+export async function initConfigPanelListeners(app: AppState): Promise<void> {
     //console.log("[DEBUG] initConfigPanelListeners called."); // Added debug log
     const backBtn = getBackButton();
     backBtn?.addEventListener('click', () => {
@@ -262,8 +334,8 @@ export async function initConfigPanelListeners(app) {
 
 
 // The PWA logic is standard and does not require refactoring.
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
+let deferredPrompt: any;
+window.addEventListener('beforeinstallprompt', (e: any) => {
     e.preventDefault();
     deferredPrompt = e;
     const installButton = document.getElementById('install-button');
@@ -271,7 +343,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         installButton.style.display = 'block';
         installButton.addEventListener('click', () => {
             deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult) => {
+            deferredPrompt.userChoice.then((choiceResult: any) => {
                 if (choiceResult.outcome === 'accepted') {
                     console.log('PWA installed');
                 } else {

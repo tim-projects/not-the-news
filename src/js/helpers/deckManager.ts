@@ -1,5 +1,3 @@
-// @filepath: src/js/helpers/deckManager.js
-
 import {
     saveSimpleState,
     saveArrayState
@@ -8,14 +6,8 @@ import {
     saveCurrentDeck,
     saveShuffleState
 } from './userStateUtils.ts';
-import {
-    generateNewDeck,
-    MappedFeedItem, // Import MappedFeedItem
-    ReadItem,       // Import ReadItem
-    StarredItem,    // Import StarredItem
-    DeckItem,       // Import DeckItem
-    ShuffledOutItem // Import ShuffledOutItem
-} from './dataUtils.ts'; // Changed to .ts
+import { generateNewDeck } from './dataUtils.ts';
+import { AppState, MappedFeedItem, ReadItem, StarredItem, DeckItem, ShuffledOutItem } from '@/types/app.ts';
 import {
     createStatusBarMessage,
     displayTemporaryMessageInTitle
@@ -25,22 +17,6 @@ import {
 } from '../ui/uiElements.js';
 
 const DAILY_SHUFFLE_LIMIT = 2;
-
-// Define the AppState interface
-interface AppState {
-    entries: MappedFeedItem[];
-    read: ReadItem[];
-    starred: StarredItem[];
-    shuffledOutGuids: ShuffledOutItem[]; // Updated to use ShuffledOutItem
-    shuffleCount: number;
-    filterMode: string;
-    lastShuffleResetDate: string | null;
-    deck: MappedFeedItem[];
-    currentDeckGuids: DeckItem[];
-    showSyncStatus: boolean; // Added for createStatusBarMessage
-    syncStatusMessage: string; // Added for createStatusBarMessage
-    // Add other properties of the app object as they become relevant
-}
 
 /**
  * Helper to safely extract GUID from either a string or an object.
