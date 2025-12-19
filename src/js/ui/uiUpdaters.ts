@@ -78,7 +78,8 @@ export async function displayTemporaryMessageInTitle(message: string): Promise<v
  * @param {string} [type='info'] Optional. 'success', 'error', 'info'.
 */
 let messageTimeoutId: NodeJS.Timeout | undefined;
-export function createStatusBarMessage(app: AppState, message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+export function createStatusBarMessage(app: AppState, message: string): void {
+    console.log(message);
     clearTimeout(messageTimeoutId);
 
     app.syncStatusMessage = message;

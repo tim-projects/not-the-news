@@ -1,0 +1,12 @@
+{
+  "rssFeeds": {
+    "Miscellaneous": {
+      "Default": [
+        { "url": "https://www.google.com/alerts/feeds/123/456" }
+      ]
+    }
+  },
+  "keywordBlacklist": [
+    "sample keyword"
+  ]
+}

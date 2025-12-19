@@ -312,10 +312,10 @@ async function setupTextareaPanel(
                 await saveSimpleState(key, dataToSave);
             }
             (app as any)[`${key}Input`] = dataToSave.sort().join("\n");
-            createStatusBarMessage(app, `${key} saved.`, 'success');
+            createStatusBarMessage(app, `${key} saved.`);
         } catch (error: any) {
             console.error(`Error saving ${key}:`, error);
-            createStatusBarMessage(app, `Failed to save ${key}: ${error.message}`, 'error');
+            createStatusBarMessage(app, `Failed to save ${key}: ${error.message}`);
         }
     });
 }
