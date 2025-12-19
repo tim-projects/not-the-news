@@ -1,55 +1,31 @@
-// @filepath: src/app.ts
+# Patch 2: Replace rssApp function in src/main.ts
 
-// Refactored JS: concise, modern, functional, same output.
+This patch replaces the existing `rssApp` function in `src/main.ts` with the more complete and updated version from `src/app.ts`.
 
-import {
-    performFeedSync,
-    performFullSync,
-    pullUserState,
-    processPendingOperations,
-    loadSimpleState,
-    loadArrayState,
-    initDb,
-    saveSimpleState,
-    getAllFeedItems
-} from './js/data/database.ts';
-import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.ts';
-import {
-    loadCurrentDeck,
-    toggleItemStateAndSync,
-    loadAndPruneReadItems,
-    loadShuffleState,
-    setFilterMode,
-    loadFilterMode
-} from './js/helpers/userStateUtils.ts';
-import {
-    updateCounts,
-    manageSettingsPanelVisibility,
-    scrollToTop,
-    attachScrollToTopHandler,
-    saveCurrentScrollPosition,
-    createStatusBarMessage
-} from './js/ui/uiUpdaters.ts';
-import {
-    initSyncToggle,
-    initImagesToggle,
-    initTheme,
-    initScrollPosition,
-    initConfigPanelListeners
-} from './js/ui/uiInitializers.ts';
-import { isOnline } from './js/utils/connectivity.ts';
+## Instructions
 
-import { AppState, MappedFeedItem, DeckItem } from './types/app.ts';
-import Alpine from 'alpinejs';
+In `src/main.ts`, find the entire `rssApp` function, which starts with:
 
-// NEW IMPORT:
-import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
+```typescript
+export function rssApp(): AppState {
+```
 
+and ends with:
+
+```typescript
+}
+```
+
+just before the line `Alpine.data('rssApp', rssApp);
+
+Replace that entire function with the following code:
+
+```typescript
 export function rssApp(): AppState {
     return {
         // --- State Properties ---
         loading: true,
-        progressMessage: 'Initializing...',
+        progressMessage: 'Initializing...', 
         deck: [],
         feedItems: {},
         filterMode: 'unread',
@@ -346,14 +322,17 @@ export function rssApp(): AppState {
             );
             this.progressMessage = '';
             this.loading = false;
-        },        saveKeywordBlacklist: async function(this: AppState): Promise<void> {
+        },
+        saveKeywordBlacklist: async function(this: AppState): Promise<void> {
             const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
             await saveSimpleState('keywordBlacklist', keywordsArray);
             createStatusBarMessage(this, 'Keyword Blacklist saved!', 'success');
             this.updateCounts();
-        },        updateCounts: async function(this: AppState): Promise<void> {
+        },
+        updateCounts: async function(this: AppState): Promise<void> {
             updateCounts(this);
-        },        scrollToTop: function(this: AppState): void {
+        },
+        scrollToTop: function(this: AppState): void {
             scrollToTop();
         },
         // --- New Function: Reset Application Data ---
@@ -763,7 +742,7 @@ export function rssApp(): AppState {
                     observer.observe(item);
                 });
             };
-            observeElements();
+            observe.Elements();
             const mutationObserver = new MutationObserver(() => {
                 observer.disconnect();
                 observeElements();
@@ -793,3 +772,4 @@ export function rssApp(): AppState {
         },
     };
 }
+```

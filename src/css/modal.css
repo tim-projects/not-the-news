@@ -1,7 +1,4 @@
-/* @filepath: src/css/modal.css */
-
-/* modal.css - All rules commented out for debugging purposes. */
-/*
+/* modal.css */
 .modal {
   position: fixed;
   z-index: 9999;
@@ -170,4 +167,3 @@ html.light .modal-content {
 .item {
   border-radius: 10px;
 }
-*/

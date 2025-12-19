@@ -444,9 +444,6 @@ def config_backup():
         api_logger.exception(f"Error during configuration backup: {e}")
         return jsonify({"status": "error", "message": f"Failed to backup configuration: {str(e)}"}), 500
 
-        api_logger.info("Successfully gathered all user settings for backup.")
-        return jsonify(all_user_settings), 200
-
     except Exception as e:
         api_logger.exception(f"Error during configuration backup: {e}")
         return jsonify({"status": "error", "message": f"Failed to backup configuration: {str(e)}"}), 500

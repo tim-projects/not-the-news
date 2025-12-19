@@ -96,6 +96,7 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Connecting to database...';
                 this.db = await initDb();
                 console.log('Database initialized');
+                console.log('Initial openSettings value:', this.openSettings);
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 console.log('Initial state loaded');
@@ -535,9 +536,10 @@ export function rssApp(): AppState {
             if (!this._initComplete) return; 
             
             this.$watch("openSettings", async (isOpen: boolean) => {
+                console.log('openSettings changed to:', isOpen);
                 if (isOpen) {
 
-                    // await manageSettingsPanelVisibility(this);
+
                 } else {
                     await saveCurrentScrollPosition();
                 }

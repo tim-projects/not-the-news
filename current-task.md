@@ -1,29 +1,40 @@
+**Completed Task: Refactor `rssApp` logic**
+
+**Goal:** Merge the `rssApp` logic from `src/app.ts` into `src/main.ts` to remove duplication and create a single source of truth.
+
+**Progress:**
+*   Analyzed `src/app.ts` and `src/main.ts` to identify differences.
+*   Created a series of patch files in `src/patches/` to perform the merge in atomic steps.
+
+**Findings:**
+*   The `rssApp` logic was duplicated across two files, with `src/app.ts` being more up-to-date.
+*   Certain features, like the stale item observer (`_initObservers`), were present in `main.ts` but not fully utilized.
+
+**Mitigations:**
+*   Created `patch-1.md` to merge and update imports.
+*   Created `patch-2.md` to replace the `rssApp` function in `main.ts` with the version from `app.ts`.
+*   Created `patch-3.md` to restore the `_initObservers` feature from the old `main.ts`.
+*   Created `patch-4.md` to ensure the `_initObservers` function is called during application initialization.
+*   The patch files provide explicit instructions for a non-thinking agent to apply the changes, ensuring a safe and consistent merge.
+
+---
+
 **Current Task Status: Frontend UI Issues**
 
-**Goal:** Address the Frontend UI Issues (Settings cog, Reset button, Backup button, Box shadow).
+**Goal:** Address the Frontend UI Issues (Reset button, Backup button, Box shadow).
 
-**Previous Task Status: TypeScript Migration (COMPLETE)**
+**Completed Task: Settings Cog Issue**
 
-**Goal Achieved:** All JavaScript files within the `src/` directory have been successfully migrated to TypeScript (`.ts` or `.tsx`) and the project builds without compiler errors.
+**Issue Resolved:** The settings cog wheel and modal now function correctly. The flickering issue was resolved by uncommenting `src/css/modal.css`. The counter was removed and console logs confirmed `openSettings` toggles as expected.
 
-**Remaining Issues (from previous task):**
+**Current Focus: Backup Button**
 
-*   **`TS6133: 'type' is declared but its value is never read.` in `src/js/ui/uiUpdaters.ts`**: This is an acceptable warning as the `type` parameter is intended for future styling improvements and does not affect current functionality.
+**Goal:** Implement functionality for the "Backup Configuration" button (`id="backup-config-button"`, `@click="backupConfig()"`). When pressed, it should trigger a download of the user's current configuration (RSS feeds, keyword blacklist, and other user settings) as a JSON file.
 
 **Mitigations and Next Steps (Frontend UI Issues):**
 
-1.  **Re-evaluate Settings Cog Issue**:
-    *   **The user reported**: "the settings cog wheel no longer works at all. it still flickers. clicking it shows a counter underneath for absolutely no reason or use. The actual settings modal no longer displays."
-    *   **Progress**:
-        *   Removed the debugging counter `settingsButtonClicks` from `src/index.html` (along with its `x-text="settingsButtonClicks"`).
-        *   Removed the entire debugging script block (`testSettingsClick()` and `console.log` overrides) from `src/index.html`.
-        *   Confirmed `openSettings` initialized to `false` in `src/app.ts` and `src/main.ts`.
-        *   Confirmed settings button `@click="openSettings = !openSettings"` correctly toggles the state.
-        *   Confirmed modal `div` uses `x-show="openSettings"`.
-        *   Identified that `manageSettingsPanelVisibility(this)` call was commented out in `src/app.ts`'s `openSettings` watcher.
-    *   **Mitigation/Next Action**: Uncomment `await manageSettingsPanelVisibility(this);` within the `openSettings` watcher in `src/app.ts`.
-    *   **Validation**: Rebuild the application and test the settings cog to see if the modal now displays correctly and if flickering is reduced.
-
-2.  **Settings Reset button doesn't work.** (Pending investigation)
-3.  **Settings Backup button doesn't work.** (Pending investigation)
-4.  **Box shadow on `button.read-button` needs to be changed to `--var(--card-border)`.** (Pending investigation)
+1.  **Settings Reset button doesn't work.** (Pending investigation)
+2.  **Settings Backup button doesn't work.** (In Progress)
+    *   **Action**: Locate the `backupConfig()` function definition. Fixed backend `config_backup` endpoint. Updated frontend to include time in backup filename.
+    *   **Next Investigation**: Create a Playwright test to simulate user interaction (login, open settings, click backup) and capture console logs and network activity to debug why the download is not triggering.
+3.  **Box shadow on `button.read-button` needs to be changed to `--var(--card-border)`.** (Pending investigation)
