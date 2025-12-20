@@ -430,14 +430,13 @@ export function rssApp(): AppState {
                     credentials: 'include' // Important for sending cookies
                 });
 
-                console.log('DEBUG: Backend reset response status:', response.status);
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to reset backend data.');
                 }
                 console.log('Backend application data reset successfully.');
-                createStatusBarMessage(this, 'Application reset complete! (Reload manually for full effect)');
-                // window.location.reload(); // Temporarily commented out for debugging
+                createStatusBarMessage(this, 'Application reset complete! Reloading...');
+                window.location.reload(); // Reload immediately after backend confirms
 
             } catch (error: any) {
                 console.error("Error during application reset:", error);

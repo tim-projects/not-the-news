@@ -65,7 +65,8 @@
     *   `closeDb()` call before IndexedDB operations.
     *   Move Service Worker unregistration before IndexedDB operations.
     *   Robustly delete `not-the-news-db` (and optionally other detected IndexedDBs) and ensure `onerror`/`onblocked` events do not halt execution.
-*   Backend `/api/admin/reset-app` function was updated with verbose logging for file deletion and a critical log to confirm execution.
+    *   The `window.location.reload()` was re-enabled after temporary commenting out for debugging.
+*   Backend `/api/admin/reset-app` function was updated with verbose logging for file deletion and a critical log to confirm execution (logs now reverted).
 *   The Playwright test (`tests/reset_button.spec.js`) was updated to:
     *   Include login steps and correct element selectors.
     *   Automatically accept the confirmation dialog.
@@ -74,19 +75,26 @@
     *   Assert that `backendReset` is true.
     *   Assert that after reload, starred count is 0, unread count is 0, and the main feed (`#items`) contains no `entry` elements.
 *   The Playwright test for the reset button is now passing.
+*   **User Confirmation:** The user has confirmed that the reset option now appears to work correctly in manual testing.
 
 **Findings:**
-*   The frontend `resetApplicationData` now successfully clears local IndexedDB and localStorage, unregisters service workers, and triggers the backend reset (as confirmed by Playwright test assertions).
-*   **Crucial Discrepancy:** Despite the Playwright test passing and logging of successful backend API calls, manual testing in a live browser shows no evidence of the `/api/admin/reset-app` endpoint being hit in the backend logs. This persists even after commenting out `window.location.reload()` to prevent request cancellation by early page navigation.
-*   This suggests a network-level issue between the manual browser and the backend service that is not present in the Playwright environment, or a very aggressive caching/interception of the request in the manual context.
+*   The frontend `resetApplicationData` now successfully clears local IndexedDB and localStorage, unregisters service workers, and triggers the backend reset.
+*   The discrepancy between Playwright and manual testing, where the backend log wasn't being hit, was resolved by re-enabling the immediate `window.location.reload()`. This implies that in the manual browser environment, the request to the backend was indeed being cancelled when the page was not explicitly reloaded immediately, leading to a race condition with the logging mechanism.
 
 **Mitigations:**
 *   Improved `tests/reset_button.spec.js` with correct login flow, selectors, and comprehensive state assertions post-reset.
-*   Enhanced `src/main.ts` for more robust local data clearing.
+*   Enhanced `src/main.ts` for more robust local data clearing and correct page reload timing.
 *   Updated `src/js/data/dbCore.ts` and `src/js/data/database.ts` to include `closeDb` functionality.
-*   Added verbose logging to `src/api.py` for `reset_app_data` to confirm backend execution and file deletions.
-*   Temporarily commented out `window.location.reload()` in `src/main.ts` for manual debugging.
-*   **Next Step:** User to provide detailed observations from browser developer console (for `DEBUG: Backend reset response status:`) and network tab (for `/api/admin/reset-app` request status) during manual reset.
+*   Verbose backend logging (temporarily added for debugging) has been reverted.
+
+---
+**New Task: UI/UX Improvement - Loading State after Reset**
+
+**Goal:** Provide clear progress messages to the user during initial data loading/syncing after a reset, especially when the deck is initially blank.
+
+**Problem:** After a reset, if data syncing takes time, the user sees a blank deck without clear indication that content is still loading, leading to a poor user experience.
+
+**Next Step:** Investigate current loading/syncing indicators and identify suitable locations in the UI and application state to display progress messages.
 
 ---
 **Completed Task: Box Shadow on `button.read-button`**

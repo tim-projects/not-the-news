@@ -477,7 +477,6 @@ def config_restore():
 @app.route("/api/admin/reset-app", methods=["POST"])
 def reset_app_data():
     _authenticate_request()
-    api_logger.critical("!!! RESET APPLICATION DATA ENDPOINT HIT !!!") # LOUD LOG
     api_logger.info("Received request to reset application data.")
 
     try:
