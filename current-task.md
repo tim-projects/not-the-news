@@ -83,9 +83,16 @@
 *   Updated `src/js/data/dbCore.ts` and `src/js/data/database.ts` to include `closeDb` functionality.
 
 ---
+**Completed Task: Box Shadow on `button.read-button`**
 
-**Current Task Status: Frontend UI Issues**
+**Goal:** Change the box shadow on `button.read-button` to `--var(--card-border)`.
 
-**Goal:** Address the Frontend UI Issues (Box shadow).
+**Progress:**
+*   Identified the relevant CSS rule in `src/css/buttons.css`.
+*   Modified the `box-shadow` property to use `--var(--card-border)`.
 
-**Next Investigation**: Investigate the "Box shadow on `button.read-button` needs to be changed to `--var(--card-border)`." issue.
+**Findings:**
+*   The `box-shadow` property was hardcoded with `--card-shadow-color` instead of using the theme-aware `--card-border` variable.
+
+**Mitigations:**
+*   Updated `src/css/buttons.css` to use `--var(--card-border)` for the `box-shadow` of `button.read-button`.
