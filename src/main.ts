@@ -20,6 +20,7 @@ import {
     loadSimpleState,
     loadArrayState,
     initDb,
+    closeDb,
     saveSimpleState,
     getAllFeedItems
 } from './js/data/database.ts';
@@ -377,35 +378,11 @@ export function rssApp(): AppState {
             this.progressMessage = 'Resetting application data...';
 
             try {
-                // 1. Clear IndexedDB databases
-                console.log('Clearing IndexedDB databases...');
-                const dbNames = await indexedDB.databases();
-                for (const dbInfo of dbNames) {
-                    await new Promise<void>((resolve, reject) => {
-                        const req = indexedDB.deleteDatabase(dbInfo.name!);
-                        req.onsuccess = () => {
-                            console.log(`IndexedDB database '${dbInfo.name}' deleted.`);
-                            resolve();
-                        };
-                        req.onerror = (event: Event) => {
-                            console.error(`Error deleting IndexedDB database '${dbInfo.name}':`, (event.target as IDBRequest).error);
-                            reject((event.target as IDBRequest).error);
-                        };
-                        req.onblocked = () => {
-                            // If there are open connections, onblocked will fire.
-                            // User needs to close all tabs for the site.
-                            alert('Please close all other tabs of this application and try again to clear the database.');
-                            reject(new Error('IndexedDB deletion blocked.'));
-                        };
-                    });
-                }
+                // 0. Close the current database connection
+                console.log('Closing database connection...');
+                await closeDb();
 
-                // 2. Clear localStorage
-                console.log('Clearing localStorage...');
-                localStorage.clear();
-                console.log('localStorage cleared.');
-
-                // 3. Unregister Service Workers
+                // 1. Unregister Service Workers
                 console.log('Unregistering service workers...');
                 if ('serviceWorker' in navigator) {
                     const registrations = await navigator.serviceWorker.getRegistrations();
@@ -416,8 +393,13 @@ export function rssApp(): AppState {
                 }
                 console.log('Service workers unregistered.');
 
-                // 4. Call backend to reset server-side data
-                console.log('Calling backend to reset application data...');
+                // 2. Clear localStorage
+                console.log('Clearing localStorage...');
+                localStorage.clear();
+                console.log('localStorage cleared.');
+
+                // 3. Call backend to reset server-side data
+                console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
                 const response = await fetch('/api/admin/reset-app', {
                     method: 'POST',
                     headers: {

@@ -32,6 +32,9 @@ test.describe('Restore Configuration Button', () => {
       }
     });
 
+    page.on('dialog', dialog => dialog.accept()); // Automatically accept confirmation dialogs
+
+
     // --- Login ---
     await page.goto(`${APP_URL}/login.html`, { waitUntil: 'networkidle' });
     await page.fill('#pw', APP_PASSWORD);

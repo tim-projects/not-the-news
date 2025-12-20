@@ -119,6 +119,18 @@ async function getDb() {
 }
 
 /**
+ * Closes the database connection.
+ */
+export async function closeDb(): Promise<void> {
+    if (_dbInstance) {
+        _dbInstance.close();
+        _dbInstance = null;
+        _dbInitPromise = null;
+        console.log('[DB] Database connection closed.');
+    }
+}
+
+/**
  * Ensures a single, ready database instance is available before a callback is executed.
  */
 export async function withDb<T>(callback: (db: IDBPDatabase) => T): Promise<T> {
