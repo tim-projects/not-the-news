@@ -477,20 +477,30 @@ def config_restore():
 @app.route("/api/admin/reset-app", methods=["POST"])
 def reset_app_data():
     _authenticate_request()
+    api_logger.critical("!!! RESET APPLICATION DATA ENDPOINT HIT !!!") # LOUD LOG
     api_logger.info("Received request to reset application data.")
 
     try:
         # Clear user state files
-        for filename in os.listdir(USER_STATE_DIR):
+        api_logger.debug(f"Attempting to clear user state files in: {USER_STATE_DIR}")
+        files_in_user_state_dir = os.listdir(USER_STATE_DIR)
+        api_logger.debug(f"Files found in {USER_STATE_DIR}: {files_in_user_state_dir}")
+        for filename in files_in_user_state_dir:
             if filename.endswith(".json"):
                 file_path = os.path.join(USER_STATE_DIR, filename)
-                os.remove(file_path)
-                api_logger.debug(f"Deleted user state file: {file_path}")
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    api_logger.debug(f"Deleted user state file: {file_path}")
+                else:
+                    api_logger.debug(f"User state file not found (already deleted?): {file_path}")
 
         # Delete feed.xml
+        api_logger.debug(f"Attempting to delete feed.xml at: {FEED_XML}")
         if os.path.exists(FEED_XML):
             os.remove(FEED_XML)
             api_logger.debug(f"Deleted feed.xml: {FEED_XML}")
+        else:
+            api_logger.debug(f"feed.xml not found (already deleted?): {FEED_XML}")
 
         # Re-seed initial configurations
         _seed_initial_configs()

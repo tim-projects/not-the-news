@@ -393,12 +393,34 @@ export function rssApp(): AppState {
                 }
                 console.log('Service workers unregistered.');
 
-                // 2. Clear localStorage
+                // 2. Clear IndexedDB databases
+                console.log('Clearing IndexedDB databases...');
+                const dbName = 'not-the-news-db';
+                
+                console.log(`Attempting to delete database: ${dbName}`);
+                await new Promise<void>((resolve) => { // No reject, always resolve to continue
+                    const req = indexedDB.deleteDatabase(dbName);
+                    req.onsuccess = () => {
+                        console.log(`IndexedDB database '${dbName}' deleted successfully.`);
+                        resolve();
+                    };
+                    req.onerror = (event: Event) => {
+                        console.error(`Error deleting IndexedDB database '${dbName}':`, (event.target as IDBRequest).error);
+                        resolve(); // Continue to next even on error
+                    };
+                    req.onblocked = () => {
+                        console.warn(`Deletion of database '${dbName}' is blocked.`);
+                        resolve(); // Continue anyway
+                    };
+                });
+                console.log('IndexedDB clearing finished.');
+
+                // 3. Clear localStorage
                 console.log('Clearing localStorage...');
                 localStorage.clear();
                 console.log('localStorage cleared.');
 
-                // 3. Call backend to reset server-side data
+                // 4. Call backend to reset server-side data
                 console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
                 const response = await fetch('/api/admin/reset-app', {
                     method: 'POST',
@@ -408,17 +430,14 @@ export function rssApp(): AppState {
                     credentials: 'include' // Important for sending cookies
                 });
 
+                console.log('DEBUG: Backend reset response status:', response.status);
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to reset backend data.');
                 }
                 console.log('Backend application data reset successfully.');
-                createStatusBarMessage(this, 'Application reset complete! Reloading...');
-
-                // 5. Reload the page to ensure a fresh start
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                createStatusBarMessage(this, 'Application reset complete! (Reload manually for full effect)');
+                // window.location.reload(); // Temporarily commented out for debugging
 
             } catch (error: any) {
                 console.error("Error during application reset:", error);
