@@ -3,57 +3,25 @@
 // Refactored JS: concise, modern, functional, same output.
 
 import { AppState } from '../../types/app.ts';
-
 import {
-
     loadSimpleState,
-
     saveSimpleState,
-
     performFullSync,
-
     saveArrayState
-
 } from '../data/database.ts';
-
-
-
+import { formatDate, mapRawItem, mapRawItems, parseRssFeedsConfig } from '../helpers/dataUtils.ts';
 import {
-
-    loadUserState,
-
-    saveUserState
-
-}
-
-from '../helpers/apiUtils.ts';
-
-
-
-import {
-
     getSyncToggle,
-
     getImagesToggle,
-
     getThemeToggle,
-
     getThemeText,
-
     getBackButton,
-
     getRssFeedsTextarea,
-
     getKeywordsBlacklistTextarea,
-
     getConfigureRssButton,
-
     getConfigureKeywordsButton,
-
     getSaveKeywordsButton,
-
     getSaveRssButton
-
 } from './uiElements.ts';
 
 
@@ -240,79 +208,6 @@ export async function initScrollPosition(app: AppState): Promise<void> {
         }
     });
 }
-
-/**
- * REFINED: Now loads data when the configure button is clicked, not from a watcher in main.js.
- */
-async function setupTextareaPanel(
-    key: string,
-    viewName: string,
-    getConfigButton: () => HTMLElement | null,
-    getTextarea: () => HTMLTextAreaElement | null,
-    getSaveButton: () => HTMLElement | null,
-    app: AppState
-): Promise<void> {
-    const configBtn = getConfigButton();
-    const saveBtn = getSaveButton();
-    //console.log(`[DEBUG] setupTextareaPanel for key: ${key}. configBtn:`, configBtn, `saveBtn:`, saveBtn); // Added debug log
-    if (!configBtn || !saveBtn) return;
-
-    configBtn.addEventListener('click', async () => {
-        // Data is now loaded here, when the user intends to configure.
-        let value;
-        if (key === 'rssFeeds' || key === 'keywordBlacklist') {
-            try {
-                const response = await loadUserState(key);
-                //console.log(`[DEBUG] loadUserState response for ${key}:`, response); // Added debug log
-                value = (response as any).value;
-            } catch (error: any) {
-                console.error(`Error loading ${key} from server:`, error);
-                value = (key === 'rssFeeds') ? '' : []; // Default to empty string or array on error
-            }
-        } else {
-            const result = await loadSimpleState(key);
-            value = result.value;
-        }
-
-        //console.log(`[DEBUG] Value before setting app input for ${key}:`, value); // Added debug log
-        let content: string;
-        if (key === 'rssFeeds' && value && typeof value === 'object') {
-            let allRssUrls: string[] = [];
-            for (const category in value) {
-                if (typeof value[category] === 'object') {
-                    for (const subcategory in value[category]) {
-                        if (Array.isArray(value[category][subcategory])) {
-                            value[category][subcategory].forEach((feed: { url?: string }) => {
-                                if (feed && feed.url) {
-                                    allRssUrls.push(feed.url);
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-            content = allRssUrls.join('\n');
-        } else {
-            content = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
-        }
-        //console.log(`[DEBUG] Final content for ${key} input before assignment:`, content); // Added debug log
-        (app as any)[`${key}Input`] = content;
-        app.modalView = viewName; // Switch to the correct view
-    });
-}
-
-export async function initConfigPanelListeners(app: AppState): Promise<void> {
-    //console.log("[DEBUG] initConfigPanelListeners called."); // Added debug log
-    const backBtn = getBackButton();
-    backBtn?.addEventListener('click', () => {
-        app.modalView = 'main';
-    });
-
-    await setupTextareaPanel('rssFeeds', 'rss', getConfigureRssButton, getRssFeedsTextarea, getSaveRssButton, app);
-    await setupTextareaPanel('keywordBlacklist', 'keywords', getConfigureKeywordsButton, getKeywordsBlacklistTextarea, getSaveKeywordsButton, app);
-}
-
-
 
 // The PWA logic is standard and does not require refactoring.
 let deferredPrompt: any;

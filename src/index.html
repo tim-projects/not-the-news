@@ -112,8 +112,8 @@
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>
                     
                     <hr>
-                    <div class="settings-option"><span>RSS Feeds</span><button id="configure-rss-feeds-btn" class="configure-button" @click="modalView = 'rss'">Configure</button></div>
-                    <div class="settings-option"><span>Keyword Blacklist</span><button id="configure-keyword-blacklist-btn" class="configure-button" @click="modalView = 'keywords'">Configure</button></div>
+                    <div class="settings-option"><span>RSS Feeds</span><button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button></div>
+                    <div class="settings-option"><span>Keyword Blacklist</span><button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button></div>
                     <hr>
                     <div class="settings-option"><label for="install-button">Install as App</label><button id="install-button" class="configure-button">Install</button></div>
                     <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>

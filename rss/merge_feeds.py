@@ -29,11 +29,13 @@ def load_rss_feeds():
     try:
         with open(RSS_FEEDS_JSON, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            nested_feeds_data = data.get('value', {}) # Expect a dictionary for nested structure
+            feeds_data = data.get('value', []) 
             
             all_urls = []
-            if isinstance(nested_feeds_data, dict):
-                for category, subcategories in nested_feeds_data.items():
+            
+            # Case 1: Nested object structure (seeded data)
+            if isinstance(feeds_data, dict):
+                for category, subcategories in feeds_data.items():
                     if isinstance(subcategories, dict):
                         for subcategory, feeds_list in subcategories.items():
                             if isinstance(feeds_list, list):
@@ -42,16 +44,16 @@ def load_rss_feeds():
                                         url = feed_item['url']
                                         if isinstance(url, str) and is_valid_url(url):
                                             all_urls.append(url)
-                                        else:
-                                            logging.warning(f"Invalid or malformed RSS feed URL skipped: {url} (from item: {feed_item})")
-                                    else:
-                                        logging.warning(f"Invalid or malformed RSS feed item skipped: {feed_item}")
-                            else:
-                                logging.warning(f"Expected list of feeds for subcategory '{subcategory}', but got: {feeds_list}")
-                    else:
-                        logging.warning(f"Expected dictionary of subcategories for category '{category}', but got: {subcategories}")
-            else:
-                logging.warning(f"Expected dictionary for nested feeds data, but got: {nested_feeds_data}")
+            
+            # Case 2: Flat list of strings (user-saved data)
+            elif isinstance(feeds_data, list):
+                for item in feeds_data:
+                    if isinstance(item, str) and is_valid_url(item):
+                        all_urls.append(item)
+                    elif isinstance(item, dict) and 'url' in item: # Handle array of objects if needed
+                        url = item['url']
+                        if isinstance(url, str) and is_valid_url(url):
+                            all_urls.append(url)
 
             return all_urls
     except json.JSONDecodeError as e:

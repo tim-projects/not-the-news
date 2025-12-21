@@ -45,6 +45,44 @@ export function shuffleArray<T>(arr: T[]): T[] {
     return arr;
 }
 
+/**
+ * Robustly parses RSS feed configuration which can be either a nested object (seeded)
+ * or a flat array of strings (user-saved).
+ */
+export function parseRssFeedsConfig(value: any): string[] {
+    const allUrls: string[] = [];
+    if (!value) return allUrls;
+
+    if (Array.isArray(value)) {
+        // Flat array of strings or objects
+        value.forEach((item: any) => {
+            if (typeof item === 'string' && item.trim()) {
+                allUrls.push(item.trim());
+            } else if (item && typeof item === 'object' && item.url) {
+                allUrls.push(item.url.trim());
+            }
+        });
+    } else if (typeof value === 'object') {
+        // Nested structure: { Category: { Subcategory: [ { url: '...' }, ... ] } }
+        for (const category in value) {
+            const subcategories = value[category];
+            if (subcategories && typeof subcategories === 'object') {
+                for (const subcategory in subcategories) {
+                    const feeds = subcategories[subcategory];
+                    if (Array.isArray(feeds)) {
+                        feeds.forEach((feed: any) => {
+                            if (feed && feed.url) {
+                                allUrls.push(feed.url.trim());
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+    return allUrls;
+}
+
 export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) => string): MappedFeedItem | null {
     if (!item) {
         console.warn("mapRawItem received an undefined or null item. Returning null.");

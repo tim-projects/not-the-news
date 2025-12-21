@@ -24,7 +24,7 @@ import {
     saveSimpleState,
     getAllFeedItems
 } from './js/data/database.ts';
-import { formatDate, mapRawItem, mapRawItems } from './js/helpers/dataUtils.ts';
+import { formatDate, mapRawItem, mapRawItems, parseRssFeedsConfig } from './js/helpers/dataUtils.ts';
 import {
     loadCurrentDeck,
     toggleItemStateAndSync,
@@ -45,8 +45,7 @@ import {
     initSyncToggle,
     initImagesToggle,
     initTheme,
-    initScrollPosition,
-    initConfigPanelListeners
+    initScrollPosition
 } from './js/ui/uiInitializers.ts';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
@@ -119,7 +118,6 @@ export function rssApp(): AppState {
                 initTheme(this);
                 initSyncToggle(this);
                 initImagesToggle(this);
-                initConfigPanelListeners(this);
                 attachScrollToTopHandler();
                 await initScrollPosition(this);
                 
@@ -372,6 +370,21 @@ export function rssApp(): AppState {
         },        processShuffle: async function(this: AppState): Promise<void> {
             await processShuffle(this);
             this.updateCounts();
+        },        loadRssFeeds: async function(this: AppState): Promise<void> {
+            try {
+                const result = await loadSimpleState('rssFeeds');
+                this.rssFeedsInput = parseRssFeedsConfig(result.value).join('\n');
+            } catch (error) {
+                console.error('Error loading RSS feeds:', error);
+            }
+        },        loadKeywordBlacklist: async function(this: AppState): Promise<void> {
+            try {
+                const result = await loadSimpleState('keywordBlacklist');
+                const value = result.value;
+                this.keywordBlacklistInput = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
+            } catch (error) {
+                console.error('Error loading keyword blacklist:', error);
+            }
         },        saveRssFeeds: async function(this: AppState): Promise<void> {
             const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean).sort();
             try {
@@ -387,6 +400,8 @@ export function rssApp(): AppState {
                     Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids,
                     this.shuffleCount, this.filterMode, this.lastShuffleResetDate
                 );
+                
+                // --- FIX: Correctly update the component state with the deck result ---
                 this.deck = deckResult.deck;
                 this.currentDeckGuids = deckResult.currentDeckGuids;
                 this.shuffledOutGuids = deckResult.shuffledOutGuids;
@@ -600,23 +615,7 @@ export function rssApp(): AppState {
                     loadSimpleState('keywordBlacklist')
                 ]);
 
-                let allRssUrls: string[] = [];
-                if (rssFeeds.value && typeof rssFeeds.value === 'object') {
-                    for (const category in rssFeeds.value) {
-                        if (typeof rssFeeds.value[category] === 'object') {
-                            for (const subcategory in rssFeeds.value[category]) {
-                                if (Array.isArray(rssFeeds.value[category][subcategory])) {
-                                    rssFeeds.value[category][subcategory].forEach((feed: { url?: string }) => {
-                                        if (feed && feed.url) {
-                                            allRssUrls.push(feed.url);
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-                this.rssFeedsInput = allRssUrls.join('\n');
+                this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');
                 this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
                     ? keywordBlacklist.value.join('\n') 
                     : '';
@@ -717,7 +716,7 @@ export function rssApp(): AppState {
                         loadSimpleState('rssFeeds'),
                         loadSimpleState('keywordBlacklist')
                     ]);
-                    this.rssFeedsInput = rssFeeds.value || '';
+                    this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');
                     if (Array.isArray(storedKeywords.value)) {
                         this.keywordBlacklistInput = storedKeywords.value.filter(Boolean).sort().join("\n");
                     } else if (typeof storedKeywords.value === 'string') {
