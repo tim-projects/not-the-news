@@ -17,8 +17,8 @@ import logging
 
 # Define paths (adjust if necessary based on where these scripts are run from)
 DATA_DIR = "/data"
-# USER_STATE_DIR = os.path.join(DATA_DIR, "user_state") # Not needed, direct path
-RSS_FEEDS_JSON = os.path.join(DATA_DIR, "config", "rssFeeds.json")
+USER_STATE_DIR = os.path.join(DATA_DIR, "user_state")
+RSS_FEEDS_JSON = os.path.join(USER_STATE_DIR, "rssFeeds.json")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

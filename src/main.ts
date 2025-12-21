@@ -343,6 +343,11 @@ export function rssApp(): AppState {
             if (this.filterMode === 'unread' && !isCurrentlyRead) {
                 // If it was unread and now read, remove it from the deck in unread mode
                 this.deck = this.deck.filter(item => item.guid !== guid);
+                // Also remove it from currentDeckGuids so it's not re-added on refresh
+                this.currentDeckGuids = this.currentDeckGuids.filter(deckItem => deckItem.guid !== guid);
+                // Save the updated deck guids to the database
+                const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
+                await saveCurrentDeck(this.currentDeckGuids);
             }
             
             this.updateCounts();
@@ -351,36 +356,62 @@ export function rssApp(): AppState {
 
             // If the deck is now empty, trigger a deck refresh
             if (this.deck.length === 0) {
-                console.log('[toggleRead] Deck is empty, refreshing...');
+                console.log('[toggleRead] Deck is empty, initiating refresh process.');
                 this.progressMessage = 'Generating new deck...';
                 this.loading = true; // Show loading screen while new deck is generated
-                await this._loadAndManageAllData();
+                try {
+                    await this._loadAndManageAllData();
+                } catch (error) {
+                    console.error('[toggleRead] Error during deck refresh:', error);
+                }
+                console.log('[toggleRead] _loadAndManageAllData completed after deck empty.');
                 this.loading = false;
                 this.progressMessage = '';
+                console.log('[toggleRead] Deck refresh process completed. Deck size:', this.deck.length);
             }
         },        processShuffle: async function(this: AppState): Promise<void> {
             await processShuffle(this);
             this.updateCounts();
         },        saveRssFeeds: async function(this: AppState): Promise<void> {
-            // Parse the multi-line string into an array of strings, one URL per line
-            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
-            await saveSimpleState('rssFeeds', rssFeedsArray); // Send the array to the backend
-            createStatusBarMessage(this, 'RSS Feeds saved!');
-            this.loading = true;
-            this.progressMessage = 'Saving feeds and performing full sync...';
-            await performFullSync(this);
-            await this.loadFeedItemsFromDB();
-            await manageDailyDeck(
-                Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids,
-                this.shuffleCount, this.filterMode, this.lastShuffleResetDate
-            );
-            this.progressMessage = '';
-            this.loading = false;
+            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean).sort();
+            try {
+                await saveSimpleState('rssFeeds', rssFeedsArray);
+                this.rssFeedsInput = rssFeedsArray.join('\n');
+                createStatusBarMessage(this, 'RSS Feeds saved!');
+                this.loading = true;
+                this.progressMessage = 'Saving feeds and performing full sync...';
+                await performFullSync(this);
+                await this.loadFeedItemsFromDB();
+                
+                const deckResult = await manageDailyDeck(
+                    Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids,
+                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate
+                );
+                this.deck = deckResult.deck;
+                this.currentDeckGuids = deckResult.currentDeckGuids;
+                this.shuffledOutGuids = deckResult.shuffledOutGuids;
+                this.shuffleCount = deckResult.shuffleCount;
+                this.lastShuffleResetDate = deckResult.lastShuffleResetDate;
+
+                await this.loadAndDisplayDeck();
+                this.progressMessage = '';
+                this.loading = false;
+            } catch (error: any) {
+                console.error('Error saving RSS feeds:', error);
+                createStatusBarMessage(this, `Failed to save RSS feeds: ${error.message}`);
+                this.loading = false;
+            }
         },        saveKeywordBlacklist: async function(this: AppState): Promise<void> {
-            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean);
-            await saveSimpleState('keywordBlacklist', keywordsArray);
-            createStatusBarMessage(this, 'Keyword Blacklist saved!');
-            this.updateCounts();
+            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean).sort();
+            try {
+                await saveSimpleState('keywordBlacklist', keywordsArray);
+                this.keywordBlacklistInput = keywordsArray.join('\n');
+                createStatusBarMessage(this, 'Keyword Blacklist saved!');
+                this.updateCounts();
+            } catch (error: any) {
+                console.error('Error saving keyword blacklist:', error);
+                createStatusBarMessage(this, `Failed to save keyword blacklist: ${error.message}`);
+            }
         },        updateCounts: async function(this: AppState): Promise<void> {
             updateCounts(this);
         },        scrollToTop: function(this: AppState): void {

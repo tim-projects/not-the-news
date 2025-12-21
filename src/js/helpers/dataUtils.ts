@@ -126,7 +126,9 @@ export async function generateNewDeck(
     shuffledOutItems: (DeckItem | string | ShuffledOutItem)[], // Can be DeckItem objects or just GUID strings (legacy)
     filterMode: string
 ): Promise<MappedFeedItem[]> {
-    console.log("ENTERING generateNewDeck");
+    console.log("ENTERING generateNewDeck with filterMode:", filterMode);
+    console.log("generateNewDeck: allFeedItems count:", allFeedItems.length);
+    console.log("generateNewDeck: readItems count:", readItems.length);
     try {
         const MAX_DECK_SIZE = 10;
 
@@ -166,8 +168,14 @@ export async function generateNewDeck(
                     !readGuidsSet.has(item.guid) &&
                     !shuffledOutGuidsSet.has(item.guid)
                 );
+                // If all items are read and the deck is empty, we should still generate a new deck.
+                if (filteredItems.length === 0) {
+                    console.log('generateNewDeck: No unread/unshuffled items found, re-filtering from all items.');
+                    filteredItems = allFeedItems.filter(item => !shuffledOutGuidsSet.has(item.guid));
+                }
                 break;
         }
+        console.log('generateNewDeck: Final filteredItems count:', filteredItems.length);
 
         if (filterMode === 'read' || filterMode === 'starred') {
             filteredItems.sort((a, b) => b.timestamp - a.timestamp);

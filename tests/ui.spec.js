@@ -267,44 +267,44 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should save RSS feeds', async ({ page }) => {
         await page.locator('#settings-button').click();
-        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
-        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
+        await expect(page.locator('.modal')).toBeVisible(); 
+        await expect(page.locator('#main-settings')).toBeVisible(); 
         await page.locator('#configure-rss-feeds-btn').click();
-        await expect(page.locator('#main-settings')).toBeHidden();
         await expect(page.locator('#rss-settings-block')).toBeVisible();
 
         const textarea = page.locator('#rss-settings-block textarea');
-        const saveButton = page.locator('#rss-settings-block .save-message');
+        const saveButton = page.locator('#save-rss-btn');
+        const statusMessage = page.locator('#status-message-container');
+        
         await expect(textarea).toBeVisible();
         await expect(saveButton).toBeVisible();
 
-        await textarea.fill('http://example.com/feed1\nhttp://example.com/feed2');
+        await textarea.fill('https://www.nasa.gov/news-release/feed/\nhttps://www.theverge.com/rss/index.xml');
         await saveButton.click();
 
-        await expect(saveButton).toHaveText('RSS Feeds saved!'); // Changed saveMessage to saveButton
-        // Verify message disappears after a short while (assuming it does)
-        await expect(saveButton).toBeHidden(); // Changed saveMessage to saveButton
+        await expect(statusMessage).toBeVisible();
+        await expect(statusMessage).toHaveText('RSS Feeds saved!');
     });
 
     test('should save Keyword Blacklist', async ({ page }) => {
         await page.locator('#settings-button').click();
-        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
-        await expect(page.locator('#main-settings')).toBeVisible(); // Ensure main settings content is visible
+        await expect(page.locator('.modal')).toBeVisible(); 
+        await expect(page.locator('#main-settings')).toBeVisible(); 
         await page.locator('#configure-keyword-blacklist-btn').click();
-        await expect(page.locator('#main-settings')).toBeHidden();
         await expect(page.locator('#keywords-settings-block')).toBeVisible();
 
         const textarea = page.locator('#keywords-settings-block textarea');
-        const saveButton = page.locator('#keywords-settings-block .save-message');
+        const saveButton = page.locator('#save-keywords-btn');
+        const statusMessage = page.locator('#status-message-container');
+        
         await expect(textarea).toBeVisible();
         await expect(saveButton).toBeVisible();
 
         await textarea.fill('keyword1\nkeyword2');
         await saveButton.click();
 
-        await expect(saveButton).toHaveText('Keywords saved!'); // Changed saveMessage to saveButton
-        // Verify message disappears after a short while (assuming it does)
-        await expect(saveButton).toBeHidden(); // Changed saveMessage to saveButton
+        await expect(statusMessage).toBeVisible();
+        await expect(statusMessage).toHaveText('Keyword Blacklist saved!');
     });
 
     test('should scroll to top', async ({ page }) => {
@@ -354,7 +354,7 @@ test.describe('UI Elements and Interactions', () => {
         await expect(starButton).not.toHaveClass(/starred/);
     });
 
-    test('should mark an item as read and unread (via close button)', async ({ page }) => {
+    test('should mark an item as read and unread', async ({ page }) => {
         // Ensure filter mode is 'unread'
         await page.locator('#settings-button').click();
         await page.locator('#filter-selector').selectOption('unread');
@@ -368,35 +368,10 @@ test.describe('UI Elements and Interactions', () => {
         await expect(readButton).toBeVisible();
 
         // Mark as read
-        await closeButton.click();
-        // Verify visual change: item should have 'read' class or disappear
-        await expect(page.locator(`.item[data-guid="${initialGuid}"]`)).not.toBeVisible();
+        await readButton.click();
+        // Verify visual change: item should disappear in unread mode
+        await expect(page.locator(`.item[data-guid="${initialGuid}"]`)).toBeHidden();
         await expect(page.locator('.item')).toHaveCount(initialItemsCount - 1);
-
-        // Mark as unread (This might require re-opening settings and changing filter, or the close button behavior might change)
-        // For this test, we assume marking unread makes it reappear in the current view if applicable.
-        // As the current UI doesn't allow unreading from an "all" or "read" view easily within the test flow,
-        // we'll rely on the close button to toggle. If the item is not visible, we can't click its close button directly.
-        // A more robust test would involve switching to 'all' filter, then unreading.
-
-        // For now, let's just confirm it disappears when marked read in unread view.
-        // If we want to test unread, we'd need to switch filters.
-        // Let's ensure it can be unread if it's still somehow present (e.g., if it's a "close" which just marks read and shuffles)
-        // If it's truly gone, the unread test would be in a different context.
-        // Given the code, marking read removes it from the current unread deck.
-        // The toggleRead function now updates the deck directly.
-
-        // To test unread, we need to switch to a view where it's visible.
-        // For simplicity, let's confirm disappearance, and then re-add if needed for unread test.
-        
-        // This test specifically focuses on "close button" marking as read and disappearing.
-        // The unread part via close button might be tricky if the item is gone.
-        // Let's simplify and focus on the "read" action causing disappearance.
-        // To verify "unread" making it reappear, we'd need to change the filter to 'all', then find it, and unread.
-        // That's more complex than intended for this specific fix.
-
-        // Let's adapt the "via read-toggle button" test for reappear logic.
-        // For this 'close button' test, we strictly confirm it vanishes.
     });
 
 

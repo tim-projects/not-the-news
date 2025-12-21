@@ -81,41 +81,61 @@ def _seed_initial_configs():
     app.logger.info("Inside _seed_initial_configs() function.")
     app.logger.info("Checking for initial config seeding...")
 
-    feeds_txt_source_path = os.path.join(CONFIG_DIR, "feeds.txt")
+    # --- Seed RSS Feeds ---
     rss_feeds_json_dest_path = os.path.join(USER_STATE_DIR, "rssFeeds.json")
-    app.logger.info(f"Checking feeds_txt_source_path: {feeds_txt_source_path}, exists: {os.path.exists(feeds_txt_source_path)}")
-    if os.path.exists(feeds_txt_source_path):
-        app.logger.info(f"Seeding rssFeeds.json from {feeds_txt_source_path}...")
-        try:
-            with open(feeds_txt_source_path, 'r', encoding='utf-8') as f:
-                urls = [line.strip() for line in f if line.strip()]
-            
-            nested_feeds = {}
-            default_category = "Miscellaneous"
-            default_subcategory = "Default"
-            nested_feeds[default_category] = {}
-            nested_feeds[default_category][default_subcategory] = [{"url": url} for url in urls]
-            
-            _save_state("rssFeeds", nested_feeds)
-            app.logger.info(f"Successfully seeded rssFeeds.json from feeds.txt.")
-        except Exception as e:
-            app.logger.error(f"Failed to seed rssFeeds.json from feeds.txt: {e}")
-            app.logger.exception("Exception during rssFeeds seeding:")
+    rss_feeds_json_source_path = os.path.join(CONFIG_DIR, "rssFeeds.json")
+    feeds_txt_source_path = os.path.join(CONFIG_DIR, "feeds.txt")
 
-    keywords_txt_source_path = os.path.join(CONFIG_DIR, "filter_keywords.txt")
+    if not os.path.exists(rss_feeds_json_dest_path):
+        if os.path.exists(rss_feeds_json_source_path):
+            app.logger.info(f"Seeding rssFeeds.json from {rss_feeds_json_source_path}...")
+            try:
+                shutil.copy(rss_feeds_json_source_path, rss_feeds_json_dest_path)
+                app.logger.info(f"Successfully copied rssFeeds.json from config to user_state.")
+            except Exception as e:
+                app.logger.error(f"Failed to copy rssFeeds.json: {e}")
+        elif os.path.exists(feeds_txt_source_path):
+            app.logger.info(f"Seeding rssFeeds.json from {feeds_txt_source_path}...")
+            try:
+                with open(feeds_txt_source_path, 'r', encoding='utf-8') as f:
+                    urls = [line.strip() for line in f if line.strip()]
+                
+                nested_feeds = {}
+                default_category = "Miscellaneous"
+                default_subcategory = "Default"
+                nested_feeds[default_category] = {}
+                nested_feeds[default_category][default_subcategory] = [{"url": url} for url in urls]
+                
+                _save_state("rssFeeds", nested_feeds)
+                app.logger.info(f"Successfully seeded rssFeeds.json from feeds.txt.")
+            except Exception as e:
+                app.logger.error(f"Failed to seed rssFeeds.json from feeds.txt: {e}")
+                app.logger.exception("Exception during rssFeeds seeding:")
+
+    # --- Seed Keyword Blacklist ---
     keyword_blacklist_json_dest_path = os.path.join(USER_STATE_DIR, "keywordBlacklist.json")
-    app.logger.info(f"Checking keywords_txt_source_path: {keywords_txt_source_path}, exists: {os.path.exists(keywords_txt_source_path)}")
-    if os.path.exists(keywords_txt_source_path):
-        app.logger.info(f"Seeding keywordBlacklist.json from {keywords_txt_source_path}...")
-        try:
-            with open(keywords_txt_source_path, 'r', encoding='utf-8') as f:
-                keywords = [line.strip() for line in f if line.strip()]
-            
-            _save_state("keywordBlacklist", keywords)
-            app.logger.info(f"Successfully seeded keywordBlacklist.json from filter_keywords.txt.")
-        except Exception as e:
-            app.logger.error(f"Failed to seed keywordBlacklist.json from feeds.txt: {e}")
-            app.logger.exception("Exception during keywordBlacklist seeding:")
+    keyword_blacklist_json_source_path = os.path.join(CONFIG_DIR, "keywordBlacklist.json")
+    keywords_txt_source_path = os.path.join(CONFIG_DIR, "filter_keywords.txt")
+
+    if not os.path.exists(keyword_blacklist_json_dest_path):
+        if os.path.exists(keyword_blacklist_json_source_path):
+            app.logger.info(f"Seeding keywordBlacklist.json from {keyword_blacklist_json_source_path}...")
+            try:
+                shutil.copy(keyword_blacklist_json_source_path, keyword_blacklist_json_dest_path)
+                app.logger.info(f"Successfully copied keywordBlacklist.json from config to user_state.")
+            except Exception as e:
+                app.logger.error(f"Failed to copy keywordBlacklist.json: {e}")
+        elif os.path.exists(keywords_txt_source_path):
+            app.logger.info(f"Seeding keywordBlacklist.json from {keywords_txt_source_path}...")
+            try:
+                with open(keywords_txt_source_path, 'r', encoding='utf-8') as f:
+                    keywords = [line.strip() for line in f if line.strip()]
+                
+                _save_state("keywordBlacklist", keywords)
+                app.logger.info(f"Successfully seeded keywordBlacklist.json from filter_keywords.txt.")
+            except Exception as e:
+                app.logger.error(f"Failed to seed keywordBlacklist.json from filter_keywords.txt: {e}")
+                app.logger.exception("Exception during keywordBlacklist seeding:")
 
 _seed_initial_configs() # Call seeding function early""")
 

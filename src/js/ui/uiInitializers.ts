@@ -299,25 +299,6 @@ async function setupTextareaPanel(
         (app as any)[`${key}Input`] = content;
         app.modalView = viewName; // Switch to the correct view
     });
-
-    saveBtn.addEventListener("click", async () => {
-        const textarea = getTextarea();
-        const content = textarea?.value ?? (app as any)[`${key}Input`];
-        const dataToSave = content.split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean);
-
-        try {
-            if (key === 'rssFeeds' || key === 'keywordBlacklist') {
-                await saveUserState(key, dataToSave);
-            } else {
-                await saveSimpleState(key, dataToSave);
-            }
-            (app as any)[`${key}Input`] = dataToSave.sort().join("\n");
-            createStatusBarMessage(app, `${key} saved.`);
-        } catch (error: any) {
-            console.error(`Error saving ${key}:`, error);
-            createStatusBarMessage(app, `Failed to save ${key}: ${error.message}`);
-        }
-    });
 }
 
 export async function initConfigPanelListeners(app: AppState): Promise<void> {

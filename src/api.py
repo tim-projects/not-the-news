@@ -146,42 +146,63 @@ def _save_state(key, value):
 api_logger.info("Calling _seed_initial_configs() now...")
 def _seed_initial_configs():
     api_logger.info("Inside _seed_initial_configs() function.")
-    config_files_to_seed = {
-        "rssFeeds.json": "feeds.txt",
-        "keywordBlacklist.json": "filter_keywords.txt"
-    }
+    api_logger.info("Checking for initial config seeding...")
 
-    for json_filename, txt_filename in config_files_to_seed.items():
-        dest_path = os.path.join(USER_STATE_DIR, json_filename)
-        source_path = os.path.join(CONFIG_DIR, txt_filename)
-        
-        api_logger.info(f"Checking for seeding of {json_filename}...")
-        api_logger.info(f"Source path: {source_path} (exists: {os.path.exists(source_path)})")
-        api_logger.info(f"Destination path: {dest_path} (exists: {os.path.exists(dest_path)})")
+    # --- Seed RSS Feeds ---
+    rss_feeds_json_dest_path = os.path.join(USER_STATE_DIR, "rssFeeds.json")
+    rss_feeds_json_source_path = os.path.join(CONFIG_DIR, "rssFeeds.json")
+    feeds_txt_source_path = os.path.join(CONFIG_DIR, "feeds.txt")
 
-        if not os.path.exists(dest_path) and os.path.exists(source_path):
-            api_logger.info(f"Seeding required for {json_filename} from {txt_filename}.")
+    if not os.path.exists(rss_feeds_json_dest_path):
+        if os.path.exists(rss_feeds_json_source_path):
+            api_logger.info(f"Seeding rssFeeds.json from {rss_feeds_json_source_path}...")
             try:
-                with open(source_path, 'r', encoding='utf-8') as f:
-                    lines = [line.strip() for line in f if line.strip()]
-
-                if json_filename == "rssFeeds.json":
-                    nested_feeds = {}
-                    default_category = "Miscellaneous"
-                    default_subcategory = "Default"
-                    nested_feeds[default_category] = {}
-                    nested_feeds[default_category][default_subcategory] = [{"url": url} for url in lines]
-                    _save_state("rssFeeds", nested_feeds)
-                else:
-                    _save_state("keywordBlacklist", lines)
-                
-                api_logger.info(f"Successfully seeded and saved {json_filename}.")
-
+                shutil.copy(rss_feeds_json_source_path, rss_feeds_json_dest_path)
+                api_logger.info(f"Successfully copied rssFeeds.json from config to user_state.")
             except Exception as e:
-                api_logger.error(f"Failed to seed {json_filename} from {txt_filename}: {e}")
-                api_logger.exception("Exception during seeding:")
-        else:
-            api_logger.info(f"Seeding not required for {json_filename}.")
+                api_logger.error(f"Failed to copy rssFeeds.json: {e}")
+        elif os.path.exists(feeds_txt_source_path):
+            api_logger.info(f"Seeding rssFeeds.json from {feeds_txt_source_path}...")
+            try:
+                with open(feeds_txt_source_path, 'r', encoding='utf-8') as f:
+                    urls = [line.strip() for line in f if line.strip()]
+                
+                nested_feeds = {}
+                default_category = "Miscellaneous"
+                default_subcategory = "Default"
+                nested_feeds[default_category] = {}
+                nested_feeds[default_category][default_subcategory] = [{"url": url} for url in urls]
+                
+                _save_state("rssFeeds", nested_feeds)
+                api_logger.info(f"Successfully seeded rssFeeds.json from feeds.txt.")
+            except Exception as e:
+                api_logger.error(f"Failed to seed rssFeeds.json from feeds.txt: {e}")
+                api_logger.exception("Exception during rssFeeds seeding:")
+
+    # --- Seed Keyword Blacklist ---
+    keyword_blacklist_json_dest_path = os.path.join(USER_STATE_DIR, "keywordBlacklist.json")
+    keyword_blacklist_json_source_path = os.path.join(CONFIG_DIR, "keywordBlacklist.json")
+    keywords_txt_source_path = os.path.join(CONFIG_DIR, "filter_keywords.txt")
+
+    if not os.path.exists(keyword_blacklist_json_dest_path):
+        if os.path.exists(keyword_blacklist_json_source_path):
+            api_logger.info(f"Seeding keywordBlacklist.json from {keyword_blacklist_json_source_path}...")
+            try:
+                shutil.copy(keyword_blacklist_json_source_path, keyword_blacklist_json_dest_path)
+                api_logger.info(f"Successfully copied keywordBlacklist.json from config to user_state.")
+            except Exception as e:
+                api_logger.error(f"Failed to copy keywordBlacklist.json: {e}")
+        elif os.path.exists(keywords_txt_source_path):
+            api_logger.info(f"Seeding keywordBlacklist.json from {keywords_txt_source_path}...")
+            try:
+                with open(keywords_txt_source_path, 'r', encoding='utf-8') as f:
+                    keywords = [line.strip() for line in f if line.strip()]
+                
+                _save_state("keywordBlacklist", keywords)
+                api_logger.info(f"Successfully seeded keywordBlacklist.json from filter_keywords.txt.")
+            except Exception as e:
+                api_logger.error(f"Failed to seed keywordBlacklist.json from filter_keywords.txt: {e}")
+                api_logger.exception("Exception during keywordBlacklist seeding:")
 
 _seed_initial_configs() # Call seeding function early
 
@@ -405,6 +426,28 @@ def post_user_state():
                     continue
                 new_last_modified = _save_state(key, op.get("value"))
                 results.append({"id": op_id, "key": key, "status": "success", "lastModified": new_last_modified})
+            elif op_type in ["readDelta", "starDelta"]:
+                target_key = "read" if op_type == "readDelta" else "starred"
+                guid = op.get("guid")
+                action = op.get("action")
+                
+                if not guid or not action:
+                    results.append({"id": op_id, "status": "failed", "reason": "Missing guid or action for delta operation"})
+                    continue
+
+                state_data = _load_state(target_key)
+                current_array = state_data.get("value", []) # Default to empty list
+                
+                if not isinstance(current_array, list): # Ensure it's a list
+                    current_array = []
+
+                new_array = [item for item in current_array if item.get("guid") != guid] # Remove existing entry for this guid
+
+                if action == "add":
+                    new_array.append({"guid": guid, "timestamp": datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')})
+                
+                new_last_modified = _save_state(target_key, new_array)
+                results.append({"id": op_id, "key": target_key, "status": "success", "lastModified": new_last_modified})
             else:
                 results.append({"id": op_id, "status": "skipped", "reason": "Unknown operation type"})
         except Exception as e:
