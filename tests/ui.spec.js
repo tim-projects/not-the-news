@@ -274,7 +274,7 @@ test.describe('UI Elements and Interactions', () => {
 
         const textarea = page.locator('#rss-settings-block textarea');
         const saveButton = page.locator('#save-rss-btn');
-        const statusMessage = page.locator('#status-message-container');
+        const statusMessage = page.locator('#sync-status-message');
         
         await expect(textarea).toBeVisible();
         await expect(saveButton).toBeVisible();
@@ -295,7 +295,7 @@ test.describe('UI Elements and Interactions', () => {
 
         const textarea = page.locator('#keywords-settings-block textarea');
         const saveButton = page.locator('#save-keywords-btn');
-        const statusMessage = page.locator('#status-message-container');
+        const statusMessage = page.locator('#sync-status-message');
         
         await expect(textarea).toBeVisible();
         await expect(saveButton).toBeVisible();
@@ -377,61 +377,35 @@ test.describe('UI Elements and Interactions', () => {
 
 
     test('should load and display content when offline', async ({ page, request }) => {
-        // Log in to ensure necessary cookies and initial data are set/cached
-        console.log('Pre-test login for offline scenario...');
-        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 });
-        const loginResponse = await request.post(`${APP_URL}/api/login`, {
-            data: { password: APP_PASSWORD },
-            headers: { 'Content-Type': 'application/json' }
-        });
-        await expect(loginResponse.status()).toBe(200);
-
-        // Extract and set authentication cookie (same logic as beforeEach)
-        const setCookieHeader = loginResponse.headers()['set-cookie'];
-        if (setCookieHeader) {
-            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
-            if (authCookieString) {
-                const parts = authCookieString.split(';');
-                const nameValue = parts[0].trim().split('=');
-                const cookieName = nameValue[0];
-                const cookieValue = nameValue[1];
-                let domain = new URL(APP_URL).hostname;
-                let path = '/';
-                parts.slice(1).forEach(part => {
-                    const trimmedPart = part.trim();
-                    if (trimmedPart.toLowerCase().startsWith('domain=')) domain = trimmedPart.substring(7);
-                    else if (trimmedPart.toLowerCase().startsWith('path=')) path = trimmedPart.substring(5);
-                });
-                await page.context().addCookies([{ name: cookieName, value: cookieValue, domain: domain, path: path, expires: -1 }]);
-            }
-        }
+        // 1. Load the app while online to ensure everything is cached
+        console.log('Ensuring app is fully loaded while online...');
         await page.goto(APP_URL, { timeout: 60000 });
-        await page.waitForLoadState('networkidle', { timeout: 60000 });
+        await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
+        await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
+        console.log('App loaded online with items.');
 
-        // Set the page to offline mode
-        console.log('Setting page to offline...');
+        // 2. Set the browser context to offline
+        console.log('Setting context to offline...');
         await page.context().setOffline(true);
 
-        // Navigate to the main app URL again (should load from cache)
-        console.log('Navigating to app URL in offline mode...');
-        await page.goto(APP_URL, { timeout: 60000 });
+        // 3. Reload the page while offline
+        console.log('Reloading page while offline...');
+        // Note: We use reload() because it's handled by the Service Worker
+        await page.reload({ waitUntil: 'load', timeout: 60000 });
 
-        // Assert that the app loads and header is visible
-        console.log('Asserting app loads in offline mode...');
-        await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
+        // 4. Verify the app still loads and shows content from IndexedDB
+        console.log('Verifying app UI in offline mode...');
         await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
         await expect(page.locator('#ntn-title')).toHaveText('Not The News');
-
-        // Assert that some content is displayed (from IndexedDB)
-        console.log('Asserting content is displayed from IndexedDB...');
+        
+        console.log('Verifying content visibility from IndexedDB...');
         await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
         const itemsCount = await page.locator('.item').count();
         expect(itemsCount).toBeGreaterThan(0);
-        console.log(`Successfully loaded ${itemsCount} items in offline mode.`);
-        
-        // Restore online status for subsequent tests (if any)
+        console.log(`Successfully verified ${itemsCount} items are visible offline.`);
+
+        // 5. Cleanup: Set back to online
         await page.context().setOffline(false);
-        console.log('Page set back to online.');
     });
 
     test.afterEach(async ({ page }, testInfo) => {
