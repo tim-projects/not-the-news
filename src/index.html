@@ -145,7 +145,7 @@
              <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z" stroke-width="1.5" /></svg>
         </button>
 
-        <div id="status-message-container" x-cloak x-show="showSyncStatus" x-text="syncStatusMessage"></div>
+        <div id="sync-status-message" x-cloak x-show="showSyncStatus" :class="{ 'visible': showSyncStatus }" x-text="syncStatusMessage"></div>
     </div>
 
     <!-- Single script tag for Vite build process -->

@@ -5,9 +5,7 @@ import {
     // @ts-ignore
     getMainSettingsBlock, 
     getFilterSelector,    // Will be typed later
-    getNtnTitleH2,        // Will be typed later
-    // @ts-ignore
-    getMessageContainer   
+    getNtnTitleH2
 } from './uiElements.js'; // Will be converted later
 import { saveSimpleState } from '../data/database.ts'; // Changed to .ts
 
@@ -77,22 +75,32 @@ export async function displayTemporaryMessageInTitle(message: string): Promise<v
  * @param {string} message The message to display.
  * @param {string} [type='info'] Optional. 'success', 'error', 'info'.
 */
-let messageTimeoutId: NodeJS.Timeout | undefined;
+let messageTimeoutId: any;
 export function createStatusBarMessage(app: AppState, message: string): void {
-    console.log(message);
-    clearTimeout(messageTimeoutId);
+    console.log(`[Status] ${message}`);
+    if (messageTimeoutId) {
+        clearTimeout(messageTimeoutId);
+    }
 
     app.syncStatusMessage = message;
-    app.showSyncStatus = true;
     
-    // Add a class for styling based on message type (optional, can be done with x-bind:class)
-    // For now, we'll keep it simple and just show the message.
-    // The existing CSS for message-container and message-container.visible should handle basic styling.
+    // Ensure the message is updated in the DOM before we trigger the CSS transition
+    const triggerShow = () => {
+        app.showSyncStatus = true;
+        messageTimeoutId = setTimeout(() => {
+            app.showSyncStatus = false;
+            // Clear message text only after it's hidden to avoid a jarring empty box
+            setTimeout(() => {
+                if (!app.showSyncStatus) app.syncStatusMessage = '';
+            }, 300);
+        }, 5000);
+    };
 
-    messageTimeoutId = setTimeout(() => {
-        app.showSyncStatus = false;
-        app.syncStatusMessage = '';
-    }, 3000);
+    if ((app as any).$nextTick) {
+        (app as any).$nextTick(triggerShow);
+    } else {
+        triggerShow();
+    }
 }
 
 /**
