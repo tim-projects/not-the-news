@@ -83,17 +83,27 @@ export const manageDailyDeck = async (
     // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
     const readGuidsSet = new Set(readItemsArray.map(getGuid));
     const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
-    // Removed unused shuffledOutGuidsSet and currentDeckGuidsSet
+    
+    // Map entries for quick lookup
+    const entriesMap = new Map(entries.map(e => [e.guid, e]));
+
+    // Attempt to build the current deck from existing items
+    let existingDeck: MappedFeedItem[] = currentDeckItems
+        .map(di => entriesMap.get(getGuid(di)))
+        .filter((item): item is MappedFeedItem => !!item);
 
     const today = new Date().toDateString();
     const isNewDay = lastShuffleResetDate !== today;
     
-    // REFINED: A deck is effectively empty if it has no items OR if all items in it have been read.
-    const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0;
-    const allItemsInDeckRead = !isDeckEmpty && currentDeckItems.every(item => readGuidsSet.has(getGuid(item)));
+    // REFINED: A deck is effectively empty if:
+    // - It has no items at all
+    // - All items in it have been read
+    // - None of its items exist in the current entries (e.g. after a reset or rotation)
+    const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
+    const allItemsInDeckRead = !isDeckEmpty && existingDeck.every(item => readGuidsSet.has(item.guid));
     const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead;
 
-    let newDeck: MappedFeedItem[] = [];
+    let newDeck: MappedFeedItem[] = existingDeck;
     let newCurrentDeckGuids: DeckItem[] = currentDeckItems;
     let newShuffledOutGuids: ShuffledOutItem[] = shuffledOutItemsArray;
     let newShuffleCount: number = shuffleCount || DAILY_SHUFFLE_LIMIT;
@@ -142,6 +152,13 @@ export const manageDailyDeck = async (
             newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
             await saveShuffleState(newShuffleCount, lastShuffleResetDate ?? new Date().toDateString());
         }
+    } else {
+        // If we are NOT resetting, ensure the existing deck items have correct read/starred status
+        newDeck = existingDeck.map(item => ({
+            ...item,
+            isRead: readGuidsSet.has(item.guid),
+            isStarred: starredGuidsSet.has(item.guid)
+        }));
     }
 
     console.log(`[deckManager] Deck management complete. Final deck size: ${newDeck.length}.`);
