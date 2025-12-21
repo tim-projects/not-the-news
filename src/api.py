@@ -534,6 +534,9 @@ def reset_app_data():
             "lastFeedSync.json"
         ]
         
+        # Define files that MUST be preserved (user configuration and preferences)
+        files_to_preserve = ["rssFeeds.json", "keywordBlacklist.json", "theme.json"]
+        
         api_logger.debug("Clearing transient user state files...")
         for filename in files_to_delete:
             file_path = os.path.join(USER_STATE_DIR, filename)
@@ -546,8 +549,8 @@ def reset_app_data():
             os.remove(FEED_XML)
             api_logger.debug(f"Deleted cached feed: {FEED_XML}")
 
-        api_logger.info("Application data reset successfully. User configuration preserved.")
-        return jsonify({"status": "ok", "message": "Application data reset successfully. Configuration preserved."}), 200
+        api_logger.info("Application data reset successfully. User configuration and theme preserved.")
+        return jsonify({"status": "ok", "message": "Application data reset successfully. Configuration and theme preserved."}), 200
 
     except Exception as e:
         api_logger.exception(f"Error resetting application data: {e}")
