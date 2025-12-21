@@ -1,0 +1,36 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation (1.0m)
+
+
+  1) tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: page.waitForSelector: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.entry:first-child') to be visible[22m
+
+
+      49 |     // Get the GUIDs of the first two entries
+      50 |     await page.screenshot({ path: 'screenshot_before_state_manipulation.png' }); // Added screenshot
+    > 51 |     const firstEntry = await page.waitForSelector('.entry:first-child', { state: 'visible' });
+         |                                   ^
+      52 |     const firstEntryGuid = await firstEntry?.evaluate(el => el.dataset.guid);
+      53 |
+      54 |     const secondEntry = await page.waitForSelector('.entry:nth-child(2)', { state: 'visible' });
+        at /home/ntn/git/not-the-news/tests/reset_button.spec.js:51:35
+
+    Error Context: test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 

@@ -103,7 +103,7 @@ export function rssApp(): AppState {
                 if (this.isOnline) {
                     this.progressMessage = 'Syncing latest content...'; // Set specific sync message
                     // Pull user state first, as feed items depend on it.
-                    await pullUserState();
+                    await pullUserState(); // This fetches user preferences like rssFeeds from backend
                     // Then sync feed items.
                     await performFeedSync(this);
                     
@@ -130,9 +130,21 @@ export function rssApp(): AppState {
                 this._initScrollObserver();
                 this._initObservers();
 
-                this.progressMessage = '';
-                this.loading = false;
+                // Ensure initial sync messages are shown and loading screen is managed
+                if (this.deck.length === 0) {
+                    // If deck is still empty after sync/load, keep loading screen up with a message
+                    if (this.entries.length > 0) {
+                        this.progressMessage = 'Fetching and building your feed...';
+                    } else {
+                        this.progressMessage = 'No feed items found. Please configure your RSS feeds.';
+                    }
+                    // Keep loading screen visible for a moment longer if deck is empty
+                    // This prevents a flash of blank screen before the message appears (if any)
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Show message for 1 second
+                }
                 
+                this.loading = false; // Hide main loading screen after all processing and messages are set
+
                 await this.updateSyncStatusMessage();
             } catch (error: any) {
                 console.error("Initialization failed:", error);
@@ -393,32 +405,24 @@ export function rssApp(): AppState {
                 }
                 console.log('Service workers unregistered.');
 
-                // 2. Clear IndexedDB databases
-                console.log('Clearing IndexedDB databases...');
-                const dbName = 'not-the-news-db';
+                // 2. Clear specific IndexedDB object stores (read, starred, feedItems, deck info)
+                console.log('Clearing specific IndexedDB object stores...');
+                try {
+                    const db = await initDb(); // Re-initialize/get DB connection
+                    const storesToClear = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids', 'feedItems'];
+                    const tx = db.transaction(storesToClear, 'readwrite');
+                    await Promise.all(storesToClear.map(storeName => {
+                        console.log(`Clearing object store: ${storeName}`);
+                        return tx.objectStore(storeName).clear();
+                    }));
+                    await tx.done;
+                    console.log('Specific IndexedDB object stores cleared.');
+                } catch (e) {
+                    console.error('Error clearing specific IndexedDB stores:', e);
+                }
                 
-                console.log(`Attempting to delete database: ${dbName}`);
-                await new Promise<void>((resolve) => { // No reject, always resolve to continue
-                    const req = indexedDB.deleteDatabase(dbName);
-                    req.onsuccess = () => {
-                        console.log(`IndexedDB database '${dbName}' deleted successfully.`);
-                        resolve();
-                    };
-                    req.onerror = (event: Event) => {
-                        console.error(`Error deleting IndexedDB database '${dbName}':`, (event.target as IDBRequest).error);
-                        resolve(); // Continue to next even on error
-                    };
-                    req.onblocked = () => {
-                        console.warn(`Deletion of database '${dbName}' is blocked.`);
-                        resolve(); // Continue anyway
-                    };
-                });
-                console.log('IndexedDB clearing finished.');
-
-                // 3. Clear localStorage
-                console.log('Clearing localStorage...');
-                localStorage.clear();
-                console.log('localStorage cleared.');
+                // localStorage is no longer cleared, as rssFeeds and keywordBlacklist should persist
+                console.log('localStorage (excluding user settings) is implicitly maintained.');
 
                 // 4. Call backend to reset server-side data
                 console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
@@ -590,10 +594,11 @@ export function rssApp(): AppState {
         
                 _loadAndManageAllData: async function(this: AppState): Promise<void> {
             console.log('_loadAndManageAllData: START');
+            this.progressMessage = 'Loading saved feed items...'; // New message
             await this.loadFeedItemsFromDB();
             console.log(`_loadAndManageAllData: After loadFeedItemsFromDB. Entries: ${this.entries.length}`);
 
-            this.progressMessage = 'Loading user state from storage...';
+            this.progressMessage = 'Loading user state from storage...'; // Existing message
             const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
@@ -611,12 +616,12 @@ export function rssApp(): AppState {
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            this.progressMessage = 'Pruning read items...';
+            this.progressMessage = 'Pruning read items...'; // Existing message
             this.read = await loadAndPruneReadItems(Object.values(this.feedItems));
             console.log(`_loadAndManageAllData: After loadAndPruneReadItems. Read count: ${this.read.length}`);
             console.log("[deckManager] Starting deck management with all data loaded.");
 
-            this.progressMessage = 'Managing today\'s deck...';
+            this.progressMessage = 'Organizing your deck...'; // New message
             console.log('_loadAndManageAllData: Before manageDailyDeck', { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length });
             const deckResult = await manageDailyDeck(
                 Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids, // Use shuffledOutGuids
@@ -630,6 +635,7 @@ export function rssApp(): AppState {
             this.lastShuffleResetDate = deckResult.lastShuffleResetDate;
 
             console.log('_loadAndManageAllData: After manageDailyDeck. Deck size:', this.deck.length);
+            this.progressMessage = 'Displaying your feed...'; // New message
             await this.loadAndDisplayDeck();
             console.log('_loadAndManageAllData: After loadAndDisplayDeck. Deck size:', this.deck.length);
 

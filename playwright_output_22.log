@@ -1,0 +1,31 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation (2.0s)
+
+
+  1) tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 
+
+    Error: locator.waitFor: state: expected one of (attached|detached|visible|hidden)
+
+      46 |     await page.waitForSelector('.entry', { state: 'visible', timeout: 10000 });
+      47 |     // Star the first item and mark the second as read
+    > 48 |     await page.locator('.entry:first-child .star').waitFor({ state: 'enabled', timeout: 5000 });
+         |                                                    ^
+      49 |     await page.locator('.entry:first-child .star').click();
+      50 |     await page.locator('.entry:nth-child(2) .read-button').waitFor({ state: 'enabled', timeout: 5000 });
+      51 |     await page.locator('.entry:nth-child(2) .read-button').click();
+        at /home/ntn/git/not-the-news/tests/reset_button.spec.js:48:52
+
+    Error Context: test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 

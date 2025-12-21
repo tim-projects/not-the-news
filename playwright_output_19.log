@@ -1,0 +1,201 @@
+
+Running 1 test using 1 worker
+
+
+--- Console Logs ---
+[log] [DB] Upgrading database from version 0 to 29
+[log] [DB] Created/Recreated store: feedItems
+[log] [DB] Created index 'guid' on store 'feedItems'
+[log] [DB] Created/Recreated store: starred
+[log] [DB] Created index 'guid' on store 'starred'
+[log] [DB] Created/Recreated store: read
+[log] [DB] Created index 'guid' on store 'read'
+[log] [DB] Created/Recreated store: currentDeckGuids
+[log] [DB] Created index 'guid' on store 'currentDeckGuids'
+[log] [DB] Created/Recreated store: shuffledOutGuids
+[log] [DB] Created index 'guid' on store 'shuffledOutGuids'
+[log] [DB] Created/Recreated store: userSettings
+[log] [DB] Created/Recreated store: pendingOperations
+[log] [DB] Opened 'not-the-news-db', version 29
+[log] DEBUG: Starting pullUserState...
+[log] [DB] Pulling user state...
+[log] ENTERING loadArrayState for starred
+[log] ENTERING loadArrayState for read
+[log] ENTERING loadArrayState for currentDeckGuids
+[log] [DB] New data received for starred.
+[log] [DB] New data received for read.
+[log] [DB] New data received for lastStateSync.
+[log] [DB] New data received for currentDeckGuids.
+[log] [DB] User state pull completed.
+[log] DEBUG: pullUserState completed.
+[log] DEBUG: Starting performFeedSync...
+[log] [DB] Fetching feed items from server.
+[log] [DB] /api/feed-guids response: {guids: Array(60), serverTime: 2025-12-21T01:27:19.622Z}
+[log] [DB] GUIDs to fetch: 60 [6e61ede772490045d8c81ebfce545fedc32c812a9d99ac213dc1d42dc8f47ac4, f0a21b5462957b0eff35aa289ef399a46132f33e5962316632b730ab8427f801, 287308f9a7d10b725c33a680906084a7ae858d9840a33f1d098a22dbf531a19f, 7ea3054c3a91eb79c372a97d4e20171caa76809998580b7c1b7a9b7807bd7e33, 9e548bb925db5f65241badc8bf48b1a8027f6c634f6a8bfe48c4e628f3e3b1fa, 65aa05a5d12c3ccab640d3c9478f6e555006e0e457cde6541d8bf7152cbd4c50, 27c26d93144684b5de085df9748b3c524467c1e7231e13768285ab828717f6c2, 2b5c518159e9df071a50b012956ff65ea8505fa9f886758bb87742e555b5457c, b90a89e3cbf91c3f71206f73ea25fb1c7ae9e0feb9b9d47168be26ca28dcef71, 85c5980c8d511f3b352fbd54fb29a6e566b9319f3bb8f0e3d9006c08ea2797ae, ad228e5ea1f711d5006c84072805cd364074f4c6b8116e01706c78f9a04b4f02, 9fda4428a9cf709e22b0634f363e05c5cf81af89b83999dd6b9c7184b9e2177c, dfca6d152a70af3c4b636b169a39435b800d7569d347b9113eba06f04e014c98, 0693b2c540fa143e0f9016a4fe8270fdc218c4c70b6d9da62573255f384716b4, 6754eb98a57cb77eb486c00f840fbd546c7e2eb933a05d037586373e414fbde3, d43092c3daf864b280960d0b52c44aa4c443a13bc4c3f29b8cfc9874aed1eb10, 84ab4de35811e89d74a43da9e89de8b6a25c7694f2c357b8521b69fcc6259b39, a207447f635679c5805bf3fcfa0919a449bdf52398761625b4ef779c0b9e6f52, 32f603963aee1951aaa97ccee6ea605316f57851d75fc99326094e8b13c76eab, 27fe2b22a19dcbc4ec43e72f2c31fea3968d5ed0c33c0fb883fcc31582fa6d72, ac449cf138675da96e916606d6c7bbc605a99517f04ea1b9b52561843ea25a79, 3cae84216bda7b16c5cc52ef85c3ae0c106469abc57f1333dc2cc0216ebaa3a6, f920c00fbeadbc9dd1ffaadaa945e0f49130aa3e11fc9b7d8ccf04d7b5b7335c, 6b02722a228b4285d1ce715dc3e0897f4ad39a78e3dc67db2d0ae1b30fd9e030, 2c43f03cd5588fa03c8248ed6dd18ad485f9d98d1586ebf123a8be8665efe390, f553bc212697798912bad2b5a341c4c7c183dd860625d993eab425dcd2a9809d, db7caa6595c6da0f48c41a0aa6d30b0a893040184c48eec43a48621e2eb473ab, 4f7e5163d4817cf9a87f80aad7cfa721e2772116959debd7006fde5dc5ae5de2, c09cb37fd1384f11abd6465f38f56d47e6a696a975250e47d17e7aaec8875b87, 9a1b30b42547f851a0c042e354c25e801f9daa0d34676dd36a7e70a0076aa0ed, 16efc563f05d306e9f28b45b4c153df009df5d199a0f66a59c4e3d103755d6f1, f9cef67e598806f684ebfd2e8c71c3b4a933ff2428f9c0296793febce606a2fc, 253897746b74e97aab3d5e5e23d558f21c9c2d8d6a0abb9d82e4477e9c951e43, eb260e9238103a64c1129cc8bf961c4c0138d8c8ecf22e8bdff92174d54a7f80, bbd1f97fb655fca1bbb59754c53e6f2c7726356803a3cf9f9a10bb589d667383, 7ce068ce79d3957b77d87728383e78b11384a0b0457da98c98b434446fc9f92b, cc1f83eceefae768b85cde448040d8aba5445c2fcf13a593458b19a00e4bfd7f, bfd03280f29df62c823d77d1eeabbbfa0ff704b0e5a3f9673091926350756dd4, 5765ad781affc38f8609ce9a0d0185b192784322cdd9dba0978c1a1dea83e064, c074f06b80aba72d04fa2b06888e8f4e2e64c1866321a0b5c6a4090031ee670a, 0b99a908ec19c887dcb869cd98496a6727f3d1c5f2da04ea201027003a75f2d7, e11148fbeeb5f20d9da785af33e1c7936b320038eaba7ba450d58c6625249393, e5f3ce1b1ab6dd49a8b364181669007e692670e5d482c6a80c8e28f5fac0cef7, 002de05eac5adfd27367f28790bac116ab374edc064199d4fecd52daced85b55, a5306b9ce78cdda85bf835f392e40095aa30df5952ae82bb8fd98d026f3ca4d1, 136dcb4b3ac312fd7a4cbe7d721fa3efbc50e26f21181cc976476aa155e51618, 3a225f9f47d17537bb339b1e4c1b96bcaed0ddb413f0482413922c8c88702028, bb1448ab7a9c7400281ce90a3a88df380f6a43da938f72a92a6ee763421d13b2, ba25d192b7b849ecc99fb336305e6861dface1bfd19db226b65f8f313c17ad11, 1c578bbce6b4ab29c42216c6556f888015a37960d2b117ad24d899abc4618084, ebd271a958fdf81c16218daab28e56652c2f0d3a611a77ad9092efdb6618e537, db6661ee075f8bfee5af117d2d6492cf1872244fb9bbd30bb1d585ea12b50ed1, e375256b8a3f9878b0c2d225f09a5f337807d6dcd06e9473ccc095c9f9bc2abd, 8a50df4df0b705edf7c389ceb5f05c994a068053d207c757380cf6bc380bb4c9, 66cf153c60ad1860a5788aaad776a6a08ecccddd73041ebf661bea1424885beb, 41e4b5464a607d087f280528b5f53b6db87c5eb73a95000b4f3ead0171e62317, 3fa23bbb29b098ebcc89a20a9fc390f4b62acfd5681c9a6d73fb6207b3a86e68, d12f5e74b84c45f7a5ada948ee80481b27451d6a3cb35e51c1a9be5e7526e81e, 09cb09c765ac971a079641b95fe723caabcd65e697fbc224823ffce4cc712fc6, 0ab758a1052cc5b98d54b06b2323a267c1be5f4497a80a1dde78a9e62dadeaec]
+[log] [DB] New GUIDs: 60, Deleting: 0
+[log] [DB] Fetched batch of 50 items: [Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object]
+[log] [DB] Fetched batch of 10 items: [Object, Object, Object, Object, Object, Object, Object, Object, Object, Object]
+[log] [loadAndDisplayDeck] Processing 0 GUIDs for display
+[log] [loadAndDisplayDeck] feedItems contains 0 items
+[log] [loadAndDisplayDeck] Found 0 items, Missing 0 items
+[log] [loadAndDisplayDeck] Final deck size: 0
+[warning] Attempted to update counts with an invalid app object. Skipping.
+[log] DEBUG: performFeedSync completed.
+[log] _loadAndManageAllData: START
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] EXITING mapRawItems. Returning length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] EXITING mapRawItems. Returning length: 60
+[log] _loadAndManageAllData: After loadFeedItemsFromDB. Entries: 60
+[log] ENTERING loadArrayState for starred
+[log] ENTERING loadArrayState for shuffledOutGuids
+[log] ENTERING loadArrayState for currentDeckGuids
+[log] [loadCurrentDeck] Loaded 0 deck objects.
+[log] _loadAndManageAllData: Loaded starred state: []
+[log] _loadAndManageAllData: Loaded currentDeckGuids: [] undefined
+[log] ENTERING loadArrayState for read
+[log] _loadAndManageAllData: After loadAndPruneReadItems. Read count: 0
+[log] [deckManager] Starting deck management with all data loaded.
+[log] _loadAndManageAllData: Before manageDailyDeck {readCount: 0, currentDeckGuidsCount: 0}
+[log] manageDailyDeck: START
+[log] manageDailyDeck: Input params: {entriesCount: 60, readItemsCount: 0, starredItemsCount: 0, shuffledOutItemsCount: 0, shuffleCount: 2}
+[log] [deckManager] DEBUG: Array.isArray(entries): true entries.length: 60
+[log] [deckManager] DEBUG: Array.isArray(entries): true entries.length: 60
+[log] ENTERING loadArrayState for currentDeckGuids
+[log] [loadCurrentDeck] Loaded 0 deck objects.
+[log] manageDailyDeck: Loaded currentDeckItems count: 0
+[log] manageDailyDeck: Condition check: {isNewDay: false, isDeckEffectivelyEmpty: true, filterModeIsNotUnread: false}
+[log] manageDailyDeck: isNewDay: false
+[log] manageDailyDeck: isDeckEffectivelyEmpty: true
+[log] manageDailyDeck: filterMode: unread
+[log] [deckManager] Resetting deck. Reason: New Day (false), Deck Effectively Empty (true), or Filter Mode Changed (unread).
+[log] ENTERING generateNewDeck
+[log] [generateNewDeck] Initial filteredItems count: 0
+[log] [generateNewDeck] After recentItems: 2
+[log] [generateNewDeck] After itemsWithLinks: 3
+[log] [generateNewDeck] After itemsWithQuestionTitle: 4
+[log] [generateNewDeck] After itemsWithQuestionFirst150: 5
+[log] [generateNewDeck] After itemsWithQuestionLast150: 6
+[log] [generateNewDeck] After itemsWithImages: 6
+[log] [generateNewDeck] After longItems: 7
+[log] [generateNewDeck] After shortItems: 8
+[log] [generateNewDeck] After shuffledRemaining: 10
+[log] manageDailyDeck: generateNewDeck returned count: 10
+[log] [saveCurrentDeck] Saving 10 deck objects.
+[log] ENTERING loadArrayState for currentDeckGuids
+[log] [DB] Operation buffered with ID: 1 {type: simpleUpdate, key: shuffleCount, value: 2, timestamp: 2025-12-21T01:27:19.710Z}
+[log] [DB] Attempting immediate sync for simpleUpdate (ID: 1).
+[log] [DB] Successfully synced and removed immediate op 1 (simpleUpdate).
+[log] [DB] Operation buffered with ID: 2 {type: simpleUpdate, key: lastShuffleResetDate, value: Sun Dec 21 2025, timestamp: 2025-12-21T01:27:19.720Z}
+[log] [DB] Attempting immediate sync for simpleUpdate (ID: 2).
+[log] [DB] Successfully synced and removed immediate op 2 (simpleUpdate).
+[log] [deckManager] Deck management complete. Final deck size: 10.
+[log] manageDailyDeck: END
+[log] _loadAndManageAllData: After manageDailyDeck. Deck size: 10
+[log] [loadAndDisplayDeck] Processing 10 GUIDs for display
+[log] [loadAndDisplayDeck] feedItems contains 60 items
+[log] [loadAndDisplayDeck] Found 10 items, Missing 0 items
+[log] [loadAndDisplayDeck] Final deck size: 10
+[log] _loadAndManageAllData: After loadAndDisplayDeck. Deck size: 10
+[log] _loadAndManageAllData: END
+[log] Initial sync complete!
+[log] Performing periodic background sync...
+[log] [DB] Fetching feed items from server.
+[log] [DB] /api/feed-guids response: {guids: Array(60), serverTime: 2025-12-21T01:27:19.751Z}
+[log] [DB] GUIDs to fetch: 0 []
+[log] [DB] New GUIDs: 0, Deleting: 0
+[log] [loadAndDisplayDeck] Processing 10 GUIDs for display
+[log] [loadAndDisplayDeck] feedItems contains 60 items
+[log] [loadAndDisplayDeck] Found 10 items, Missing 0 items
+[log] [loadAndDisplayDeck] Final deck size: 10
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] EXITING mapRawItems. Returning length: 60
+[log] _loadAndManageAllData: START
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] ENTERING mapRawItems. rawList length: 60
+[log] EXITING mapRawItems. Returning length: 60
+[log] _loadAndManageAllData: After loadFeedItemsFromDB. Entries: 60
+[log] ENTERING loadArrayState for starred
+[log] ENTERING loadArrayState for shuffledOutGuids
+[log] ENTERING loadArrayState for currentDeckGuids
+[log] [loadCurrentDeck] Loaded 10 deck objects.
+[log] _loadAndManageAllData: Loaded starred state: []
+[log] _loadAndManageAllData: Loaded currentDeckGuids: [Proxy(Object), Proxy(Object), Proxy(Object)] object
+[log] ENTERING loadArrayState for read
+[log] _loadAndManageAllData: After loadAndPruneReadItems. Read count: 0
+[log] [deckManager] Starting deck management with all data loaded.
+[log] _loadAndManageAllData: Before manageDailyDeck {readCount: 0, currentDeckGuidsCount: 10}
+[log] manageDailyDeck: START
+[log] manageDailyDeck: Input params: {entriesCount: 60, readItemsCount: 0, starredItemsCount: 0, shuffledOutItemsCount: 0, shuffleCount: 2}
+[log] [deckManager] DEBUG: Array.isArray(entries): true entries.length: 60
+[log] [deckManager] DEBUG: Array.isArray(entries): true entries.length: 60
+[log] ENTERING loadArrayState for currentDeckGuids
+[log] [loadCurrentDeck] Loaded 10 deck objects.
+[log] manageDailyDeck: Loaded currentDeckItems count: 10
+[log] manageDailyDeck: Condition check: {isNewDay: false, isDeckEffectivelyEmpty: false, filterModeIsNotUnread: false}
+[log] manageDailyDeck: isNewDay: false
+[log] manageDailyDeck: isDeckEffectivelyEmpty: false
+[log] manageDailyDeck: filterMode: unread
+[log] [deckManager] Deck management complete. Final deck size: 0.
+[log] manageDailyDeck: END
+[log] _loadAndManageAllData: After manageDailyDeck. Deck size: 0
+[log] [loadAndDisplayDeck] Processing 10 GUIDs for display
+[log] [loadAndDisplayDeck] feedItems contains 60 items
+[log] [loadAndDisplayDeck] Found 10 items, Missing 0 items
+[log] [loadAndDisplayDeck] Final deck size: 10
+[log] _loadAndManageAllData: After loadAndDisplayDeck. Deck size: 10
+[log] _loadAndManageAllData: END
+[log] Background sync complete.
+--------------------
+
+Found 10 entry elements.
+  ✓  1 tests/reset_button.spec.js:7:7 › Initial Feed Loading › should load feed items on initial run (7.0s)
+
+  1 passed (8.0s)

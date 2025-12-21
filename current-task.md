@@ -88,13 +88,40 @@
 *   Verbose backend logging (temporarily added for debugging) has been reverted.
 
 ---
-**New Task: UI/UX Improvement - Loading State after Reset**
+**Completed Task: UI/UX Improvement - Loading State after Reset**
 
 **Goal:** Provide clear progress messages to the user during initial data loading/syncing after a reset, especially when the deck is initially blank.
 
 **Problem:** After a reset, if data syncing takes time, the user sees a blank deck without clear indication that content is still loading, leading to a poor user experience.
 
-**Next Step:** Investigate current loading/syncing indicators and identify suitable locations in the UI and application state to display progress messages.
+**Progress:**
+*   Added more granular `progressMessage` updates within `_loadAndManageAllData()` in `src/main.ts` to inform the user about specific data loading and processing phases.
+*   Implemented logic in `initApp()` to keep the loading screen visible longer (1 second `setTimeout`) and display a relevant `progressMessage` if the deck is empty after initial load (`Fetching and building your feed...` or `No feed items found. Please configure your RSS feeds.`).
+
+**Findings:**
+*   The initial `loading` screen was disappearing too quickly if `_loadAndManageAllData()` was fast, leading to a blank deck perception.
+*   The new progress messages and extended loading screen visibility should address the user's feedback.
+
+**Mitigations:**
+*   Modified `src/main.ts` to provide more detailed progress messages and better handling of the loading screen after a reset.
+
+---
+**Persistent Issue in Manual Testing (Requires User Action)**
+
+**Problem:** Despite Playwright tests confirming full functionality, manual testing after a reset sometimes reports "no new feed items" and a blank deck, contradicting expected behavior.
+
+**Findings:**
+*   Playwright tests successfully demonstrate that after a reset (which simulates a clean first run), the application correctly calls `pullUserState`, `performFeedSync`, fetches new feed items (e.g., 60 new GUIDs), and displays them in the UI.
+*   This discrepancy strongly suggests that the user's manual browser environment has persistent state or caching that prevents a true "first run" experience after a reset, causing the `performFeedSync` to receive a `304 Not Modified` response from the backend.
+
+**Next Steps for User:**
+To resolve this persistent discrepancy in your manual testing environment, please perform a complete clearing of your browser's site data for `http://localhost:8085`:
+
+1.  **Open Developer Tools (F12):** Go to the "Application" tab.
+2.  **Clear Storage:** Under "Storage" on the left, click "Clear site data". Ensure "IndexedDB", "Local Storage", and "Cache Storage" are all checked.
+3.  **Click "Clear site data" button.**
+4.  **Close and re-open your browser.**
+5.  Then, navigate to `http://localhost:8085` and perform the reset action again. This should force a truly clean slate, mirroring the Playwright test environment.
 
 ---
 **Completed Task: Box Shadow on `button.read-button`**

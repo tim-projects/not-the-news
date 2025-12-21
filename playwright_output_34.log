@@ -1,0 +1,74 @@
+
+Running 1 test using 1 worker
+
+[Test] Dialog appeared: confirm - Are you sure you want to reset the application? This will clear all local data, cache, and unregister the service worker.
+
+--- Console Logs ---
+[log] resetApplicationData called.
+[log] User confirmed reset: true
+[log] Closing database connection...
+[log] [DB] Database connection closed.
+[log] Unregistering service workers...
+[log] Service Worker unregistered: http://localhost:8085/
+[log] Service workers unregistered.
+[log] Clearing specific IndexedDB object stores...
+--------------------
+
+
+--- Network Responses ---
+[Response] 200 http://localhost:8085/login.html
+[Response] 200 http://localhost:8085/assets/modal-BfeI5J6W.css
+[Response] 200 http://localhost:8085/registerSW.js
+[Response] 200 https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap
+[Response] 200 http://localhost:8085/assets/Playfair_Display-DaGQPUCb.ttf
+[Response] 200 http://localhost:8085/api/login
+[Response] 200 http://localhost:8085/
+[Response] 200 http://localhost:8085/assets/main-CzpSFYxm.css
+[Response] 200 http://localhost:8085/assets/modal-BfeI5J6W.css
+[Response] 200 http://localhost:8085/registerSW.js
+[Response] 200 http://localhost:8085/assets/main-8_VIySzg.js
+[Response] 200 https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap
+[Response] 200 http://localhost:8085/assets/Playfair_Display-DaGQPUCb.ttf
+[Response] 200 http://localhost:8085/api/user-state/starred
+[Response] 200 http://localhost:8085/api/user-state/read
+[Response] 200 http://localhost:8085/api/user-state/currentDeckGuids
+[Response] 200 http://localhost:8085/api/user-state/lastStateSync
+[Response] 200 http://localhost:8085/api/feed-guids?since=
+[Response] 200 http://localhost:8085/api/feed-items
+[Response] 200 http://localhost:8085/api/feed-items
+[Response] 200 http://localhost:8085/api/user-state
+[Response] 200 http://localhost:8085/api/user-state
+[Response] 200 http://localhost:8085/api/feed-guids?since=2025-12-21T02:55:27.408Z
+------------------------
+
+  ✘  1 tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation (4.3s)
+
+
+  1) tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mtrue[39m
+    Received: [31mfalse[39m
+
+      89 |     expect(userConfirmed).toBe(true);
+      90 |     expect(clearingIndexedDB).toBe(true);
+    > 91 |     expect(backendReset).toBe(true);
+         |                          ^
+      92 |
+      93 |     // --- Verify application state after reset ---
+      94 |
+        at /home/ntn/git/not-the-news/tests/reset_button.spec.js:91:26
+
+    Error Context: test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 

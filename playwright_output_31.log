@@ -1,0 +1,34 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation (9.0s)
+
+
+  1) tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 
+
+    TimeoutError: locator.waitFor: Timeout 5000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.entry:first-child .star')[22m
+
+
+      51 |     // Click the first star button
+      52 |     // Use a more robust wait strategy: wait until the element is attached, visible, and has non-zero size/opacity.
+    > 53 |     await page.locator('.entry:first-child .star').waitFor({ state: 'attached', timeout: 5000 });
+         |                                                    ^
+      54 |     await page.locator('.entry:first-child .star').waitFor({ state: 'visible', timeout: 5000 });
+      55 |     // Additional check for actionability if the above doesn't work (e.g., element is covered)
+      56 |     await page.waitForFunction((selector) => {
+        at /home/ntn/git/not-the-news/tests/reset_button.spec.js:53:52
+
+    Error Context: test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tests-reset_button-Reset-A-2281f-ata-and-handle-confirmation/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/reset_button.spec.js:7:7 › Reset Application Data › should call resetApplicationData and handle confirmation 
