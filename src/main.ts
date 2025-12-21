@@ -522,6 +522,11 @@ export function rssApp(): AppState {
                 }
                 console.log('Backend application data reset successfully.');
                 createStatusBarMessage(this, 'Application reset complete! Reloading...');
+                
+                // --- FIX: Before reloading, ensure we pull the preserved state from the backend ---
+                // Passing 'true' to force a fresh pull of all keys.
+                await pullUserState(true);
+                
                 window.location.reload(); // Reload immediately after backend confirms
 
             } catch (error: any) {

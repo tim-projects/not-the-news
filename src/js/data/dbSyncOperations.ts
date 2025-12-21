@@ -214,24 +214,27 @@ const PULL_DEBOUNCE_MS = 500;
 /**
  * A private helper to pull a single user state key from the server.
  */
-async function _pullSingleStateKey(key: string, def: UserStateDef): Promise<{ key: string, status: string | number, timestamp?: string }> {
+async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolean = false): Promise<{ key: string, status: string | number, timestamp?: string }> {
     // ✅ --- START: RACE CONDITION FIX ---
     // Before fetching from the server, check if there are local changes for this key
     // that are waiting to be synced. If so, we must not overwrite them.
-    const allPendingOps: Operation[] = await withDb((db: IDBPDatabase) => db.getAll('pendingOperations')).catch(() => []);
-    
-    // Check for operations that match the key directly (e.g., 'simpleUpdate' for 'syncEnabled')
-    // or match the operation type related to the key (e.g., 'starDelta' for the 'starred' key).
-    const hasPendingOperations = allPendingOps.some((op: Operation) => 
-        op.key === key || 
-        (op.type === 'starDelta' && key === 'starred') ||
-        (op.type === 'readDelta' && key === 'read') ||
-        (op.type === 'simpleUpdate' && op.key === 'currentDeckGuids')
-    );
+    // We only skip if NOT in force mode.
+    if (!force) {
+        const allPendingOps: Operation[] = await withDb((db: IDBPDatabase) => db.getAll('pendingOperations')).catch(() => []);
+        
+        // Check for operations that match the key directly (e.g., 'simpleUpdate' for 'syncEnabled')
+        // or match the operation type related to the key (e.g., 'starDelta' for the 'starred' key).
+        const hasPendingOperations = allPendingOps.some((op: Operation) => 
+            op.key === key || 
+            (op.type === 'starDelta' && key === 'starred') ||
+            (op.type === 'readDelta' && key === 'read') ||
+            (op.type === 'simpleUpdate' && op.key === 'currentDeckGuids')
+        );
 
-    if (hasPendingOperations) {
-        console.log(`[DB] Skipping pull for '${key}' because local changes are pending synchronization.`);
-        return { key, status: 'skipped_pending' };
+        if (hasPendingOperations) {
+            console.log(`[DB] Skipping pull for '${key}' because local changes are pending synchronization.`);
+            return { key, status: 'skipped_pending' };
+        }
     }
     // ✅ --- END: RACE CONDITION FIX ---
 
@@ -239,12 +242,12 @@ async function _pullSingleStateKey(key: string, def: UserStateDef): Promise<{ ke
     const localTimestamp: string = lastModified || '';
     
     const headers: { [key: string]: string } = { 'Content-Type': 'application/json' };
-    if (localTimestamp) headers['If-None-Match'] = localTimestamp;
+    if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
     try {
         const response: Response = await fetch(`${API_BASE_URL}/api/user-state/${key}`, { method: 'GET', headers });
 
-        if (response.status === 304) {
+        if (response.status === 304 && !force) {
             return { key, status: 304, timestamp: localTimestamp };
         }
         if (!response.ok) {
@@ -263,11 +266,14 @@ async function _pullSingleStateKey(key: string, def: UserStateDef): Promise<{ ke
             const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
             const objectsToRemove = localObjects.filter((item: any) => !serverGuids.has(item.guid));
 
-            if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
+            if (objectsToAdd.length > 0 || objectsToRemove.length > 0 || force) {
                  await withDb(async (db: IDBPDatabase) => {
                     const tx = db.transaction(def.store, 'readwrite');
+                    if (force) await tx.store.clear(); // Clear local store if forcing
                     for (const item of objectsToAdd) await tx.store.put(item);
-                    for (const item of objectsToRemove) await tx.store.delete(item.id);
+                    for (const item of objectsToRemove) {
+                        if (!force) await tx.store.delete(item.id);
+                    }
                     await tx.done;
                 });
             }
@@ -286,24 +292,24 @@ async function _pullSingleStateKey(key: string, def: UserStateDef): Promise<{ ke
 /**
  * Pulls the user state from the server.
  */
-export async function pullUserState(): Promise<void> {
+export async function pullUserState(force: boolean = false): Promise<void> {
     const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
-    if (!isOnline() || !syncEnabled) {
+    if (!isOnline() || (!syncEnabled && !force)) {
         if (syncEnabled) console.log('[DB] Offline. Skipping user state pull.');
         return;
     }
     
-    if (_isPullingUserState) return;
+    if (_isPullingUserState && !force) return;
     const now: number = Date.now();
-    if (now - _lastPullAttemptTime < PULL_DEBOUNCE_MS) return;
+    if (!force && now - _lastPullAttemptTime < PULL_DEBOUNCE_MS) return;
 
     _lastPullAttemptTime = now;
     _isPullingUserState = true;
-    console.log('[DB] Pulling user state...');
+    console.log(`[DB] Pulling user state (force=${force})...`);
     
     try {
         const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS).filter(([, def]) => !def.localOnly) as [string, UserStateDef][];
-        const results: { key: string, status: string | number, timestamp?: string }[] = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def)));
+        const results: { key: string, status: string | number, timestamp?: string }[] = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
         
         const newestOverallTimestamp: string = results.reduce((newest: string, result: { key: string, status: string | number, timestamp?: string }) => {
             return (result?.timestamp && result.timestamp > newest) ? result.timestamp : newest;

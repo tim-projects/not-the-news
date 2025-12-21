@@ -523,35 +523,31 @@ def reset_app_data():
     api_logger.info("Received request to reset application data.")
 
     try:
+        # Define files that SHOULD be deleted (transient progress/state)
         files_to_delete = [
             "starred.json",
             "read.json",
             "currentDeckGuids.json",
             "shuffledOutGuids.json",
-            "lastShuffleResetDate.json" # Also clear this so deck resets
+            "lastShuffleResetDate.json",
+            "lastStateSync.json",
+            "lastFeedSync.json"
         ]
         
-        api_logger.debug("Attempting to clear specific user state files.")
+        api_logger.debug("Clearing transient user state files...")
         for filename in files_to_delete:
             file_path = os.path.join(USER_STATE_DIR, filename)
             if os.path.exists(file_path):
                 os.remove(file_path)
-                api_logger.debug(f"Deleted user state file: {file_path}")
-            else:
-                api_logger.debug(f"User state file not found: {file_path}")
+                api_logger.debug(f"Deleted: {file_path}")
 
-        # Delete feed.xml
-        api_logger.debug(f"Attempting to delete feed.xml at: {FEED_XML}")
+        # Delete feed.xml (cached content)
         if os.path.exists(FEED_XML):
             os.remove(FEED_XML)
-            api_logger.debug(f"Deleted feed.xml: {FEED_XML}")
-        else:
-            api_logger.debug(f"feed.xml not found: {FEED_XML}")
+            api_logger.debug(f"Deleted cached feed: {FEED_XML}")
 
-        # Do NOT re-seed initial configurations here.
-        # rssFeeds and keywordBlacklist should persist.
-        api_logger.info("Application data reset and re-seeded successfully.")
-        return jsonify({"status": "ok", "message": "Application data reset successfully."}), 200
+        api_logger.info("Application data reset successfully. User configuration preserved.")
+        return jsonify({"status": "ok", "message": "Application data reset successfully. Configuration preserved."}), 200
 
     except Exception as e:
         api_logger.exception(f"Error resetting application data: {e}")
