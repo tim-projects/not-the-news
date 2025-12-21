@@ -21,13 +21,21 @@ interface UserStateDefs {
 export const USER_STATE_DEFS: UserStateDefs = {
     starred: { store: 'starred', type: 'array', localOnly: false, default: [] },
     read: { store: 'read', type: 'array', localOnly: false, default: [] },
-    lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
-    lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
-    openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
-    imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
-    syncEnabled: { store: 'userSettings', type: 'simple', localOnly: true, default: true },
     currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: false, default: [] },
-    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: true, default: [] },
+    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: false, default: [] },
+    lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
+    lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
+    openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
+    imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
+    syncEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
+    theme: { store: 'userSettings', type: 'simple', localOnly: false, default: 'dark' },
+    filterMode: { store: 'userSettings', type: 'simple', localOnly: false, default: 'unread' },
+    shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
+    lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
+    lastViewedItemId: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
+    lastViewedItemOffset: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
+    rssFeeds: { store: 'userSettings', type: 'simple', localOnly: false, default: {} },
+    keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
 };
 

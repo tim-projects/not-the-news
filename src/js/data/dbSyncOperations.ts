@@ -252,7 +252,7 @@ async function _pullSingleStateKey(key: string, def: UserStateDef): Promise<{ ke
             return { key, status: response.status };
         }
         const data: { value: any, lastModified: string } = await response.json();
-        console.log(`[DB] New data received for ${key}.`);
+        console.log(`[DB Sync] Received data for ${key}:`, data.value);
 
         if (def.type === 'array') {
             const serverObjects: any[] = data.value || [];
