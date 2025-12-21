@@ -105,23 +105,7 @@
 **Mitigations:**
 *   Modified `src/main.ts` to provide more detailed progress messages and better handling of the loading screen after a reset.
 
----
-**Persistent Issue in Manual Testing (Requires User Action)**
 
-**Problem:** Despite Playwright tests confirming full functionality, manual testing after a reset sometimes reports "no new feed items" and a blank deck, contradicting expected behavior.
-
-**Findings:**
-*   Playwright tests successfully demonstrate that after a reset (which simulates a clean first run), the application correctly calls `pullUserState`, `performFeedSync`, fetches new feed items (e.g., 60 new GUIDs), and displays them in the UI.
-*   This discrepancy strongly suggests that the user's manual browser environment has persistent state or caching that prevents a true "first run" experience after a reset, causing the `performFeedSync` to receive a `304 Not Modified` response from the backend.
-
-**Next Steps for User:**
-To resolve this persistent discrepancy in your manual testing environment, please perform a complete clearing of your browser's site data for `http://localhost:8085`:
-
-1.  **Open Developer Tools (F12):** Go to the "Application" tab.
-2.  **Clear Storage:** Under "Storage" on the left, click "Clear site data". Ensure "IndexedDB", "Local Storage", and "Cache Storage" are all checked.
-3.  **Click "Clear site data" button.**
-4.  **Close and re-open your browser.**
-5.  Then, navigate to `http://localhost:8085` and perform the reset action again. This should force a truly clean slate, mirroring the Playwright test environment.
 
 ---
 **Completed Task: Box Shadow on `button.read-button`**

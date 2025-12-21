@@ -348,6 +348,16 @@ export function rssApp(): AppState {
             this.updateCounts();
             await this._reconcileAndRefreshUI(); // Reconcile to handle potential item removals/animations
             this.updateSyncStatusMessage();
+
+            // If the deck is now empty, trigger a deck refresh
+            if (this.deck.length === 0) {
+                console.log('[toggleRead] Deck is empty, refreshing...');
+                this.progressMessage = 'Generating new deck...';
+                this.loading = true; // Show loading screen while new deck is generated
+                await this._loadAndManageAllData();
+                this.loading = false;
+                this.progressMessage = '';
+            }
         },        processShuffle: async function(this: AppState): Promise<void> {
             await processShuffle(this);
             this.updateCounts();
