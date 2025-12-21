@@ -87,7 +87,11 @@ export const manageDailyDeck = async (
 
     const today = new Date().toDateString();
     const isNewDay = lastShuffleResetDate !== today;
-    const isDeckEffectivelyEmpty = !currentDeckItems || currentDeckItems.length === 0 || currentDeckItems.every(item => readGuidsSet.has(getGuid(item)));
+    
+    // REFINED: A deck is effectively empty if it has no items OR if all items in it have been read.
+    const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0;
+    const allItemsInDeckRead = !isDeckEmpty && currentDeckItems.every(item => readGuidsSet.has(getGuid(item)));
+    const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead;
 
     let newDeck: MappedFeedItem[] = [];
     let newCurrentDeckGuids: DeckItem[] = currentDeckItems;
@@ -96,10 +100,10 @@ export const manageDailyDeck = async (
     let newLastShuffleResetDate: string = lastShuffleResetDate || today;
 
     // Use the new, smarter variable in the condition
-    console.log('manageDailyDeck: Condition check:', { isNewDay, isDeckEffectivelyEmpty, filterModeIsNotUnread: filterMode !== 'unread' });
-    console.log('manageDailyDeck: isNewDay:', isNewDay);
-    console.log('manageDailyDeck: isDeckEffectivelyEmpty:', isDeckEffectivelyEmpty);
-    console.log('manageDailyDeck: filterMode:', filterMode);
+    console.log('manageDailyDeck: Condition check:', { isNewDay, isDeckEffectivelyEmpty, filterModeIsNotUnread: filterMode !== 'unread', entriesCount: entries.length });
+    
+    // CRITICAL FIX: If the deck is empty but we HAVE entries, we MUST generate a new deck, 
+    // especially after a reset.
     if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${filterMode}).`);
 
