@@ -15,169 +15,128 @@ import {
     getImagesToggle,
     getThemeToggle,
     getThemeText,
-    getBackButton,
-    getRssFeedsTextarea,
-    getKeywordsBlacklistTextarea,
-    getConfigureRssButton,
-    getConfigureKeywordsButton,
-    getSaveKeywordsButton,
-    getSaveRssButton
-} from './uiElements.ts';
-
-
-
-import {
-
-    createStatusBarMessage
-
-}
-
-from './uiUpdaters.ts';
-
-
-
-type UpdateCountsCallback = (app: AppState) => Promise<void>;
-
-type GetToggleElementFunction = () => HTMLElement | null;
-
-
-
-
-
-/**
-
- * Dispatches a custom event to signal that core application data is loaded.
-
- */
-
-function dispatchAppDataReady() {
-
-    document.dispatchEvent(new CustomEvent('app-data-ready', { bubbles: true }));
-
-    console.log("Dispatched 'app-data-ready' event.");
-
-}
-
-
-
-/**
-
- * Initializes listeners for data readiness to update UI elements.
-
- * @param {object} app The Alpine.js app state object.
-
- * @param {Function} updateCountsCb The callback function to update all counts.
-
- */
-
-export function initDataReadyListener(app: AppState, updateCountsCb: UpdateCountsCallback): void {
-
-    document.addEventListener('app-data-ready', () => {
-
-        if (typeof updateCountsCb === 'function') {
-
-            console.log("App data is ready, updating counts now.");
-
-            updateCountsCb(app);
-
-        } else {
-
-            console.error("updateCountsCb function not provided to initDataReadyListener.");
-
-        }
-
-    });
-
-}
-
-/**
- * Sets up a boolean toggle UI element to complement Alpine's x-model.
- * x-model handles updating the 'app' state. This function adds the persistence logic.
- * @param {object} app The Alpine.js app state object.
- * @param {Function} getToggleEl Function returning the toggle DOM element.
- * @param {string} dbKey The key to use in the 'userSettings' object store.
- * @param {Function} [onToggleCb=() => {}] Optional callback when the toggle changes.
- */
-async function setupBooleanToggle(app: AppState, getToggleEl: GetToggleElementFunction, dbKey: string, onToggleCb: (newValue: boolean) => void = () => {}): Promise<void> {
-    const toggleEl = getToggleEl();
-    if (!toggleEl) return;
-
-    // This listener performs actions that x-model doesn't,
-    // like saving to the database and running side-effect callbacks.
-    toggleEl.addEventListener('change', async () => {
-        // We read the new value from the app's state, which x-model has just updated.
-        const newValue = (app as any)[dbKey];
-        await saveSimpleState(dbKey, newValue);
-        onToggleCb(newValue);
-    });
-}
-
-/**
- * Initializes the synchronization toggle.
- * @param {object} app The Alpine.js app state object.
- */
-export async function initSyncToggle(app: AppState): Promise<void> {
-    await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled: boolean) => {
-        app.updateSyncStatusMessage?.(); // Update the status message on toggle
-        if (enabled) {
-            console.log("Sync enabled, triggering full sync.");
-            await performFullSync(app);
-            if (!app.currentDeckGuids?.length && app.entries?.length) {
-                console.log("Deck is empty after sync. Rebuilding from all available items.");
-                const now = new Date().toISOString();
-                const readGuids = new Set(app.read?.map(h => h.guid));
-                const shuffledOutGuids = new Set(app.shuffledOutGuids?.map(s => s.guid)); // Changed from shuffledOutItems
-                app.currentDeckGuids = app.entries
-                    .filter(item => !readGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
-                    .map(item => ({
-                        guid: item.guid,
-                        addedAt: now
-                    }));
-                await saveArrayState('currentDeckGuids', app.currentDeckGuids);
-                console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
-            }
-            dispatchAppDataReady();
-        }
-    });
-}
-
-export async function initImagesToggle(app: AppState): Promise<void> {
-    await setupBooleanToggle(app, getImagesToggle, 'imagesEnabled');
-}
-
-/**
- * REFINED: Initializes the theme, handling all UI logic internally.
- * It applies the theme on load and manages all subsequent user interactions.
- * This removes all theme-related DOM manipulation from main.js.
- * @param {object} app The Alpine.js app state object.
- */
-export function initTheme(app: AppState): void {
-    const htmlEl = document.documentElement;
-    const toggle = getThemeToggle();
-    const text = getThemeText();
-    if (!toggle || !text) return;
-
-    // Helper function to apply all theme UI changes in one place.
-    const applyThemeUI = (theme: string) => {
-        htmlEl.classList.remove('light', 'dark');
-        htmlEl.classList.add(theme);
-        (toggle as HTMLInputElement).checked = (theme === 'dark');
-        text.textContent = theme;
+        getBackButton,
+        getRssFeedsTextarea,
+        getKeywordsBlacklistTextarea,
+        getConfigureRssButton,
+        getConfigureKeywordsButton,
+        getSaveKeywordsButton,
+        getSaveRssButton,
+        getOpenUrlsInNewTabToggle
+    } from './uiElements.ts';
+    
+    import {
+        createStatusBarMessage
+    }
+    from './uiUpdaters.ts';
+    
+    type UpdateCountsCallback = (app: AppState) => Promise<void>;
+    type GetToggleElementFunction = () => HTMLElement | null;
+    
+    const SETTING_LABELS: Record<string, string> = {
+        syncEnabled: 'Auto-Sync',
+        imagesEnabled: 'Images',
+        openUrlsInNewTabEnabled: 'Open in New Tab'
     };
-
-    // 1. Apply the initial theme on load based on the app's state.
-    applyThemeUI(app.theme);
-
-    // 2. Handle all subsequent user interactions.
-    toggle.addEventListener('change', async () => {
-        const newTheme = (toggle as HTMLInputElement).checked ? 'dark' : 'light';
-        app.theme = newTheme; // Update the central state
-        applyThemeUI(newTheme); // Update all UI elements
-        
-        // Persist the change
-        await saveSimpleState('theme', newTheme);
-    });
-}
+    
+    /**
+     * Sets up a boolean toggle UI element to complement Alpine's x-model.
+     * x-model handles updating the 'app' state. This function adds the persistence logic.
+     * @param {object} app The Alpine.js app state object.
+     * @param {Function} getToggleEl Function returning the toggle DOM element.
+     * @param {string} dbKey The key to use in the 'userSettings' object store.
+     * @param {Function} [onToggleCb=() => {}] Optional callback when the toggle changes.
+     */
+    async function setupBooleanToggle(app: AppState, getToggleEl: GetToggleElementFunction, dbKey: string, onToggleCb: (newValue: boolean) => void = () => {}): Promise<void> {
+        const toggleEl = getToggleEl();
+        if (!toggleEl) return;
+    
+        // This listener performs actions that x-model doesn't,
+        // like saving to the database and running side-effect callbacks.
+        toggleEl.addEventListener('change', async () => {
+            // We read the new value from the app's state, which x-model has just updated.
+            const newValue = (app as any)[dbKey];
+            await saveSimpleState(dbKey, newValue);
+            
+            const label = SETTING_LABELS[dbKey] || dbKey;
+            createStatusBarMessage(app, `${label} ${newValue ? 'Enabled' : 'Disabled'}.`);
+            
+            onToggleCb(newValue);
+        });
+    }
+    
+    /**
+     * Initializes the synchronization toggle.
+     * @param {object} app The Alpine.js app state object.
+     */
+    export async function initSyncToggle(app: AppState): Promise<void> {
+        await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled: boolean) => {
+            app.updateSyncStatusMessage?.(); // Update the status message on toggle
+            if (enabled) {
+                console.log("Sync enabled, triggering full sync.");
+                await performFullSync(app);
+                if (!app.currentDeckGuids?.length && app.entries?.length) {
+                    console.log("Deck is empty after sync. Rebuilding from all available items.");
+                    const now = new Date().toISOString();
+                    const readGuids = new Set(app.read?.map(h => h.guid));
+                    const shuffledOutGuids = new Set(app.shuffledOutGuids?.map(s => s.guid)); // Changed from shuffledOutItems
+                    app.currentDeckGuids = app.entries
+                        .filter(item => !readGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
+                        .map(item => ({
+                            guid: item.guid,
+                            addedAt: now
+                        }));
+                    await saveArrayState('currentDeckGuids', app.currentDeckGuids);
+                    console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
+                }
+                dispatchAppDataReady();
+            }
+        });
+    }
+    
+    export async function initImagesToggle(app: AppState): Promise<void> {
+        await setupBooleanToggle(app, getImagesToggle, 'imagesEnabled');
+    }
+    
+    export async function initUrlsNewTabToggle(app: AppState): Promise<void> {
+        await setupBooleanToggle(app, getOpenUrlsInNewTabToggle, 'openUrlsInNewTabEnabled');
+    }
+    
+    /**
+     * REFINED: Initializes the theme, handling all UI logic internally.
+     * It applies the theme on load and manages all subsequent user interactions.
+     * This removes all theme-related DOM manipulation from main.js.
+     * @param {object} app The Alpine.js app state object.
+     */
+    export function initTheme(app: AppState): void {
+        const htmlEl = document.documentElement;
+        const toggle = getThemeToggle();
+        const text = getThemeText();
+        if (!toggle || !text) return;
+    
+        // Helper function to apply all theme UI changes in one place.
+        const applyThemeUI = (theme: string) => {
+            htmlEl.classList.remove('light', 'dark');
+            htmlEl.classList.add(theme);
+            (toggle as HTMLInputElement).checked = (theme === 'dark');
+            text.textContent = theme;
+        };
+    
+        // 1. Apply the initial theme on load based on the app's state.
+        applyThemeUI(app.theme);
+    
+        // 2. Handle all subsequent user interactions.
+        toggle.addEventListener('change', async () => {
+            const newTheme = (toggle as HTMLInputElement).checked ? 'dark' : 'light';
+            app.theme = newTheme; // Update the central state
+            applyThemeUI(newTheme); // Update all UI elements
+            
+            createStatusBarMessage(app, `Theme set to ${newTheme}.`);
+            
+            // Persist the change
+            await saveSimpleState('theme', newTheme);
+        });
+    }
 
 export async function initScrollPosition(app: AppState): Promise<void> {
     // This function is now called inside a $nextTick in main.js,
