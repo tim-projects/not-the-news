@@ -81,7 +81,9 @@
                             <p class="pubdate" x-text="entry.pubDate"></p>
                         </div>
                         <template x-if="imagesEnabled && entry.image">
-                            <img :src="entry.image" alt="" class="entry-image" @load="$el.classList.add('loaded')" x-init="if($el.complete) $el.classList.add('loaded')" />
+                            <img :data-src="entry.image" alt="" class="entry-image" loading="lazy" 
+                                 x-init="observeImage($el)"
+                                 @load="$el.classList.add('loaded')" />
                         </template>
                         <span x-html="entry.description"></span>
                     </div>

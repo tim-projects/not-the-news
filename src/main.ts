@@ -84,6 +84,7 @@ export function rssApp(): AppState {
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
+        imageObserver: null,
         db: null,
         _initComplete: false,
         staleItemObserver: null,
@@ -99,6 +100,8 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Loading settings...';
                 await this._loadInitialState();
                 
+                this._initImageObserver();
+
                 if (this.isOnline) {
                     this.progressMessage = 'Syncing latest content...'; // Set specific sync message
                     // Pull user state first, as feed items depend on it.
@@ -431,6 +434,29 @@ export function rssApp(): AppState {
             updateCounts(this);
         },        scrollToTop: function(this: AppState): void {
             scrollToTop();
+        },
+        observeImage: function(this: AppState, el: HTMLImageElement): void {
+            if (this.imageObserver) {
+                this.imageObserver.observe(el);
+            }
+        },
+        _initImageObserver: function(this: AppState): void {
+            this.imageObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target as HTMLImageElement;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            // Optionally remove the observer after loading
+                            this.imageObserver?.unobserve(img);
+                        }
+                    }
+                });
+            }, {
+                root: null, // use viewport
+                rootMargin: '50% 0px', // preload slightly ahead
+                threshold: 0.01
+            });
         },
         // --- New Function: Reset Application Data ---
         resetApplicationData: async function(this: AppState): Promise<void> {
