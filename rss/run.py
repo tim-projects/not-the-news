@@ -38,6 +38,14 @@ def is_merge_running():
     )
 
 def generate_feed():
+    if os.path.exists(final_feed_file):
+        age = time.time() - os.path.getmtime(final_feed_file)
+        if age < 60:  # 1 minute cooldown
+            mins = age / 60
+            print(
+                f"{final_feed_file} is only {mins:.1f} minutes old; skipping this cycle."
+            )
+            return
     if is_merge_running():
         print("merge_feeds.py is already running; skipping this cycle.")
         return
