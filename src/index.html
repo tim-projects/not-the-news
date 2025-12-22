@@ -106,9 +106,9 @@
                             <option value="all">All</option>
                         </select>
                     </div>
+                    <div class="settings-group"><label for="sync-toggle">Auto-Sync Feed</label><div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div></div>
                     
                     <h2>SETTINGS</h2>
-                    <div class="settings-group"><label for="sync-toggle">Auto-Sync Feed</label><div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="theme-toggle">Theme</label><div class="d-flex align-items-center"><span id="theme-text" x-text="theme"></span><label class="switch"><input type="checkbox" id="theme-toggle" :checked="theme === 'dark'" @change="toggleTheme()"><span class="slider"></span></label></div></div>
                     <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
                     <div class="settings-group"><label for="images-toggle">Show Images</label><div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div></div>
@@ -119,9 +119,7 @@
                     <div class="settings-option"><span>Keyword Blacklist</span><button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button></div>
                     <hr>
                     <div class="settings-option"><label for="install-button">Install as App</label><button id="install-button" class="configure-button">Install</button></div>
-                    <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
-                    <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
-                    <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>
+                    <div class="settings-option"><span>Advanced Settings</span><button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button></div>
                 </div>
 
                 <div id="rss-settings-block" x-show="modalView === 'rss'">
@@ -142,11 +140,22 @@
 
                 <div id="css-settings-block" x-show="modalView === 'css'">
                     <h2>Configure Custom CSS</h2>
+                    <p style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.5rem;">Tip: Use the reset button to load a template with common variables.</p>
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="customCss" placeholder="/* Enter custom CSS here */
 /* Example: .itemtitle { font-weight: bold; } */"></textarea>
-                        <button id="save-css-btn" class="settings-button" @click="saveCustomCss()">Save CSS</button>
+                        <div class="d-flex justify-between" style="margin-top: 1rem;">
+                            <button id="reset-css-btn" class="settings-button" @click="resetCustomCss()">Reset to Default</button>
+                            <button id="save-css-btn" class="settings-button" @click="saveCustomCss()">Save CSS</button>
+                        </div>
                     </div>
+                </div>
+
+                <div id="advanced-settings-block" x-show="modalView === 'advanced'">
+                    <h2>Advanced Settings</h2>
+                    <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
+                    <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
+                    <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>
                 </div>
             </div>
         </div>

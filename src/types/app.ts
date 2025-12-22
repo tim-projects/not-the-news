@@ -106,6 +106,7 @@ export interface AppState {
     saveRssFeeds(): Promise<void>;
     saveKeywordBlacklist(): Promise<void>;
     saveCustomCss(): Promise<void>;
+    resetCustomCss(): Promise<void>;
     applyCustomCss(): void;
     toggleTheme(): Promise<void>;
     scrollToTop(): void;

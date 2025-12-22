@@ -52,6 +52,34 @@ import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState } from './types/app.ts';
 
+const DEFAULT_CUSTOM_CSS_TEMPLATE = `/* Custom CSS Template - Edit variables to customize your experience */
+:root {
+  /* Dark Theme Variables (Default) */
+  --bg: #1A1A1B;
+  --fg: gainsboro;
+  --primary: cornflowerblue;
+  --secondary: aliceblue;
+  --card-bg: #1E1E1E;
+  --card-border: #343536;
+  --card-shadow-color: black;
+  --fg-muted: gray;
+  --border-radius: 5px;
+}
+
+html.light {
+  /* Light Theme Overrides */
+  --bg: #f5f5f5;
+  --fg: darkslategrey;
+  --primary: cornflowerblue;
+  --secondary: slategrey;
+  --card-bg: #ffffff;
+  --card-border: #EEE;
+  --card-shadow-color: lightgrey;
+}
+
+/* Add custom styles below */
+`;
+
 export function rssApp(): AppState {
     return {
         // --- State Properties ---
@@ -408,7 +436,7 @@ export function rssApp(): AppState {
         loadCustomCss: async function(this: AppState): Promise<void> {
             const { loadSimpleState } = await import('./js/data/dbUserState.ts');
             const { value } = await loadSimpleState('customCss');
-            this.customCss = typeof value === 'string' ? value : '';
+            this.customCss = (typeof value === 'string' && value.trim() !== '') ? value : DEFAULT_CUSTOM_CSS_TEMPLATE;
             this.applyCustomCss();
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
@@ -462,7 +490,16 @@ export function rssApp(): AppState {
                 console.error('Error saving custom CSS:', error);
                 createStatusBarMessage(this, `Failed to save custom CSS: ${error.message}`);
             }
-        },        applyCustomCss: function(this: AppState): void {
+        },
+        resetCustomCss: async function(this: AppState): Promise<void> {
+            if (!confirm('Reset Custom CSS to default template? This will overwrite your current customizations.')) {
+                return;
+            }
+            this.customCss = DEFAULT_CUSTOM_CSS_TEMPLATE;
+            await this.saveCustomCss();
+            createStatusBarMessage(this, 'Custom CSS reset to template!');
+        },
+        applyCustomCss: function(this: AppState): void {
             let styleEl = document.getElementById('custom-user-css');
             if (!styleEl) {
                 styleEl = document.createElement('style');

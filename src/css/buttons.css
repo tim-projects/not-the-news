@@ -253,7 +253,7 @@ button.star.starred:active {
 
 #back-button {
   position: absolute;
-  top: 0.5rem;
+  top: 1px;
   left: 1.2rem;
   background: none;
   color: var(--fg);

@@ -282,7 +282,7 @@ ul.feed-list,
     margin-top: -0.8em;
   }
 
-  .pubdate p,
+.pubdate p,
   .itemfrom p {
     font-size: smaller !important;
   }
@@ -291,4 +291,17 @@ ul.feed-list,
   .button-star {
     font-size: xx-large;
   }
+}
+
+/* Utilities */
+.d-flex {
+  display: flex !important;
+}
+
+.gap-2 {
+  gap: 0.5rem !important;
+}
+
+.justify-between {
+  justify-content: space-between !important;
 }
