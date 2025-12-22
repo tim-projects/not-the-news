@@ -7,16 +7,11 @@
  * Using arrow functions provides a concise and consistent syntax.
  */
 
-// Toggle elements for settings
+// Settings elements
 export const getSyncToggle = () => document.getElementById('sync-toggle');
-export const getSyncText = () => document.getElementById('sync-text');
 export const getImagesToggle = () => document.getElementById('images-toggle');
-export const getImagesText = () => document.getElementById('images-text');
-export const getThemeToggle = () => document.getElementById('theme-toggle');
-export const getThemeText = () => document.getElementById('theme-text');
 export const getOpenUrlsInNewTabToggle = () => document.getElementById('open-urls-in-new-tab-toggle');
 export const getShadowsToggle = () => document.getElementById('shadows-toggle');
-export const getShadowsText = () => document.getElementById('shadows-text');
 
 // Display elements
 export const getShuffleCountDisplay = () => document.getElementById('shuffle-count-display');

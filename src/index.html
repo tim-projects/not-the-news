@@ -121,38 +121,33 @@
                     <div class="settings-group"><label for="sync-toggle">Auto-Sync Feed</label><div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div></div>
                     
                     <h2>SETTINGS</h2>
-                    <div class="settings-group"><label for="theme-toggle">Theme</label><div class="d-flex align-items-center"><span id="theme-text" x-text="theme"></span><label class="switch"><input type="checkbox" id="theme-toggle" :checked="theme === 'dark'" @change="toggleTheme()"><span class="slider"></span></label></div></div>
                     <div class="settings-group">
-                        <label for="theme-style-selector">Theme Style:</label>
-                        <select id="theme-style-selector" x-model="themeStyle" @change="saveThemeStyle()" class="filter-select">
-                            <template x-if="theme === 'light'">
-                                <optgroup label="Light Themes">
-                                    <option value="original">Original Light</option>
-                                    <option value="sepia">Sepia</option>
-                                    <option value="solarized">Solarized Light</option>
-                                    <option value="github-light">GitHub Light</option>
-                                    <option value="atom-one-light">Atom One Light</option>
-                                    <option value="gruvbox-light">Gruvbox Light</option>
-                                    <option value="catppuccin-latte">Catppuccin Latte</option>
-                                    <option value="rose-pine-dawn">Rosé Pine Dawn</option>
-                                    <option value="paper">Paper</option>
-                                    <option value="morning">Morning</option>
-                                </optgroup>
-                            </template>
-                            <template x-if="theme === 'dark'">
-                                <optgroup label="Dark Themes">
-                                    <option value="original">Original Dark</option>
-                                    <option value="midnight">Midnight</option>
-                                    <option value="nord">Nord</option>
-                                    <option value="dracula">Dracula</option>
-                                    <option value="monokai">Monokai</option>
-                                    <option value="gruvbox-dark">Gruvbox Dark</option>
-                                    <option value="catppuccin-mocha">Catppuccin Mocha</option>
-                                    <option value="tokyo-night">Tokyo Night</option>
-                                    <option value="synthwave">Synthwave '84</option>
-                                    <option value="material-dark">Material Dark</option>
-                                </optgroup>
-                            </template>
+                        <label for="theme-style-selector">Theme:</label>
+                        <select id="theme-style-selector" :value="themeStyle" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].parentElement.dataset.theme)" class="filter-select">
+                            <optgroup label="Light Themes" data-theme="light">
+                                <option value="original">Original Light</option>
+                                <option value="sepia">Sepia</option>
+                                <option value="solarized">Solarized Light</option>
+                                <option value="github-light">GitHub Light</option>
+                                <option value="atom-one-light">Atom One Light</option>
+                                <option value="gruvbox-light">Gruvbox Light</option>
+                                <option value="catppuccin-latte">Catppuccin Latte</option>
+                                <option value="rose-pine-dawn">Rosé Pine Dawn</option>
+                                <option value="paper">Paper</option>
+                                <option value="morning">Morning</option>
+                            </optgroup>
+                            <optgroup label="Dark Themes" data-theme="dark">
+                                <option value="original">Original Dark</option>
+                                <option value="midnight">Midnight</option>
+                                <option value="nord">Nord</option>
+                                <option value="dracula">Dracula</option>
+                                <option value="monokai">Monokai</option>
+                                <option value="gruvbox-dark">Gruvbox Dark</option>
+                                <option value="catppuccin-mocha">Catppuccin Mocha</option>
+                                <option value="tokyo-night">Tokyo Night</option>
+                                <option value="synthwave">Synthwave '84</option>
+                                <option value="material-dark">Material Dark</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div class="settings-group">

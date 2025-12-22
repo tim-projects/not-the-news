@@ -132,7 +132,7 @@ export interface AppState {
     applyCustomCss(): void;
     applyThemeStyle(): void;
     applyFontSize(): void;
-    toggleTheme(): Promise<void>;
+    updateThemeAndStyle(newStyle: string, newTheme: 'light' | 'dark'): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;
     _initImageObserver(): void;

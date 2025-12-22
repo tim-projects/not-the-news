@@ -572,10 +572,39 @@ export function rssApp(): AppState {
                     
                     this.applyThemeStyle();
                 },
+                updateThemeAndStyle: async function(this: AppState, newStyle: string, newTheme: 'light' | 'dark'): Promise<void> {
+                    console.log(`Updating theme to ${newTheme} and style to ${newStyle}`);
+                    
+                    this.theme = newTheme;
+                    this.themeStyle = newStyle;
+                    
+                    // Apply theme class to HTML element
+                    const htmlEl = document.documentElement;
+                    htmlEl.classList.remove('light', 'dark');
+                    htmlEl.classList.add(newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    
+                    // Persist to DB
+                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                    await saveSimpleState('theme', newTheme);
+                    
+                    if (newTheme === 'light') {
+                        this.themeStyleLight = newStyle;
+                        await saveSimpleState('themeStyleLight', newStyle);
+                    } else {
+                        this.themeStyleDark = newStyle;
+                        await saveSimpleState('themeStyleDark', newStyle);
+                    }
+                    
+                    await saveSimpleState('themeStyle', newStyle);
+                    this.applyThemeStyle();
+                    createStatusBarMessage(this, `Theme set to ${newTheme} (${newStyle}).`);
+                },
                 saveThemeStyle: async function(this: AppState): Promise<void> {
+                    // This method is now mostly handled by updateThemeAndStyle
+                    // But we keep it for backward compatibility or if called directly
                     const { saveSimpleState } = await import('./js/data/dbUserState.ts');
                     
-                    // Update the specific style for the current mode
                     if (this.theme === 'light') {
                         this.themeStyleLight = this.themeStyle;
                         await saveSimpleState('themeStyleLight', this.themeStyleLight);
@@ -586,7 +615,6 @@ export function rssApp(): AppState {
                     
                     await saveSimpleState('themeStyle', this.themeStyle);
                     this.applyThemeStyle();
-                    createStatusBarMessage(this, `Theme style applied.`);
                 },
                 applyThemeStyle: function(this: AppState): void {
                     const htmlEl = document.documentElement;
@@ -599,7 +627,7 @@ export function rssApp(): AppState {
                 loadFontSize: async function(this: AppState): Promise<void> {
                     const { loadSimpleState } = await import('./js/data/dbUserState.ts');
                     const { value } = await loadSimpleState('fontSize');
-                    this.fontSize = typeof value === 'number' ? value : 100;
+                    this.fontSize = (typeof value === 'number') ? value : 100;
                     this.applyFontSize();
                 },
                 saveFontSize: async function(this: AppState): Promise<void> {
@@ -609,26 +637,6 @@ export function rssApp(): AppState {
                 },
                 applyFontSize: function(this: AppState): void {
                     document.documentElement.style.setProperty('--font-scale', (this.fontSize / 100).toString());
-                },
-                toggleTheme: async function(this: AppState): Promise<void> {
-                    const newTheme = this.theme === 'dark' ? 'light' : 'dark';
-                    this.theme = newTheme;
-                    const htmlEl = document.documentElement;
-                    htmlEl.classList.remove('light', 'dark');
-                    htmlEl.classList.add(newTheme);
-                    localStorage.setItem('theme', newTheme);
-                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
-                    await saveSimpleState('theme', newTheme);
-                    
-                    // Switch to the stored style for the new theme
-                    if (newTheme === 'light') {
-                        this.themeStyle = this.themeStyleLight || 'original';
-                    } else {
-                        this.themeStyle = this.themeStyleDark || 'original';
-                    }
-                    
-                    createStatusBarMessage(this, `Theme set to ${newTheme}.`);
-                    await this.saveThemeStyle();
                 },
                 updateCounts: async function(this: AppState): Promise<void> {
             updateCounts(this);

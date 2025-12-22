@@ -13,9 +13,7 @@ import {
     getSyncToggle,
     getImagesToggle,
     getOpenUrlsInNewTabToggle,
-    getShadowsToggle,
-    getThemeToggle,
-    getThemeText
+    getShadowsToggle
 } from './uiElements.ts';
 
 import {
@@ -102,42 +100,6 @@ type GetToggleElementFunction = () => HTMLElement | null;
     
     export async function initUrlsNewTabToggle(app: AppState): Promise<void> {
         await setupBooleanToggle(app, getOpenUrlsInNewTabToggle, 'openUrlsInNewTabEnabled');
-    }
-    
-    /**
-     * REFINED: Initializes the theme, handling all UI logic internally.
-     * It applies the theme on load and manages all subsequent user interactions.
-     * This removes all theme-related DOM manipulation from main.js.
-     * @param {object} app The Alpine.js app state object.
-     */
-    export function initTheme(app: AppState): void {
-        const htmlEl = document.documentElement;
-        const toggle = getThemeToggle();
-        const text = getThemeText();
-        if (!toggle || !text) return;
-    
-        // Helper function to apply all theme UI changes in one place.
-        const applyThemeUI = (theme: string) => {
-            htmlEl.classList.remove('light', 'dark');
-            htmlEl.classList.add(theme);
-            (toggle as HTMLInputElement).checked = (theme === 'dark');
-            text.textContent = theme;
-        };
-    
-        // 1. Apply the initial theme on load based on the app's state.
-        applyThemeUI(app.theme);
-    
-        // 2. Handle all subsequent user interactions.
-        toggle.addEventListener('change', async () => {
-            const newTheme = (toggle as HTMLInputElement).checked ? 'dark' : 'light';
-            app.theme = newTheme; // Update the central state
-            applyThemeUI(newTheme); // Update all UI elements
-            
-            createStatusBarMessage(app, `Theme set to ${newTheme}.`);
-            
-            // Persist the change
-            await saveSimpleState('theme', newTheme);
-        });
     }
 
 export async function initScrollPosition(app: AppState): Promise<void> {
