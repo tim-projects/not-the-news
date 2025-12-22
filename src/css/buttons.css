@@ -32,7 +32,12 @@ button.close {
   top: 1px;
   right: 1px;
   margin: 0;
-  padding: 0 1rem 0 1rem;
+  padding: 0 0 0.3rem 0; /* Push content up slightly for visual centering */
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -254,15 +259,22 @@ button.star.starred:active {
 #back-button {
   position: absolute;
   top: 1px;
-  left: 1.2rem;
-  background: none;
+  left: 1px;
+  background: var(--bg);
   color: var(--fg);
   font-size: 1.8rem;
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0 0 0.3rem 0; /* Push content up slightly for visual centering */
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 10;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px 0 20px 0;
+  opacity: 0.8;
+  box-shadow: 1px 1px 0 1px var(--card-shadow-color);
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 
@@ -338,16 +350,22 @@ button.star.starred:active {
   color: var(--fg);
 }
 
-.modal-content>button.close {
+.modal-content>button.close,
+.modal-content>#back-button {
   font-size: 2rem;
   opacity: 0.8;
 }
 
 html.light button.close,
+html.light #back-button,
 html.light button.star {
   background: var(--card-bg);
   color: var(--fg);
   box-shadow: -1px 1px 0 1px var(--card-shadow-color);
+}
+
+html.light #back-button {
+  box-shadow: 1px 1px 0 1px var(--card-shadow-color);
 }
 
 html.light button.close:hover {
@@ -362,6 +380,10 @@ html.light button.star:hover {
 
 html.dark button.close {
   box-shadow: -1px 1px 0 0px var(--card-border);
+}
+
+html.dark #back-button {
+  box-shadow: 1px 1px 0 0px var(--card-border);
 }
 
 html.dark button.star {
