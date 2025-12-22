@@ -58,7 +58,7 @@ button.close:active {
 }
 
 button.star {
-  font-size: 1.75rem;
+  font-size: 2.2rem;
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
