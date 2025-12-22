@@ -224,7 +224,16 @@ export async function overwriteArrayAndSyncChanges(storeName: string, newObjects
     if (storeName === 'starred') opType = 'starDelta';
     if (storeName === 'read') opType = 'readDelta';
 
-    if (!opType) return; // Nothing to do if we can't determine the operation type
+    if (!opType) {
+        // --- FIX: Fallback for arrays without delta handlers (shuffledOutGuids, currentDeckGuids) ---
+        await queueAndAttemptSyncOperation({
+            type: 'simpleUpdate',
+            key: defEntry[0], // Use the key from USER_STATE_DEFS
+            value: newObjects,
+            timestamp: new Date().toISOString()
+        } as any);
+        return;
+    }
 
     // ✅ FIX: Loop through the differences and queue operations directly using the public function.
     if (guidsToRemove.length > 0) {

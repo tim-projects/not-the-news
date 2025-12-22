@@ -64,6 +64,7 @@ export interface AppState {
     openSettings: boolean;
     modalView: string;
     shuffleCount: number;
+    lastShuffleResetDate: string | null;
     syncEnabled: boolean;
     imagesEnabled: boolean;
     openUrlsInNewTabEnabled: boolean;

@@ -133,18 +133,6 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
 
 export function mapRawItems(rawList: RawFeedItem[], fmtFn: (dateStr: string) => string): MappedFeedItem[] {
     console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-    console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
     if (!Array.isArray(rawList)) {
         console.warn("mapRawItems received a non-array input. Returning empty array.");
         return [];
@@ -201,7 +189,9 @@ export async function generateNewDeck(
         const readGuidsSet = new Set([...getGuidSet(readItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const starredGuidsSet = new Set([...getGuidSet(starredItems)].filter(guid => allFeedGuidsSet.has(guid)));
         const shuffledOutGuidsSet = new Set([...getGuidSet(shuffledOutItems)].filter(guid => allFeedGuidsSet.has(guid)));
-        // const currentDeckGuidsSet = getGuidSet(currentDeckItems); // Removed as it was unused
+        
+        console.log(`[generateNewDeck] readGuidsSet size: ${readGuidsSet.size}`);
+        console.log(`[generateNewDeck] shuffledOutGuidsSet size: ${shuffledOutGuidsSet.size}`);
 
         let filteredItems: MappedFeedItem[] = [];
         console.log(`[generateNewDeck] Initial filteredItems count: ${filteredItems.length}`);
@@ -401,9 +391,7 @@ export async function generateNewDeck(
             nextDeckItems = nextDeckItems.concat(remainingItems.slice(0, 10 - nextDeckItems.length));
         }
 
-        nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
-
-        return nextDeckItems;
+        return shuffleArray([...nextDeckItems]);
 
     } catch (error) {
         console.error("An error occurred during deck generation:", error);

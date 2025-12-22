@@ -262,7 +262,7 @@ export function rssApp(): AppState {
 
             console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
 
-            this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
+            this.deck = Array.isArray(items) ? items : [];
             console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
         },
         loadFeedItemsFromDB: async function(this: AppState): Promise<void> {
@@ -289,7 +289,11 @@ export function rssApp(): AppState {
         // --- Getters ---
         get filteredEntries(): MappedFeedItem[] {
             if (!Array.isArray(this.deck)) this.deck = [];
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
+            
+            // --- FIX: Include deck content in hash to invalidate cache on shuffle ---
+            const deckContentHash = this.deck.length > 0 ? this.deck[0].guid.substring(0, 8) : 'empty';
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}-${deckContentHash}`;
+            
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
             }

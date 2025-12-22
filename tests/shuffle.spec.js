@@ -76,6 +76,20 @@ test.describe('Shuffle Persistence', () => {
         console.log("Feed items visible.");
     });
 
+    test.afterEach(async ({ request }) => {
+        // Reset shuffle count after each test so manual testing is easier
+        await request.post(`${APP_URL}/api/user-state`, {
+            data: [
+                { type: 'simpleUpdate', key: 'shuffleCount', value: 2, id: Date.now() },
+                { type: 'simpleUpdate', key: 'lastShuffleResetDate', value: null, id: Date.now() + 1 }
+            ],
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': APP_PASSWORD
+            }
+        });
+    });
+
     test('should decrement shuffle count and persist after refresh', async ({ page }) => {
         const shuffleButton = page.locator('#shuffle-button');
         const shuffleCountSpan = shuffleButton.locator('.shuffle-count');
@@ -90,16 +104,18 @@ test.describe('Shuffle Persistence', () => {
         } else {
             // 2. Click shuffle
             const firstItemGuid = await page.locator('.item').first().getAttribute('data-guid');
+            console.log(`First item before shuffle: ${firstItemGuid}`);
             await shuffleButton.click();
             
-            // Wait for toast or deck update
-            await page.waitForTimeout(1000); 
+            // Wait for the first item to actually change in the DOM
+            await expect(page.locator('.item').first()).not.toHaveAttribute('data-guid', firstItemGuid || '', { timeout: 10000 });
             
             const newCountText = await shuffleCountSpan.textContent();
             const newCount = parseInt(newCountText || '0');
             expect(newCount).toBe(initialCount - 1);
             
             const secondItemGuid = await page.locator('.item').first().getAttribute('data-guid');
+            console.log(`First item after shuffle: ${secondItemGuid}`);
             expect(secondItemGuid).not.toBe(firstItemGuid);
 
             // 3. Refresh and check count

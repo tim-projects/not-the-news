@@ -217,7 +217,7 @@ export async function processShuffle(app: AppState): Promise<void> {
     }
 
     const visibleGuids = app.deck.map(item => item.guid);
-    console.log(`[deckManager] processShuffle: Visible GUIDs to shuffle out: ${visibleGuids.length}`);
+    console.log(`[deckManager] processShuffle: Visible GUIDs to shuffle out: ${visibleGuids.length}`, visibleGuids);
     const existingShuffledGuids: ShuffledOutItem[] = (app.shuffledOutGuids || []).map(getGuid).map(guid => ({ guid, shuffledAt: new Date().toISOString() }));
     
     const existingShuffledGuidsSet = new Set(existingShuffledGuids.map(getGuid));
@@ -233,8 +233,9 @@ export async function processShuffle(app: AppState): Promise<void> {
     app.shuffledOutGuids = newShuffledOutGuids;
     app.shuffleCount--;
 
-    // Persist the new state.
-    await saveArrayState('shuffledOutGuids', newShuffledOutGuids);
+    // Persist the new state using the sync-capable function.
+    const { overwriteArrayAndSyncChanges } = await import('../data/dbUserState.ts');
+    await overwriteArrayAndSyncChanges('shuffledOutGuids', newShuffledOutGuids);
     await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate ?? new Date().toDateString());
 
     const shuffleDisplay = getShuffleCountDisplay();

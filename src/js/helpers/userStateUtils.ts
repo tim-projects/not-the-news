@@ -219,12 +219,12 @@ export async function saveCurrentDeck(deckObjects: DeckItem[]): Promise<void> {
 
 // --- Unchanged Functions Below ---
 
-export async function loadShuffleState(): Promise<{ shuffleCount: number; lastShuffleResetDate: string; }> {
+export async function loadShuffleState(): Promise<{ shuffleCount: number; lastShuffleResetDate: string | null; }> {
     const { value: shuffleCount } = await loadSimpleState('shuffleCount');
     const { value: lastShuffleResetDate } = await loadSimpleState('lastShuffleResetDate');
     return {
         shuffleCount: typeof shuffleCount === 'number' ? shuffleCount : 2,
-        lastShuffleResetDate: lastShuffleResetDate || new Date().toDateString(),
+        lastShuffleResetDate: lastShuffleResetDate || null,
     };
 }
 
