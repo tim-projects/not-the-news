@@ -21,5 +21,11 @@ test-results/
 playwright_session.log
 playwright_test_output.log
 podman_full_logs.log
-screenshot.png
-screenshot2.png
+archive
+GEMINI-PLAN-MODE
+issues.md
+current-task.md
+next-tasks.md
+report.md
+tasks-completed.md
+TODO.txt

@@ -82,6 +82,8 @@ export interface AppState {
     showSyncStatus: boolean;
     theme: string;
     themeStyle: string;
+    themeStyleLight: string;
+    themeStyleDark: string;
     customCss: string;
     showUndo: boolean;
     undoItemGuid: string | null;

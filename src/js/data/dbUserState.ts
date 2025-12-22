@@ -30,13 +30,8 @@ export const USER_STATE_DEFS: UserStateDefs = {
     syncEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     theme: { store: 'userSettings', type: 'simple', localOnly: false, default: 'dark' },
     themeStyle: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
-    filterMode: { store: 'userSettings', type: 'simple', localOnly: false, default: 'unread' },
-    shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
-    lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
-    lastViewedItemId: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
-    lastViewedItemOffset: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
-    rssFeeds: { store: 'userSettings', type: 'simple', localOnly: false, default: {} },
-    keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },
+    themeStyleLight: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
+    themeStyleDark: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
     customCss: { store: 'userSettings', type: 'simple', localOnly: false, default: '' },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
 };

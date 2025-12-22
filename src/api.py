@@ -95,19 +95,23 @@ USER_STATE_SERVER_DEFAULTS = {
 
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
 
-    'theme': {'type': 'simple', 'default': 'light'},
+        'theme': {'type': 'simple', 'default': 'light'},
 
-    'themeStyle': {'type': 'simple', 'default': 'original'},
+        'themeStyle': {'type': 'simple', 'default': 'original'},
 
-    'lastFeedSync': {'type': 'simple', 'default': None},
+            'themeStyleLight': {'type': 'simple', 'default': 'original'},
 
-    'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
+            'themeStyleDark': {'type': 'simple', 'default': 'original'},
 
-        'rssFeeds': {'type': 'nested_object', 'default': {}},
+        'lastFeedSync': {'type': 'simple', 'default': None},
 
-        'keywordBlacklist': {'type': 'array', 'default': []},
+        'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
 
-        'customCss': {'type': 'simple', 'default': ''},
+            'rssFeeds': {'type': 'nested_object', 'default': {}},
+
+            'keywordBlacklist': {'type': 'array', 'default': []},
+
+            'customCss': {'type': 'simple', 'default': ''},
 
     }
 

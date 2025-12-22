@@ -119,5 +119,17 @@ test.describe('Theme Functionality', () => {
             return getComputedStyle(el).getPropertyValue('--bg').trim();
         });
         expect(bgColor).toBe('#282a36');
+
+        // Verify link color override
+        const linkColor = await page.evaluate(() => {
+            // Create a temporary link to test style application
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            const color = getComputedStyle(a).color;
+            document.body.removeChild(a);
+            return color;
+        });
+        // #8be9fd is rgb(139, 233, 253)
+        expect(linkColor).toBe('rgb(139, 233, 253)');
     });
 });

@@ -128,6 +128,8 @@ export function rssApp(): AppState {
         showSyncStatus: false,
         theme: 'dark', // Default theme
         themeStyle: 'original',
+        themeStyleLight: 'original',
+        themeStyleDark: 'original',
         customCss: '',
         showUndo: false,
         undoItemGuid: null,
@@ -532,12 +534,36 @@ export function rssApp(): AppState {
                 },
                 loadThemeStyle: async function(this: AppState): Promise<void> {
                     const { loadSimpleState } = await import('./js/data/dbUserState.ts');
-                    const { value } = await loadSimpleState('themeStyle');
-                    this.themeStyle = typeof value === 'string' ? value : 'original';
+                    const [styleResult, lightStyleResult, darkStyleResult] = await Promise.all([
+                        loadSimpleState('themeStyle'),
+                        loadSimpleState('themeStyleLight'),
+                        loadSimpleState('themeStyleDark')
+                    ]);
+                    
+                    this.themeStyleLight = typeof lightStyleResult.value === 'string' ? lightStyleResult.value : 'original';
+                    this.themeStyleDark = typeof darkStyleResult.value === 'string' ? darkStyleResult.value : 'original';
+                    
+                    // If we just loaded, set themeStyle based on current theme to ensure consistency
+                    if (this.theme === 'light') {
+                        this.themeStyle = this.themeStyleLight;
+                    } else {
+                        this.themeStyle = this.themeStyleDark;
+                    }
+                    
                     this.applyThemeStyle();
                 },
                 saveThemeStyle: async function(this: AppState): Promise<void> {
                     const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                    
+                    // Update the specific style for the current mode
+                    if (this.theme === 'light') {
+                        this.themeStyleLight = this.themeStyle;
+                        await saveSimpleState('themeStyleLight', this.themeStyleLight);
+                    } else {
+                        this.themeStyleDark = this.themeStyle;
+                        await saveSimpleState('themeStyleDark', this.themeStyleDark);
+                    }
+                    
                     await saveSimpleState('themeStyle', this.themeStyle);
                     this.applyThemeStyle();
                     createStatusBarMessage(this, `Theme style applied.`);
@@ -559,9 +585,15 @@ export function rssApp(): AppState {
                     localStorage.setItem('theme', newTheme);
                     const { saveSimpleState } = await import('./js/data/dbUserState.ts');
                     await saveSimpleState('theme', newTheme);
+                    
+                    // Switch to the stored style for the new theme
+                    if (newTheme === 'light') {
+                        this.themeStyle = this.themeStyleLight || 'original';
+                    } else {
+                        this.themeStyle = this.themeStyleDark || 'original';
+                    }
+                    
                     createStatusBarMessage(this, `Theme set to ${newTheme}.`);
-                    // Reset themeStyle to original when switching between light and dark
-                    this.themeStyle = 'original';
                     await this.saveThemeStyle();
                 },
                 updateCounts: async function(this: AppState): Promise<void> {
