@@ -1,0 +1,110 @@
+import { test, expect } from '@playwright/test';
+
+const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_PASSWORD = "devtestpwd";
+
+test.describe('Undo Mark as Read', () => {
+    test.beforeEach(async ({ page, request }) => {
+        console.log('Navigating to login page...');
+        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 });
+
+        const loginResponse = await request.post(`${APP_URL}/api/login`, {
+            data: { password: APP_PASSWORD },
+            headers: { 'Content-Type': 'application/json' }
+        });
+        await expect(loginResponse.status()).toBe(200);
+
+        const setCookieHeader = loginResponse.headers()['set-cookie'];
+        if (setCookieHeader) {
+            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
+            if (authCookieString) {
+                const parts = authCookieString.split(';');
+                const nameValue = parts[0].trim().split('=');
+                await page.context().addCookies([{
+                    name: nameValue[0],
+                    value: nameValue[1],
+                    domain: new URL(APP_URL).hostname,
+                    path: '/',
+                    expires: -1
+                }]);
+            }
+        }
+
+        await page.goto(APP_URL, { timeout: 60000 });
+        await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
+        await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
+    });
+
+    test('should show undo notification when marking an item as read', async ({ page }) => {
+        // Ensure filter mode is 'unread'
+        await page.locator('#settings-button').click();
+        await page.locator('#filter-selector').selectOption('unread');
+        await page.locator('.modal-content .close').click();
+
+        await page.waitForSelector('.item');
+        const firstItem = page.locator('.item').first();
+        const firstGuid = await firstItem.getAttribute('data-guid');
+        const readButton = page.locator(`.item[data-guid="${firstGuid}"] .read-button`);
+
+        // Mark as read
+        await readButton.click();
+
+        // Verify item is hidden
+        await expect(page.locator(`.item[data-guid="${firstGuid}"]`)).toBeHidden();
+
+        // Verify undo notification is visible
+        const undoNotification = page.locator('#undo-notification');
+        await expect(undoNotification).toBeVisible();
+        await expect(undoNotification).toHaveClass(/visible/);
+
+        // Verify undo button text
+        const undoButton = undoNotification.locator('.undo-button');
+        await expect(undoButton).toContainText('Undo');
+
+        // Verify timer line is active
+        const timerLine = undoNotification.locator('.undo-timer-line');
+        await expect(timerLine).toHaveClass(/active/);
+    });
+
+    test('should restore item when undo is clicked', async ({ page }) => {
+        // Ensure filter mode is 'unread'
+        await page.locator('#settings-button').click();
+        await page.locator('#filter-selector').selectOption('unread');
+        await page.locator('.modal-content .close').click();
+
+        await page.waitForSelector('.item');
+        const firstItem = page.locator('.item').first();
+        const firstGuid = await firstItem.getAttribute('data-guid');
+        const readButton = page.locator(`.item[data-guid="${firstGuid}"] .read-button`);
+
+        // Mark as read
+        await readButton.click();
+        await expect(page.locator(`.item[data-guid="${firstGuid}"]`)).toBeHidden();
+
+        // Click undo
+        await page.locator('#undo-notification .undo-button').click();
+
+        // Verify item is restored
+        await expect(page.locator(`.item[data-guid="${firstGuid}"]`)).toBeVisible();
+
+        // Verify undo notification is hidden
+        await expect(page.locator('#undo-notification')).toBeHidden();
+    });
+
+    test('should hide undo notification after 5 seconds', async ({ page }) => {
+        await page.waitForSelector('.item');
+        const firstItem = page.locator('.item').first();
+        const firstGuid = await firstItem.getAttribute('data-guid');
+        const readButton = page.locator(`.item[data-guid="${firstGuid}"] .read-button`);
+
+        // Mark as read
+        await readButton.click();
+        await expect(page.locator('#undo-notification')).toBeVisible();
+
+        // Wait for 5.5 seconds (to be sure)
+        await page.waitForTimeout(5500);
+
+        // Verify undo notification is hidden
+        await expect(page.locator('#undo-notification')).toBeHidden();
+    });
+});

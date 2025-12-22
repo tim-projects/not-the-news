@@ -92,6 +92,8 @@ export interface AppState {
     staleItemObserver: IntersectionObserver | null; // Added for _initObservers
     _isSyncing: boolean; // Added for performBackgroundSync
     lastShuffleResetDate: string | null; // Added for deckManager and AppState compatibility
+    showUndo: boolean;
+    undoItemGuid: string | null;
 
     // --- Core Methods ---
     initApp(): Promise<void>;
@@ -106,6 +108,7 @@ export interface AppState {
     isRead(guid: string): boolean;
     toggleStar(guid: string): Promise<void>;
     toggleRead(guid: string): Promise<void>;
+    undoMarkRead(): Promise<void>;
     processShuffle(): Promise<void>;
     loadRssFeeds(): Promise<void>;
     loadKeywordBlacklist(): Promise<void>;

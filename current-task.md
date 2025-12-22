@@ -30,3 +30,4 @@ The status message bar (toast) never appears. It needs to be implemented such th
 - **Prioritized Image Loading:** Implemented an `IntersectionObserver` to trigger image loading as items enter the viewport.
 - **Smart Deck Management:** Refined `manageDailyDeck` to detect effectively empty decks (e.g. after a reset) and force immediate population from entries.
 - **Settings Feedback:** Added status messages for all settings toggles (Sync, Images, Theme, etc.).
+- **Consistent UI Components:** Aligned the undo button's background, colors, and vertical position with the scroll-to-top button for a more cohesive UI.

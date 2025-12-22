@@ -148,6 +148,15 @@
         </button>
 
         <div id="sync-status-message" x-cloak x-show="showSyncStatus" :class="{ 'visible': showSyncStatus }" x-text="syncStatusMessage"></div>
+
+        <div id="undo-notification" x-cloak x-show="showUndo" :class="{ 'visible': showUndo }">
+            <button @click="undoMarkRead()" class="undo-button">
+                <span>Undo</span>
+                <div class="undo-timer-container">
+                    <div class="undo-timer-line" :class="{ 'active': showUndo }"></div>
+                </div>
+            </button>
+        </div>
     </div>
 
     <!-- Single script tag for Vite build process -->

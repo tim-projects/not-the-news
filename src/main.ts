@@ -39,7 +39,8 @@ import {
     scrollToTop,
     attachScrollToTopHandler,
     saveCurrentScrollPosition,
-    createStatusBarMessage
+    createStatusBarMessage,
+    showUndoNotification
 } from './js/ui/uiUpdaters.ts';
 import {
     initSyncToggle,
@@ -81,6 +82,8 @@ export function rssApp(): AppState {
         theme: 'dark', // Default theme
         keywordSaveMessage: '', // Initialized as empty string
         rssSaveMessage: '', // Initialized as empty string
+        showUndo: false,
+        undoItemGuid: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -349,11 +352,23 @@ export function rssApp(): AppState {
                 // Save the updated deck guids to the database
                 const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
                 await saveCurrentDeck(this.currentDeckGuids);
+            } else if (this.filterMode === 'unread' && isCurrentlyRead) {
+                // If it was read and now unread (Undo), add it back to the deck if missing
+                if (!this.currentDeckGuids.some(deckItem => deckItem.guid === guid)) {
+                    this.currentDeckGuids.push({ guid, addedAt: new Date().toISOString() });
+                    // Save the updated deck guids to the database
+                    const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
+                    await saveCurrentDeck(this.currentDeckGuids);
+                }
             }
             
             this.updateCounts();
             await this._reconcileAndRefreshUI(); // Reconcile to handle potential item removals/animations
             this.updateSyncStatusMessage();
+
+            if (!isCurrentlyRead) {
+                showUndoNotification(this, guid);
+            }
 
             // If the deck is now empty, trigger a deck refresh
             if (this.deck.length === 0) {
@@ -370,6 +385,12 @@ export function rssApp(): AppState {
                 this.progressMessage = '';
                 console.log('[toggleRead] Deck refresh process completed. Deck size:', this.deck.length);
             }
+        },        undoMarkRead: async function(this: AppState): Promise<void> {
+            if (!this.undoItemGuid) return;
+            const guid = this.undoItemGuid;
+            this.showUndo = false;
+            this.undoItemGuid = null;
+            await this.toggleRead(guid);
         },        processShuffle: async function(this: AppState): Promise<void> {
             await processShuffle(this);
             this.updateCounts();

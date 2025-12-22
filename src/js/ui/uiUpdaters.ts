@@ -104,6 +104,28 @@ export function createStatusBarMessage(app: AppState, message: string): void {
 }
 
 /**
+ * Shows an undo notification with a countdown.
+ * @param {AppState} app The Alpine.js app state.
+ * @param {string} guid The GUID of the item to potentially undo.
+ */
+let undoTimeoutId: any;
+export function showUndoNotification(app: AppState, guid: string): void {
+    if (undoTimeoutId) {
+        clearTimeout(undoTimeoutId);
+    }
+
+    app.undoItemGuid = guid;
+    app.showUndo = true;
+
+    undoTimeoutId = setTimeout(() => {
+        app.showUndo = false;
+        setTimeout(() => {
+            if (!app.showUndo) app.undoItemGuid = null;
+        }, 500); // Wait for fade out animation
+    }, 5000);
+}
+
+/**
  * Manages the visibility of different settings panels based on the current modal view.
  * @param {object} app The Alpine.js app state object.
  */
