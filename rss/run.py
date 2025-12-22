@@ -10,7 +10,7 @@ import shutil
 # --- Paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-feed_dir = os.path.join(SCRIPT_DIR, "../data/feed/")
+feed_dir = "/data/feed/"
 merged_file = os.path.join(feed_dir, "merged_feed.xml")
 merged_log_file = os.path.join("/app/logs/", "merged_feeds.log")
 filtered_file = os.path.join(feed_dir, "filtered_feed.xml")

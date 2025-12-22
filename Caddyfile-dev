@@ -47,11 +47,13 @@ https://vscode.tail06b521.ts.net:443 {
      path /api/time*
      path /api/feed-guids*
      path /api/feed-items*
+     path /api/feed-sync*
      path /api/admin/*
    }
    handle @protected_api {
      @unauth {
        not header Cookie auth*
+       not header Authorization *
      }
      respond @unauth "Unauthorized" 401
      
@@ -141,11 +143,13 @@ http://localhost:80 {
      path /api/time*
      path /api/feed-guids*
      path /api/feed-items*
+     path /api/feed-sync*
      path /api/admin/*
    }
    handle @protected_api {
      @unauth {
        not header Cookie auth*
+       not header Authorization *
      }
      respond @unauth "Unauthorized" 401
      

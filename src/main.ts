@@ -865,7 +865,7 @@ export function rssApp(): AppState {
             console.log("[deckManager] Starting deck management with all data loaded.");
 
             this.progressMessage = 'Organizing your deck...'; // New message
-            console.log('_loadAndManageAllData: Before manageDailyDeck', { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length });
+            console.log('_loadAndManageAllData: Before manageDailyDeck', { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length, shuffleCount: this.shuffleCount });
             const deckResult = await manageDailyDeck(
                 Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids, // Use shuffledOutGuids
                 this.shuffleCount, this.filterMode, this.lastShuffleResetDate

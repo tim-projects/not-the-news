@@ -83,6 +83,7 @@ export const manageDailyDeck = async (
     // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
     const readGuidsSet = new Set(readItemsArray.map(getGuid));
     const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
+    const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
     
     // Map entries for quick lookup
     const entriesMap = new Map(entries.map(e => [e.guid, e]));
@@ -98,15 +99,26 @@ export const manageDailyDeck = async (
     // REFINED: A deck is effectively empty if:
     // - It has no items at all
     // - All items in it have been read
+    // - All items in it have been shuffled out
     // - None of its items exist in the current entries (e.g. after a reset or rotation)
     const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
     const allItemsInDeckRead = !isDeckEmpty && existingDeck.every(item => readGuidsSet.has(item.guid));
-    const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead;
+    const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid));
+    const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead || allItemsInDeckShuffled;
+
+    console.log('manageDailyDeck: Deck Status:', { 
+        isDeckEmpty, 
+        allItemsInDeckRead, 
+        allItemsInDeckShuffled, 
+        isDeckEffectivelyEmpty,
+        existingDeckCount: existingDeck.length,
+        currentDeckItemsCount: currentDeckItems.length
+    });
 
     let newDeck: MappedFeedItem[] = existingDeck;
     let newCurrentDeckGuids: DeckItem[] = currentDeckItems;
     let newShuffledOutGuids: ShuffledOutItem[] = shuffledOutItemsArray;
-    let newShuffleCount: number = shuffleCount || DAILY_SHUFFLE_LIMIT;
+    let newShuffleCount: number = (typeof shuffleCount === 'number') ? shuffleCount : DAILY_SHUFFLE_LIMIT;
     let newLastShuffleResetDate: string = lastShuffleResetDate || today;
 
     // Use the new, smarter variable in the condition
@@ -114,8 +126,8 @@ export const manageDailyDeck = async (
     
     // CRITICAL FIX: If the deck is empty but we HAVE entries, we MUST generate a new deck, 
     // especially after a reset.
-    if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread') {
-        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${filterMode}).`);
+    if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread' || (currentDeckItems.length === 0 && entries.length > 0)) {
+        console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), Filter Mode Changed (${filterMode}), or Initial Load (${currentDeckItems.length === 0}).`);
 
         const newDeckItems = await generateNewDeck(
             allItems,
@@ -147,10 +159,6 @@ export const manageDailyDeck = async (
             await saveShuffleState(newShuffleCount, today as string);
             newLastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
-        } else if (isDeckEffectivelyEmpty && filterMode === 'unread') {
-            // Increment shuffle count when deck is exhausted, up to DAILY_SHUFFLE_LIMIT
-            newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
-            await saveShuffleState(newShuffleCount, lastShuffleResetDate ?? new Date().toDateString());
         }
     } else {
         // If we are NOT resetting, ensure the existing deck items have correct read/starred status
@@ -209,6 +217,7 @@ export async function processShuffle(app: AppState): Promise<void> {
     }
 
     const visibleGuids = app.deck.map(item => item.guid);
+    console.log(`[deckManager] processShuffle: Visible GUIDs to shuffle out: ${visibleGuids.length}`);
     const existingShuffledGuids: ShuffledOutItem[] = (app.shuffledOutGuids || []).map(getGuid).map(guid => ({ guid, shuffledAt: new Date().toISOString() }));
     
     const existingShuffledGuidsSet = new Set(existingShuffledGuids.map(getGuid));
@@ -247,6 +256,9 @@ export async function processShuffle(app: AppState): Promise<void> {
     // Update the app object with the results
     app.deck = result.deck;
     app.currentDeckGuids = result.currentDeckGuids;
+    app.shuffledOutGuids = result.shuffledOutGuids;
+    app.shuffleCount = result.shuffleCount;
+    app.lastShuffleResetDate = result.lastShuffleResetDate;
 
     displayTemporaryMessageInTitle('Feed shuffled!');
     console.log(`[deckManager] Deck shuffled. Remaining shuffles: ${app.shuffleCount}.`);

@@ -6,6 +6,8 @@ import json
 import secrets
 import logging, html
 import tempfile
+import subprocess
+import redis
 from flask import Flask, request, jsonify, abort, make_response
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
@@ -24,6 +26,8 @@ api_logger.addHandler(handler)
 
 api_logger.debug("DEBUG: api.py script started, logging to stderr.")
 
+# Redis client for session/token storage
+redis_client = redis.Redis(host='localhost', port=6380, db=1)
 
 app = Flask(__name__)
 
@@ -87,9 +91,11 @@ USER_STATE_SERVER_DEFAULTS = {
 
     'syncEnabled': {'type': 'simple', 'default': True},
 
-    'imagesEnabled': {'type': 'simple', 'default': True},
+        'imagesEnabled': {'type': 'simple', 'default': True},
 
-    'lastStateSync': {'type': 'simple', 'default': None},
+        'fontSize': {'type': 'simple', 'default': 100},
+
+        'lastStateSync': {'type': 'simple', 'default': None},
 
     'lastViewedItemId': {'type': 'simple', 'default': None},
 
@@ -216,50 +222,85 @@ def _seed_initial_configs():
 
 _seed_initial_configs() # Call seeding function early
 
+def _authenticate_request():
+    auth_token = request.cookies.get('auth') or request.headers.get('Authorization')
+    if not auth_token:
+        api_logger.warning("Authentication failed: No auth token provided.")
+        abort(401)
+    
+    # Simple check for development: if APP_PASSWORD matches
+    if auth_token == os.environ.get('APP_PASSWORD'):
+        return
+
+    # Check Redis for the token
+    try:
+        if redis_client.exists(f"token:{auth_token}"):
+            return
+    except Exception as e:
+        api_logger.error(f"Redis error during token verification: {e}")
+
+    password_file = os.path.join(DATA_DIR, "password.txt")
+    if os.path.exists(password_file):
+        with open(password_file, 'r') as f:
+            stored_password = f.read().strip()
+        if auth_token == stored_password:
+            return
+    
+    api_logger.warning("Authentication failed: Invalid token.")
+    abort(401)
+
 @app.route("/api/login", methods=["POST"])
 def login():
     try:
         if not request.is_json:
-            app.logger.warning("Login: Missing JSON in request")
+            api_logger.warning("Login: Missing JSON in request")
             return jsonify({"error": "Missing JSON in request"}), 400
         data = request.get_json()
         submitted_pw = data.get("password")
         if not submitted_pw:
-            app.logger.warning("Login: Password not provided")
+            api_logger.warning("Login: Password not provided")
             return jsonify({"error": "Password required"}), 400
 
         app_password = os.environ.get("APP_PASSWORD")
 
         if not app_password:
-            app.logger.error("Login: Server misconfigured, APP_PASSWORD not set")
+            api_logger.error("Login: Server misconfigured, APP_PASSWORD not set")
             return jsonify({"error": "Server misconfigured"}), 500
 
         if submitted_pw != app_password:
-            app.logger.info("Login: Invalid password attempt")
+            api_logger.info("Login: Invalid password attempt")
             return jsonify({"error": "Invalid password"}), 401
 
         auth_token = secrets.token_urlsafe(32)
+        
+        # Store token in Redis with 90-day expiration
+        try:
+            redis_client.setex(f"token:{auth_token}", 90*24*60*60, "valid")
+        except Exception as e:
+            api_logger.error(f"Failed to store token in Redis: {e}")
+            # We continue even if Redis fails, but it might break session persistence
+
         resp = make_response(jsonify({"status": "ok"}))
         resp.set_cookie("auth", auth_token, max_age=90*24*60*60, httponly=True, secure=True, samesite="Strict", path="/")
-        app.logger.info("Login: Successful authentication")
+        api_logger.info("Login: Successful authentication")
         return resp
     except Exception as e:
-        app.logger.exception(f"Login error: {str(e)}")
+        api_logger.exception(f"Login error: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 def _load_feed_items():
     if not os.path.exists(FEED_XML):
-        app.logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
+        api_logger.warning(f"Failed to load feed.xml: File not found at {FEED_XML}")
         return {}
 
     try:
         with open(FEED_XML, 'r', encoding='utf-8') as f:
             feed_content = f.read()
-        app.logger.debug(f"Read feed.xml content, length: {len(feed_content)}")
+        api_logger.debug(f"Read feed.xml content, length: {len(feed_content)}")
         root = ET.fromstring(feed_content)
-        app.logger.debug("Successfully parsed feed.xml")
+        api_logger.debug("Successfully parsed feed.xml")
     except (FileNotFoundError, ET.ParseError) as e:
-        app.logger.warning(f"Failed to load or parse feed.xml: {e}")
+        api_logger.warning(f"Failed to load or parse feed.xml: {e}")
         api_logger.exception("Exception during feed XML loading:")
         return {}
 
@@ -272,7 +313,7 @@ def _load_feed_items():
     for it in root.findall(".//item"):
         guid = it.findtext("guid") or it.findtext("link")
         if not guid:
-            app.logger.warning(f"Feed item missing GUID or Link, skipping.")
+            api_logger.warning(f"Feed item missing GUID or Link, skipping.")
             continue
 
         raw_date = it.findtext("pubDate") or ""
@@ -300,7 +341,7 @@ def _load_feed_items():
             "description": unescaped_description,
         }
         items[guid] = data
-    app.logger.debug(f"Found {len(items)} items in feed.xml")
+    api_logger.debug(f"Found {len(items)} items in feed.xml")
     return items
 
 @app.route("/api/time", methods=["GET"])
@@ -310,6 +351,7 @@ def time():
 
 @app.route("/api/feed-guids", methods=["GET"])
 def feed_guids():
+    _authenticate_request()
     items = _load_feed_items()
     latest_pub_date = None
     if items:
@@ -344,6 +386,7 @@ def feed_guids():
 
 @app.route("/api/feed-items", methods=["GET", "POST"])
 def feed_items():
+    _authenticate_request()
     all_items = _load_feed_items()
     result_items = []
 
@@ -362,6 +405,29 @@ def feed_items():
         result_items = [all_items[g] for g in wanted_guids if g in all_items]
 
     return jsonify(result_items), 200
+
+@app.route("/api/feed-sync", methods=["POST"])
+def manual_feed_sync():
+    _authenticate_request()
+    api_logger.info("Received request for manual feed sync.")
+    try:
+        # Run the feed generation script synchronously
+        # We use the absolute path to the script and the venv python
+        result = subprocess.run(
+            ["/venv/bin/python3", "/rss/run.py"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd="/rss" # Set CWD to where the script expects to be
+        )
+        api_logger.info(f"Manual feed sync successful: {result.stdout}")
+        return jsonify({"status": "ok", "output": result.stdout}), 200
+    except subprocess.CalledProcessError as e:
+        api_logger.error(f"Manual feed sync failed: {e.stderr}")
+        return jsonify({"status": "error", "message": e.stderr}), 500
+    except Exception as e:
+        api_logger.exception(f"Unexpected error during manual feed sync: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 def _load_state(key):
     api_logger.debug(f"Loading state for key: '{key}'")
@@ -466,17 +532,6 @@ def post_user_state():
 
     return jsonify({"status": "ok", "serverTime": server_time, "results": results}), 200
 
-def _authenticate_request():
-    auth_token = request.cookies.get("auth")
-    if not auth_token:
-        app.logger.warning("Authentication failed: No auth cookie.")
-        abort(401, description="Authentication required.")
-    
-    # In a real application, you would validate this token against a session store or similar.
-    # For this example, we assume presence implies validity after a successful login.
-    # If the token was generated by `secrets.token_urlsafe(32)`, its existence is enough for this simple auth.
-    return True # Authentication successful
-
 @app.route("/api/admin/config-backup", methods=["GET"])
 def config_backup():
     _authenticate_request()
@@ -540,12 +595,22 @@ def reset_app_data():
             "currentDeckGuids.json",
             "shuffledOutGuids.json",
             "lastShuffleResetDate.json",
+            "shuffleCount.json",
             "lastStateSync.json",
             "lastFeedSync.json"
         ]
         
         # Define files that MUST be preserved (user configuration and preferences)
-        files_to_preserve = ["rssFeeds.json", "keywordBlacklist.json", "theme.json"]
+        files_to_preserve = [
+            "rssFeeds.json", 
+            "keywordBlacklist.json", 
+            "theme.json",
+            "themeStyle.json",
+            "themeStyleLight.json",
+            "themeStyleDark.json",
+            "fontSize.json",
+            "customCss.json"
+        ]
         
         api_logger.debug("Clearing transient user state files...")
         for filename in files_to_delete:

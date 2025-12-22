@@ -34,7 +34,11 @@ export const USER_STATE_DEFS: UserStateDefs = {
     themeStyleDark: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
     customCss: { store: 'userSettings', type: 'simple', localOnly: false, default: '' },
     fontSize: { store: 'userSettings', type: 'simple', localOnly: true, default: 100 },
-    feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
+    feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
+    rssFeeds: { store: 'userSettings', type: 'simple', localOnly: false, default: {} },
+    keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },
+    shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
+    lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null }
 };
 
 interface SimpleStateValue {

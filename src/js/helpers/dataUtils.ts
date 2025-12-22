@@ -214,14 +214,28 @@ export async function generateNewDeck(
                 break;
             case 'unread':
             default:
+                // First try items that are BOTH unread and unshuffled
                 filteredItems = allFeedItems.filter(item =>
                     !readGuidsSet.has(item.guid) &&
                     !shuffledOutGuidsSet.has(item.guid)
                 );
-                // If all items are read and the deck is empty, we should still generate a new deck.
+                
+                // If that's empty, try items that are just unshuffled (might be read)
                 if (filteredItems.length === 0) {
-                    console.log('generateNewDeck: No unread/unshuffled items found, re-filtering from all items.');
+                    console.log('generateNewDeck: No unread/unshuffled items found, trying all unshuffled items.');
                     filteredItems = allFeedItems.filter(item => !shuffledOutGuidsSet.has(item.guid));
+                }
+
+                // If STILL empty, try items that are unread (even if shuffled out)
+                if (filteredItems.length === 0) {
+                    console.log('generateNewDeck: No unshuffled items found, trying all unread items.');
+                    filteredItems = allFeedItems.filter(item => !readGuidsSet.has(item.guid));
+                }
+
+                // If STILL empty, fallback to ALL items
+                if (filteredItems.length === 0) {
+                    console.log('generateNewDeck: Absolutely no filter matches, using all items.');
+                    filteredItems = [...allFeedItems];
                 }
                 break;
         }
