@@ -69,7 +69,12 @@ button.star {
   bottom: 2px;
   right: 0;
   margin: 0;
-  padding: 0 1rem 0 1rem;
+  padding: 0 0 0.3rem 0; /* Align with read button centering */
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
