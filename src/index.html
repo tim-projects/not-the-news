@@ -48,7 +48,7 @@
 </head>
 
 <body>
-    <div id="app" x-data="rssApp" x-init="initApp()">
+    <div id="app" x-data="rssApp" x-init="initApp()" :class="{ 'hide-images': !imagesEnabled }">
         <div id="loading-screen" x-show="loading" class="loading-screen">
             <div class="loading-text">Loading…</div>
             <div id="progress-message" class="progress-message" x-text="progressMessage"></div>
@@ -81,7 +81,7 @@
                             <p class="pubdate" x-text="entry.pubDate"></p>
                         </div>
                         <template x-if="imagesEnabled && entry.image">
-                            <img :data-src="entry.image" alt="" class="entry-image" loading="lazy" 
+                            <img :data-src="entry.image" alt="" class="entry-image title-image" loading="lazy" 
                                  x-init="observeImage($el)"
                                  @load="$el.classList.add('loaded')" />
                         </template>

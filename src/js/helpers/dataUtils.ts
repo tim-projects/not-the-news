@@ -91,9 +91,21 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     const parser = new DOMParser();
     const doc = parser.parseFromString(item.description || "", "text/html");
 
-    const imgEl = doc.querySelector("img") as HTMLImageElement | null; // Cast to HTMLImageElement
-    const imgSrc = imgEl?.src || "";
-    imgEl?.remove();
+    const images = doc.querySelectorAll("img");
+    let imgSrc = "";
+    
+    if (images.length === 1) {
+        const imgEl = images[0] as HTMLImageElement;
+        imgEl.classList.add('title-image');
+        imgSrc = imgEl.src || "";
+        imgEl.remove();
+    } else {
+        images.forEach(img => {
+            img.setAttribute('loading', 'lazy');
+            // Ensure images in description also get the 'loaded' class for visibility
+            img.setAttribute('onload', "this.classList.add('loaded')");
+        });
+    }
 
     let sourceUrl = "";
     const sourceEl = doc.querySelector(".source-url") || doc.querySelector("a");
