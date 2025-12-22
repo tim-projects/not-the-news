@@ -160,8 +160,8 @@ export async function initScrollPosition(app: AppState): Promise<void> {
                 // Use 'auto' for instant scroll on load.
                 targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
                 // Restore the fine-tuned vertical offset if it exists.
-                if (typeof lastViewedItemOffset === 'number' && lastViewedItemOffset > 0) {
-                    window.scrollTo({ top: window.scrollY + lastViewedItemOffset, behavior: 'auto' });
+                if (typeof lastViewedItemOffset === 'number' && lastViewedItemOffset !== 0) {
+                    window.scrollTo({ top: window.scrollY - lastViewedItemOffset, behavior: 'auto' });
                 }
             }
         }

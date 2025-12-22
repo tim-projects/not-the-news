@@ -237,7 +237,9 @@ export async function saveCurrentScrollPosition(): Promise<void> {
     const entryElements: NodeListOf<HTMLElement> = document.querySelectorAll('.entry[data-guid]');
     const firstVisibleEntry = Array.from(entryElements).find((el: HTMLElement) => {
         const rect: DOMRect = el.getBoundingClientRect();
-        return rect.top >= 0 && rect.bottom > 0;
+        // Pick the first element that is at least partially in or below the viewport.
+        // rect.bottom > 0 means the bottom of the element is below the top of the viewport.
+        return rect.bottom > 0;
     });
 
     if (firstVisibleEntry) {

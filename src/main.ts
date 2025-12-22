@@ -152,7 +152,9 @@ export function rssApp(): AppState {
                 initSyncToggle(this);
                 initImagesToggle(this);
                 attachScrollToTopHandler();
-                await initScrollPosition(this);
+                this.$nextTick(() => {
+                    initScrollPosition(this);
+                });
                 
                 this.progressMessage = 'Setting up app watchers...';
                 this._setupWatchers();
@@ -885,6 +887,16 @@ export function rssApp(): AppState {
                 this.isOnline = false;
                 await this.updateSyncStatusMessage(); // <-- FIX: Update status on offline event
             });
+
+            // Auto-save scroll position
+            let scrollTimeout: any;
+            window.addEventListener('scroll', () => {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    saveCurrentScrollPosition();
+                }, 1000);
+            }, { passive: true });
+
             setTimeout(backgroundSync, 0);
         },
         _startPeriodicSync: function(this: AppState): void {
