@@ -26,6 +26,8 @@ html {
   --bg-alt: #ffffff; /* You might want a dark specific --bg-alt-dark */
   --toggle-track: #ccc; /* Or a dark specific color */
   --link-highlight: aliceblue;
+  --primary-rgb: 100, 149, 237;
+  --secondary-rgb: 240, 248, 255;
   --gold-color: #FFD700; /* Gold color for starred/read highlights */
   --gold-rgb: 255, 215, 0; /* RGB components for gold color */
   --border-radius: 5px;
@@ -42,6 +44,8 @@ html {
   --light-card-shadow-color: lightgrey;
   --light-toggle-track: #ccc;
   --light-link-highlight: rgba(173, 216, 230, 0.5);
+  --light-primary-rgb: 100, 149, 237;
+  --light-secondary-rgb: 112, 128, 144;
   --read-item-bg: #e0e0e0; /* A slightly lighter background for read items */
 }
 
@@ -74,6 +78,8 @@ html.light {
   --fg: var(--light-fg);
   --primary: var(--light-primary);
   --secondary: var(--light-secondary);
+  --primary-rgb: var(--light-primary-rgb);
+  --secondary-rgb: var(--light-secondary-rgb);
   --card-bg: var(--light-card-bg);
   --card-border: var(--light-card-border);
   --card-shadow-color: var(--light-card-shadow-color);
