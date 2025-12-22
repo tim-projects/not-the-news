@@ -55,7 +55,7 @@ button.close:active {
 }
 
 button.star {
-  font-size: 2.2rem;
+  font-size: 2.5rem;
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
@@ -219,7 +219,6 @@ button.star.starred:active {
   height: 3.5em;
   background-color: var(--card-bg);
   color: var(--fg);
-  margin-left: auto;
   border-radius: 100px;
   opacity: 0.8;
   padding-top: 0.4em;
