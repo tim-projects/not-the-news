@@ -11,8 +11,23 @@ import './css/modal.css';
 import './css/status.css';
 import './css/themes/sepia.css';
 import './css/themes/solarized-light.css';
+import './css/themes/github-light.css';
+import './css/themes/atom-one-light.css';
+import './css/themes/gruvbox-light.css';
+import './css/themes/catppuccin-latte.css';
+import './css/themes/rose-pine-dawn.css';
+import './css/themes/paper.css';
+import './css/themes/morning.css';
+
 import './css/themes/midnight.css';
 import './css/themes/nord.css';
+import './css/themes/dracula.css';
+import './css/themes/monokai.css';
+import './css/themes/gruvbox-dark.css';
+import './css/themes/catppuccin-mocha.css';
+import './css/themes/tokyo-night.css';
+import './css/themes/synthwave.css';
+import './css/themes/material-dark.css';
 
 // Refactored JS: concise, modern, functional, same output.
 

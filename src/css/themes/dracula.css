@@ -1,0 +1,13 @@
+html.dark.theme-dracula {
+  --bg: #282a36;
+  --fg: #f8f8f2;
+  --primary: #bd93f9;
+  --secondary: #6272a4;
+  --card-bg: #44475a;
+  --card-border: #6272a4;
+  --card-shadow-color: rgba(0,0,0,0.3);
+}
+
+html.dark.theme-dracula a {
+  color: #8be9fd;
+}

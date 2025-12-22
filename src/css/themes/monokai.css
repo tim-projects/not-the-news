@@ -1,0 +1,21 @@
+html.dark.theme-monokai {
+  --bg: #272822;
+  --fg: #f8f8f2;
+  --primary: #a6e22e;
+  --secondary: #fd971f;
+  --card-bg: #3e3d32;
+  --card-border: #75715e;
+  --card-shadow-color: rgba(0,0,0,0.3);
+}
+
+html.dark.theme-monokai .configure-button,
+html.dark.theme-monokai .settings-group button,
+html.dark.theme-monokai .settings-btn:hover,
+html.dark.theme-monokai .shuffle-btn:hover,
+html.dark.theme-monokai button.close:hover,
+html.dark.theme-monokai button.star:hover,
+html.dark.theme-monokai button.read-button:hover,
+html.dark.theme-monokai #scroll-to-top:hover,
+html.dark.theme-monokai .cog-wheel-button:hover {
+  color: #272822 !important;
+}

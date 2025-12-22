@@ -1,0 +1,10 @@
+html.light.theme-atom-one-light {
+  --bg: #fafafa;
+  --fg: #383a42;
+  --primary: #4078f2;
+  --secondary: #a0a1a7;
+  --card-bg: #ffffff;
+  --card-border: #e5e5e6;
+  --card-shadow-color: rgba(0,0,0,0.05);
+  background-image: none;
+}

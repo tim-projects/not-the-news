@@ -1,0 +1,10 @@
+html.light.theme-catppuccin-latte {
+  --bg: #eff1f5;
+  --fg: #4c4f69;
+  --primary: #1e66f5;
+  --secondary: #8839ef;
+  --card-bg: #e6e9ef;
+  --card-border: #ccd0da;
+  --card-shadow-color: rgba(76,79,105,0.05);
+  background-image: none;
+}

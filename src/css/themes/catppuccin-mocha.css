@@ -1,0 +1,9 @@
+html.dark.theme-catppuccin-mocha {
+  --bg: #1e1e2e;
+  --fg: #cdd6f4;
+  --primary: #cba6f7;
+  --secondary: #89b4fa;
+  --card-bg: #313244;
+  --card-border: #45475a;
+  --card-shadow-color: rgba(30,30,46,0.3);
+}

@@ -1,0 +1,10 @@
+html.light.theme-paper {
+  --bg: #ffffff;
+  --fg: #000000;
+  --primary: #000000;
+  --secondary: #444444;
+  --card-bg: #ffffff;
+  --card-border: #000000;
+  --card-shadow-color: rgba(0,0,0,0);
+  background-image: none;
+}

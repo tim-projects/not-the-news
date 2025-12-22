@@ -1,0 +1,10 @@
+html.light.theme-rose-pine-dawn {
+  --bg: #faf4ed;
+  --fg: #575279;
+  --primary: #286983;
+  --secondary: #d7827e;
+  --card-bg: #fffaf3;
+  --card-border: #dfdad9;
+  --card-shadow-color: rgba(87,82,121,0.05);
+  background-image: none;
+}

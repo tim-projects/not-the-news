@@ -1,0 +1,10 @@
+html.light.theme-morning {
+  --bg: #e6efff;
+  --fg: #334e68;
+  --primary: #102a43;
+  --secondary: #627d98;
+  --card-bg: #f0f7ff;
+  --card-border: #bcccdc;
+  --card-shadow-color: rgba(16,42,67,0.08);
+  background-image: none;
+}

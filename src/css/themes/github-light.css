@@ -1,0 +1,10 @@
+html.light.theme-github-light {
+  --bg: #ffffff;
+  --fg: #24292f;
+  --primary: #0969da;
+  --secondary: #57606a;
+  --card-bg: #f6f8fa;
+  --card-border: #d0d7de;
+  --card-shadow-color: rgba(27,31,35,0.04);
+  background-image: none;
+}
