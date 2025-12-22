@@ -80,8 +80,7 @@ export function rssApp(): AppState {
         syncStatusMessage: '',
         showSyncStatus: false,
         theme: 'dark', // Default theme
-        keywordSaveMessage: '', // Initialized as empty string
-        rssSaveMessage: '', // Initialized as empty string
+        customCss: '',
         showUndo: false,
         undoItemGuid: null,
         _lastFilterHash: '',
@@ -402,14 +401,17 @@ export function rssApp(): AppState {
                 console.error('Error loading RSS feeds:', error);
             }
         },        loadKeywordBlacklist: async function(this: AppState): Promise<void> {
-            try {
-                const result = await loadSimpleState('keywordBlacklist');
-                const value = result.value;
-                this.keywordBlacklistInput = Array.isArray(value) ? value.filter(Boolean).sort().join("\n") : (value || "");
-            } catch (error) {
-                console.error('Error loading keyword blacklist:', error);
-            }
-        },        saveRssFeeds: async function(this: AppState): Promise<void> {
+            const { loadSimpleState } = await import('./js/data/dbUserState.ts');
+            const { value } = await loadSimpleState('keywordBlacklist');
+            this.keywordBlacklistInput = Array.isArray(value) ? value.join('\n') : '';
+        },
+        loadCustomCss: async function(this: AppState): Promise<void> {
+            const { loadSimpleState } = await import('./js/data/dbUserState.ts');
+            const { value } = await loadSimpleState('customCss');
+            this.customCss = typeof value === 'string' ? value : '';
+            this.applyCustomCss();
+        },
+        saveRssFeeds: async function(this: AppState): Promise<void> {
             const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean).sort();
             try {
                 await saveSimpleState('rssFeeds', rssFeedsArray);
@@ -451,6 +453,23 @@ export function rssApp(): AppState {
                 console.error('Error saving keyword blacklist:', error);
                 createStatusBarMessage(this, `Failed to save keyword blacklist: ${error.message}`);
             }
+        },        saveCustomCss: async function(this: AppState): Promise<void> {
+            try {
+                await saveSimpleState('customCss', this.customCss);
+                this.applyCustomCss();
+                createStatusBarMessage(this, 'Custom CSS saved!');
+            } catch (error: any) {
+                console.error('Error saving custom CSS:', error);
+                createStatusBarMessage(this, `Failed to save custom CSS: ${error.message}`);
+            }
+        },        applyCustomCss: function(this: AppState): void {
+            let styleEl = document.getElementById('custom-user-css');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'custom-user-css';
+                document.head.appendChild(styleEl);
+            }
+            styleEl.textContent = this.customCss;
         },        updateCounts: async function(this: AppState): Promise<void> {
             updateCounts(this);
         },        scrollToTop: function(this: AppState): void {
@@ -671,6 +690,8 @@ export function rssApp(): AppState {
                 this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
                     ? keywordBlacklist.value.join('\n') 
                     : '';
+                
+                await this.loadCustomCss();
             } catch (error: any) {
                 console.error('Error loading initial state:', error);
                 // Set default values in case of error

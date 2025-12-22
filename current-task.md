@@ -1,18 +1,18 @@
-# Current Task: Fix Status Message Bar and Config Sync
+# Current Task: Custom CSS and UI Refinements
 
 ## Objective
-The status message bar (toast) never appears. It needs to be implemented such that it:
-1. Appears at the bottom of the screen when a message is generated.
-2. Stays visible long enough to be read.
-3. Automatically hides after a delay.
-4. Uses a non-distracting animation to avoid interrupting the user's reading experience.
+Implement a "Custom CSS" feature that allows users to override application styles through the settings modal.
+1. Add a "Custom CSS" option with a configure button in the settings modal.
+2. Create a configuration view with a textarea for entering CSS.
+3. Persist the custom CSS to the server/database.
+4. Dynamically apply the custom CSS to the application.
 
 ## Progress
-- [x] Investigate `createStatusBarMessage` implementation in `src/js/ui/uiUpdaters.ts`.
-- [x] Check `src/css/status.css` for existing styles and animations.
-- [x] Update logic in `main.ts` or `uiUpdaters.ts` to manage the visibility lifecycle.
-- [x] Ensure the animation is subtle and non-distracting.
-- [x] Verify with manual check and UI tests.
+- [x] Add "Custom CSS" UI elements to `src/index.html`.
+- [x] Update `AppState` type and initial state in `src/main.ts`.
+- [x] Implement saving and applying custom CSS logic.
+- [x] Ensure persistence via sync operations.
+- [x] Verify functionality.
 
 ## Findings
 - **Status Bar ID Inconsistency:** The HTML used `#status-message-container` while CSS targeted `#sync-status-message`.

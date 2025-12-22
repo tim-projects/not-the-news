@@ -101,11 +101,15 @@ USER_STATE_SERVER_DEFAULTS = {
 
     'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
 
-    'rssFeeds': {'type': 'nested_object', 'default': {}},
+        'rssFeeds': {'type': 'nested_object', 'default': {}},
 
-    'keywordBlacklist': {'type': 'array', 'default': []},
+        'keywordBlacklist': {'type': 'array', 'default': []},
 
-}
+        'customCss': {'type': 'simple', 'default': ''},
+
+    }
+
+    
 
 def _atomic_write(filepath, content, mode='w', encoding='utf-8'):
     '''

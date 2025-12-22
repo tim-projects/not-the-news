@@ -115,7 +115,7 @@ html.dark .switch input:checked+.slider {
   resize: vertical;
   border-radius: var(--border-radius);
   overflow-y: auto;
-  font-family: inherit;
+  font-family: monospace;
   font-size: 1rem;
   line-height: 1.4;
 }

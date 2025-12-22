@@ -80,18 +80,8 @@ export interface AppState {
     deckManaged: boolean;
     syncStatusMessage: string;
     showSyncStatus: boolean;
-    keywordSaveMessage: string;
-    rssSaveMessage?: string;
-    _lastFilterHash: string;
-    _cachedFilteredEntries: MappedFeedItem[] | null;
-    scrollObserver: IntersectionObserver | null;
-    imageObserver: IntersectionObserver | null;
-    db: IDBDatabase | null; // IndexedDB database instance
-    theme: string; // Added for initTheme
-    _initComplete: boolean; // Added for _setupWatchers
-    staleItemObserver: IntersectionObserver | null; // Added for _initObservers
-    _isSyncing: boolean; // Added for performBackgroundSync
-    lastShuffleResetDate: string | null; // Added for deckManager and AppState compatibility
+    theme: string;
+    customCss: string;
     showUndo: boolean;
     undoItemGuid: string | null;
 
@@ -112,9 +102,12 @@ export interface AppState {
     processShuffle(): Promise<void>;
     loadRssFeeds(): Promise<void>;
     loadKeywordBlacklist(): Promise<void>;
+    loadCustomCss(): Promise<void>;
     saveRssFeeds(): Promise<void>;
     saveKeywordBlacklist(): Promise<void>;
-    updateCounts(): Promise<void>;
+    saveCustomCss(): Promise<void>;
+    applyCustomCss(): void;
+    toggleTheme(): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;
     _initImageObserver(): void;

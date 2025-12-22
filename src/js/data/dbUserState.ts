@@ -36,6 +36,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     lastViewedItemOffset: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
     rssFeeds: { store: 'userSettings', type: 'simple', localOnly: false, default: {} },
     keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },
+    customCss: { store: 'userSettings', type: 'simple', localOnly: false, default: '' },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
 };
 

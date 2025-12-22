@@ -1711,16 +1711,22 @@ const navigationHandler = async ({ event }) => {
   try {
     return await fetch(event.request);
   } catch (error) {
-    return caches.match("index.html");
+    const cachedResponse = await caches.match("index.html");
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    return new Response("<h1>Offline</h1><p>You are currently offline and this page is not available in the cache.</p>", {
+      headers: { "Content-Type": "text/html" }
+    });
   }
 };
 registerRoute(
-  ({ request, url }) => {
+  ({ request }) => {
     return request.mode === "navigate";
   },
   navigationHandler
 );
-precacheAndRoute([{"revision":null,"url":"assets/main-BUIEag08.js"},{"revision":null,"url":"assets/main-CzpSFYxm.css"},{"revision":null,"url":"assets/modal-D__-0rYm.css"},{"revision":"66d4e93d31d059c746e1592d59c74cf3","url":"images/favicon.svg"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8f3d514b1160c9ff6cbbc05c8abbd443","url":"images/placeholder.svg"},{"revision":"a4038b2c1b5de7ef8f4f60bb8885d25b","url":"index.html"},{"revision":"28084add79697ab098eca4d8442b1845","url":"login.html"},{"revision":"dac41677a41f1bb52f051f546cada96e","url":"manifest.json"},{"revision":"1872c500de691dce40960bb85481de07","url":"registerSW.js"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8e5b7cfdf62773bfdb6052e17020ca1a","url":"manifest.webmanifest"}]);
+precacheAndRoute([{"revision":null,"url":"assets/main-Db7_LmUB.js"},{"revision":null,"url":"assets/main-z_DfRhQ9.css"},{"revision":null,"url":"assets/modal-Pk50ayqF.css"},{"revision":"66d4e93d31d059c746e1592d59c74cf3","url":"images/favicon.svg"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8f3d514b1160c9ff6cbbc05c8abbd443","url":"images/placeholder.svg"},{"revision":"94b8cfc41a4b9f9aee31a2a9a3c48da1","url":"index.html"},{"revision":"7aae2cdc3aeb571dc83274426c039eba","url":"login.html"},{"revision":"dac41677a41f1bb52f051f546cada96e","url":"manifest.json"},{"revision":"1872c500de691dce40960bb85481de07","url":"registerSW.js"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8e5b7cfdf62773bfdb6052e17020ca1a","url":"manifest.webmanifest"}]);
 cleanupOutdatedCaches();
 clientsClaim();
 registerRoute(

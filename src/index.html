@@ -110,6 +110,7 @@
                     <h2>SETTINGS</h2>
                     <div class="settings-group"><label for="sync-toggle">Auto-Sync Feed</label><div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="theme-toggle">Theme</label><div class="d-flex align-items-center"><span id="theme-text" x-text="theme"></span><label class="switch"><input type="checkbox" id="theme-toggle" :checked="theme === 'dark'" @change="toggleTheme()"><span class="slider"></span></label></div></div>
+                    <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
                     <div class="settings-group"><label for="images-toggle">Show Images</label><div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>
                     
@@ -128,7 +129,6 @@
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
                         <button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save Feeds</button>
-                        <span class="save-message" x-show="rssSaveMessage" x-text="rssSaveMessage"></span>
                     </div>
                 </div>
 
@@ -137,7 +137,15 @@
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
                         <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
-                        <span class="save-message" x-show="keywordSaveMessage" x-text="keywordSaveMessage"></span>
+                    </div>
+                </div>
+
+                <div id="css-settings-block" x-show="modalView === 'css'">
+                    <h2>Configure Custom CSS</h2>
+                    <div class="settings-group grow">
+                        <textarea class="settings-textarea" x-model="customCss" placeholder="/* Enter custom CSS here */
+/* Example: .itemtitle { font-weight: bold; } */"></textarea>
+                        <button id="save-css-btn" class="settings-button" @click="saveCustomCss()">Save CSS</button>
                     </div>
                 </div>
             </div>
