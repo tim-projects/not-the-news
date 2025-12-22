@@ -44,6 +44,7 @@
         #status-message-container.visible {
             opacity: 1;
         }
+        [x-cloak] { display: none !important; }
     </style>
 </head>
 
@@ -54,7 +55,7 @@
             <div id="progress-message" class="progress-message" x-text="progressMessage"></div>
         </div>
         
-        <header id="header" x-show="!loading" class="header">
+        <header id="header" x-show="!loading" class="header" x-cloak>
             <div id="ntn-title"><h2>Not The News</h2></div>
             <div id="header-options">
                 <button id="shuffle-button" @click="processShuffle()" class="shuffle-btn" title="Shuffle">
@@ -91,7 +92,7 @@
             </template>
         </main>
 
-        <div x-show="openSettings" class="modal"
+        <div x-show="openSettings" class="modal" x-cloak
              x-transition:enter="transition ease-out duration-150"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
