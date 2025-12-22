@@ -71,34 +71,6 @@ import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState } from './types/app.ts';
 
-const DEFAULT_CUSTOM_CSS_TEMPLATE = `/* Custom CSS Template - Edit variables to customize your experience */
-:root {
-  /* Dark Theme Variables (Default) */
-  --bg: #1A1A1B;
-  --fg: gainsboro;
-  --primary: cornflowerblue;
-  --secondary: aliceblue;
-  --card-bg: #1E1E1E;
-  --card-border: #343536;
-  --card-shadow-color: black;
-  --fg-muted: gray;
-  --border-radius: 5px;
-}
-
-html.light {
-  /* Light Theme Overrides */
-  --bg: #f5f5f5;
-  --fg: darkslategrey;
-  --primary: cornflowerblue;
-  --secondary: slategrey;
-  --card-bg: #ffffff;
-  --card-border: #EEE;
-  --card-shadow-color: lightgrey;
-}
-
-/* Add custom styles below */
-`;
-
 export function rssApp(): AppState {
     return {
         // --- State Properties ---
@@ -461,7 +433,7 @@ export function rssApp(): AppState {
         loadCustomCss: async function(this: AppState): Promise<void> {
             const { loadSimpleState } = await import('./js/data/dbUserState.ts');
             const { value } = await loadSimpleState('customCss');
-            this.customCss = (typeof value === 'string' && value.trim() !== '') ? value : DEFAULT_CUSTOM_CSS_TEMPLATE;
+            this.customCss = (typeof value === 'string' && value.trim() !== '') ? value : this.generateCustomCssTemplate();
             this.applyCustomCss();
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
@@ -520,9 +492,24 @@ export function rssApp(): AppState {
             if (!confirm('Reset Custom CSS to default template? This will overwrite your current customizations.')) {
                 return;
             }
-            this.customCss = DEFAULT_CUSTOM_CSS_TEMPLATE;
+            this.customCss = this.generateCustomCssTemplate();
             await this.saveCustomCss();
             createStatusBarMessage(this, 'Custom CSS reset to template!');
+        },
+        generateCustomCssTemplate: function(this: AppState): string {
+            const style = getComputedStyle(document.documentElement);
+            const vars = [
+                '--bg', '--fg', '--primary', '--secondary', '--card-bg', 
+                '--card-border', '--card-shadow-color', '--fg-muted', '--border-radius'
+            ];
+            
+            let template = `/* Custom CSS Template - Current theme: ${this.theme} ${this.themeStyle} */\n:root {\n`;
+            vars.forEach(v => {
+                const val = style.getPropertyValue(v).trim();
+                if (val) template += `  ${v}: ${val};\n`;
+            });
+            template += `}\n\n/* Add custom styles below */\n`;
+            return template;
         },
                 applyCustomCss: function(this: AppState): void {
                     let styleEl = document.getElementById('custom-user-css');

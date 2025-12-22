@@ -115,6 +115,7 @@ export interface AppState {
     saveThemeStyle(): Promise<void>;
     saveFontSize(): Promise<void>;
     resetCustomCss(): Promise<void>;
+    generateCustomCssTemplate(): string;
     applyCustomCss(): void;
     applyThemeStyle(): void;
     applyFontSize(): void;
