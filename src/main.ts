@@ -76,6 +76,7 @@ export function rssApp(): AppState {
         // --- State Properties ---
         loading: true,
         progressMessage: 'Initializing...',
+        itemLoadCount: 0,
         deck: [],
         feedItems: {},
         filterMode: 'unread',
@@ -441,7 +442,7 @@ export function rssApp(): AppState {
             this.applyCustomCss();
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
-            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean).sort();
+            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
             try {
                 await saveSimpleState('rssFeeds', rssFeedsArray);
                 this.rssFeedsInput = rssFeedsArray.join('\n');

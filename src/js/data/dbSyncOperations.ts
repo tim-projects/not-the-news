@@ -374,6 +374,9 @@ export async function performFeedSync(app: AppState): Promise<void> {
 
         console.log(`[DB] New GUIDs: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
 
+        const totalToFetch = guidsToFetch.length;
+        let fetchedSoFar = 0;
+
         if (guidsToFetch.length > 0) {
             // ✅ STABILITY FIX: Re-introduce batching for fetching item bodies to avoid network errors on large updates.
             const BATCH_SIZE: number = 50;
@@ -390,6 +393,12 @@ export async function performFeedSync(app: AppState): Promise<void> {
                     const fetchedItems: FeedItem[] = await itemsResponse.json();
                     console.log(`[DB] Fetched batch of ${fetchedItems.length} items:`, fetchedItems);
                     newItems.push(...fetchedItems);
+                    
+                    fetchedSoFar += fetchedItems.length;
+                    if (app) {
+                        app.itemLoadCount = fetchedSoFar;
+                        app.progressMessage = `Fetching feed content... (${fetchedSoFar}/${totalToFetch})`;
+                    }
                 } else {
                     console.error(`[DB] Failed to fetch a batch of feed items. Status: ${itemsResponse.status}`);
                 }
@@ -416,6 +425,14 @@ export async function performFeedSync(app: AppState): Promise<void> {
 
         if (serverTime) await _saveSyncMetaState('lastFeedSync', serverTime);
         
+        // Reset progress indicators
+        if (app) {
+            // We keep itemLoadCount for a moment to show finality or just clear it
+            setTimeout(() => {
+                app.itemLoadCount = 0;
+            }, 1000);
+        }
+
         // Trigger UI updates
         app?.loadFeedItemsFromDB?.();
         app?.loadAndDisplayDeck?.();

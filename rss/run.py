@@ -37,8 +37,8 @@ def is_merge_running():
         == 0
     )
 
-def generate_feed():
-    if os.path.exists(final_feed_file):
+def generate_feed(force=False):
+    if not force and os.path.exists(final_feed_file):
         age = time.time() - os.path.getmtime(final_feed_file)
         if age < 60:  # 1 minute cooldown
             mins = age / 60
@@ -118,19 +118,22 @@ def main():
     parser.add_argument(
         "--interval", type=int, default=300, help="Seconds between runs in daemon mode"
     )
+    parser.add_argument(
+        "--force", action="store_true", help="Force generation regardless of age"
+    )
     args = parser.parse_args()
 
     if args.daemon:
         print(f"Starting in daemon mode (interval={args.interval}s)")
         try:
             while True:
-                generate_feed()
+                generate_feed(force=args.force)
                 time.sleep(args.interval)
         except KeyboardInterrupt:
             print("Daemon shutdown requested; exiting.")
             sys.exit(0)
     else:
-        generate_feed()
+        generate_feed(force=args.force)
 
 if __name__ == "__main__":
     main()

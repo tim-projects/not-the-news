@@ -414,7 +414,7 @@ def manual_feed_sync():
         # Run the feed generation script synchronously
         # We use the absolute path to the script and the venv python
         result = subprocess.run(
-            ["/venv/bin/python3", "/rss/run.py"],
+            ["/venv/bin/python3", "/rss/run.py", "--force"],
             capture_output=True,
             text=True,
             check=True,

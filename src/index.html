@@ -57,6 +57,10 @@
         <div id="loading-screen" x-show="loading" class="loading-screen">
             <div class="loading-text">Loading…</div>
             <div id="progress-message" class="progress-message" x-text="progressMessage"></div>
+            
+            <div x-show="itemLoadCount > 0" class="item-load-count" style="margin-top: 0.75rem; font-size: 0.9rem; opacity: 0.8; font-family: monospace;">
+                <span x-text="itemLoadCount"></span> items loaded
+            </div>
         </div>
         
         <header id="header" x-show="!loading" class="header" x-cloak>

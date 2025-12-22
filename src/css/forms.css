@@ -18,13 +18,10 @@
 
 .filter-select:focus {
   box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
-  background-color: var(--primary);
-  color: white;
 }
 
 .filter-select:active {
-  background-color: var(--primary);
-  color: white;
+  box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
 }
 
 .filter-select:focus-visible {

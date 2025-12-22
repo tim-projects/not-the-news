@@ -13,12 +13,12 @@ button:hover {
 
 button:focus {
   outline: none;
-  box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 button:active {
   transform: translateY(1px);
-  box-shadow: inset 1px 1px 5px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 button.close {
@@ -48,13 +48,10 @@ button.close:hover {
 
 button.close:focus {
   box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
-  color: var(--secondary);
-  background: var(--primary);
 }
 
 button.close:active {
-  background-color: var(--primary);
-  color: var(--secondary);
+  box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
 }
 
 button.star {
@@ -85,13 +82,10 @@ button.star:hover {
 
 button.star:focus {
   box-shadow: -2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary);
-  color: var(--secondary);
-  background: var(--primary);
 }
 
 button.star:active {
-  background-color: var(--primary);
-  color: var(--secondary);
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary);
 }
 
 button.read-button {
@@ -121,13 +115,10 @@ button.read-button:hover {
 
 button.read-button:focus {
   box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
-  color: var(--secondary);
-  background: var(--primary);
 }
 
 button.read-button:active {
-  background-color: var(--primary);
-  color: var(--secondary);
+  box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
 }
 
 button.star.starred {
@@ -148,14 +139,11 @@ button.star.starred:hover {
 }
 
 button.star.starred:focus {
-  box-shadow: 0 0 0 3px var(--primary), inset 0 0 0 1px var(--primary);
-  color: var(--primary);
-  background-color: rgba(var(--primary-rgb), 0.1);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 button.star.starred:active {
-  background-color: rgba(var(--primary-rgb), 0.2);
-  color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 #scroll-to-top {
@@ -190,13 +178,10 @@ button.star.starred:active {
 
 #scroll-to-top:focus {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--primary);
-  background-color: var(--primary);
-  color: white;
 }
 
 #scroll-to-top:active {
-  background-color: var(--primary);
-  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--primary);
 }
 
 .cog-wheel-button {
@@ -222,13 +207,10 @@ button.star.starred:active {
 
 .cog-wheel-button:focus {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), 0 0 0 3px var(--primary);
-  background-color: var(--primary);
-  color: white;
 }
 
 .cog-wheel-button:active {
-  background-color: var(--primary);
-  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), 0 0 0 3px var(--primary);
 }
 
 .shuffle-btn,
@@ -256,14 +238,11 @@ button.star.starred:active {
 .shuffle-btn:focus,
 .settings-btn:focus {
   box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
-  background-color: var(--primary);
-  color: white;
 }
 
 .shuffle-btn:active,
 .settings-btn:active {
-  background-color: var(--primary);
-  color: white;
+  box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
 }
 
 #back-button {
@@ -295,13 +274,10 @@ button.star.starred:active {
 
 #back-button:focus {
   box-shadow: 0 0 0 3px var(--primary);
-  color: var(--primary);
-  background-color: rgba(0, 0, 0, 0.1);
 }
 
 #back-button:active {
-  color: var(--primary);
-  background-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 .configure-button {
@@ -321,14 +297,11 @@ button.star.starred:active {
 }
 
 .configure-button:focus {
-  box-shadow: 0 0 0 3px var(--secondary);
-  background-color: var(--secondary);
-  color: var(--fg);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 .configure-button:active {
-  background-color: var(--secondary);
-  color: var(--fg);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 .settings-group button {
@@ -350,14 +323,11 @@ button.star.starred:active {
 }
 
 .settings-group button:focus {
-  box-shadow: 0 0 0 3px var(--secondary);
-  background-color: var(--secondary);
-  color: var(--fg);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 .settings-group button:active {
-  background-color: var(--secondary);
-  color: var(--fg);
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 .modal-content>button.close,

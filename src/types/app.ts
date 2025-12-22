@@ -58,6 +58,7 @@ export interface AppState {
     // --- State Properties ---
     loading: boolean;
     progressMessage: string;
+    itemLoadCount: number; // New: Number of items loaded
     deck: MappedFeedItem[];
     feedItems: { [guid: string]: any }; // Adjust 'any' to a more specific type if known
     filterMode: string;
