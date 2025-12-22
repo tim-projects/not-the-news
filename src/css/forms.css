@@ -98,9 +98,41 @@ select#theme-style-selector option:hover {
 
 .font-size-range {
   width: 100%;
-  margin: 0.5rem 0;
+  margin: 0 0.5rem;
   cursor: pointer;
   accent-color: var(--primary);
+}
+
+.font-size-control {
+  gap: 0.25rem;
+}
+
+.font-size-value {
+  min-width: 3.5rem;
+  text-align: right;
+  font-family: monospace;
+  margin-right: 0.5rem;
+}
+
+.font-size-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary);
+  color: white;
+  border-radius: var(--border-radius);
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+}
+
+.font-size-btn:hover {
+  background-color: var(--secondary);
+  color: var(--fg);
 }
 
 html.dark .switch input:checked+.slider {

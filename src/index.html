@@ -151,9 +151,12 @@
                         </select>
                     </div>
                     <div class="settings-group">
-                        <label for="font-size-slider">Font Size: <span x-text="`${fontSize}%`"></span ></label>
-                        <div class="d-flex align-items-center grow">
+                        <label for="font-size-slider">Font Size</label>
+                        <div class="d-flex align-items-center grow font-size-control">
+                            <span class="font-size-value" x-text="`${fontSize}%`"></span >
+                            <button class="font-size-btn" @click="fontSize = Math.max(50, fontSize - 5); applyFontSize(); saveFontSize();" aria-label="Decrease font size">-</button>
                             <input type="range" id="font-size-slider" min="50" max="200" step="5" x-model.number="fontSize" @input="applyFontSize()" @change="saveFontSize()" class="font-size-range">
+                            <button class="font-size-btn" @click="fontSize = Math.min(200, fontSize + 5); applyFontSize(); saveFontSize();" aria-label="Increase font size">+</button>
                         </div>
                     </div>
                     <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
