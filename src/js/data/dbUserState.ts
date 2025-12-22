@@ -29,6 +29,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     syncEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     theme: { store: 'userSettings', type: 'simple', localOnly: false, default: 'dark' },
+    themeStyle: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
     filterMode: { store: 'userSettings', type: 'simple', localOnly: false, default: 'unread' },
     shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },

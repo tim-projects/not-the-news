@@ -1,0 +1,10 @@
+html.light.theme-sepia {
+  --bg: #f4ecd8;
+  --fg: #5b4636;
+  --primary: #8b4513;
+  --secondary: #d2b48c;
+  --card-bg: #fdf5e6;
+  --card-border: #e3d5b8;
+  --card-shadow-color: rgba(0,0,0,0.1);
+  background-image: none;
+}

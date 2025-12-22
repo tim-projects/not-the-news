@@ -9,6 +9,10 @@ import './css/layout.css';
 import './css/content.css';
 import './css/modal.css';
 import './css/status.css';
+import './css/themes/sepia.css';
+import './css/themes/solarized-light.css';
+import './css/themes/midnight.css';
+import './css/themes/nord.css';
 
 // Refactored JS: concise, modern, functional, same output.
 
@@ -108,6 +112,7 @@ export function rssApp(): AppState {
         syncStatusMessage: '',
         showSyncStatus: false,
         theme: 'dark', // Default theme
+        themeStyle: 'original',
         customCss: '',
         showUndo: false,
         undoItemGuid: null,
@@ -148,7 +153,7 @@ export function rssApp(): AppState {
                 }
 
                 this.progressMessage = 'Applying user preferences...';
-                initTheme(this);
+                // initTheme is no longer needed as we handle it via _loadInitialState and toggleTheme
                 initSyncToggle(this);
                 initImagesToggle(this);
                 attachScrollToTopHandler();
@@ -501,15 +506,50 @@ export function rssApp(): AppState {
             await this.saveCustomCss();
             createStatusBarMessage(this, 'Custom CSS reset to template!');
         },
-        applyCustomCss: function(this: AppState): void {
-            let styleEl = document.getElementById('custom-user-css');
-            if (!styleEl) {
-                styleEl = document.createElement('style');
-                styleEl.id = 'custom-user-css';
-                document.head.appendChild(styleEl);
-            }
-            styleEl.textContent = this.customCss;
-        },        updateCounts: async function(this: AppState): Promise<void> {
+                applyCustomCss: function(this: AppState): void {
+                    let styleEl = document.getElementById('custom-user-css');
+                    if (!styleEl) {
+                        styleEl = document.createElement('style');
+                        styleEl.id = 'custom-user-css';
+                        document.head.appendChild(styleEl);
+                    }
+                    styleEl.textContent = this.customCss;
+                },
+                loadThemeStyle: async function(this: AppState): Promise<void> {
+                    const { loadSimpleState } = await import('./js/data/dbUserState.ts');
+                    const { value } = await loadSimpleState('themeStyle');
+                    this.themeStyle = typeof value === 'string' ? value : 'original';
+                    this.applyThemeStyle();
+                },
+                saveThemeStyle: async function(this: AppState): Promise<void> {
+                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                    await saveSimpleState('themeStyle', this.themeStyle);
+                    this.applyThemeStyle();
+                    createStatusBarMessage(this, `Theme style applied.`);
+                },
+                applyThemeStyle: function(this: AppState): void {
+                    const htmlEl = document.documentElement;
+                    const classesToRemove = Array.from(htmlEl.classList).filter(c => c.startsWith('theme-'));
+                    htmlEl.classList.remove(...classesToRemove);
+                    if (this.themeStyle !== 'original') {
+                        htmlEl.classList.add(`theme-${this.themeStyle}`);
+                    }
+                },
+                toggleTheme: async function(this: AppState): Promise<void> {
+                    const newTheme = this.theme === 'dark' ? 'light' : 'dark';
+                    this.theme = newTheme;
+                    const htmlEl = document.documentElement;
+                    htmlEl.classList.remove('light', 'dark');
+                    htmlEl.classList.add(newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                    await saveSimpleState('theme', newTheme);
+                    createStatusBarMessage(this, `Theme set to ${newTheme}.`);
+                    // Reset themeStyle to original when switching between light and dark
+                    this.themeStyle = 'original';
+                    await this.saveThemeStyle();
+                },
+                updateCounts: async function(this: AppState): Promise<void> {
             updateCounts(this);
         },        scrollToTop: function(this: AppState): void {
             scrollToTop();
@@ -731,6 +771,7 @@ export function rssApp(): AppState {
                     : '';
                 
                 await this.loadCustomCss();
+                await this.loadThemeStyle();
             } catch (error: any) {
                 console.error('Error loading initial state:', error);
                 // Set default values in case of error

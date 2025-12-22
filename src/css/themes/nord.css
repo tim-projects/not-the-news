@@ -1,0 +1,9 @@
+html.dark.theme-nord {
+  --bg: #2e3440;
+  --fg: #eceff4;
+  --primary: #88c0d0;
+  --secondary: #81a1c1;
+  --card-bg: #3b4252;
+  --card-border: #4c566a;
+  --card-shadow-color: rgba(0,0,0,0.3);
+}

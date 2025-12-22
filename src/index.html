@@ -116,6 +116,25 @@
                     
                     <h2>SETTINGS</h2>
                     <div class="settings-group"><label for="theme-toggle">Theme</label><div class="d-flex align-items-center"><span id="theme-text" x-text="theme"></span><label class="switch"><input type="checkbox" id="theme-toggle" :checked="theme === 'dark'" @change="toggleTheme()"><span class="slider"></span></label></div></div>
+                    <div class="settings-group">
+                        <label for="theme-style-selector">Theme Style:</label>
+                        <select id="theme-style-selector" x-model="themeStyle" @change="saveThemeStyle()" class="filter-select">
+                            <template x-if="theme === 'light'">
+                                <optgroup label="Light Themes">
+                                    <option value="original">Original Light</option>
+                                    <option value="sepia">Sepia</option>
+                                    <option value="solarized">Solarized Light</option>
+                                </optgroup>
+                            </template>
+                            <template x-if="theme === 'dark'">
+                                <optgroup label="Dark Themes">
+                                    <option value="original">Original Dark</option>
+                                    <option value="midnight">Midnight</option>
+                                    <option value="nord">Nord</option>
+                                </optgroup>
+                            </template>
+                        </select>
+                    </div>
                     <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
                     <div class="settings-group"><label for="images-toggle">Show Images</label><div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>

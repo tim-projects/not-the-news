@@ -31,12 +31,20 @@
   outline: none;
 }
 
-select#filter-selector {
+select#filter-selector,
+select#theme-style-selector {
   background: var(--card-bg);
   color: var(--fg);
 }
 
-select#filter-selector option:hover {
+select#filter-selector option,
+select#theme-style-selector option {
+  background: var(--card-bg);
+  color: var(--fg);
+}
+
+select#filter-selector option:hover,
+select#theme-style-selector option:hover {
   background: var(--primary);
 }
 

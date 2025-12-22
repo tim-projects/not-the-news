@@ -81,6 +81,7 @@ export interface AppState {
     syncStatusMessage: string;
     showSyncStatus: boolean;
     theme: string;
+    themeStyle: string;
     customCss: string;
     showUndo: boolean;
     undoItemGuid: string | null;
@@ -103,11 +104,14 @@ export interface AppState {
     loadRssFeeds(): Promise<void>;
     loadKeywordBlacklist(): Promise<void>;
     loadCustomCss(): Promise<void>;
+    loadThemeStyle(): Promise<void>;
     saveRssFeeds(): Promise<void>;
     saveKeywordBlacklist(): Promise<void>;
     saveCustomCss(): Promise<void>;
+    saveThemeStyle(): Promise<void>;
     resetCustomCss(): Promise<void>;
     applyCustomCss(): void;
+    applyThemeStyle(): void;
     toggleTheme(): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;

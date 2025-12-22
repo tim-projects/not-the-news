@@ -104,12 +104,13 @@ html.dark #header {
   color: var(--primary);
 }
 
-html.light .itemtitle {
-  background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
-}
-
 html.light .itemtitle a {
   color: var(--primary);
+}
+
+/* Original Light Theme specific gradient */
+html.light:not([class*="theme-"]) .itemtitle {
+  background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
 }
 
 html.light .item {

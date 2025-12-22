@@ -1,0 +1,10 @@
+html.light.theme-solarized {
+  --bg: #fdf6e3;
+  --fg: #657b83;
+  --primary: #268bd2;
+  --secondary: #93a1a1;
+  --card-bg: #eee8d5;
+  --card-border: #d5ccba;
+  --card-shadow-color: rgba(0,0,0,0.1);
+  background-image: none;
+}

@@ -97,6 +97,8 @@ USER_STATE_SERVER_DEFAULTS = {
 
     'theme': {'type': 'simple', 'default': 'light'},
 
+    'themeStyle': {'type': 'simple', 'default': 'original'},
+
     'lastFeedSync': {'type': 'simple', 'default': None},
 
     'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }

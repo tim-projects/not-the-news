@@ -1,0 +1,9 @@
+html.dark.theme-midnight {
+  --bg: #000000;
+  --fg: #ffffff;
+  --primary: #bb86fc;
+  --secondary: #03dac6;
+  --card-bg: #121212;
+  --card-border: #333333;
+  --card-shadow-color: rgba(0,0,0,0.5);
+}
