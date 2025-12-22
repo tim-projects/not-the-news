@@ -1,6 +1,6 @@
 /* layout.css */
 #header {
-  position: static;
+  position: relative;
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -22,18 +22,25 @@
   margin-right: 1rem;
 }
 
-#header-options {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.header-balancer {
+  display: none;
+}
+
+#ntn-title {
+  flex: 1;
 }
 
 #header h2 {
   padding: 0;
   margin: 0;
   font-size: 1.75rem;
-  flex: 1;
   text-align: center;
+}
+
+#header-options {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 html.light #header {
@@ -156,10 +163,12 @@ ul.feed-list,
     justify-content: space-between;
   }
 
+  #ntn-title {
+    flex: 1;
+  }
+
   #header h2 {
     text-align: left;
-    left: 0.25em;
-    transform: none;
     height: auto;
   }
 }
@@ -224,9 +233,22 @@ ul.feed-list,
     font-size: large;
   }
 
+  .header-balancer {
+    display: block;
+    flex: 1;
+  }
+
+  #ntn-title {
+    flex: 2;
+  }
+
+  #header-options {
+    flex: 1;
+    justify-content: flex-end;
+  }
+
   #header h2 {
     font-size: 2.5rem;
-    flex: 1;
     text-align: center;
   }
 
@@ -265,11 +287,6 @@ ul.feed-list,
     transform: translateX(-50%);
   }
 
-.pubdate p,
-  .itemfrom p {
-    font-size: smaller !important;
-  }
-
   .button-close,
   .button-star {
     font-size: xx-large;
@@ -288,3 +305,11 @@ ul.feed-list,
 .justify-between {
   justify-content: space-between !important;
 }
+
+/* Support for toggling item shadows */
+body.no-shadows .item,
+body.no-shadows img.entry-image,
+body.no-shadows .itemdescription img {
+  box-shadow: none !important;
+}
+
