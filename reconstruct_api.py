@@ -152,14 +152,20 @@ USER_STATE_SERVER_DEFAULTS = {
     'filterMode': {'type': 'simple', 'default': 'unread'},
     'syncEnabled': {'type': 'simple', 'default': True},
     'imagesEnabled': {'type': 'simple', 'default': True},
+    'fontSize': {'type': 'simple', 'default': 100},
     'lastStateSync': {'type': 'simple', 'default': None},
     'lastViewedItemId': {'type': 'simple', 'default': None},
     'lastViewedItemOffset': {'type': 'simple', 'default': 0},
     'theme': {'type': 'simple', 'default': 'light'},
+    'themeStyle': {'type': 'simple', 'default': 'original'},
+    'themeStyleLight': {'type': 'simple', 'default': 'original'},
+    'themeStyleDark': {'type': 'simple', 'default': 'original'},
     'lastFeedSync': {'type': 'simple', 'default': None},
     'shuffledOutGuids': {'type': 'array', 'default': []},           # Array of { guid, shuffledAt }
     'rssFeeds': {'type': 'nested_object', 'default': {}},
     'keywordBlacklist': {'type': 'array', 'default': []},
+    'customCss': {'type': 'simple', 'default': ''},
+    'shadowsEnabled': {'type': 'simple', 'default': True},
 }""")
 
 # Define the full and correct login function body with the decorator

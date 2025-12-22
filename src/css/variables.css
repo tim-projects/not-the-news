@@ -21,7 +21,7 @@ html {
   --secondary: aliceblue;
   --card-bg: #1E1E1E;
   --card-border: #343536;
-  --card-shadow-color: black;
+  --card-shadow-color: #00000052;
   --fg-muted: gray;
   --bg-alt: #ffffff; /* You might want a dark specific --bg-alt-dark */
   --toggle-track: #ccc; /* Or a dark specific color */

@@ -38,7 +38,8 @@ export const USER_STATE_DEFS: UserStateDefs = {
     rssFeeds: { store: 'userSettings', type: 'simple', localOnly: false, default: {} },
     keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },
     shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
-    lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null }
+    lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
+    shadowsEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true }
 };
 
 interface SimpleStateValue {

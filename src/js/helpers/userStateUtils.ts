@@ -12,8 +12,6 @@ import {
     overwriteArrayAndSyncChanges
 } from '../data/dbUserState.ts';
 
-import { createStatusBarMessage } from '../ui/uiUpdaters.ts';
-
 /**
  * A helper function to deeply clone an object, sanitizing it for IndexedDB storage.
  * It removes non-cloneable properties like functions.
@@ -81,13 +79,6 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
         }
     }
     
-    // Display status message to the user
-    if (stateKey === 'read') {
-        createStatusBarMessage(app, isCurrentlyActive ? 'Item unread.' : 'Item read.');
-    } else if (stateKey === 'starred') {
-        createStatusBarMessage(app, isCurrentlyActive ? 'Item unstarred.' : 'Item starred.');
-    }
-
     // Update UI counts
     if (typeof app.updateCounts === 'function') app.updateCounts();
 

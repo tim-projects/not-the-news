@@ -43,6 +43,7 @@ interface AppState { // Minimal AppState interface needed for performFeedSync
     loadFeedItemsFromDB?: () => Promise<void>;
     loadAndDisplayDeck?: () => Promise<void>;
     updateCounts?: () => Promise<void>;
+    progressMessage?: string;
 }
 
 
@@ -52,13 +53,15 @@ interface AppState { // Minimal AppState interface needed for performFeedSync
  * without triggering the sync queue. This is critical to prevent infinite loops.
  * @param {string} key The key to save (e.g., 'lastStateSync').
  * @param {any} value The value to save.
+ * @param {string} [timestamp] Optional timestamp to use. Defaults to current time.
  * @returns {Promise<void>}
  */
-async function _saveSyncMetaState(key: string, value: any): Promise<void> {
+async function _saveSyncMetaState(key: string, value: any, timestamp?: string): Promise<void> {
     return withDb(async (db: IDBPDatabase) => {
         try {
+            const lastModified = timestamp || new Date().toISOString();
             // Directly use `db.put` to bypass the queueing logic in dbUserState.js
-            await db.put('userSettings', { key, value, lastModified: new Date().toISOString() });
+            await db.put('userSettings', { key, value, lastModified });
         } catch (e: any) {
             console.error(`[DB] Failed to save sync metadata for key '${key}':`, e);
         }
@@ -263,8 +266,8 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
             const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
             const localGuids = new Set(localObjects.map((item: any) => item.guid));
 
-            const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
-            const objectsToRemove = localObjects.filter((item: any) => !serverGuids.has(item.guid));
+            const objectsToAdd = force ? serverObjects : serverObjects.filter((item: any) => !localGuids.has(item.guid));
+            const objectsToRemove = force ? [] : localObjects.filter((item: any) => !serverGuids.has(item.guid));
 
             if (objectsToAdd.length > 0 || objectsToRemove.length > 0 || force) {
                  await withDb(async (db: IDBPDatabase) => {
@@ -279,7 +282,7 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
             }
         } else {
             // Use the internal save function to prevent re-queuing this change.
-            await _saveSyncMetaState(key, data.value);
+            await _saveSyncMetaState(key, data.value, data.lastModified);
         }
         
         return { key, status: 200, timestamp: data.lastModified };
@@ -293,9 +296,23 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
  * Pulls the user state from the server.
  */
 export async function pullUserState(force: boolean = false): Promise<void> {
-    const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
-    if (!isOnline() || (!syncEnabled && !force)) {
-        if (syncEnabled) console.log('[DB] Offline. Skipping user state pull.');
+    if (!isOnline()) return;
+
+    let { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
+    
+    // If sync is disabled locally, we should still pull the 'syncEnabled' key
+    // to see if it was enabled on another device.
+    if (!syncEnabled && !force) {
+        console.log('[DB] Sync is disabled locally. Checking for remote status...');
+        const syncEnabledDef = USER_STATE_DEFS['syncEnabled'];
+        const result = await _pullSingleStateKey('syncEnabled', syncEnabledDef, false);
+        if (result.status === 200) {
+             const state = await loadSimpleState('syncEnabled') as SimpleStateValue;
+             syncEnabled = state.value;
+        }
+    }
+
+    if (!syncEnabled && !force) {
         return;
     }
     
@@ -308,7 +325,7 @@ export async function pullUserState(force: boolean = false): Promise<void> {
     console.log(`[DB] Pulling user state (force=${force})...`);
     
     try {
-        const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS).filter(([, def]) => !def.localOnly) as [string, UserStateDef][];
+        const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS).filter(([key, def]) => !def.localOnly && key !== 'syncEnabled') as [string, UserStateDef][];
         const results: { key: string, status: string | number, timestamp?: string }[] = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
         
         const newestOverallTimestamp: string = results.reduce((newest: string, result: { key: string, status: string | number, timestamp?: string }) => {
@@ -341,12 +358,13 @@ export async function getAllFeedItems(): Promise<FeedItem[]> {
 
 /**
  * Performs a feed synchronization, fetching new or updated items.
+ * @returns {Promise<boolean>} True if sync was successful, false otherwise.
  */
-export async function performFeedSync(app: AppState): Promise<void> {
+export async function performFeedSync(app: AppState): Promise<boolean> {
     const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) {
         if (syncEnabled) console.log('[DB] Offline. Skipping feed sync.');
-        return;
+        return true; // Not an error
     }
     
     console.log('[DB] Fetching feed items from server.');
@@ -357,7 +375,7 @@ export async function performFeedSync(app: AppState): Promise<void> {
 
         if (response.status === 304) {
             console.log('[DB] Feed not modified.');
-            return;
+            return true;
         }
         if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-guids`);
 
@@ -396,11 +414,11 @@ export async function performFeedSync(app: AppState): Promise<void> {
                     
                     fetchedSoFar += fetchedItems.length;
                     if (app) {
-                        app.itemLoadCount = fetchedSoFar;
                         app.progressMessage = `Fetching feed content... (${fetchedSoFar}/${totalToFetch})`;
                     }
                 } else {
                     console.error(`[DB] Failed to fetch a batch of feed items. Status: ${itemsResponse.status}`);
+                    return false;
                 }
             }
             
@@ -425,38 +443,36 @@ export async function performFeedSync(app: AppState): Promise<void> {
 
         if (serverTime) await _saveSyncMetaState('lastFeedSync', serverTime);
         
-        // Reset progress indicators
-        if (app) {
-            // We keep itemLoadCount for a moment to show finality or just clear it
-            setTimeout(() => {
-                app.itemLoadCount = 0;
-            }, 1000);
-        }
-
         // Trigger UI updates
         app?.loadFeedItemsFromDB?.();
         app?.loadAndDisplayDeck?.();
         app?.updateCounts?.();
 
+        return true;
+
     } catch (error: any) {
         console.error('[DB] Failed to synchronize feed:', error);
+        return false;
     }
 }
 
 /**
  * Performs a full synchronization, pulling user state and feed items.
+ * @returns {Promise<boolean>} True if sync was successful, false otherwise.
  */
-export async function performFullSync(app: AppState): Promise<void> {
+export async function performFullSync(app: AppState): Promise<boolean> {
     const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
-    if (!isOnline() || !syncEnabled) return;
+    if (!isOnline() || !syncEnabled) return true;
     
     console.log('[DB] Full sync initiated.');
     try {
-        // Run pulls first, then push any pending changes.
-        await pullUserState();
-        await performFeedSync(app);
+        // Run push first, then pulls.
         await processPendingOperations(); // Process any items that were queued while offline.
+        await pullUserState();
+        const syncSuccess = await performFeedSync(app);
+        return syncSuccess;
     } catch (error: any) {
         console.error('[DB] Full sync failed:', error);
+        return false;
     }
 }

@@ -409,10 +409,9 @@ def feed_items():
 
     return jsonify(result_items), 200
 
-@app.route("/api/feed-sync", methods=["POST"])
-def manual_feed_sync():
-    _authenticate_request()
-    api_logger.info("Received request for manual feed sync.")
+def _trigger_feed_sync():
+    """Triggers the RSS feed generation pipeline."""
+    api_logger.info("Triggering feed generation pipeline.")
     try:
         # Run the feed generation script synchronously
         # We use the absolute path to the script and the venv python
@@ -423,14 +422,24 @@ def manual_feed_sync():
             check=True,
             cwd="/rss" # Set CWD to where the script expects to be
         )
-        api_logger.info(f"Manual feed sync successful: {result.stdout}")
-        return jsonify({"status": "ok", "output": result.stdout}), 200
+        api_logger.info(f"Feed sync successful: {result.stdout}")
+        return True, result.stdout
     except subprocess.CalledProcessError as e:
-        api_logger.error(f"Manual feed sync failed: {e.stderr}")
-        return jsonify({"status": "error", "message": e.stderr}), 500
+        api_logger.error(f"Feed sync failed: {e.stderr}")
+        return False, e.stderr
     except Exception as e:
-        api_logger.exception(f"Unexpected error during manual feed sync: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        api_logger.exception(f"Unexpected error during feed sync: {e}")
+        return False, str(e)
+
+@app.route("/api/feed-sync", methods=["POST"])
+def manual_feed_sync():
+    _authenticate_request()
+    api_logger.info("Received request for manual feed sync.")
+    success, output = _trigger_feed_sync()
+    if success:
+        return jsonify({"status": "ok", "output": output}), 200
+    else:
+        return jsonify({"status": "error", "message": output}), 500
 
 def _load_state(key):
     api_logger.debug(f"Loading state for key: '{key}'")
@@ -595,6 +604,7 @@ def reset_app_data():
         files_to_delete = [
             "starred.json",
             "read.json",
+            "hidden.json",
             "currentDeckGuids.json",
             "shuffledOutGuids.json",
             "lastShuffleResetDate.json",
@@ -626,6 +636,12 @@ def reset_app_data():
         if os.path.exists(FEED_XML):
             os.remove(FEED_XML)
             api_logger.debug(f"Deleted cached feed: {FEED_XML}")
+
+        # Trigger an immediate feed sync to ensure the user has content after reload
+        api_logger.info("Triggering immediate feed sync after reset...")
+        sync_success, sync_message = _trigger_feed_sync()
+        if not sync_success:
+            api_logger.warning(f"Feed sync after reset failed: {sync_message}")
 
         api_logger.info("Application data reset successfully. User configuration and theme preserved.")
         return jsonify({"status": "ok", "message": "Application data reset successfully. Configuration and theme preserved."}), 200

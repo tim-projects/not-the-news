@@ -15,6 +15,8 @@ export const getImagesText = () => document.getElementById('images-text');
 export const getThemeToggle = () => document.getElementById('theme-toggle');
 export const getThemeText = () => document.getElementById('theme-text');
 export const getOpenUrlsInNewTabToggle = () => document.getElementById('open-urls-in-new-tab-toggle');
+export const getShadowsToggle = () => document.getElementById('shadows-toggle');
+export const getShadowsText = () => document.getElementById('shadows-text');
 
 // Display elements
 export const getShuffleCountDisplay = () => document.getElementById('shuffle-count-display');

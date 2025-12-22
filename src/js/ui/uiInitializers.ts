@@ -9,34 +9,27 @@ import {
     performFullSync,
     saveArrayState
 } from '../data/database.ts';
-import { formatDate, mapRawItem, mapRawItems, parseRssFeedsConfig } from '../helpers/dataUtils.ts';
 import {
     getSyncToggle,
     getImagesToggle,
+    getOpenUrlsInNewTabToggle,
+    getShadowsToggle,
     getThemeToggle,
-    getThemeText,
-        getBackButton,
-        getRssFeedsTextarea,
-        getKeywordsBlacklistTextarea,
-        getConfigureRssButton,
-        getConfigureKeywordsButton,
-        getSaveKeywordsButton,
-        getSaveRssButton,
-        getOpenUrlsInNewTabToggle
-    } from './uiElements.ts';
-    
-    import {
-        createStatusBarMessage
-    }
-    from './uiUpdaters.ts';
-    
-    type UpdateCountsCallback = (app: AppState) => Promise<void>;
-    type GetToggleElementFunction = () => HTMLElement | null;
+    getThemeText
+} from './uiElements.ts';
+
+import {
+    createStatusBarMessage
+}
+from './uiUpdaters.ts';
+
+type GetToggleElementFunction = () => HTMLElement | null;
     
     const SETTING_LABELS: Record<string, string> = {
         syncEnabled: 'Auto-Sync',
         imagesEnabled: 'Images',
-        openUrlsInNewTabEnabled: 'Open in New Tab'
+        openUrlsInNewTabEnabled: 'Open in New Tab',
+        shadowsEnabled: 'Shadows'
     };
     
     /**
@@ -73,8 +66,14 @@ import {
         await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled: boolean) => {
             app.updateSyncStatusMessage?.(); // Update the status message on toggle
             if (enabled) {
+                createStatusBarMessage(app, 'Kicking off a new sync');
                 console.log("Sync enabled, triggering full sync.");
-                await performFullSync(app);
+                const syncSuccess = await performFullSync(app);
+                if (syncSuccess) {
+                    createStatusBarMessage(app, 'Sync complete!');
+                } else {
+                    createStatusBarMessage(app, 'Sync finished with some issues.');
+                }
                 if (!app.currentDeckGuids?.length && app.entries?.length) {
                     console.log("Deck is empty after sync. Rebuilding from all available items.");
                     const now = new Date().toISOString();
@@ -89,13 +88,16 @@ import {
                     await saveArrayState('currentDeckGuids', app.currentDeckGuids);
                     console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
                 }
-                dispatchAppDataReady();
             }
         });
     }
     
     export async function initImagesToggle(app: AppState): Promise<void> {
         await setupBooleanToggle(app, getImagesToggle, 'imagesEnabled');
+    }
+
+    export async function initShadowsToggle(app: AppState): Promise<void> {
+        await setupBooleanToggle(app, getShadowsToggle, 'shadowsEnabled');
     }
     
     export async function initUrlsNewTabToggle(app: AppState): Promise<void> {

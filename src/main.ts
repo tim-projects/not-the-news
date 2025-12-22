@@ -66,7 +66,6 @@ import {
     initImagesToggle,
     initShadowsToggle,
     initUrlsNewTabToggle,
-    initTheme,
     initScrollPosition
 } from './js/ui/uiInitializers.ts';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
@@ -139,11 +138,15 @@ export function rssApp(): AppState {
                     // Pull user state first, as feed items depend on it.
                     await pullUserState(); // This fetches user preferences like rssFeeds from backend
                     // Then sync feed items.
-                    await performFeedSync(this);
+                    const syncSuccess = await performFeedSync(this);
                     
                     // Now that both syncs are complete, load all data into app state.
                     await this._loadAndManageAllData();
-                    createStatusBarMessage(this, "Initial sync complete!");
+                    if (syncSuccess) {
+                        createStatusBarMessage(this, "Initial sync complete!");
+                    } else {
+                        createStatusBarMessage(this, "Sync finished with some issues. Check console for details.");
+                    }
                 } else {
                     this.progressMessage = 'Offline mode. Loading local data...';
                     await this._loadAndManageAllData();
@@ -198,14 +201,18 @@ export function rssApp(): AppState {
             this.loading = true;
             try {
                 await processPendingOperations();
-                await performFeedSync(this);
+                const syncSuccess = await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
                 this.deckManaged = true;
                 this.progressMessage = '';
                 this.loading = false;
                 console.log('Immediate background sync complete.');
-                createStatusBarMessage(this, 'Sync complete!');
+                if (syncSuccess) {
+                    createStatusBarMessage(this, 'Sync complete!');
+                } else {
+                    createStatusBarMessage(this, 'Sync finished with errors.');
+                }
             } catch (error: any) {
                 console.error('Immediate background sync failed:', error);
                 this.progressMessage = 'Sync Failed!';
@@ -466,7 +473,7 @@ export function rssApp(): AppState {
                 createStatusBarMessage(this, 'RSS Feeds saved!');
                 this.loading = true;
                 this.progressMessage = 'Saving feeds and performing full sync...';
-                await performFullSync(this);
+                const syncSuccess = await performFullSync(this);
                 await this.loadFeedItemsFromDB();
                 
                 const deckResult = await manageDailyDeck(
@@ -484,6 +491,9 @@ export function rssApp(): AppState {
                 await this.loadAndDisplayDeck();
                 this.progressMessage = '';
                 this.loading = false;
+                if (!syncSuccess) {
+                    createStatusBarMessage(this, 'Feeds saved, but sync finished with errors.');
+                }
             } catch (error: any) {
                 console.error('Error saving RSS feeds:', error);
                 createStatusBarMessage(this, `Failed to save RSS feeds: ${error.message}`);
@@ -544,14 +554,14 @@ export function rssApp(): AppState {
                 },
                 loadThemeStyle: async function(this: AppState): Promise<void> {
                     const { loadSimpleState } = await import('./js/data/dbUserState.ts');
-                    const [styleResult, lightStyleResult, darkStyleResult] = await Promise.all([
+                    const [, lightRes, darkRes] = await Promise.all([
                         loadSimpleState('themeStyle'),
                         loadSimpleState('themeStyleLight'),
                         loadSimpleState('themeStyleDark')
                     ]);
                     
-                    this.themeStyleLight = typeof lightStyleResult.value === 'string' ? lightStyleResult.value : 'original';
-                    this.themeStyleDark = typeof darkStyleResult.value === 'string' ? darkStyleResult.value : 'original';
+                    this.themeStyleLight = typeof lightRes.value === 'string' ? lightRes.value : 'original';
+                    this.themeStyleDark = typeof darkRes.value === 'string' ? darkRes.value : 'original';
                     
                     // If we just loaded, set themeStyle based on current theme to ensure consistency
                     if (this.theme === 'light') {
@@ -984,11 +994,11 @@ export function rssApp(): AppState {
                 if (!this.syncEnabled || !this.isOnline) return;
                 console.log('Performing periodic background sync...');
                 await processPendingOperations();
-                await performFeedSync(this);
+                const syncSuccess = await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
                 this.deckManaged = true;
-                console.log('Background sync complete.');
+                console.log(`Background sync complete. Success: ${syncSuccess}`);
             };
 
             window.addEventListener('online', async () => {
@@ -1016,8 +1026,6 @@ export function rssApp(): AppState {
                     saveCurrentScrollPosition();
                 }, 1000);
             }, { passive: true });
-
-            setTimeout(backgroundSync, 0);
         },
         _startPeriodicSync: function(this: AppState): void {
             let lastActivityTimestamp = Date.now();
@@ -1039,11 +1047,11 @@ export function rssApp(): AppState {
                 console.log('Starting scheduled background sync...');
                 try { // Added try-catch for error handling
                     await processPendingOperations();
-                    await performFeedSync(this);
+                    const syncSuccess = await performFeedSync(this);
                     await pullUserState();
                     await this._loadAndManageAllData();
                     this.deckManaged = true;
-                    console.log('Scheduled sync complete.');
+                    console.log(`Scheduled sync complete. Success: ${syncSuccess}`);
                 } catch (error: any) {
                     console.error('Periodic sync failed:', error);
                 }

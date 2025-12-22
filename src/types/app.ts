@@ -92,9 +92,18 @@ export interface AppState {
     undoTimerActive: boolean;
     undoItemGuid: string | null;
     undoItemIndex: number | null;
+    db: any | null;
+    _lastFilterHash: string;
+    _cachedFilteredEntries: MappedFeedItem[] | null;
+    scrollObserver: IntersectionObserver | null;
+    imageObserver: IntersectionObserver | null;
+    staleItemObserver: IntersectionObserver | null;
+    _initComplete: boolean;
+    _isSyncing: boolean;
 
     // --- Core Methods ---
     initApp(): Promise<void>;
+    updateCounts(): Promise<void>;
     performBackgroundSync(): Promise<void>;
     _reconcileAndRefreshUI(): Promise<void>;
     _initObservers(): void;

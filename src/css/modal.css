@@ -109,6 +109,7 @@ html.light .modal-content {
 
 .settings-group label {
   flex-shrink: 0;
+  font-size: 1.1em;
 }
 
 .settings-group span[id$="-text"] {
@@ -146,11 +147,6 @@ html.light .modal-content {
   justify-content: space-between;
   align-items: center;
   padding: 0.25rem 0;
-  border-bottom: 1px solid var(--card-border);
-}
-
-.settings-option:last-child {
-  border-bottom: none;
 }
 
 .settings-option span {
