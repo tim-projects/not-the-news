@@ -22,7 +22,7 @@ button:active {
 }
 
 button.close {
-  font-size: 1.75rem;
+  font-size: 24px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
@@ -32,9 +32,9 @@ button.close {
   top: 1px;
   right: 1px;
   margin: 0;
-  padding: 0 0 0.3rem 0; /* Push content up slightly for visual centering */
-  width: 4rem;
-  height: 4rem;
+  padding: 0 0 4px 0; /* Push content up slightly for visual centering */
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -55,7 +55,7 @@ button.close:active {
 }
 
 button.star {
-  font-size: 2.5rem;
+  font-size: 35px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
@@ -66,9 +66,9 @@ button.star {
   bottom: 2px;
   right: 0;
   margin: 0;
-  padding: 0 0 0.3rem 0; /* Align with read button centering */
-  width: 4rem;
-  height: 4rem;
+  padding: 0 0 4px 0; /* Align with read button centering */
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,7 +89,7 @@ button.star:active {
 }
 
 button.read-button {
-  font-size: 1.75rem;
+  font-size: 24px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
@@ -99,9 +99,9 @@ button.read-button {
   top: 1px;
   right: 1px;
   margin: 0;
-  padding: 0 0 0.3rem 0; /* Push content up slightly for visual centering */
-  width: 4rem;
-  height: 4rem;
+  padding: 0 0 4px 0; /* Push content up slightly for visual centering */
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -250,11 +250,11 @@ button.star.starred:active {
   left: 1px;
   background: var(--bg);
   color: var(--fg);
-  font-size: 1.8rem;
+  font-size: 25px;
   cursor: pointer;
-  padding: 0 0 0.3rem 0; /* Push content up slightly for visual centering */
-  width: 4rem;
-  height: 4rem;
+  padding: 0 0 4px 0; /* Push content up slightly for visual centering */
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -331,7 +331,7 @@ button.star.starred:active {
 
 .modal-content>button.close,
 .modal-content>#back-button {
-  font-size: 2rem;
+  font-size: 28px;
   opacity: 0.8;
 }
 

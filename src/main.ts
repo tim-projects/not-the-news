@@ -696,23 +696,32 @@ export function rssApp(): AppState {
                 console.log('Service workers unregistered.');
 
                 // 2. Clear specific IndexedDB object stores (read, starred, feedItems, deck info)
-                console.log('Clearing specific IndexedDB object stores...');
+                console.log('Clearing feed and progress IndexedDB object stores...');
                 try {
                     const db = await initDb(); // Re-initialize/get DB connection
-                    const storesToClear = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids', 'feedItems'];
-                    const tx = db.transaction(storesToClear, 'readwrite');
+                    const storesToClear = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids', 'feedItems', 'pendingOperations'];
+                    const tx = db.transaction([...storesToClear, 'userSettings'], 'readwrite');
                     await Promise.all(storesToClear.map(storeName => {
                         console.log(`Clearing object store: ${storeName}`);
                         return tx.objectStore(storeName).clear();
                     }));
+                    
+                    // Also clear sync metadata to force a fresh pull from server
+                    console.log('Clearing sync metadata from userSettings...');
+                    const userSettingsStore = tx.objectStore('userSettings');
+                    await Promise.all([
+                        userSettingsStore.delete('lastFeedSync'),
+                        userSettingsStore.delete('lastStateSync')
+                    ]);
+
                     await tx.done;
-                    console.log('Specific IndexedDB object stores cleared.');
+                    console.log('Specific IndexedDB object stores and sync metadata cleared.');
                 } catch (e) {
-                    console.error('Error clearing specific IndexedDB stores:', e);
+                    console.error('Error clearing IndexedDB stores:', e);
                 }
                 
-                // localStorage is no longer cleared, as rssFeeds and keywordBlacklist should persist
-                console.log('localStorage (excluding user settings) is implicitly maintained.');
+                // localStorage is no longer cleared to keep theme and other preferences
+                console.log('localStorage is preserved.');
 
                 // 4. Call backend to reset server-side data
                 console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
@@ -735,7 +744,10 @@ export function rssApp(): AppState {
                 // Passing 'true' to force a fresh pull of all keys.
                 await pullUserState(true);
                 
-                window.location.reload(); // Reload immediately after backend confirms
+                // Reload after a short delay to allow the message to be seen
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
 
             } catch (error: any) {
                 console.error("Error during application reset:", error);

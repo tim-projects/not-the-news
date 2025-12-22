@@ -256,11 +256,6 @@ ul.feed-list,
     margin-left: auto;
     margin-right: 1rem;
   }
-
-  .button-close,
-  .button-star {
-    font-size: xx-large;
-  }
 }
 
 @media (min-width: 1024px) {
@@ -285,11 +280,6 @@ ul.feed-list,
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-  }
-
-  .button-close,
-  .button-star {
-    font-size: xx-large;
   }
 }
 
