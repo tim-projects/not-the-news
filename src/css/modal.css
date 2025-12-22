@@ -91,12 +91,12 @@ html.light .modal-content {
 }
 
 .settings-group {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 0.5rem 0;
+  padding: 0.2rem 0;
   box-sizing: border-box;
 }
 
@@ -145,7 +145,7 @@ html.light .modal-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
+  padding: 0.25rem 0;
   border-bottom: 1px solid var(--card-border);
 }
 
