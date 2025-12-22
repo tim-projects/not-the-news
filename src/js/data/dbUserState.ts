@@ -33,6 +33,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     themeStyleLight: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
     themeStyleDark: { store: 'userSettings', type: 'simple', localOnly: false, default: 'original' },
     customCss: { store: 'userSettings', type: 'simple', localOnly: false, default: '' },
+    fontSize: { store: 'userSettings', type: 'simple', localOnly: true, default: 100 },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 }
 };
 

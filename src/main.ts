@@ -131,6 +131,7 @@ export function rssApp(): AppState {
         themeStyleLight: 'original',
         themeStyleDark: 'original',
         customCss: '',
+        fontSize: 100,
         showUndo: false,
         undoItemGuid: null,
         _lastFilterHash: '',
@@ -576,6 +577,20 @@ export function rssApp(): AppState {
                         htmlEl.classList.add(`theme-${this.themeStyle}`);
                     }
                 },
+                loadFontSize: async function(this: AppState): Promise<void> {
+                    const { loadSimpleState } = await import('./js/data/dbUserState.ts');
+                    const { value } = await loadSimpleState('fontSize');
+                    this.fontSize = typeof value === 'number' ? value : 100;
+                    this.applyFontSize();
+                },
+                saveFontSize: async function(this: AppState): Promise<void> {
+                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                    await saveSimpleState('fontSize', this.fontSize);
+                    this.applyFontSize();
+                },
+                applyFontSize: function(this: AppState): void {
+                    document.documentElement.style.setProperty('--font-scale', (this.fontSize / 100).toString());
+                },
                 toggleTheme: async function(this: AppState): Promise<void> {
                     const newTheme = this.theme === 'dark' ? 'light' : 'dark';
                     this.theme = newTheme;
@@ -819,6 +834,7 @@ export function rssApp(): AppState {
                 
                 await this.loadCustomCss();
                 await this.loadThemeStyle();
+                await this.loadFontSize();
             } catch (error: any) {
                 console.error('Error loading initial state:', error);
                 // Set default values in case of error

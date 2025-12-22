@@ -1,19 +1,14 @@
-# Current Task: Add Theme Styles
+# Current Task: Add Global Font Size Scaling
 
 ## Objective
-Add a 'Theme Style' dropdown to the settings modal that allows users to choose from various theme presets.
-1. Create 4 additional themes (2 light, 2 dark) in separate CSS files.
-2. Add a dropdown UI element that filters options based on the current Light/Dark mode.
-3. Implement logic to persist and apply selected theme styles.
-4. Ensure selected light and dark theme styles are remembered independently when switching modes.
+Add a locally stored setting to allow users to increase or decrease the global font size (50% to 200%).
+1.  Add a `fontSize` property to `AppState` and `dbUserState` (local storage only).
+2.  Create a UI control (slider or range input) in the settings modal to adjust the percentage.
+3.  Implement logic to apply the font size scaling to the `html` or `body` element using a CSS variable or `font-size` percentage.
+4.  Ensure the setting persists across reloads but is not synced to the backend (device-specific).
 
 ## Progress
-- [x] Create theme CSS files.
-- [x] Update AppState type and database schemas.
-- [x] Implement theme switching logic in main.ts.
-- [x] Add dropdown to settings modal.
-- [x] Verify functionality.
-- [ ] Update `AppState` and database to store `themeStyleLight` and `themeStyleDark`.
-- [ ] Update `toggleTheme` logic to swap between stored light and dark styles.
-- [ ] Update `saveThemeStyle` to update the specific style for the current mode.
-- [ ] Verify independent persistence of light/dark styles.
+- [x] Add `fontSize` to `AppState` and `dbUserState`.
+- [x] Implement font size application logic (CSS variable `--font-scale` or similar).
+- [x] Add font size slider to settings UI.
+- [x] Verify functionality and persistence.

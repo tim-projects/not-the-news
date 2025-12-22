@@ -149,6 +149,12 @@
                             </template>
                         </select>
                     </div>
+                    <div class="settings-group">
+                        <label for="font-size-slider">Font Size: <span x-text="`${fontSize}%`"></span ></label>
+                        <div class="d-flex align-items-center grow">
+                            <input type="range" id="font-size-slider" min="50" max="200" step="5" x-model.number="fontSize" @input="applyFontSize()" @change="saveFontSize()" class="font-size-range">
+                        </div>
+                    </div>
                     <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
                     <div class="settings-group"><label for="images-toggle">Show Images</label><div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>

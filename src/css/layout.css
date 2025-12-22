@@ -193,7 +193,7 @@ ul.feed-list,
 
   body,
   html {
-    font-size: calc(18px + .2vw);
+    font-size: calc((18px + .2vw) * var(--font-scale));
   }
 
   .item {
@@ -261,7 +261,7 @@ ul.feed-list,
 
   body,
   html {
-    font-size: calc(20px + .3vw);
+    font-size: calc((20px + .3vw) * var(--font-scale));
   }
 
   .item {

@@ -85,6 +85,7 @@ export interface AppState {
     themeStyleLight: string;
     themeStyleDark: string;
     customCss: string;
+    fontSize: number;
     showUndo: boolean;
     undoItemGuid: string | null;
 
@@ -107,13 +108,16 @@ export interface AppState {
     loadKeywordBlacklist(): Promise<void>;
     loadCustomCss(): Promise<void>;
     loadThemeStyle(): Promise<void>;
+    loadFontSize(): Promise<void>;
     saveRssFeeds(): Promise<void>;
     saveKeywordBlacklist(): Promise<void>;
     saveCustomCss(): Promise<void>;
     saveThemeStyle(): Promise<void>;
+    saveFontSize(): Promise<void>;
     resetCustomCss(): Promise<void>;
     applyCustomCss(): void;
     applyThemeStyle(): void;
+    applyFontSize(): void;
     toggleTheme(): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;
