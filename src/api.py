@@ -119,6 +119,8 @@ USER_STATE_SERVER_DEFAULTS = {
 
             'customCss': {'type': 'simple', 'default': ''},
 
+            'shadowsEnabled': {'type': 'simple', 'default': True},
+
     }
 
     
@@ -229,7 +231,8 @@ def _authenticate_request():
         abort(401)
     
     # Simple check for development: if APP_PASSWORD matches
-    if auth_token == os.environ.get('APP_PASSWORD'):
+    app_password = os.environ.get('APP_PASSWORD')
+    if app_password and auth_token == app_password:
         return
 
     # Check Redis for the token

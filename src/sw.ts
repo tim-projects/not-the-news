@@ -28,7 +28,7 @@ const navigationHandler: RouteHandlerCallback = async ({ event }): Promise<Respo
   } catch (error: any) {
     // If the network fails, fall back to the index.html from the cache.
     // This is the single-page application fallback.
-    const cachedResponse = await caches.match('index.html');
+    const cachedResponse = await caches.match('/index.html') || await caches.match('index.html');
     if (cachedResponse) {
         return cachedResponse;
     }

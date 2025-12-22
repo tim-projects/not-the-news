@@ -13,12 +13,21 @@ test.describe('UI Elements and Interactions', () => {
             const request = response.request();
             // Log only XHR/Fetch responses
             if (request.resourceType() === 'xhr' || request.resourceType() === 'fetch') {
+                if (response.status() >= 300 && response.status() <= 399) {
+                    console.log(`Response (XHR/Fetch - Redirect): ${response.status()} ${response.url()}`);
+                    return;
+                }
                 try {
                     const json = await response.json();
                     console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${JSON.stringify(json, null, 2)}`);
                 } catch (e) {
                     // Not all XHR/Fetch responses are JSON, log as text
-                    console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${await response.text()}`);
+                    try {
+                        const text = await response.text();
+                        console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${text}`);
+                    } catch (err) {
+                        console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: [Could not read body: ${err.message}]`);
+                    }
                 }
             } else {
                 console.log(`Response: ${response.status()} ${response.url()}`);
@@ -118,8 +127,7 @@ test.describe('UI Elements and Interactions', () => {
         await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
         console.log('Header is visible. Main UI rendered.');
         
-        await page.waitForLoadState('networkidle', { timeout: 60000 });
-        console.log('Network is idle.');
+        // Removed waitForLoadState('networkidle') as it can hang with Service Workers/Background Sync
 
         // NEW: Wait for at least one feed item to be visible
         console.log('Waiting for at least one feed item (.item) to be visible...');
@@ -384,25 +392,61 @@ test.describe('UI Elements and Interactions', () => {
         await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
         console.log('App loaded online with items.');
 
+        // Wait for Service Worker to be ready and all assets to be cached
+        console.log('Waiting for Service Worker to be activated and ready...');
+        await page.evaluate(async () => {
+            if ('serviceWorker' in navigator) {
+                const registration = await navigator.serviceWorker.ready;
+                // Force activation
+                if (registration.waiting) {
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+                // Wait for the active worker to be controller
+                if (!navigator.serviceWorker.controller) {
+                    await new Promise(resolve => {
+                        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+                    });
+                }
+                console.log('Service Worker is ready and controlling the page.');
+            }
+        });
+        // Give it more time to ensure background caching tasks are done and SW is stable
+        await page.waitForTimeout(10000);
+
         // 2. Set the browser context to offline
         console.log('Setting context to offline...');
         await page.context().setOffline(true);
 
         // 3. Reload the page while offline
         console.log('Reloading page while offline...');
-        // Note: We use reload() because it's handled by the Service Worker
-        await page.reload({ waitUntil: 'load', timeout: 60000 });
+        // Note: We use goto() because it's handled by the Service Worker for the initial navigation
+        await page.goto(APP_URL, { waitUntil: 'load', timeout: 60000 });
+        await page.waitForLoadState('load');
 
         // 4. Verify the app still loads and shows content from IndexedDB
         console.log('Verifying app UI in offline mode...');
-        await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
-        await expect(page.locator('#ntn-title')).toHaveText('Not The News');
-        
+        try {
+            // Wait for loading screen to disappear
+            await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
+            await expect(page.locator('#ntn-title')).toHaveText('Not The News', { timeout: 30000 });
+        } catch (e) {
+            console.log('Failed to find #ntn-title or loading screen did not hide. Current page content:', await page.content());
+            throw e;
+        }
+
+        // Verify content visibility from IndexedDB FIRST to ensure app is working
         console.log('Verifying content visibility from IndexedDB...');
-        await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
-        const itemsCount = await page.locator('.item').count();
+        const itemSelector = page.locator('.item');
+        await expect(itemSelector.first()).toBeVisible({ timeout: 30000 });
+        const itemsCount = await itemSelector.count();
         expect(itemsCount).toBeGreaterThan(0);
         console.log(`Successfully verified ${itemsCount} items are visible offline.`);
+
+        // Verify "Offline." status message is visible
+        console.log('Verifying offline status message...');
+        const syncStatusMessage = page.locator('#sync-status-message');
+        await expect(syncStatusMessage).toBeVisible({ timeout: 10000 });
+        await expect(syncStatusMessage).toHaveText('Offline.');
 
         // 5. Cleanup: Set back to online
         await page.context().setOffline(false);
