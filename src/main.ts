@@ -69,6 +69,7 @@ import {
     initScrollPosition
 } from './js/ui/uiInitializers.ts';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
+import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState } from './types/app.ts';
 
@@ -81,6 +82,7 @@ export function rssApp(): AppState {
         feedItems: {},
         filterMode: 'unread',
         openSettings: false,
+        openShortcuts: false,
         modalView: 'main',
         shuffleCount: 0,
         syncEnabled: true,
@@ -110,6 +112,8 @@ export function rssApp(): AppState {
         undoTimerActive: false,
         undoItemGuid: null,
         undoItemIndex: null,
+        selectedGuid: null,
+        starredGuid: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -362,19 +366,14 @@ export function rssApp(): AppState {
         },        isRead: function(this: AppState, guid: string): boolean {
             return this.read.some(e => e.guid === guid);
         },        toggleStar: async function(this: AppState, guid: string): Promise<void> {
-            const isCurrentlyStarred = this.isStarred(guid);
+            const isStarring = !this.starred.some(item => item.guid === guid);
+            if (isStarring) {
+                this.starredGuid = guid;
+                setTimeout(() => {
+                    if (this.starredGuid === guid) this.starredGuid = null;
+                }, 500); // Animation duration
+            }
             await toggleItemStateAndSync(this, guid, 'starred');
-            
-            // Directly update the item's starred status in the current deck and entries
-            this.deck = this.deck.map(item =>
-                item.guid === guid ? { ...item, isStarred: !isCurrentlyStarred } : item
-            );
-            this.entries = this.entries.map(item =>
-                item.guid === guid ? { ...item, isStarred: !isCurrentlyStarred } : item
-            );
-            
-            this.updateCounts();
-            this.updateSyncStatusMessage();
         },        toggleRead: async function(this: AppState, guid: string): Promise<void> {
             const isCurrentlyRead = this.isRead(guid);
             let removedIndex: number | null = null;
@@ -418,7 +417,7 @@ export function rssApp(): AppState {
             await this._reconcileAndRefreshUI(); // Reconcile to handle potential item removals/animations
             this.updateSyncStatusMessage();
 
-            if (!isCurrentlyRead) {
+            if (!isCurrentlyRead && this.filterMode !== 'all') {
                 showUndoNotification(this, guid, removedIndex);
             }
 
@@ -444,6 +443,13 @@ export function rssApp(): AppState {
             await this.toggleRead(guid);
             this.undoItemGuid = null;
             this.undoItemIndex = null;
+        },        selectItem: function(this: AppState, guid: string): void {
+            if (this.selectedGuid === guid) return;
+            this.selectedGuid = guid;
+            // Use the same scroll logic as keyboard manager
+            import('./js/helpers/keyboardManager.ts').then(m => {
+                m.scrollSelectedIntoView(guid, this);
+            });
         },        processShuffle: async function(this: AppState): Promise<void> {
             await processShuffle(this);
             this.updateCounts();
@@ -1046,6 +1052,11 @@ export function rssApp(): AppState {
                     saveCurrentScrollPosition();
                 }, 1000);
             }, { passive: true });
+
+            // Global Keyboard Shortcuts
+            window.addEventListener('keydown', (e: KeyboardEvent) => {
+                handleKeyboardShortcuts(e, this);
+            });
         },
         _startPeriodicSync: function(this: AppState): void {
             let lastActivityTimestamp = Date.now();

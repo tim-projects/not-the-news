@@ -112,6 +112,7 @@ html {
   font-size: calc(14px * var(--font-scale));
   background-color: var(--bg);
   background-repeat: repeat;
+  overflow-x: hidden;
 }
 
 p,

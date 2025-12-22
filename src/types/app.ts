@@ -62,6 +62,7 @@ export interface AppState {
     feedItems: { [guid: string]: any }; // Adjust 'any' to a more specific type if known
     filterMode: string;
     openSettings: boolean;
+    openShortcuts: boolean;
     modalView: string;
     shuffleCount: number;
     lastShuffleResetDate: string | null;
@@ -92,6 +93,8 @@ export interface AppState {
     undoTimerActive: boolean;
     undoItemGuid: string | null;
     undoItemIndex: number | null;
+    selectedGuid: string | null;
+    starredGuid: string | null;
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;
@@ -116,6 +119,7 @@ export interface AppState {
     toggleStar(guid: string): Promise<void>;
     toggleRead(guid: string): Promise<void>;
     undoMarkRead(): Promise<void>;
+    selectItem(guid: string): void;
     processShuffle(): Promise<void>;
     loadRssFeeds(): Promise<void>;
     loadKeywordBlacklist(): Promise<void>;

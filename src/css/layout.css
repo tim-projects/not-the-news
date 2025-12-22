@@ -52,10 +52,66 @@ html.dark #header {
   text-shadow: 2px 2px 2px var(--card-shadow-color);
 }
 
+#app-viewport {
+  width: 100%;
+  position: relative;
+}
+
+#sliding-container {
+  display: flex;
+  width: calc(150vw + 1.4rem);
+  gap: 1.4rem;
+  transition: margin-left 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+  align-items: stretch; /* Crucial: make both sections the same height */
+}
+
+#app-viewport.shifted #sliding-container {
+  margin-left: calc(-50vw - 1.4rem);
+}
+
+#main-section {
+  width: 100vw;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+#shortcuts-section {
+  width: 50vw;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background-color: var(--bg);
+  position: relative;
+}
+
+.help-panel-item {
+    width: 90%;
+    max-width: 600px;
+    margin: 0 auto !important;
+    position: sticky;
+    top: 15vh; /* Center it vertically in the viewport when stuck */
+    z-index: 10;
+}
+
 #items {
   width: 100%;
   display: block;
   overflow-x: hidden;
+}
+
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  width: 100%;
+  text-align: center;
+}
+
+.empty-state p {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  opacity: 0.5;
+  margin: 0;
 }
 
 .itembox {

@@ -214,7 +214,8 @@ button.star.starred:active {
 }
 
 .shuffle-btn,
-.settings-btn {
+.settings-btn,
+.help-btn {
   width: 3.5em;
   height: 3.5em;
   background-color: var(--card-bg);
@@ -226,21 +227,31 @@ button.star.starred:active {
   border: 1px solid var(--card-border);
   cursor: pointer;
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-btn {
+    padding-top: 0;
 }
 
 .shuffle-btn:hover,
-.settings-btn:hover {
+.settings-btn:hover,
+.help-btn:hover {
   background-color: var(--primary);
   color: white;
 }
 
 .shuffle-btn:focus,
-.settings-btn:focus {
+.settings-btn:focus,
+.help-btn:focus {
   box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
 }
 
 .shuffle-btn:active,
-.settings-btn:active {
+.settings-btn:active,
+.help-btn:active {
   box-shadow: 1px 1px 5px var(--card-shadow-color), 0 0 0 3px var(--primary);
 }
 
