@@ -62,8 +62,16 @@ html.light .modal-content {
   transition-duration: 0.2s;
 }
 
+.duration-150 {
+  transition-duration: 0.15s;
+}
+
 .ease-in {
   transition-timing-function: ease-in;
+}
+
+.ease-out {
+  transition-timing-function: ease-out;
 }
 
 .opacity-100 {
