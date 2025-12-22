@@ -95,7 +95,7 @@ button.read-button {
   color: var(--fg);
   border-radius: 0 10px 0 20px;
   opacity: 0.8;
-  box-shadow: -1px 1px 0 1px var(--card-border);
+  box-shadow: -1px 1px 0 1px var(--card-shadow-color);
   position: absolute;
   top: 1px;
   right: 1px;
@@ -384,6 +384,10 @@ html.light button.star:hover {
 }
 
 html.dark button.close {
+  box-shadow: -1px 1px 0 0px var(--card-border);
+}
+
+html.dark button.read-button {
   box-shadow: -1px 1px 0 0px var(--card-border);
 }
 
