@@ -64,6 +64,8 @@ import {
 import {
     initSyncToggle,
     initImagesToggle,
+    initShadowsToggle,
+    initUrlsNewTabToggle,
     initTheme,
     initScrollPosition
 } from './js/ui/uiInitializers.ts';
@@ -76,7 +78,6 @@ export function rssApp(): AppState {
         // --- State Properties ---
         loading: true,
         progressMessage: 'Initializing...',
-        itemLoadCount: 0,
         deck: [],
         feedItems: {},
         filterMode: 'unread',
@@ -86,6 +87,7 @@ export function rssApp(): AppState {
         syncEnabled: true,
         imagesEnabled: true,
         openUrlsInNewTabEnabled: true,
+        shadowsEnabled: true,
         rssFeedsInput: '',
         keywordBlacklistInput: '',
         entries: [],
@@ -106,7 +108,9 @@ export function rssApp(): AppState {
         customCss: '',
         fontSize: 100,
         showUndo: false,
+        undoTimerActive: false,
         undoItemGuid: null,
+        undoItemIndex: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -130,6 +134,8 @@ export function rssApp(): AppState {
 
                 if (this.isOnline) {
                     this.progressMessage = 'Syncing latest content...'; // Set specific sync message
+                    // Push any pending local changes first.
+                    await processPendingOperations();
                     // Pull user state first, as feed items depend on it.
                     await pullUserState(); // This fetches user preferences like rssFeeds from backend
                     // Then sync feed items.
@@ -147,6 +153,8 @@ export function rssApp(): AppState {
                 // initTheme is no longer needed as we handle it via _loadInitialState and toggleTheme
                 initSyncToggle(this);
                 initImagesToggle(this);
+                initShadowsToggle(this);
+                initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
                 this.$nextTick(() => {
                     initScrollPosition(this);
@@ -189,6 +197,7 @@ export function rssApp(): AppState {
             this.progressMessage = 'Syncing...';
             this.loading = true;
             try {
+                await processPendingOperations();
                 await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
@@ -207,19 +216,17 @@ export function rssApp(): AppState {
 
         updateSyncStatusMessage: async function(this: AppState): Promise<void> {
             const online = isOnline();
-            let message = '';
-            let show = false;
 
             if (!online) {
-                message = 'Offline.';
-                show = true;
+                this.syncStatusMessage = 'Offline.';
+                this.showSyncStatus = true;
             } else if (!this.syncEnabled) {
-                message = 'Sync is disabled.';
-                show = true;
+                this.syncStatusMessage = 'Sync is disabled.';
+                this.showSyncStatus = true;
+            } else {
+                this.showSyncStatus = false;
+                this.syncStatusMessage = '';
             }
-
-            this.syncStatusMessage = message;
-            this.showSyncStatus = show;
         },
         
         loadAndDisplayDeck: async function(this: AppState): Promise<void> {
@@ -363,6 +370,7 @@ export function rssApp(): AppState {
             this.updateSyncStatusMessage();
         },        toggleRead: async function(this: AppState, guid: string): Promise<void> {
             const isCurrentlyRead = this.isRead(guid);
+            let removedIndex: number | null = null;
             await toggleItemStateAndSync(this, guid, 'read');
             
             // Directly update the item's read status in the current deck and entries
@@ -375,6 +383,9 @@ export function rssApp(): AppState {
 
             if (this.filterMode === 'unread' && !isCurrentlyRead) {
                 // If it was unread and now read, remove it from the deck in unread mode
+                removedIndex = this.currentDeckGuids.findIndex(item => item.guid === guid);
+                if (removedIndex === -1) removedIndex = null;
+
                 this.deck = this.deck.filter(item => item.guid !== guid);
                 // Also remove it from currentDeckGuids so it's not re-added on refresh
                 this.currentDeckGuids = this.currentDeckGuids.filter(deckItem => deckItem.guid !== guid);
@@ -384,7 +395,12 @@ export function rssApp(): AppState {
             } else if (this.filterMode === 'unread' && isCurrentlyRead) {
                 // If it was read and now unread (Undo), add it back to the deck if missing
                 if (!this.currentDeckGuids.some(deckItem => deckItem.guid === guid)) {
-                    this.currentDeckGuids.push({ guid, addedAt: new Date().toISOString() });
+                    const deckItem = { guid, addedAt: new Date().toISOString() };
+                    if (this.undoItemIndex !== null && this.undoItemIndex >= 0) {
+                        this.currentDeckGuids.splice(this.undoItemIndex, 0, deckItem);
+                    } else {
+                        this.currentDeckGuids.push(deckItem);
+                    }
                     // Save the updated deck guids to the database
                     const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
                     await saveCurrentDeck(this.currentDeckGuids);
@@ -396,7 +412,7 @@ export function rssApp(): AppState {
             this.updateSyncStatusMessage();
 
             if (!isCurrentlyRead) {
-                showUndoNotification(this, guid);
+                showUndoNotification(this, guid, removedIndex);
             }
 
             // If the deck is now empty, trigger a deck refresh
@@ -418,8 +434,9 @@ export function rssApp(): AppState {
             if (!this.undoItemGuid) return;
             const guid = this.undoItemGuid;
             this.showUndo = false;
-            this.undoItemGuid = null;
             await this.toggleRead(guid);
+            this.undoItemGuid = null;
+            this.undoItemIndex = null;
         },        processShuffle: async function(this: AppState): Promise<void> {
             await processShuffle(this);
             this.updateCounts();
@@ -951,6 +968,12 @@ export function rssApp(): AppState {
                 this.scrollToTop();
             });
             
+            this.$watch('shadowsEnabled', (enabled: boolean) => {
+                document.body.classList.toggle('no-shadows', !enabled);
+            });
+            // Initial state for shadows
+            document.body.classList.toggle('no-shadows', !this.shadowsEnabled);
+            
             this.$watch('entries', () => this.updateCounts());
             this.$watch('read', () => this.updateCounts());
             this.$watch('starred', () => this.updateCounts());
@@ -960,6 +983,7 @@ export function rssApp(): AppState {
             const backgroundSync = async (): Promise<void> => {
                 if (!this.syncEnabled || !this.isOnline) return;
                 console.log('Performing periodic background sync...');
+                await processPendingOperations();
                 await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
@@ -1014,6 +1038,7 @@ export function rssApp(): AppState {
                 }
                 console.log('Starting scheduled background sync...');
                 try { // Added try-catch for error handling
+                    await processPendingOperations();
                     await performFeedSync(this);
                     await pullUserState();
                     await this._loadAndManageAllData();

@@ -81,32 +81,48 @@ html.dark #sync-status-message {
     color: white;
 }
 
-.undo-button:hover .undo-timer-line,
-.undo-button:focus .undo-timer-line,
-.undo-button:active .undo-timer-line {
-    background-color: white;
+.undo-button:hover .undo-timer-outline,
+.undo-button:focus .undo-timer-outline,
+.undo-button:active .undo-timer-outline {
+    stroke: white;
 }
 
-.undo-timer-container {
-    width: 100%;
-    height: 3px;
-    background-color: rgba(0, 0, 0, 0.1);
+.undo-timer-svg {
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
-}
-
-.undo-timer-line {
     width: 100%;
     height: 100%;
-    background-color: var(--primary); /* Use primary color for the timer */
-    transform: scaleX(1);
-    transform-origin: left;
+    pointer-events: none;
+    overflow: visible;
 }
 
-.undo-timer-line.active {
-    transition: transform 5s linear;
-    transform: scaleX(0);
+.undo-timer-outline {
+    x: 2px;
+    y: 2px;
+    width: calc(100% - 4px);
+    height: calc(100% - 4px);
+    rx: 100px;
+    ry: 100px;
+    fill: none;
+    stroke: var(--primary);
+    stroke-width: 4px;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke .2s ease;
+}
+
+.undo-timer-outline.active {
+    animation: undo-timeout 5s linear forwards;
+}
+
+@keyframes undo-timeout {
+    from {
+        stroke-dashoffset: 1;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
 }
 
 /* Theme-specific overrides removed as they now use variables */

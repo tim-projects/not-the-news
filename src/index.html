@@ -57,10 +57,6 @@
         <div id="loading-screen" x-show="loading" class="loading-screen">
             <div class="loading-text">Loading…</div>
             <div id="progress-message" class="progress-message" x-text="progressMessage"></div>
-            
-            <div x-show="itemLoadCount > 0" class="item-load-count" style="margin-top: 0.75rem; font-size: 0.9rem; opacity: 0.8; font-family: monospace;">
-                <span x-text="itemLoadCount"></span> items loaded
-            </div>
         </div>
         
         <header id="header" x-show="!loading" class="header" x-cloak>
@@ -170,6 +166,7 @@
                     <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
                     <div class="settings-group"><label for="images-toggle">Show Images</label><div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>
+                    <div class="settings-group"><label for="shadows-toggle">Item Shadows</label><div class="d-flex align-items-center"><span id="shadows-text" x-text="shadowsEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="shadows-toggle" x-model="shadowsEnabled"><span class="slider"></span></label></div></div>
                     
                     <hr>
                     <div class="settings-option"><span>RSS Feeds</span><button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button></div>
@@ -226,9 +223,9 @@
         <div id="undo-notification" x-cloak x-show="showUndo" :class="{ 'visible': showUndo }">
             <button @click="undoMarkRead()" class="undo-button">
                 <span>Undo</span>
-                <div class="undo-timer-container">
-                    <div class="undo-timer-line" :class="{ 'active': showUndo }"></div>
-                </div>
+                <svg class="undo-timer-svg">
+                    <rect class="undo-timer-outline" pathLength="1" :class="{ 'active': undoTimerActive }" />
+                </svg>
             </button>
         </div>
     </div>

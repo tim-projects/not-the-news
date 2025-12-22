@@ -109,20 +109,32 @@ export function createStatusBarMessage(app: AppState, message: string): void {
  * @param {string} guid The GUID of the item to potentially undo.
  */
 let undoTimeoutId: any;
-export function showUndoNotification(app: AppState, guid: string): void {
+export function showUndoNotification(app: AppState, guid: string, index: number | null = null): void {
     if (undoTimeoutId) {
         clearTimeout(undoTimeoutId);
     }
 
     app.undoItemGuid = guid;
+    app.undoItemIndex = index;
     app.showUndo = true;
+    app.undoTimerActive = false;
 
-    undoTimeoutId = setTimeout(() => {
-        app.showUndo = false;
-        setTimeout(() => {
-            if (!app.showUndo) app.undoItemGuid = null;
-        }, 500); // Wait for fade out animation
-    }, 5000);
+    const startTimer = () => {
+        app.undoTimerActive = true;
+        undoTimeoutId = setTimeout(() => {
+            app.showUndo = false;
+            app.undoTimerActive = false;
+            setTimeout(() => {
+                if (!app.showUndo) app.undoItemGuid = null;
+            }, 500); // Wait for fade out animation
+        }, 5000);
+    };
+
+    if ((app as any).$nextTick) {
+        (app as any).$nextTick(startTimer);
+    } else {
+        setTimeout(startTimer, 10);
+    }
 }
 
 /**

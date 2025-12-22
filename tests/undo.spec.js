@@ -61,9 +61,9 @@ test.describe('Undo Mark as Read', () => {
         const undoButton = undoNotification.locator('.undo-button');
         await expect(undoButton).toContainText('Undo');
 
-        // Verify timer line is active
-        const timerLine = undoNotification.locator('.undo-timer-line');
-        await expect(timerLine).toHaveClass(/active/);
+        // Verify timer outline is active
+        const timerOutline = undoNotification.locator('.undo-timer-outline');
+        await expect(timerOutline).toHaveClass(/active/);
     });
 
     test('should restore item when undo is clicked', async ({ page }) => {
@@ -89,6 +89,38 @@ test.describe('Undo Mark as Read', () => {
 
         // Verify undo notification is hidden
         await expect(page.locator('#undo-notification')).toBeHidden();
+    });
+
+    test('should restore item to its original position when undo is clicked', async ({ page }) => {
+        // Ensure filter mode is 'unread'
+        await page.locator('#settings-button').click();
+        await page.locator('#filter-selector').selectOption('unread');
+        await page.locator('.modal-content .close').click();
+
+        await page.waitForSelector('.item');
+        const items = page.locator('.item');
+        const count = await items.count();
+        if (count < 2) {
+            console.log('Not enough items to test position restoration, skipping.');
+            return;
+        }
+
+        const secondItem = items.nth(1);
+        const secondGuid = await secondItem.getAttribute('data-guid');
+        const readButton = page.locator(`.item[data-guid="${secondGuid}"] .read-button`);
+
+        // Mark second item as read
+        await readButton.click();
+        await expect(page.locator(`.item[data-guid="${secondGuid}"]`)).toBeHidden();
+
+        // Click undo
+        await page.locator('#undo-notification .undo-button').click();
+
+        // Verify item is restored and is still at index 1
+        await expect(page.locator(`.item[data-guid="${secondGuid}"]`)).toBeVisible();
+        const restoredItem = page.locator('.item').nth(1);
+        const restoredGuid = await restoredItem.getAttribute('data-guid');
+        expect(restoredGuid).toBe(secondGuid);
     });
 
     test('should hide undo notification after 5 seconds', async ({ page }) => {
