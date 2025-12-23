@@ -6,8 +6,9 @@
     transform: translateX(-50%);
     padding: 10px 20px;
     border-radius: 25px;
-    background-color: #333;
-    color: #fff;
+    background-color: var(--card-bg);
+    color: var(--fg);
+    border: 1px solid var(--card-border);
     font-size: 0.9em;
     font-weight: 500;
     z-index: 10000;
@@ -15,27 +16,13 @@
     visibility: hidden;
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, bottom 0.3s ease-in-out;
     pointer-events: none; /* Allows clicks to pass through */
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 10px var(--card-shadow-color);
 }
 
 #sync-status-message.visible {
     opacity: 1;
     visibility: visible;
     bottom: 30px;
-}
-
-/* Light Theme Styling */
-html.light #sync-status-message {
-    background-color: #ffffff;
-    color: #333;
-    border: 1px solid #eee;
-}
-
-/* Dark Theme Styling */
-html.dark #sync-status-message {
-    background-color: #2a2a2e;
-    color: #f0f0f0;
-    border: 1px solid #444;
 }
 
 /* --- Undo Notification --- */

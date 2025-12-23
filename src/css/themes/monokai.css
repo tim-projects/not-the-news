@@ -5,7 +5,7 @@ html.dark.theme-monokai {
   --secondary: #fd971f;
   --card-bg: #3e3d32;
   --card-border: #75715e;
-  --card-shadow-color: rgba(0,0,0,0.3);
+  --card-shadow-color: rgba(0, 0, 0, 0.4);
 }
 
 html.dark.theme-monokai .configure-button,

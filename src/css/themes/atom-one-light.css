@@ -5,6 +5,6 @@ html.light.theme-atom-one-light {
   --secondary: #a0a1a7;
   --card-bg: #ffffff;
   --card-border: #e5e5e6;
-  --card-shadow-color: rgba(0,0,0,0.05);
+  --card-shadow-color: rgba(0, 0, 0, 0.1);
   background-image: none;
 }

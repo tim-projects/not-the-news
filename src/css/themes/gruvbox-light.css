@@ -5,6 +5,6 @@ html.light.theme-gruvbox-light {
   --secondary: #928374;
   --card-bg: #f2e5bc;
   --card-border: #d5c4a1;
-  --card-shadow-color: rgba(60,56,54,0.1);
+  --card-shadow-color: rgba(0, 0, 0, 0.15);
   background-image: none;
 }

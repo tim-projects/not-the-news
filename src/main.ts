@@ -448,19 +448,22 @@ export function rssApp(): AppState {
                 showUndoNotification(this, guid, removedIndex);
             }
 
-            // If the deck is now empty, trigger a deck refresh
-            if (this.deck.length === 0) {
+            // If the deck is now empty in unread mode, trigger a deck refresh
+            if (this.filterMode === 'unread' && this.deck.length === 0) {
                 console.log('[toggleRead] Deck is empty, initiating refresh process.');
                 this.progressMessage = 'Generating new deck...';
                 this.loading = true; // Show loading screen while new deck is generated
                 try {
+                    // We call _loadAndManageAllData to regenerate the deck
                     await this._loadAndManageAllData();
+                    // Nudge Alpine by creating a new array reference if not already done
+                    this.deck = [...this.deck];
                 } catch (error) {
                     console.error('[toggleRead] Error during deck refresh:', error);
+                } finally {
+                    this.loading = false;
+                    this.progressMessage = '';
                 }
-                console.log('[toggleRead] _loadAndManageAllData completed after deck empty.');
-                this.loading = false;
-                this.progressMessage = '';
                 console.log('[toggleRead] Deck refresh process completed. Deck size:', this.deck.length);
             }
         },        undoMarkRead: async function(this: AppState): Promise<void> {
@@ -656,6 +659,12 @@ export function rssApp(): AppState {
                 },
                 applyThemeStyle: function(this: AppState): void {
                     const htmlEl = document.documentElement;
+                    
+                    // Manage light/dark base classes
+                    htmlEl.classList.remove('light', 'dark');
+                    htmlEl.classList.add(this.theme);
+                    
+                    // Manage theme style specific classes
                     const classesToRemove = Array.from(htmlEl.classList).filter(c => c.startsWith('theme-'));
                     htmlEl.classList.remove(...classesToRemove);
                     if (this.themeStyle !== 'original') {
@@ -897,6 +906,7 @@ export function rssApp(): AppState {
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = themeState.value ?? 'dark';
+                localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
                 this.isOnline = isOnline();
                 
                 const [rssFeeds, keywordBlacklist] = await Promise.all([
@@ -970,7 +980,7 @@ export function rssApp(): AppState {
             console.log('_loadAndManageAllData: After manageDailyDeck. Deck size:', this.deck.length);
             this.progressMessage = 'Displaying your feed...'; // New message
             await this.loadAndDisplayDeck();
-            console.log('_loadAndManageAllData: After loadAndDisplayDeck. Deck size:', this.deck.length);
+            console.log('_loadAndManageAllData: After loadAndDisplayDeck. Final Deck size:', this.deck.length);
 
             this.updateAllUI();
             console.log('_loadAndManageAllData: END');

@@ -5,7 +5,7 @@ html.dark.theme-material-dark {
   --secondary: #546e7a;
   --card-bg: #37474f;
   --card-border: #455a64;
-  --card-shadow-color: rgba(0,0,0,0.3);
+  --card-shadow-color: rgba(0, 0, 0, 0.4);
 }
 
 html.dark.theme-material-dark a {

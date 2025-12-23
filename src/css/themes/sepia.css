@@ -5,6 +5,6 @@ html.light.theme-sepia {
   --secondary: #d2b48c;
   --card-bg: #fdf5e6;
   --card-border: #e3d5b8;
-  --card-shadow-color: rgba(0,0,0,0.1);
+  --card-shadow-color: rgba(0, 0, 0, 0.15);
   background-image: none;
 }

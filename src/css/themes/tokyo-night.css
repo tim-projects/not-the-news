@@ -5,5 +5,5 @@ html.dark.theme-tokyo-night {
   --secondary: #bb9af7;
   --card-bg: #24283b;
   --card-border: #414868;
-  --card-shadow-color: rgba(0,0,0,0.3);
+  --card-shadow-color: rgba(0, 0, 0, 0.4);
 }

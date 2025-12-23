@@ -155,7 +155,7 @@ body.no-scroll {
   font-family: 'Playfair Display', serif;
   font-weight: 400;
   text-transform: capitalize;
-  min-height: calc(1.4em * 2);
+  min-height: calc(1.4em * 4);
   margin-top: 0;
   position: relative;
 }
@@ -389,6 +389,10 @@ ul.feed-list,
 }
 
 /* Support for toggling item shadows */
+body.no-shadows {
+  --card-shadow-color: transparent !important;
+}
+
 body.no-shadows .item,
 body.no-shadows img.entry-image,
 body.no-shadows .itemdescription img {

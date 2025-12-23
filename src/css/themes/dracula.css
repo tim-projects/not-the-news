@@ -5,7 +5,7 @@ html.dark.theme-dracula {
   --secondary: #6272a4;
   --card-bg: #44475a;
   --card-border: #6272a4;
-  --card-shadow-color: rgba(0,0,0,0.3);
+  --card-shadow-color: rgba(0, 0, 0, 0.4);
 }
 
 html.dark.theme-dracula a {

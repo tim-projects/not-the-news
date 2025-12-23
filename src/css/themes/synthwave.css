@@ -5,5 +5,5 @@ html.dark.theme-synthwave {
   --secondary: #36f9f6;
   --card-bg: #241b2f;
   --card-border: #ff7edb;
-  --card-shadow-color: rgba(255,126,219,0.1);
+  --card-shadow-color: rgba(0, 0, 0, 0.4);
 }

@@ -5,6 +5,6 @@ html.light.theme-rose-pine-dawn {
   --secondary: #d7827e;
   --card-bg: #fffaf3;
   --card-border: #dfdad9;
-  --card-shadow-color: rgba(87,82,121,0.05);
+  --card-shadow-color: rgba(0, 0, 0, 0.1);
   background-image: none;
 }

@@ -5,6 +5,6 @@ html.light.theme-solarized {
   --secondary: #93a1a1;
   --card-bg: #eee8d5;
   --card-border: #d5ccba;
-  --card-shadow-color: rgba(0,0,0,0.1);
+  --card-shadow-color: rgba(0, 0, 0, 0.15);
   background-image: none;
 }

@@ -5,6 +5,6 @@ html.light.theme-paper {
   --secondary: #444444;
   --card-bg: #ffffff;
   --card-border: #000000;
-  --card-shadow-color: rgba(0,0,0,0);
+  --card-shadow-color: rgba(0, 0, 0, 0.15);
   background-image: none;
 }
