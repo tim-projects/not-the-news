@@ -1711,7 +1711,7 @@ const navigationHandler = async ({ event }) => {
   try {
     return await fetch(event.request);
   } catch (error) {
-    const cachedResponse = await caches.match("index.html");
+    const cachedResponse = await caches.match("/index.html") || await caches.match("index.html");
     if (cachedResponse) {
       return cachedResponse;
     }
@@ -1726,7 +1726,7 @@ registerRoute(
   },
   navigationHandler
 );
-precacheAndRoute([{"revision":null,"url":"assets/main-Db7_LmUB.js"},{"revision":null,"url":"assets/main-z_DfRhQ9.css"},{"revision":null,"url":"assets/modal-Pk50ayqF.css"},{"revision":"66d4e93d31d059c746e1592d59c74cf3","url":"images/favicon.svg"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8f3d514b1160c9ff6cbbc05c8abbd443","url":"images/placeholder.svg"},{"revision":"94b8cfc41a4b9f9aee31a2a9a3c48da1","url":"index.html"},{"revision":"7aae2cdc3aeb571dc83274426c039eba","url":"login.html"},{"revision":"dac41677a41f1bb52f051f546cada96e","url":"manifest.json"},{"revision":"1872c500de691dce40960bb85481de07","url":"registerSW.js"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8e5b7cfdf62773bfdb6052e17020ca1a","url":"manifest.webmanifest"}]);
+precacheAndRoute([{"revision":null,"url":"assets/main-brDHmkFh.css"},{"revision":null,"url":"assets/main-Dn6iHmXi.js"},{"revision":null,"url":"assets/modal-CJtVjCnR.css"},{"revision":"66d4e93d31d059c746e1592d59c74cf3","url":"images/favicon.svg"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8f3d514b1160c9ff6cbbc05c8abbd443","url":"images/placeholder.svg"},{"revision":"c362951eb672ab7e04e4a0a3b90093cc","url":"index.html"},{"revision":"ca687f9b99b9d96fe1ad35a22dacffb7","url":"login.html"},{"revision":"dac41677a41f1bb52f051f546cada96e","url":"manifest.json"},{"revision":"1872c500de691dce40960bb85481de07","url":"registerSW.js"},{"revision":"f60dd809acb5a45e7eee5ec69c07bf79","url":"images/icon-192.png"},{"revision":"aa991a2f4a5ec985392436a9211baeb1","url":"images/icon-512.png"},{"revision":"8e5b7cfdf62773bfdb6052e17020ca1a","url":"manifest.webmanifest"}]);
 cleanupOutdatedCaches();
 clientsClaim();
 registerRoute(

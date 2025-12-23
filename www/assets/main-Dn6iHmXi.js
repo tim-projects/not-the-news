@@ -656,10 +656,10 @@ function attributesOnly(attributes) {
 }
 var isDeferringHandlers = false;
 var directiveHandlerStacks = /* @__PURE__ */ new Map();
-var currentHandlerStackKey = Symbol();
+var currentHandlerStackKey = /* @__PURE__ */ Symbol();
 function deferHandlingDirectives(callback) {
   isDeferringHandlers = true;
-  let key = Symbol();
+  let key = /* @__PURE__ */ Symbol();
   currentHandlerStackKey = key;
   directiveHandlerStacks.set(key, []);
   let flushHandlers = () => {
@@ -1773,8 +1773,8 @@ var hasChanged = (value, oldValue) => value !== oldValue && (value === value || 
 var targetMap = /* @__PURE__ */ new WeakMap();
 var effectStack = [];
 var activeEffect;
-var ITERATE_KEY = Symbol("iterate");
-var MAP_KEY_ITERATE_KEY = Symbol("Map key iterate");
+var ITERATE_KEY = /* @__PURE__ */ Symbol("iterate");
+var MAP_KEY_ITERATE_KEY = /* @__PURE__ */ Symbol("Map key iterate");
 function isEffect(fn) {
   return fn && fn._isEffect === true;
 }
@@ -3653,10 +3653,11 @@ async function withDb(callback) {
 }
 const isOnline = () => navigator.onLine;
 const API_BASE_URL = window.location.origin;
-async function _saveSyncMetaState(key, value) {
+async function _saveSyncMetaState(key, value, timestamp) {
   return withDb(async (db) => {
     try {
-      await db.put("userSettings", { key, value, lastModified: (/* @__PURE__ */ new Date()).toISOString() });
+      const lastModified = timestamp || (/* @__PURE__ */ new Date()).toISOString();
+      await db.put("userSettings", { key, value, lastModified });
     } catch (e) {
       console.error(`[DB] Failed to save sync metadata for key '${key}':`, e);
     }
@@ -3796,8 +3797,8 @@ async function _pullSingleStateKey(key, def, force = false) {
       const localObjects = localData || [];
       const serverGuids = new Set(serverObjects.map((item) => item.guid));
       const localGuids = new Set(localObjects.map((item) => item.guid));
-      const objectsToAdd = serverObjects.filter((item) => !localGuids.has(item.guid));
-      const objectsToRemove = localObjects.filter((item) => !serverGuids.has(item.guid));
+      const objectsToAdd = force ? serverObjects : serverObjects.filter((item) => !localGuids.has(item.guid));
+      const objectsToRemove = force ? [] : localObjects.filter((item) => !serverGuids.has(item.guid));
       if (objectsToAdd.length > 0 || objectsToRemove.length > 0 || force) {
         await withDb(async (db) => {
           const tx = db.transaction(def.store, "readwrite");
@@ -3810,7 +3811,7 @@ async function _pullSingleStateKey(key, def, force = false) {
         });
       }
     } else {
-      await _saveSyncMetaState(key, data2.value);
+      await _saveSyncMetaState(key, data2.value, data2.lastModified);
     }
     return { key, status: 200, timestamp: data2.lastModified };
   } catch (error2) {
@@ -3819,9 +3820,18 @@ async function _pullSingleStateKey(key, def, force = false) {
   }
 }
 async function pullUserState(force = false) {
-  const { value: syncEnabled } = await loadSimpleState("syncEnabled");
-  if (!isOnline() || !syncEnabled && !force) {
-    if (syncEnabled) console.log("[DB] Offline. Skipping user state pull.");
+  if (!isOnline()) return;
+  let { value: syncEnabled } = await loadSimpleState("syncEnabled");
+  if (!syncEnabled && !force) {
+    console.log("[DB] Sync is disabled locally. Checking for remote status...");
+    const syncEnabledDef = USER_STATE_DEFS["syncEnabled"];
+    const result = await _pullSingleStateKey("syncEnabled", syncEnabledDef, false);
+    if (result.status === 200) {
+      const state = await loadSimpleState("syncEnabled");
+      syncEnabled = state.value;
+    }
+  }
+  if (!syncEnabled && !force) {
     return;
   }
   if (_isPullingUserState && !force) return;
@@ -3831,7 +3841,7 @@ async function pullUserState(force = false) {
   _isPullingUserState = true;
   console.log(`[DB] Pulling user state (force=${force})...`);
   try {
-    const keysToPull = Object.entries(USER_STATE_DEFS).filter(([, def]) => !def.localOnly);
+    const keysToPull = Object.entries(USER_STATE_DEFS).filter(([key, def]) => !def.localOnly && key !== "syncEnabled");
     const results = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
     const newestOverallTimestamp = results.reduce((newest, result) => {
       return result?.timestamp && result.timestamp > newest ? result.timestamp : newest;
@@ -3854,7 +3864,7 @@ async function performFeedSync(app) {
   const { value: syncEnabled } = await loadSimpleState("syncEnabled");
   if (!isOnline() || !syncEnabled) {
     if (syncEnabled) console.log("[DB] Offline. Skipping feed sync.");
-    return;
+    return true;
   }
   console.log("[DB] Fetching feed items from server.");
   try {
@@ -3862,7 +3872,7 @@ async function performFeedSync(app) {
     const response = await fetch(`${API_BASE_URL}/api/feed-guids?since=${lastFeedSyncTime || ""}`);
     if (response.status === 304) {
       console.log("[DB] Feed not modified.");
-      return;
+      return true;
     }
     if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-guids`);
     const responseData = await response.json();
@@ -3875,6 +3885,8 @@ async function performFeedSync(app) {
     console.log(`[DB] GUIDs to fetch: ${guidsToFetch.length}`, guidsToFetch);
     const guidsToDelete = [...localGuids].filter((guid) => !serverGuids.has(guid));
     console.log(`[DB] New GUIDs: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
+    const totalToFetch = guidsToFetch.length;
+    let fetchedSoFar = 0;
     if (guidsToFetch.length > 0) {
       const BATCH_SIZE = 50;
       const newItems = [];
@@ -3889,8 +3901,13 @@ async function performFeedSync(app) {
           const fetchedItems = await itemsResponse.json();
           console.log(`[DB] Fetched batch of ${fetchedItems.length} items:`, fetchedItems);
           newItems.push(...fetchedItems);
+          fetchedSoFar += fetchedItems.length;
+          if (app) {
+            app.progressMessage = `Fetching feed content... (${fetchedSoFar}/${totalToFetch})`;
+          }
         } else {
           console.error(`[DB] Failed to fetch a batch of feed items. Status: ${itemsResponse.status}`);
+          return false;
         }
       }
       await withDb(async (db) => {
@@ -3914,20 +3931,24 @@ async function performFeedSync(app) {
     app?.loadFeedItemsFromDB?.();
     app?.loadAndDisplayDeck?.();
     app?.updateCounts?.();
+    return true;
   } catch (error2) {
     console.error("[DB] Failed to synchronize feed:", error2);
+    return false;
   }
 }
 async function performFullSync(app) {
   const { value: syncEnabled } = await loadSimpleState("syncEnabled");
-  if (!isOnline() || !syncEnabled) return;
+  if (!isOnline() || !syncEnabled) return true;
   console.log("[DB] Full sync initiated.");
   try {
-    await pullUserState();
-    await performFeedSync(app);
     await processPendingOperations();
+    await pullUserState();
+    const syncSuccess = await performFeedSync(app);
+    return syncSuccess;
   } catch (error2) {
     console.error("[DB] Full sync failed:", error2);
+    return false;
   }
 }
 const USER_STATE_DEFS = {
@@ -3941,15 +3962,17 @@ const USER_STATE_DEFS = {
   imagesEnabled: { store: "userSettings", type: "simple", localOnly: false, default: true },
   syncEnabled: { store: "userSettings", type: "simple", localOnly: false, default: true },
   theme: { store: "userSettings", type: "simple", localOnly: false, default: "dark" },
-  filterMode: { store: "userSettings", type: "simple", localOnly: false, default: "unread" },
-  shuffleCount: { store: "userSettings", type: "simple", localOnly: false, default: 2 },
-  lastShuffleResetDate: { store: "userSettings", type: "simple", localOnly: false, default: null },
-  lastViewedItemId: { store: "userSettings", type: "simple", localOnly: false, default: null },
-  lastViewedItemOffset: { store: "userSettings", type: "simple", localOnly: false, default: 0 },
+  themeStyle: { store: "userSettings", type: "simple", localOnly: false, default: "original" },
+  themeStyleLight: { store: "userSettings", type: "simple", localOnly: false, default: "original" },
+  themeStyleDark: { store: "userSettings", type: "simple", localOnly: false, default: "original" },
+  customCss: { store: "userSettings", type: "simple", localOnly: false, default: "" },
+  fontSize: { store: "userSettings", type: "simple", localOnly: true, default: 100 },
+  feedLastModified: { store: "userSettings", type: "simple", localOnly: true, default: 0 },
   rssFeeds: { store: "userSettings", type: "simple", localOnly: false, default: {} },
   keywordBlacklist: { store: "userSettings", type: "simple", localOnly: false, default: [] },
-  customCss: { store: "userSettings", type: "simple", localOnly: false, default: "" },
-  feedLastModified: { store: "userSettings", type: "simple", localOnly: true, default: 0 }
+  shuffleCount: { store: "userSettings", type: "simple", localOnly: false, default: 2 },
+  lastShuffleResetDate: { store: "userSettings", type: "simple", localOnly: false, default: null },
+  shadowsEnabled: { store: "userSettings", type: "simple", localOnly: false, default: true }
 };
 async function loadSimpleState(key, storeName = "userSettings") {
   return withDb(async (db) => {
@@ -4027,6 +4050,12 @@ async function loadArrayState(storeName) {
     }
   });
 }
+async function findByGuid(storeName, guid) {
+  return withDb((db) => db.getFromIndex(storeName, "guid", guid)).catch((e) => {
+    console.error(`Error finding item by GUID '${guid}' in store '${storeName}':`, e);
+    return void 0;
+  });
+}
 async function updateArrayState(storeName, item, add2) {
   await withDb(async (db) => {
     const tx = db.transaction(storeName, "readwrite");
@@ -4065,11 +4094,56 @@ async function overwriteArrayAndSyncChanges(storeName, newObjects) {
   const oldGuids = new Set(oldObjects.map((item) => item.guid));
   await saveArrayState(storeName, newObjects);
   const newGuids = new Set(newObjects.map((item) => item.guid));
-  [...oldGuids].filter((guid) => !newGuids.has(guid));
-  [...newGuids].filter((guid) => !newGuids.has(guid));
+  const guidsToRemove = [...oldGuids].filter((guid) => !newGuids.has(guid));
+  const guidsToAdd = [...newGuids].filter((guid) => !newGuids.has(guid));
   const defEntry = Object.entries(USER_STATE_DEFS).find(([, v]) => v.store === storeName);
   if (!defEntry || defEntry[1].localOnly) return;
-  return;
+  let opType = "";
+  if (storeName === "starred") opType = "starDelta";
+  if (storeName === "read") opType = "readDelta";
+  if (!opType) {
+    await queueAndAttemptSyncOperation({
+      type: "simpleUpdate",
+      key: defEntry[0],
+      // Use the key from USER_STATE_DEFS
+      value: newObjects,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    return;
+  }
+  if (guidsToRemove.length > 0) {
+    console.log(`[DB] Queuing ${guidsToRemove.length} 'remove' operations for '${storeName}'.`);
+    for (const guid of guidsToRemove) {
+      await queueAndAttemptSyncOperation({ type: opType, guid, action: "remove", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+    }
+  }
+  if (guidsToAdd.length > 0) {
+    console.log(`[DB] Queuing ${guidsToAdd.length} 'add' operations for '${storeName}'.`);
+    for (const guid of guidsToAdd) {
+      await queueAndAttemptSyncOperation({ type: opType, guid, action: "add", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+    }
+  }
+}
+async function pruneStaleReadItems(readItems, feedItems) {
+  if (!Array.isArray(readItems) || !Array.isArray(feedItems)) {
+    console.warn("[DB] pruneStaleReadItems skipped due to invalid input.");
+    return;
+  }
+  const validFeedGuids = new Set(feedItems.map((item) => item.guid));
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1e3;
+  const now = Date.now();
+  const prunedReadItems = readItems.filter((item) => {
+    if (validFeedGuids.has(item.guid)) return true;
+    const readAtTimestamp = new Date(item.readAt).getTime();
+    return now - readAtTimestamp < THIRTY_DAYS_MS;
+  });
+  if (prunedReadItems.length < readItems.length) {
+    const itemsRemoved = readItems.length - prunedReadItems.length;
+    console.log(`[DB] Pruning ${itemsRemoved} stale read items.`);
+    await overwriteArrayAndSyncChanges("read", prunedReadItems);
+  } else {
+    console.log("[DB] No stale read items to prune.");
+  }
 }
 async function saveArrayState(storeName, objects) {
   return withDb(async (db) => {
@@ -4086,13 +4160,36 @@ async function saveArrayState(storeName, objects) {
 const dbUserState = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   USER_STATE_DEFS,
+  findByGuid,
   loadArrayState,
   loadSimpleState,
   overwriteArrayAndSyncChanges,
+  pruneStaleReadItems,
   queueAndAttemptSyncOperation,
   saveArrayState,
   saveSimpleState,
   updateArrayState
+}, Symbol.toStringTag, { value: "Module" }));
+const database = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  USER_STATE_DEFS,
+  closeDb,
+  findByGuid,
+  getAllFeedItems,
+  initDb: getDb,
+  loadArrayState,
+  loadSimpleState,
+  overwriteArrayAndSyncChanges,
+  performFeedSync,
+  performFullSync,
+  processPendingOperations,
+  pruneStaleReadItems,
+  pullUserState,
+  queueAndAttemptSyncOperation,
+  saveArrayState,
+  saveSimpleState,
+  updateArrayState,
+  withDb
 }, Symbol.toStringTag, { value: "Module" }));
 function formatDate(dateStr) {
   const now = /* @__PURE__ */ new Date();
@@ -4156,9 +4253,19 @@ function mapRawItem(item, fmtFn) {
   }
   const parser = new DOMParser();
   const doc = parser.parseFromString(item.description || "", "text/html");
-  const imgEl = doc.querySelector("img");
-  const imgSrc = imgEl?.src || "";
-  imgEl?.remove();
+  const images = doc.querySelectorAll("img");
+  let imgSrc = "";
+  if (images.length === 1) {
+    const imgEl = images[0];
+    imgEl.classList.add("title-image");
+    imgSrc = imgEl.src || "";
+    imgEl.remove();
+  } else {
+    images.forEach((img) => {
+      img.setAttribute("loading", "lazy");
+      img.setAttribute("onload", "this.classList.add('loaded')");
+    });
+  }
   let sourceUrl = "";
   const sourceEl = doc.querySelector(".source-url") || doc.querySelector("a");
   if (sourceEl) {
@@ -4181,18 +4288,6 @@ function mapRawItem(item, fmtFn) {
   };
 }
 function mapRawItems(rawList, fmtFn) {
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
-  console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
   console.log(`ENTERING mapRawItems. rawList length: ${rawList.length}`);
   if (!Array.isArray(rawList)) {
     console.warn("mapRawItems received a non-array input. Returning empty array.");
@@ -4219,6 +4314,8 @@ async function generateNewDeck(allFeedItems, readItems, starredItems, shuffledOu
     const readGuidsSet = new Set([...getGuidSet(readItems)].filter((guid) => allFeedGuidsSet.has(guid)));
     const starredGuidsSet = new Set([...getGuidSet(starredItems)].filter((guid) => allFeedGuidsSet.has(guid)));
     const shuffledOutGuidsSet = new Set([...getGuidSet(shuffledOutItems)].filter((guid) => allFeedGuidsSet.has(guid)));
+    console.log(`[generateNewDeck] readGuidsSet size: ${readGuidsSet.size}`);
+    console.log(`[generateNewDeck] shuffledOutGuidsSet size: ${shuffledOutGuidsSet.size}`);
     let filteredItems = [];
     console.log(`[generateNewDeck] Initial filteredItems count: ${filteredItems.length}`);
     switch (filterMode) {
@@ -4234,8 +4331,16 @@ async function generateNewDeck(allFeedItems, readItems, starredItems, shuffledOu
           (item) => !readGuidsSet.has(item.guid) && !shuffledOutGuidsSet.has(item.guid)
         );
         if (filteredItems.length === 0) {
-          console.log("generateNewDeck: No unread/unshuffled items found, re-filtering from all items.");
+          console.log("generateNewDeck: No unread/unshuffled items found, trying all unshuffled items.");
           filteredItems = allFeedItems.filter((item) => !shuffledOutGuidsSet.has(item.guid));
+        }
+        if (filteredItems.length === 0) {
+          console.log("generateNewDeck: No unshuffled items found, trying all unread items.");
+          filteredItems = allFeedItems.filter((item) => !readGuidsSet.has(item.guid));
+        }
+        if (filteredItems.length === 0) {
+          console.log("generateNewDeck: Absolutely no filter matches, using all items.");
+          filteredItems = [...allFeedItems];
         }
         break;
     }
@@ -4372,182 +4477,11 @@ async function generateNewDeck(allFeedItems, readItems, starredItems, shuffledOu
       const remainingItems = offlineFilteredItems.filter((item) => !nextDeckItems.includes(item));
       nextDeckItems = nextDeckItems.concat(remainingItems.slice(0, 10 - nextDeckItems.length));
     }
-    nextDeckItems.sort((a, b) => b.timestamp - a.timestamp);
-    return nextDeckItems;
+    return shuffleArray([...nextDeckItems]);
   } catch (error2) {
     console.error("An error occurred during deck generation:", error2);
     return [];
   }
-}
-const getSyncToggle = () => document.getElementById("sync-toggle");
-const getImagesToggle = () => document.getElementById("images-toggle");
-const getThemeToggle = () => document.getElementById("theme-toggle");
-const getThemeText = () => document.getElementById("theme-text");
-const getShuffleCountDisplay = () => document.getElementById("shuffle-count-display");
-const getFilterSelector = () => document.getElementById("filter-selector");
-const getNtnTitleH2 = () => document.querySelector("#ntn-title h2");
-function splitMessageIntoLines(message, maxCharsPerLine = 30) {
-  const words = message.split(" ");
-  let line1 = [];
-  let line2 = [];
-  let currentLineLength = 0;
-  for (const word of words) {
-    const wordLength = word.length + (line1.length > 0 ? 1 : 0);
-    if (currentLineLength + wordLength <= maxCharsPerLine) {
-      line1.push(word);
-      currentLineLength += wordLength;
-    } else {
-      line2.push(word);
-    }
-  }
-  return [line1.join(" "), line2.join(" ")].filter(Boolean);
-}
-async function displayTemporaryMessageInTitle(message) {
-  const titleH2 = getNtnTitleH2();
-  if (!titleH2) {
-    console.warn("displayTemporaryMessageInTitle: 'ntn-title h2' element not found.");
-    return;
-  }
-  const originalText = "NOT THE NEWS";
-  const lines = splitMessageIntoLines(message);
-  const originalOverflow = titleH2.style.overflow;
-  titleH2.style.overflow = "visible";
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  if (lines.length > 0) {
-    titleH2.textContent = lines[0];
-    await delay(1500);
-  }
-  if (lines.length > 1) {
-    titleH2.textContent = lines.join(" ");
-    await delay(1500);
-  } else if (lines.length === 1) {
-    await delay(1500);
-  }
-  titleH2.textContent = originalText;
-  titleH2.style.overflow = originalOverflow;
-}
-let messageTimeoutId;
-function createStatusBarMessage(app, message) {
-  console.log(`[Status] ${message}`);
-  if (messageTimeoutId) {
-    clearTimeout(messageTimeoutId);
-  }
-  app.syncStatusMessage = message;
-  const triggerShow = () => {
-    app.showSyncStatus = true;
-    messageTimeoutId = setTimeout(() => {
-      app.showSyncStatus = false;
-      setTimeout(() => {
-        if (!app.showSyncStatus) app.syncStatusMessage = "";
-      }, 300);
-    }, 5e3);
-  };
-  if (app.$nextTick) {
-    app.$nextTick(triggerShow);
-  } else {
-    triggerShow();
-  }
-}
-let undoTimeoutId;
-function showUndoNotification(app, guid) {
-  if (undoTimeoutId) {
-    clearTimeout(undoTimeoutId);
-  }
-  app.undoItemGuid = guid;
-  app.showUndo = true;
-  undoTimeoutId = setTimeout(() => {
-    app.showUndo = false;
-    setTimeout(() => {
-      if (!app.showUndo) app.undoItemGuid = null;
-    }, 500);
-  }, 5e3);
-}
-function manageSettingsPanelVisibility(app) {
-  const mainSettings = document.getElementById("main-settings");
-  const rssSettings = document.getElementById("rss-settings-block");
-  const keywordsSettings = document.getElementById("keywords-settings-block");
-  if (!mainSettings || !rssSettings || !keywordsSettings) {
-    console.warn("One or more settings panels not found.");
-    return Promise.resolve();
-  }
-  mainSettings.style.display = "none";
-  rssSettings.style.display = "none";
-  keywordsSettings.style.display = "none";
-  switch (app.modalView) {
-    case "main":
-      mainSettings.style.display = "block";
-      break;
-    case "rss":
-      rssSettings.style.display = "block";
-      break;
-    case "keywords":
-      keywordsSettings.style.display = "block";
-      break;
-    default:
-      console.warn("Unknown modalView:", app.modalView);
-      mainSettings.style.display = "block";
-  }
-  return Promise.resolve();
-}
-async function updateCounts(app) {
-  if (!app?.entries?.length || !app.read || !app.starred || !app.currentDeckGuids) {
-    console.warn("Attempted to update counts with an invalid app object. Skipping.");
-    return;
-  }
-  const readSet = new Set(app.read.map((item) => item.guid));
-  const starredSet = new Set(app.starred.map((item) => item.guid));
-  const deckGuidsSet = new Set(app.currentDeckGuids.map((item) => item.guid));
-  const entries = app.entries;
-  const allC = entries.length;
-  const readC = entries.filter((e) => readSet.has(e.guid)).length;
-  const starredC = entries.filter((e) => starredSet.has(e.guid)).length;
-  const unreadInDeckC = entries.filter((e) => deckGuidsSet.has(e.guid) && !readSet.has(e.guid)).length;
-  const selector = getFilterSelector();
-  if (!selector) return;
-  const counts = { all: allC, read: readC, starred: starredC, unread: unreadInDeckC };
-  Array.from(selector.options).forEach((opt) => {
-    const filterName = opt.text.split(" ")[0];
-    opt.text = `${filterName} (${counts[opt.value] ?? 0})`;
-  });
-}
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-const attachScrollToTopHandler = /* @__PURE__ */ (() => {
-  let inactivityTimeout;
-  let previousScrollPosition = 0;
-  return (buttonId = "scroll-to-top") => {
-    const button = document.getElementById(buttonId);
-    if (!button) return;
-    const handleScroll = () => {
-      const currentScrollPosition = window.scrollY;
-      button.classList.toggle("visible", currentScrollPosition < previousScrollPosition && currentScrollPosition > 0);
-      previousScrollPosition = currentScrollPosition;
-      clearTimeout(inactivityTimeout);
-      inactivityTimeout = setTimeout(() => button.classList.remove("visible"), 2e3);
-    };
-    window.addEventListener("scroll", handleScroll);
-    button.addEventListener("click", (e) => {
-      e.preventDefault();
-      scrollToTop();
-    });
-  };
-})();
-async function saveCurrentScrollPosition() {
-  let lastViewedItemId = "";
-  let lastViewedItemOffset = 0;
-  const entryElements = document.querySelectorAll(".entry[data-guid]");
-  const firstVisibleEntry = Array.from(entryElements).find((el) => {
-    const rect = el.getBoundingClientRect();
-    return rect.top >= 0 && rect.bottom > 0;
-  });
-  if (firstVisibleEntry) {
-    const rect = firstVisibleEntry.getBoundingClientRect();
-    lastViewedItemId = firstVisibleEntry.dataset.guid || "";
-    lastViewedItemOffset = rect.top;
-  }
-  await saveSimpleState("lastViewedItemId", lastViewedItemId);
-  await saveSimpleState("lastViewedItemOffset", lastViewedItemOffset);
 }
 function sanitizeForIndexedDB(obj) {
   if (typeof structuredClone === "function") {
@@ -4592,11 +4526,6 @@ async function toggleItemStateAndSync(app, guid, stateKey) {
     } else {
       app.starred = app.starred.filter((item) => item.guid !== guid);
     }
-  }
-  if (stateKey === "read") {
-    createStatusBarMessage(app, isCurrentlyActive ? "Item unread." : "Item read.");
-  } else if (stateKey === "starred") {
-    createStatusBarMessage(app, isCurrentlyActive ? "Item unstarred." : "Item starred.");
   }
   if (typeof app.updateCounts === "function") app.updateCounts();
   const opType = `${stateKey}Delta`;
@@ -4695,7 +4624,7 @@ async function loadShuffleState() {
   const { value: lastShuffleResetDate } = await loadSimpleState("lastShuffleResetDate");
   return {
     shuffleCount: typeof shuffleCount === "number" ? shuffleCount : 2,
-    lastShuffleResetDate: lastShuffleResetDate || (/* @__PURE__ */ new Date()).toDateString()
+    lastShuffleResetDate: lastShuffleResetDate || null
   };
 }
 async function saveShuffleState(count, resetDate) {
@@ -4725,10 +4654,202 @@ const userStateUtils = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defi
   setFilterMode,
   toggleItemStateAndSync
 }, Symbol.toStringTag, { value: "Module" }));
+const getSyncToggle = () => document.getElementById("sync-toggle");
+const getImagesToggle = () => document.getElementById("images-toggle");
+const getOpenUrlsInNewTabToggle = () => document.getElementById("open-urls-in-new-tab-toggle");
+const getShadowsToggle = () => document.getElementById("shadows-toggle");
+const getShuffleCountDisplay = () => document.getElementById("shuffle-count-display");
+const getFilterSelector = () => document.getElementById("filter-selector");
+const getNtnTitleH2 = () => document.querySelector("#ntn-title h2");
+function splitMessageIntoLines(message, maxCharsPerLine = 30) {
+  const words = message.split(" ");
+  let line1 = [];
+  let line2 = [];
+  let currentLineLength = 0;
+  for (const word of words) {
+    const wordLength = word.length + (line1.length > 0 ? 1 : 0);
+    if (currentLineLength + wordLength <= maxCharsPerLine) {
+      line1.push(word);
+      currentLineLength += wordLength;
+    } else {
+      line2.push(word);
+    }
+  }
+  return [line1.join(" "), line2.join(" ")].filter(Boolean);
+}
+async function displayTemporaryMessageInTitle(message) {
+  const titleH2 = getNtnTitleH2();
+  if (!titleH2) {
+    console.warn("displayTemporaryMessageInTitle: 'ntn-title h2' element not found.");
+    return;
+  }
+  const originalText = "NOT THE NEWS";
+  const lines = splitMessageIntoLines(message);
+  const originalOverflow = titleH2.style.overflow;
+  titleH2.style.overflow = "visible";
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  if (lines.length > 0) {
+    titleH2.textContent = lines[0];
+    await delay(1500);
+  }
+  if (lines.length > 1) {
+    titleH2.textContent = lines.join(" ");
+    await delay(1500);
+  } else if (lines.length === 1) {
+    await delay(1500);
+  }
+  titleH2.textContent = originalText;
+  titleH2.style.overflow = originalOverflow;
+}
+let messageTimeoutId;
+function createStatusBarMessage(app, message) {
+  console.log(`[Status] ${message}`);
+  if (messageTimeoutId) {
+    clearTimeout(messageTimeoutId);
+  }
+  app.syncStatusMessage = message;
+  const triggerShow = () => {
+    app.showSyncStatus = true;
+    messageTimeoutId = setTimeout(() => {
+      app.showSyncStatus = false;
+      setTimeout(() => {
+        if (!app.showSyncStatus) app.syncStatusMessage = "";
+      }, 300);
+    }, 5e3);
+  };
+  if (app.$nextTick) {
+    app.$nextTick(triggerShow);
+  } else {
+    triggerShow();
+  }
+}
+let undoTimeoutId;
+function showUndoNotification(app, guid, index = null) {
+  if (undoTimeoutId) {
+    clearTimeout(undoTimeoutId);
+  }
+  app.undoItemGuid = guid;
+  app.undoItemIndex = index;
+  app.showUndo = true;
+  app.undoTimerActive = false;
+  const startTimer = () => {
+    app.undoTimerActive = true;
+    undoTimeoutId = setTimeout(() => {
+      app.showUndo = false;
+      app.undoTimerActive = false;
+      setTimeout(() => {
+        if (!app.showUndo) app.undoItemGuid = null;
+      }, 500);
+    }, 5e3);
+  };
+  if (app.$nextTick) {
+    app.$nextTick(startTimer);
+  } else {
+    setTimeout(startTimer, 10);
+  }
+}
+function manageSettingsPanelVisibility(app) {
+  const mainSettings = document.getElementById("main-settings");
+  const rssSettings = document.getElementById("rss-settings-block");
+  const keywordsSettings = document.getElementById("keywords-settings-block");
+  const cssSettings = document.getElementById("css-settings-block");
+  const advancedSettings = document.getElementById("advanced-settings-block");
+  if (!mainSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings) {
+    console.warn("One or more settings panels not found.");
+    return Promise.resolve();
+  }
+  mainSettings.style.display = "none";
+  rssSettings.style.display = "none";
+  keywordsSettings.style.display = "none";
+  cssSettings.style.display = "none";
+  advancedSettings.style.display = "none";
+  switch (app.modalView) {
+    case "main":
+      mainSettings.style.display = "block";
+      break;
+    case "rss":
+      rssSettings.style.display = "block";
+      break;
+    case "keywords":
+      keywordsSettings.style.display = "block";
+      break;
+    case "css":
+      cssSettings.style.display = "block";
+      break;
+    case "advanced":
+      advancedSettings.style.display = "block";
+      break;
+    default:
+      console.warn("Unknown modalView:", app.modalView);
+      mainSettings.style.display = "block";
+  }
+  return Promise.resolve();
+}
+async function updateCounts(app) {
+  if (!app?.entries?.length || !app.read || !app.starred || !app.currentDeckGuids) {
+    console.warn("Attempted to update counts with an invalid app object. Skipping.");
+    return;
+  }
+  const readSet = new Set(app.read.map((item) => item.guid));
+  const starredSet = new Set(app.starred.map((item) => item.guid));
+  const deckGuidsSet = new Set(app.currentDeckGuids.map((item) => item.guid));
+  const entries = app.entries;
+  const allC = entries.length;
+  const readC = entries.filter((e) => readSet.has(e.guid)).length;
+  const starredC = entries.filter((e) => starredSet.has(e.guid)).length;
+  const unreadInDeckC = entries.filter((e) => deckGuidsSet.has(e.guid) && !readSet.has(e.guid)).length;
+  const selector = getFilterSelector();
+  if (!selector) return;
+  const counts = { all: allC, read: readC, starred: starredC, unread: unreadInDeckC };
+  Array.from(selector.options).forEach((opt) => {
+    const filterName = opt.text.split(" ")[0];
+    opt.text = `${filterName} (${counts[opt.value] ?? 0})`;
+  });
+}
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+const attachScrollToTopHandler = /* @__PURE__ */ (() => {
+  let inactivityTimeout;
+  let previousScrollPosition = 0;
+  return (buttonId = "scroll-to-top") => {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    const handleScroll = () => {
+      const currentScrollPosition = window.scrollY;
+      button.classList.toggle("visible", currentScrollPosition < previousScrollPosition && currentScrollPosition > 0);
+      previousScrollPosition = currentScrollPosition;
+      clearTimeout(inactivityTimeout);
+      inactivityTimeout = setTimeout(() => button.classList.remove("visible"), 2e3);
+    };
+    window.addEventListener("scroll", handleScroll);
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      scrollToTop();
+    });
+  };
+})();
+async function saveCurrentScrollPosition() {
+  let lastViewedItemId = "";
+  let lastViewedItemOffset = 0;
+  const entryElements = document.querySelectorAll(".entry[data-guid]");
+  const firstVisibleEntry = Array.from(entryElements).find((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.bottom > 0;
+  });
+  if (firstVisibleEntry) {
+    const rect = firstVisibleEntry.getBoundingClientRect();
+    lastViewedItemId = firstVisibleEntry.dataset.guid || "";
+    lastViewedItemOffset = rect.top;
+  }
+  await saveSimpleState("lastViewedItemId", lastViewedItemId);
+  await saveSimpleState("lastViewedItemOffset", lastViewedItemOffset);
+}
 const SETTING_LABELS = {
   syncEnabled: "Auto-Sync",
   imagesEnabled: "Images",
-  openUrlsInNewTabEnabled: "Open in New Tab"
+  openUrlsInNewTabEnabled: "Open in New Tab",
+  shadowsEnabled: "Shadows"
 };
 async function setupBooleanToggle(app, getToggleEl, dbKey, onToggleCb = () => {
 }) {
@@ -4746,8 +4867,14 @@ async function initSyncToggle(app) {
   await setupBooleanToggle(app, getSyncToggle, "syncEnabled", async (enabled) => {
     app.updateSyncStatusMessage?.();
     if (enabled) {
+      createStatusBarMessage(app, "Kicking off a new sync");
       console.log("Sync enabled, triggering full sync.");
-      await performFullSync(app);
+      const syncSuccess = await performFullSync(app);
+      if (syncSuccess) {
+        createStatusBarMessage(app, "Sync complete!");
+      } else {
+        createStatusBarMessage(app, "Sync finished with some issues.");
+      }
       if (!app.currentDeckGuids?.length && app.entries?.length) {
         console.log("Deck is empty after sync. Rebuilding from all available items.");
         const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -4760,32 +4887,17 @@ async function initSyncToggle(app) {
         await saveArrayState("currentDeckGuids", app.currentDeckGuids);
         console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
       }
-      dispatchAppDataReady();
     }
   });
 }
 async function initImagesToggle(app) {
   await setupBooleanToggle(app, getImagesToggle, "imagesEnabled");
 }
-function initTheme(app) {
-  const htmlEl = document.documentElement;
-  const toggle = getThemeToggle();
-  const text = getThemeText();
-  if (!toggle || !text) return;
-  const applyThemeUI = (theme) => {
-    htmlEl.classList.remove("light", "dark");
-    htmlEl.classList.add(theme);
-    toggle.checked = theme === "dark";
-    text.textContent = theme;
-  };
-  applyThemeUI(app.theme);
-  toggle.addEventListener("change", async () => {
-    const newTheme = toggle.checked ? "dark" : "light";
-    app.theme = newTheme;
-    applyThemeUI(newTheme);
-    createStatusBarMessage(app, `Theme set to ${newTheme}.`);
-    await saveSimpleState("theme", newTheme);
-  });
+async function initShadowsToggle(app) {
+  await setupBooleanToggle(app, getShadowsToggle, "shadowsEnabled");
+}
+async function initUrlsNewTabToggle(app) {
+  await setupBooleanToggle(app, getOpenUrlsInNewTabToggle, "openUrlsInNewTabEnabled");
 }
 async function initScrollPosition(app) {
   window.requestAnimationFrame(async () => {
@@ -4797,8 +4909,8 @@ async function initScrollPosition(app) {
       const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: "auto", block: "start" });
-        if (typeof lastViewedItemOffset === "number" && lastViewedItemOffset > 0) {
-          window.scrollTo({ top: window.scrollY + lastViewedItemOffset, behavior: "auto" });
+        if (typeof lastViewedItemOffset === "number" && lastViewedItemOffset !== 0) {
+          window.scrollTo({ top: window.scrollY - lastViewedItemOffset, behavior: "auto" });
         }
       }
     }
@@ -4859,21 +4971,36 @@ const manageDailyDeck = async (entries, readItems, starredItems, shuffledOutItem
   console.log("manageDailyDeck: Loaded currentDeckItems count:", currentDeckItems.length);
   const readGuidsSet = new Set(readItemsArray.map(getGuid));
   const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
+  const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
   const entriesMap = new Map(entries.map((e) => [e.guid, e]));
   let existingDeck = currentDeckItems.map((di) => entriesMap.get(getGuid(di))).filter((item) => !!item);
   const today = (/* @__PURE__ */ new Date()).toDateString();
   const isNewDay = lastShuffleResetDate !== today;
   const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
   const allItemsInDeckRead = !isDeckEmpty && existingDeck.every((item) => readGuidsSet.has(item.guid));
-  const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead;
+  const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every((item) => shuffledOutGuidsSet.has(item.guid));
+  const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead || allItemsInDeckShuffled;
+  console.log("manageDailyDeck: Deck Status:", {
+    isDeckEmpty,
+    allItemsInDeckRead,
+    allItemsInDeckShuffled,
+    isDeckEffectivelyEmpty,
+    existingDeckCount: existingDeck.length,
+    currentDeckItemsCount: currentDeckItems.length
+  });
   let newDeck = existingDeck;
   let newCurrentDeckGuids = currentDeckItems;
   let newShuffledOutGuids = shuffledOutItemsArray;
-  let newShuffleCount = shuffleCount || DAILY_SHUFFLE_LIMIT;
+  let newShuffleCount = typeof shuffleCount === "number" ? shuffleCount : DAILY_SHUFFLE_LIMIT;
   let newLastShuffleResetDate = lastShuffleResetDate || today;
   console.log("manageDailyDeck: Condition check:", { isNewDay, isDeckEffectivelyEmpty, filterModeIsNotUnread: filterMode !== "unread", entriesCount: entries.length });
-  if (isNewDay || isDeckEffectivelyEmpty || filterMode !== "unread") {
-    console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), or Filter Mode Changed (${filterMode}).`);
+  if (isNewDay || isDeckEffectivelyEmpty || filterMode !== "unread" || currentDeckItems.length === 0 && entries.length > 0) {
+    console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), Filter Mode Changed (${filterMode}), or Initial Load (${currentDeckItems.length === 0}).`);
+    if (!isNewDay && currentDeckItems.length > 0 && isDeckEffectivelyEmpty && filterMode === "unread") {
+      console.log("[deckManager] Automatically incrementing shuffleCount due to empty deck.");
+      newShuffleCount++;
+      await saveShuffleState(newShuffleCount, newLastShuffleResetDate);
+    }
     const newDeckItems = await generateNewDeck(
       allItems,
       readItemsArray,
@@ -4900,9 +5027,6 @@ const manageDailyDeck = async (entries, readItems, starredItems, shuffledOutItem
       await saveShuffleState(newShuffleCount, today);
       newLastShuffleResetDate = today;
       await saveSimpleState("lastShuffleResetDate", today);
-    } else if (isDeckEffectivelyEmpty && filterMode === "unread") {
-      newShuffleCount = Math.min(newShuffleCount + 1, DAILY_SHUFFLE_LIMIT);
-      await saveShuffleState(newShuffleCount, lastShuffleResetDate ?? (/* @__PURE__ */ new Date()).toDateString());
     }
   } else {
     newDeck = existingDeck.map((item) => ({
@@ -4928,6 +5052,7 @@ async function processShuffle(app) {
     return;
   }
   const visibleGuids = app.deck.map((item) => item.guid);
+  console.log(`[deckManager] processShuffle: Visible GUIDs to shuffle out: ${visibleGuids.length}`, visibleGuids);
   const existingShuffledGuids = (app.shuffledOutGuids || []).map(getGuid).map((guid) => ({ guid, shuffledAt: (/* @__PURE__ */ new Date()).toISOString() }));
   const existingShuffledGuidsSet = new Set(existingShuffledGuids.map(getGuid));
   const updatedShuffledGuidsSet = /* @__PURE__ */ new Set([...existingShuffledGuidsSet, ...visibleGuids]);
@@ -4938,7 +5063,11 @@ async function processShuffle(app) {
   }));
   app.shuffledOutGuids = newShuffledOutGuids;
   app.shuffleCount--;
-  await saveArrayState("shuffledOutGuids", newShuffledOutGuids);
+  const { overwriteArrayAndSyncChanges: overwriteArrayAndSyncChanges2 } = await __vitePreload(async () => {
+    const { overwriteArrayAndSyncChanges: overwriteArrayAndSyncChanges3 } = await Promise.resolve().then(() => dbUserState);
+    return { overwriteArrayAndSyncChanges: overwriteArrayAndSyncChanges3 };
+  }, true ? void 0 : void 0);
+  await overwriteArrayAndSyncChanges2("shuffledOutGuids", newShuffledOutGuids);
   await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate ?? (/* @__PURE__ */ new Date()).toDateString());
   const shuffleDisplay = getShuffleCountDisplay();
   if (shuffleDisplay) {
@@ -4955,9 +5084,176 @@ async function processShuffle(app) {
   );
   app.deck = result.deck;
   app.currentDeckGuids = result.currentDeckGuids;
+  app.shuffledOutGuids = result.shuffledOutGuids;
+  app.shuffleCount = result.shuffleCount;
+  app.lastShuffleResetDate = result.lastShuffleResetDate;
   displayTemporaryMessageInTitle("Feed shuffled!");
   console.log(`[deckManager] Deck shuffled. Remaining shuffles: ${app.shuffleCount}.`);
 }
+async function handleKeyboardShortcuts(event, app) {
+  const target = event.target;
+  const isTyping = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+  if (isTyping) return;
+  const key = event.key;
+  const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+  if (app.openShortcuts && key !== "?" && key !== "Escape" && !(key === "k" && isCtrlOrCmd)) {
+    const blockedKeys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "j", "k"];
+    if (blockedKeys.includes(key)) {
+      event.preventDefault();
+    }
+    return;
+  }
+  switch (key) {
+    case "j":
+    case "ArrowDown":
+      event.preventDefault();
+      await moveSelection(app, 1);
+      break;
+    case "k":
+      if (isCtrlOrCmd) {
+        event.preventDefault();
+        if (app.openShortcuts) {
+          app.openShortcuts = false;
+        } else {
+          app.openShortcuts = true;
+        }
+      } else {
+        event.preventDefault();
+        await moveSelection(app, -1);
+      }
+      break;
+    case "ArrowUp":
+      event.preventDefault();
+      await moveSelection(app, -1);
+      break;
+    case " ":
+    case "n":
+      event.preventDefault();
+      if (app.selectedGuid) {
+        const currentGuid = app.selectedGuid;
+        await moveSelection(app, 1);
+        await app.toggleRead(currentGuid);
+      } else if (app.filteredEntries.length > 0) {
+        app.selectedGuid = app.filteredEntries[0].guid;
+        scrollSelectedIntoView(app.selectedGuid, app);
+      }
+      break;
+    case "s":
+    case "L":
+      if (app.selectedGuid) {
+        event.preventDefault();
+        await app.toggleStar(app.selectedGuid);
+      }
+      break;
+    case "i":
+      event.preventDefault();
+      app.imagesEnabled = !app.imagesEnabled;
+      createStatusBarMessage(app, `Images ${app.imagesEnabled ? "Enabled" : "Disabled"}.`);
+      __vitePreload(() => Promise.resolve().then(() => database), true ? void 0 : void 0).then((m) => {
+        m.saveSimpleState("imagesEnabled", app.imagesEnabled);
+      });
+      break;
+    case "o":
+    case "Enter":
+      if (app.selectedGuid) {
+        event.preventDefault();
+        const item = app.filteredEntries.find((e) => e.guid === app.selectedGuid);
+        if (item?.link) {
+          window.open(item.link, "_blank", "noopener,noreferrer");
+        }
+      }
+      break;
+    case "r":
+    case "m":
+      if (app.selectedGuid) {
+        event.preventDefault();
+        await app.toggleRead(app.selectedGuid);
+      }
+      break;
+    case "t":
+      event.preventDefault();
+      app.scrollToTop();
+      break;
+    case "u":
+      event.preventDefault();
+      await app.undoMarkRead();
+      break;
+    case "?":
+      event.preventDefault();
+      if (app.openShortcuts) {
+        app.openShortcuts = false;
+      } else {
+        app.openShortcuts = true;
+      }
+      break;
+    case "Escape":
+      if (app.openShortcuts) {
+        event.preventDefault();
+        app.openShortcuts = false;
+      } else if (app.openSettings) {
+        event.preventDefault();
+        app.openSettings = false;
+      } else if (app.selectedGuid) {
+        event.preventDefault();
+        app.selectedGuid = null;
+      }
+      break;
+    case "z":
+      if (isCtrlOrCmd) {
+        event.preventDefault();
+        await app.undoMarkRead();
+      }
+      break;
+  }
+}
+async function moveSelection(app, direction) {
+  const entries = app.filteredEntries;
+  if (entries.length === 0) return;
+  if (!app.selectedGuid) {
+    const baseGuid = app.lastSelectedGuid;
+    const currentIndex = baseGuid ? entries.findIndex((e) => e.guid === baseGuid) : -1;
+    if (currentIndex === -1) {
+      app.selectedGuid = entries[0].guid;
+    } else {
+      let nextIndex = currentIndex + direction;
+      if (nextIndex >= entries.length) nextIndex = entries.length - 1;
+      if (nextIndex < 0) nextIndex = 0;
+      app.selectedGuid = entries[nextIndex].guid;
+    }
+  } else {
+    const currentIndex = entries.findIndex((e) => e.guid === app.selectedGuid);
+    let nextIndex = currentIndex + direction;
+    if (nextIndex >= entries.length) nextIndex = entries.length - 1;
+    if (nextIndex < 0) nextIndex = 0;
+    app.selectedGuid = entries[nextIndex].guid;
+  }
+  scrollSelectedIntoView(app.selectedGuid, app);
+}
+function scrollSelectedIntoView(guid, app) {
+  if (!guid) return;
+  if (app.filteredEntries.length > 0 && app.filteredEntries[0].guid === guid) {
+    app.scrollToTop();
+    return;
+  }
+  setTimeout(() => {
+    const element = document.querySelector(`.entry[data-guid="${guid}"]`);
+    if (element) {
+      const header = document.querySelector("#header");
+      const headerHeight = header ? header.getBoundingClientRect().height : 0;
+      const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+      const offsetPosition = elementPosition - headerHeight - 20;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+    }
+  }, 10);
+}
+const keyboardManager = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  handleKeyboardShortcuts,
+  scrollSelectedIntoView
+}, Symbol.toStringTag, { value: "Module" }));
 function rssApp() {
   return {
     // --- State Properties ---
@@ -4967,11 +5263,13 @@ function rssApp() {
     feedItems: {},
     filterMode: "unread",
     openSettings: false,
+    openShortcuts: false,
     modalView: "main",
     shuffleCount: 0,
     syncEnabled: true,
     imagesEnabled: true,
     openUrlsInNewTabEnabled: true,
+    shadowsEnabled: true,
     rssFeedsInput: "",
     keywordBlacklistInput: "",
     entries: [],
@@ -4986,9 +5284,19 @@ function rssApp() {
     showSyncStatus: false,
     theme: "dark",
     // Default theme
+    themeStyle: "original",
+    themeStyleLight: "original",
+    themeStyleDark: "original",
     customCss: "",
+    fontSize: 100,
     showUndo: false,
+    undoTimerActive: false,
     undoItemGuid: null,
+    undoItemIndex: null,
+    selectedGuid: null,
+    lastSelectedGuid: null,
+    starredGuid: null,
+    readingGuid: null,
     _lastFilterHash: "",
     _cachedFilteredEntries: null,
     scrollObserver: null,
@@ -5009,20 +5317,28 @@ function rssApp() {
         this._initImageObserver();
         if (this.isOnline) {
           this.progressMessage = "Syncing latest content...";
+          await processPendingOperations();
           await pullUserState();
-          await performFeedSync(this);
+          const syncSuccess = await performFeedSync(this);
           await this._loadAndManageAllData();
-          createStatusBarMessage(this, "Initial sync complete!");
+          if (syncSuccess) {
+            createStatusBarMessage(this, "Initial sync complete!");
+          } else {
+            createStatusBarMessage(this, "Sync finished with some issues. Check console for details.");
+          }
         } else {
           this.progressMessage = "Offline mode. Loading local data...";
           await this._loadAndManageAllData();
         }
         this.progressMessage = "Applying user preferences...";
-        initTheme(this);
         initSyncToggle(this);
         initImagesToggle(this);
+        initShadowsToggle(this);
+        initUrlsNewTabToggle(this);
         attachScrollToTopHandler();
-        await initScrollPosition(this);
+        this.$nextTick(() => {
+          initScrollPosition(this);
+        });
         this.progressMessage = "Setting up app watchers...";
         this._setupWatchers();
         this._setupEventListeners();
@@ -5052,14 +5368,19 @@ function rssApp() {
       this.progressMessage = "Syncing...";
       this.loading = true;
       try {
-        await performFeedSync(this);
+        await processPendingOperations();
+        const syncSuccess = await performFeedSync(this);
         await pullUserState();
         await this._loadAndManageAllData();
         this.deckManaged = true;
         this.progressMessage = "";
         this.loading = false;
         console.log("Immediate background sync complete.");
-        createStatusBarMessage(this, "Sync complete!");
+        if (syncSuccess) {
+          createStatusBarMessage(this, "Sync complete!");
+        } else {
+          createStatusBarMessage(this, "Sync finished with errors.");
+        }
       } catch (error2) {
         console.error("Immediate background sync failed:", error2);
         this.progressMessage = "Sync Failed!";
@@ -5069,17 +5390,16 @@ function rssApp() {
     },
     updateSyncStatusMessage: async function() {
       const online = isOnline();
-      let message = "";
-      let show = false;
       if (!online) {
-        message = "Offline.";
-        show = true;
+        this.syncStatusMessage = "Offline.";
+        this.showSyncStatus = true;
       } else if (!this.syncEnabled) {
-        message = "Sync is disabled.";
-        show = true;
+        this.syncStatusMessage = "Sync is disabled.";
+        this.showSyncStatus = true;
+      } else {
+        this.showSyncStatus = false;
+        this.syncStatusMessage = "";
       }
-      this.syncStatusMessage = message;
-      this.showSyncStatus = show;
     },
     loadAndDisplayDeck: async function() {
       let guidsToDisplay = this.currentDeckGuids;
@@ -5115,7 +5435,7 @@ function rssApp() {
         }
       }
       console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
-      this.deck = Array.isArray(items) ? items.sort((a, b) => b.timestamp - a.timestamp) : [];
+      this.deck = Array.isArray(items) ? items : [];
       console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
     },
     loadFeedItemsFromDB: async function() {
@@ -5140,7 +5460,8 @@ function rssApp() {
     // --- Getters ---
     get filteredEntries() {
       if (!Array.isArray(this.deck)) this.deck = [];
-      const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}`;
+      const deckContentHash = this.deck.length > 0 ? this.deck[0].guid.substring(0, 8) : "empty";
+      const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}-${deckContentHash}`;
       if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
         return this._cachedFilteredEntries;
       }
@@ -5185,19 +5506,31 @@ function rssApp() {
       return this.read.some((e) => e.guid === guid);
     },
     toggleStar: async function(guid) {
-      const isCurrentlyStarred = this.isStarred(guid);
+      const isStarring = !this.starred.some((item) => item.guid === guid);
+      if (isStarring) {
+        this.starredGuid = guid;
+        setTimeout(() => {
+          if (this.starredGuid === guid) this.starredGuid = null;
+        }, 1e3);
+      }
       await toggleItemStateAndSync(this, guid, "starred");
-      this.deck = this.deck.map(
-        (item) => item.guid === guid ? { ...item, isStarred: !isCurrentlyStarred } : item
-      );
-      this.entries = this.entries.map(
-        (item) => item.guid === guid ? { ...item, isStarred: !isCurrentlyStarred } : item
-      );
-      this.updateCounts();
-      this.updateSyncStatusMessage();
     },
     toggleRead: async function(guid) {
       const isCurrentlyRead = this.isRead(guid);
+      const wasSelected = this.selectedGuid === guid;
+      let nextGuidToSelect = null;
+      if (!isCurrentlyRead && wasSelected && this.filterMode === "unread") {
+        const currentIndex = this.filteredEntries.findIndex((e) => e.guid === guid);
+        if (currentIndex !== -1 && currentIndex < this.filteredEntries.length - 1) {
+          nextGuidToSelect = this.filteredEntries[currentIndex + 1].guid;
+        }
+      }
+      if (!isCurrentlyRead) {
+        this.readingGuid = guid;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        this.readingGuid = null;
+      }
+      let removedIndex = null;
       await toggleItemStateAndSync(this, guid, "read");
       this.deck = this.deck.map(
         (item) => item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
@@ -5206,6 +5539,8 @@ function rssApp() {
         (item) => item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
       );
       if (this.filterMode === "unread" && !isCurrentlyRead) {
+        removedIndex = this.currentDeckGuids.findIndex((item) => item.guid === guid);
+        if (removedIndex === -1) removedIndex = null;
         this.deck = this.deck.filter((item) => item.guid !== guid);
         this.currentDeckGuids = this.currentDeckGuids.filter((deckItem) => deckItem.guid !== guid);
         const { saveCurrentDeck: saveCurrentDeck2 } = await __vitePreload(async () => {
@@ -5213,9 +5548,19 @@ function rssApp() {
           return { saveCurrentDeck: saveCurrentDeck3 };
         }, true ? void 0 : void 0);
         await saveCurrentDeck2(this.currentDeckGuids);
+        if (nextGuidToSelect) {
+          this.selectItem(nextGuidToSelect);
+        } else if (wasSelected) {
+          this.selectedGuid = null;
+        }
       } else if (this.filterMode === "unread" && isCurrentlyRead) {
         if (!this.currentDeckGuids.some((deckItem) => deckItem.guid === guid)) {
-          this.currentDeckGuids.push({ guid, addedAt: (/* @__PURE__ */ new Date()).toISOString() });
+          const deckItem = { guid, addedAt: (/* @__PURE__ */ new Date()).toISOString() };
+          if (this.undoItemIndex !== null && this.undoItemIndex >= 0) {
+            this.currentDeckGuids.splice(this.undoItemIndex, 0, deckItem);
+          } else {
+            this.currentDeckGuids.push(deckItem);
+          }
           const { saveCurrentDeck: saveCurrentDeck2 } = await __vitePreload(async () => {
             const { saveCurrentDeck: saveCurrentDeck3 } = await Promise.resolve().then(() => userStateUtils);
             return { saveCurrentDeck: saveCurrentDeck3 };
@@ -5226,8 +5571,8 @@ function rssApp() {
       this.updateCounts();
       await this._reconcileAndRefreshUI();
       this.updateSyncStatusMessage();
-      if (!isCurrentlyRead) {
-        showUndoNotification(this, guid);
+      if (!isCurrentlyRead && this.filterMode !== "all") {
+        showUndoNotification(this, guid, removedIndex);
       }
       if (this.deck.length === 0) {
         console.log("[toggleRead] Deck is empty, initiating refresh process.");
@@ -5248,8 +5593,20 @@ function rssApp() {
       if (!this.undoItemGuid) return;
       const guid = this.undoItemGuid;
       this.showUndo = false;
-      this.undoItemGuid = null;
       await this.toggleRead(guid);
+      this.undoItemGuid = null;
+      this.undoItemIndex = null;
+    },
+    selectItem: function(guid) {
+      if (this.selectedGuid === guid) {
+        if (this.openShortcuts) this.openShortcuts = false;
+        return;
+      }
+      this.selectedGuid = guid;
+      if (this.openShortcuts) this.openShortcuts = false;
+      __vitePreload(() => Promise.resolve().then(() => keyboardManager), true ? void 0 : void 0).then((m) => {
+        m.scrollSelectedIntoView(guid, this);
+      });
     },
     processShuffle: async function() {
       await processShuffle(this);
@@ -5277,18 +5634,18 @@ function rssApp() {
         return { loadSimpleState: loadSimpleState22 };
       }, true ? void 0 : void 0);
       const { value } = await loadSimpleState2("customCss");
-      this.customCss = typeof value === "string" ? value : "";
+      this.customCss = typeof value === "string" && value.trim() !== "" ? value : this.generateCustomCssTemplate();
       this.applyCustomCss();
     },
     saveRssFeeds: async function() {
-      const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map((url) => url.trim()).filter(Boolean).sort();
+      const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
       try {
         await saveSimpleState("rssFeeds", rssFeedsArray);
         this.rssFeedsInput = rssFeedsArray.join("\n");
         createStatusBarMessage(this, "RSS Feeds saved!");
         this.loading = true;
         this.progressMessage = "Saving feeds and performing full sync...";
-        await performFullSync(this);
+        const syncSuccess = await performFullSync(this);
         await this.loadFeedItemsFromDB();
         const deckResult = await manageDailyDeck(
           Array.from(this.entries),
@@ -5307,6 +5664,9 @@ function rssApp() {
         await this.loadAndDisplayDeck();
         this.progressMessage = "";
         this.loading = false;
+        if (!syncSuccess) {
+          createStatusBarMessage(this, "Feeds saved, but sync finished with errors.");
+        }
       } catch (error2) {
         console.error("Error saving RSS feeds:", error2);
         createStatusBarMessage(this, `Failed to save RSS feeds: ${error2.message}`);
@@ -5335,6 +5695,41 @@ function rssApp() {
         createStatusBarMessage(this, `Failed to save custom CSS: ${error2.message}`);
       }
     },
+    resetCustomCss: async function() {
+      if (!confirm("Reset Custom CSS to default template? This will overwrite your current customizations.")) {
+        return;
+      }
+      this.customCss = this.generateCustomCssTemplate();
+      await this.saveCustomCss();
+      createStatusBarMessage(this, "Custom CSS reset to template!");
+    },
+    generateCustomCssTemplate: function() {
+      const style = getComputedStyle(document.documentElement);
+      const vars = [
+        "--bg",
+        "--fg",
+        "--primary",
+        "--secondary",
+        "--card-bg",
+        "--card-border",
+        "--card-shadow-color",
+        "--fg-muted",
+        "--border-radius"
+      ];
+      let template = `/* Custom CSS Template - Current theme: ${this.theme} ${this.themeStyle} */
+:root {
+`;
+      vars.forEach((v) => {
+        const val = style.getPropertyValue(v).trim();
+        if (val) template += `  ${v}: ${val};
+`;
+      });
+      template += `}
+
+/* Add custom styles below */
+`;
+      return template;
+    },
     applyCustomCss: function() {
       let styleEl = document.getElementById("custom-user-css");
       if (!styleEl) {
@@ -5343,6 +5738,92 @@ function rssApp() {
         document.head.appendChild(styleEl);
       }
       styleEl.textContent = this.customCss;
+    },
+    loadThemeStyle: async function() {
+      const { loadSimpleState: loadSimpleState2 } = await __vitePreload(async () => {
+        const { loadSimpleState: loadSimpleState22 } = await Promise.resolve().then(() => dbUserState);
+        return { loadSimpleState: loadSimpleState22 };
+      }, true ? void 0 : void 0);
+      const [, lightRes, darkRes] = await Promise.all([
+        loadSimpleState2("themeStyle"),
+        loadSimpleState2("themeStyleLight"),
+        loadSimpleState2("themeStyleDark")
+      ]);
+      this.themeStyleLight = typeof lightRes.value === "string" ? lightRes.value : "original";
+      this.themeStyleDark = typeof darkRes.value === "string" ? darkRes.value : "original";
+      if (this.theme === "light") {
+        this.themeStyle = this.themeStyleLight;
+      } else {
+        this.themeStyle = this.themeStyleDark;
+      }
+      this.applyThemeStyle();
+    },
+    updateThemeAndStyle: async function(newStyle, newTheme) {
+      console.log(`Updating theme to ${newTheme} and style to ${newStyle}`);
+      this.theme = newTheme;
+      this.themeStyle = newStyle;
+      const htmlEl = document.documentElement;
+      htmlEl.classList.remove("light", "dark");
+      htmlEl.classList.add(newTheme);
+      localStorage.setItem("theme", newTheme);
+      const { saveSimpleState: saveSimpleState2 } = await __vitePreload(async () => {
+        const { saveSimpleState: saveSimpleState22 } = await Promise.resolve().then(() => dbUserState);
+        return { saveSimpleState: saveSimpleState22 };
+      }, true ? void 0 : void 0);
+      await saveSimpleState2("theme", newTheme);
+      if (newTheme === "light") {
+        this.themeStyleLight = newStyle;
+        await saveSimpleState2("themeStyleLight", newStyle);
+      } else {
+        this.themeStyleDark = newStyle;
+        await saveSimpleState2("themeStyleDark", newStyle);
+      }
+      await saveSimpleState2("themeStyle", newStyle);
+      this.applyThemeStyle();
+      createStatusBarMessage(this, `Theme set to ${newTheme} (${newStyle}).`);
+    },
+    saveThemeStyle: async function() {
+      const { saveSimpleState: saveSimpleState2 } = await __vitePreload(async () => {
+        const { saveSimpleState: saveSimpleState22 } = await Promise.resolve().then(() => dbUserState);
+        return { saveSimpleState: saveSimpleState22 };
+      }, true ? void 0 : void 0);
+      if (this.theme === "light") {
+        this.themeStyleLight = this.themeStyle;
+        await saveSimpleState2("themeStyleLight", this.themeStyleLight);
+      } else {
+        this.themeStyleDark = this.themeStyle;
+        await saveSimpleState2("themeStyleDark", this.themeStyleDark);
+      }
+      await saveSimpleState2("themeStyle", this.themeStyle);
+      this.applyThemeStyle();
+    },
+    applyThemeStyle: function() {
+      const htmlEl = document.documentElement;
+      const classesToRemove = Array.from(htmlEl.classList).filter((c) => c.startsWith("theme-"));
+      htmlEl.classList.remove(...classesToRemove);
+      if (this.themeStyle !== "original") {
+        htmlEl.classList.add(`theme-${this.themeStyle}`);
+      }
+    },
+    loadFontSize: async function() {
+      const { loadSimpleState: loadSimpleState2 } = await __vitePreload(async () => {
+        const { loadSimpleState: loadSimpleState22 } = await Promise.resolve().then(() => dbUserState);
+        return { loadSimpleState: loadSimpleState22 };
+      }, true ? void 0 : void 0);
+      const { value } = await loadSimpleState2("fontSize");
+      this.fontSize = typeof value === "number" ? value : 100;
+      this.applyFontSize();
+    },
+    saveFontSize: async function() {
+      const { saveSimpleState: saveSimpleState2 } = await __vitePreload(async () => {
+        const { saveSimpleState: saveSimpleState22 } = await Promise.resolve().then(() => dbUserState);
+        return { saveSimpleState: saveSimpleState22 };
+      }, true ? void 0 : void 0);
+      await saveSimpleState2("fontSize", this.fontSize);
+      this.applyFontSize();
+    },
+    applyFontSize: function() {
+      document.documentElement.style.setProperty("--font-scale", (this.fontSize / 100).toString());
     },
     updateCounts: async function() {
       updateCounts(this);
@@ -5397,21 +5878,27 @@ function rssApp() {
           }
         }
         console.log("Service workers unregistered.");
-        console.log("Clearing specific IndexedDB object stores...");
+        console.log("Clearing feed and progress IndexedDB object stores...");
         try {
           const db = await getDb();
-          const storesToClear = ["read", "starred", "currentDeckGuids", "shuffledOutGuids", "feedItems"];
-          const tx = db.transaction(storesToClear, "readwrite");
+          const storesToClear = ["read", "starred", "currentDeckGuids", "shuffledOutGuids", "feedItems", "pendingOperations"];
+          const tx = db.transaction([...storesToClear, "userSettings"], "readwrite");
           await Promise.all(storesToClear.map((storeName) => {
             console.log(`Clearing object store: ${storeName}`);
             return tx.objectStore(storeName).clear();
           }));
+          console.log("Clearing sync metadata from userSettings...");
+          const userSettingsStore = tx.objectStore("userSettings");
+          await Promise.all([
+            userSettingsStore.delete("lastFeedSync"),
+            userSettingsStore.delete("lastStateSync")
+          ]);
           await tx.done;
-          console.log("Specific IndexedDB object stores cleared.");
+          console.log("Specific IndexedDB object stores and sync metadata cleared.");
         } catch (e) {
-          console.error("Error clearing specific IndexedDB stores:", e);
+          console.error("Error clearing IndexedDB stores:", e);
         }
-        console.log("localStorage (excluding user settings) is implicitly maintained.");
+        console.log("localStorage is preserved.");
         console.log("DEBUG: About to make fetch call to /api/admin/reset-app");
         const response = await fetch("/api/admin/reset-app", {
           method: "POST",
@@ -5428,7 +5915,9 @@ function rssApp() {
         console.log("Backend application data reset successfully.");
         createStatusBarMessage(this, "Application reset complete! Reloading...");
         await pullUserState(true);
-        window.location.reload();
+        setTimeout(() => {
+          window.location.reload();
+        }, 1e3);
       } catch (error2) {
         console.error("Error during application reset:", error2);
         this.errorMessage = `Failed to reset application: ${error2.message}`;
@@ -5535,6 +6024,8 @@ function rssApp() {
         this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join("\n");
         this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) ? keywordBlacklist.value.join("\n") : "";
         await this.loadCustomCss();
+        await this.loadThemeStyle();
+        await this.loadFontSize();
       } catch (error2) {
         console.error("Error loading initial state:", error2);
         this.syncEnabled = true;
@@ -5570,7 +6061,7 @@ function rssApp() {
       console.log(`_loadAndManageAllData: After loadAndPruneReadItems. Read count: ${this.read.length}`);
       console.log("[deckManager] Starting deck management with all data loaded.");
       this.progressMessage = "Organizing your deck...";
-      console.log("_loadAndManageAllData: Before manageDailyDeck", { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length });
+      console.log("_loadAndManageAllData: Before manageDailyDeck", { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length, shuffleCount: this.shuffleCount });
       const deckResult = await manageDailyDeck(
         Array.from(this.entries),
         this.read,
@@ -5615,6 +6106,15 @@ function rssApp() {
       }, { root: null, threshold: 0 });
     },
     _setupWatchers: function() {
+      this.$watch("openShortcuts", async (isOpen) => {
+        if (isOpen) {
+          document.body.classList.add("no-scroll");
+          await saveCurrentScrollPosition();
+        } else {
+          document.body.classList.remove("no-scroll");
+          document.body.style.overflow = "";
+        }
+      });
       this.$watch("openSettings", async (isOpen) => {
         if (isOpen) {
           this.modalView = "main";
@@ -5654,20 +6154,28 @@ function rssApp() {
         }
         this.scrollToTop();
       });
+      this.$watch("shadowsEnabled", (enabled) => {
+        document.body.classList.toggle("no-shadows", !enabled);
+      });
+      document.body.classList.toggle("no-shadows", !this.shadowsEnabled);
       this.$watch("entries", () => this.updateCounts());
       this.$watch("read", () => this.updateCounts());
       this.$watch("starred", () => this.updateCounts());
       this.$watch("currentDeckGuids", () => this.updateCounts());
+      this.$watch("selectedGuid", (newGuid) => {
+        if (newGuid) this.lastSelectedGuid = newGuid;
+      });
     },
     _setupEventListeners: function() {
       const backgroundSync = async () => {
         if (!this.syncEnabled || !this.isOnline) return;
         console.log("Performing periodic background sync...");
-        await performFeedSync(this);
+        await processPendingOperations();
+        const syncSuccess = await performFeedSync(this);
         await pullUserState();
         await this._loadAndManageAllData();
         this.deckManaged = true;
-        console.log("Background sync complete.");
+        console.log(`Background sync complete. Success: ${syncSuccess}`);
       };
       window.addEventListener("online", async () => {
         this.isOnline = true;
@@ -5685,7 +6193,16 @@ function rssApp() {
         this.isOnline = false;
         await this.updateSyncStatusMessage();
       });
-      setTimeout(backgroundSync, 0);
+      let scrollTimeout;
+      window.addEventListener("scroll", () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          saveCurrentScrollPosition();
+        }, 1e3);
+      }, { passive: true });
+      window.addEventListener("keydown", (e) => {
+        handleKeyboardShortcuts(e, this);
+      });
     },
     _startPeriodicSync: function() {
       let lastActivityTimestamp = Date.now();
@@ -5704,11 +6221,12 @@ function rssApp() {
         }
         console.log("Starting scheduled background sync...");
         try {
-          await performFeedSync(this);
+          await processPendingOperations();
+          const syncSuccess = await performFeedSync(this);
           await pullUserState();
           await this._loadAndManageAllData();
           this.deckManaged = true;
-          console.log("Scheduled sync complete.");
+          console.log(`Scheduled sync complete. Success: ${syncSuccess}`);
         } catch (error2) {
           console.error("Periodic sync failed:", error2);
         }

@@ -1,4 +1,5 @@
 import { AppState } from '@/types/app.ts';
+import { createStatusBarMessage } from '../ui/uiUpdaters.ts';
 
 /**
  * Handles keyboard events for application navigation and actions.
@@ -17,6 +18,16 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
     const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
     // 3. Handle shortcuts
+    // If shortcuts are open, only allow toggle (?), Escape, and Ctrl+k to close it.
+    if (app.openShortcuts && key !== '?' && key !== 'Escape' && !(key === 'k' && isCtrlOrCmd)) {
+        // Block keys that cause scrolling
+        const blockedKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'j', 'k'];
+        if (blockedKeys.includes(key)) {
+            event.preventDefault();
+        }
+        return;
+    }
+
     switch (key) {
         case 'j':
         case 'ArrowDown':
@@ -69,6 +80,7 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
         case 'i':
             event.preventDefault();
             app.imagesEnabled = !app.imagesEnabled;
+            createStatusBarMessage(app, `Images ${app.imagesEnabled ? 'Enabled' : 'Disabled'}.`);
             // Persist the change
             import('../data/database.ts').then(m => {
                 m.saveSimpleState('imagesEnabled', app.imagesEnabled);
@@ -87,19 +99,21 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
             break;
 
         case 'r':
+        case 'm':
             if (app.selectedGuid) {
                 event.preventDefault();
                 await app.toggleRead(app.selectedGuid);
             }
             break;
 
+        case 't':
+            event.preventDefault();
+            app.scrollToTop();
+            break;
+
         case 'u':
             event.preventDefault();
-            if (app.filterMode !== 'unread') {
-                app.filterMode = 'unread';
-            }
-            app.scrollToTop();
-            app.selectedGuid = null;
+            await app.undoMarkRead();
             break;
 
         case '?':
@@ -118,6 +132,9 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
             } else if (app.openSettings) {
                 event.preventDefault();
                 app.openSettings = false;
+            } else if (app.selectedGuid) {
+                event.preventDefault();
+                app.selectedGuid = null;
             }
             break;
 
@@ -140,7 +157,20 @@ async function moveSelection(app: AppState, direction: number): Promise<void> {
     if (entries.length === 0) return;
 
     if (!app.selectedGuid) {
-        app.selectedGuid = entries[0].guid;
+        // If nothing is selected, try to start from lastSelectedGuid
+        const baseGuid = app.lastSelectedGuid;
+        const currentIndex = baseGuid ? entries.findIndex(e => e.guid === baseGuid) : -1;
+        
+        if (currentIndex === -1) {
+            // If lastSelectedGuid is not in current view or doesn't exist, start at top
+            app.selectedGuid = entries[0].guid;
+        } else {
+            // Navigate relative to lastSelectedGuid
+            let nextIndex = currentIndex + direction;
+            if (nextIndex >= entries.length) nextIndex = entries.length - 1;
+            if (nextIndex < 0) nextIndex = 0;
+            app.selectedGuid = entries[nextIndex].guid;
+        }
     } else {
         const currentIndex = entries.findIndex(e => e.guid === app.selectedGuid);
         let nextIndex = currentIndex + direction;

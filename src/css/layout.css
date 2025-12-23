@@ -1,72 +1,22 @@
 /* layout.css */
-#header {
-  position: relative;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1rem;
-  background-color: transparent;
-  font-family: 'Playfair Display', serif;
-  font-weight: 400;
-  text-transform: uppercase;
-  text-align: center;
-  color: var(--fg-muted);
-  font-size: small;
-  font-variant: all-small-caps;
-  max-height: 3em;
-}
-
-#header .switch {
-  margin-left: auto;
-  margin-right: 1rem;
-}
-
-.header-balancer {
-  display: none;
-}
-
-#ntn-title {
-  flex: 1;
-}
-
-#header h2 {
-  padding: 0;
-  margin: 0;
-  font-size: 1.75rem;
-  text-align: center;
-}
-
-#header-options {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-html.light #header {
-  background-color: var(--bg);
-  color: var(--fg-muted);
-}
-
-html.dark #header {
-  text-shadow: 2px 2px 2px var(--card-shadow-color);
-}
-
 #app-viewport {
-  width: 100%;
+  width: 100vw;
   position: relative;
+  overflow-x: hidden;
 }
 
 #sliding-container {
   display: flex;
-  width: calc(150vw + 1.4rem);
-  gap: 1.4rem;
-  transition: margin-left 0.6s cubic-bezier(0.65, 0, 0.35, 1);
-  align-items: stretch; /* Crucial: make both sections the same height */
+  width: calc(200vw + var(--feed-gap));
+  gap: var(--feed-gap);
+  transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+  align-items: stretch;
 }
 
 #app-viewport.shifted #sliding-container {
-  margin-left: calc(-50vw - 1.4rem);
+  /* Shift left by 60vw to keep 40% of feed visible and center the help column content */
+  transform: translateX(calc(-60vw - var(--feed-gap)));
 }
 
 #main-section {
@@ -76,20 +26,79 @@ html.dark #header {
 }
 
 #shortcuts-section {
-  width: 50vw;
+  width: 100vw;
   flex-shrink: 0;
   box-sizing: border-box;
-  background-color: var(--bg);
+  background-color: transparent;
   position: relative;
+  display: flex;
+  justify-content: flex-start; /* Align card to start of its 100vw column */
+  padding-left: 5vw; /* Offset to help centering in the shifted viewport */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease-in-out, visibility 0.4s;
+}
+
+#app-viewport.shifted #shortcuts-section {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (min-width: 1024px) {
+  #shortcuts-section {
+    margin-left: -28rem;
+  }
 }
 
 .help-panel-item {
     width: 90%;
     max-width: 600px;
-    margin: 0 auto !important;
+    margin: var(--feed-gap) 0 !important; /* Left aligned in its section */
     position: sticky;
-    top: 15vh; /* Center it vertically in the viewport when stuck */
-    z-index: 10;
+    top: 5vh;
+    z-index: 100; /* Ensure it's above other items */
+    background-color: var(--card-bg); /* Ensure it's opaque */
+}
+
+body.no-scroll {
+  overflow: hidden !important;
+  scrollbar-gutter: stable;
+}
+
+#header {
+  position: relative;
+  z-index: 1000;
+  padding: 1rem 0;
+  background-color: transparent;
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  font-size: small;
+  font-variant: all-small-caps;
+}
+
+#ntn-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+#header h2 {
+  padding: 0;
+  margin: 0;
+  font-size: 1.75rem;
+  text-align: left;
+}
+
+#header-options {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 #items {
@@ -126,7 +135,7 @@ html.dark #header {
   position: relative;
   box-shadow: 0px 4px 15px -5px var(--card-shadow-color);
   max-width: 100%;
-  margin: 1em auto;
+  margin: var(--feed-gap) auto;
   float: none;
 }
 
@@ -250,8 +259,23 @@ ul.feed-list,
 
   .item {
     max-width: 75%;
-    margin: 2em auto;
+    margin: var(--feed-gap) auto;
     box-shadow: 1px 1px 50px 1px var(--card-shadow-color) !important;
+  }
+
+  #ntn-title {
+    max-width: 75%;
+    justify-content: center;
+    position: relative;
+  }
+
+  #header h2 {
+    text-align: center;
+  }
+
+  #header-options {
+    position: absolute;
+    right: 0;
   }
 
   .itemtitle h1 {
@@ -268,7 +292,7 @@ ul.feed-list,
 
   .item {
     max-width: 85%;
-    margin: 1.5em auto;
+    margin: var(--feed-gap) auto;
     float: none;
   }
 
@@ -282,7 +306,7 @@ ul.feed-list,
     margin-left: 20%;
     margin-right: 20%;
     box-shadow: 1px 1px 100px 1px var(--card-shadow-color) !important;
-    margin: 1.4em auto;
+    margin: var(--feed-gap) auto;
   }
 
   .filter-select {
@@ -323,7 +347,11 @@ ul.feed-list,
 
   .item {
     max-width: 50%;
-    margin: 2.5em auto;
+    margin: var(--feed-gap) auto;
+  }
+
+  #ntn-title {
+    max-width: 50%;
   }
 
   .itemtitle h1 {

@@ -187,20 +187,18 @@ span.shuffle-count {
 
 /* Keyboard navigation focus styles */
 .item.entry.selected-item {
-    border-color: var(--primary) !important;
-    box-shadow: 0 0 15px var(--primary) !important;
     outline: none;
-    animation: selection-highlight 1s ease-out forwards;
+    animation: selection-highlight 10s ease-out forwards;
 }
 
 @keyframes selection-highlight {
     0% {
-        border-color: var(--primary);
-        box-shadow: 0 0 20px var(--primary);
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 20px var(--primary) !important;
     }
     100% {
-        border-color: var(--card-border);
-        box-shadow: 0px 4px 15px -5px var(--card-shadow-color);
+        border-color: var(--card-border) !important;
+        box-shadow: 0px 4px 15px -5px var(--card-shadow-color) !important;
     }
 }
 
@@ -220,11 +218,42 @@ span.shuffle-count {
     z-index: 10;
 }
 
+.star-button-animation-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 11;
+}
+
 .star-outline {
     x: 0;
     y: 0;
     width: 100%;
     height: 100%;
+    fill: none;
+    stroke: var(--gold-color);
+    stroke-width: 4px;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0.66;
+    animation: draw-outline 0.5s ease-in-out forwards;
+}
+
+.star-button-outline {
+    fill: none;
+    stroke: var(--gold-color);
+    stroke-width: 4px;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0.66;
+    animation: draw-outline 0.5s ease-in-out 0.5s forwards; /* 0.5s delay to follow title animation */
+}
+
+.read-button-outline {
     fill: none;
     stroke: var(--gold-color);
     stroke-width: 4px;

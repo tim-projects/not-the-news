@@ -94,7 +94,9 @@ export interface AppState {
     undoItemGuid: string | null;
     undoItemIndex: number | null;
     selectedGuid: string | null;
+    lastSelectedGuid: string | null;
     starredGuid: string | null;
+    readingGuid: string | null;
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;

@@ -49,7 +49,8 @@
     #login-form button {
       width: 100%;
       padding: 12px;
-      color: var(--fg); /* Default text color for the button */
+      background-color: var(--primary);
+      color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
@@ -59,8 +60,8 @@
     }
 
     #login-form button:hover {
-      background-color: var(--primary); /* The hover background */
-      color: white; /* Ensure text contrasts with --secondary */
+      background-color: var(--secondary);
+      color: var(--fg);
     }
 
     #login-form button:focus {
@@ -92,7 +93,7 @@
       document.documentElement.classList.add('dark');
     }
   </script>
-  <link rel="stylesheet" crossorigin href="/assets/modal-Pk50ayqF.css">
+  <link rel="stylesheet" crossorigin href="/assets/modal-CJtVjCnR.css">
 <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -102,7 +103,7 @@
       </div>
     <form id="login-form">
       <p>Please log in below. Enter the password you used when building the docker container:</p>
-      <input type="password" placeholder="Enter password" required id="pw">
+      <input type="password" placeholder="Enter password" required id="pw" autofocus>
       <button type="submit">Login</button>
     </form>
   </div>

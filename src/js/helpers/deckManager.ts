@@ -129,6 +129,14 @@ export const manageDailyDeck = async (
     if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread' || (currentDeckItems.length === 0 && entries.length > 0)) {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), Filter Mode Changed (${filterMode}), or Initial Load (${currentDeckItems.length === 0}).`);
 
+        // If it's not a new day, not an initial load, but the deck is empty, increment shuffle count
+        // This handles the "cleared current deck" scenario the user mentioned.
+        if (!isNewDay && currentDeckItems.length > 0 && isDeckEffectivelyEmpty && filterMode === 'unread') {
+            console.log('[deckManager] Automatically incrementing shuffleCount due to empty deck.');
+            newShuffleCount++;
+            await saveShuffleState(newShuffleCount, newLastShuffleResetDate);
+        }
+
         const newDeckItems = await generateNewDeck(
             allItems,
             readItemsArray,

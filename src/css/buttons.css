@@ -21,6 +21,11 @@ button:active {
   box-shadow: 0 0 0 3px var(--primary);
 }
 
+button:disabled {
+    cursor: default;
+    pointer-events: none;
+}
+
 button.close {
   font-size: 24px;
   background: var(--bg);
@@ -238,9 +243,13 @@ button.star.starred:active {
 
 .shuffle-btn:hover,
 .settings-btn:hover,
-.help-btn:hover {
+.help-btn:hover,
+.shuffle-btn.active,
+.settings-btn.active,
+.help-btn.active {
   background-color: var(--primary);
   color: white;
+  opacity: 1;
 }
 
 .shuffle-btn:focus,

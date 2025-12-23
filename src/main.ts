@@ -113,7 +113,9 @@ export function rssApp(): AppState {
         undoItemGuid: null,
         undoItemIndex: null,
         selectedGuid: null,
+        lastSelectedGuid: null,
         starredGuid: null,
+        readingGuid: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -371,11 +373,29 @@ export function rssApp(): AppState {
                 this.starredGuid = guid;
                 setTimeout(() => {
                     if (this.starredGuid === guid) this.starredGuid = null;
-                }, 500); // Animation duration
+                }, 1000); // 0.5s for title + 0.5s for button
             }
             await toggleItemStateAndSync(this, guid, 'starred');
         },        toggleRead: async function(this: AppState, guid: string): Promise<void> {
             const isCurrentlyRead = this.isRead(guid);
+            const wasSelected = this.selectedGuid === guid;
+            let nextGuidToSelect: string | null = null;
+
+            // Identify next item BEFORE we change the read status, if it's currently selected in unread mode
+            if (!isCurrentlyRead && wasSelected && this.filterMode === 'unread') {
+                const currentIndex = this.filteredEntries.findIndex(e => e.guid === guid);
+                if (currentIndex !== -1 && currentIndex < this.filteredEntries.length - 1) {
+                    nextGuidToSelect = this.filteredEntries[currentIndex + 1].guid;
+                }
+            }
+            
+            if (!isCurrentlyRead) {
+                this.readingGuid = guid;
+                // Short delay to allow animation to show
+                await new Promise(resolve => setTimeout(resolve, 500));
+                this.readingGuid = null;
+            }
+
             let removedIndex: number | null = null;
             await toggleItemStateAndSync(this, guid, 'read');
             
@@ -398,6 +418,13 @@ export function rssApp(): AppState {
                 // Save the updated deck guids to the database
                 const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
                 await saveCurrentDeck(this.currentDeckGuids);
+                
+                // NOW move selection if we identified a next item
+                if (nextGuidToSelect) {
+                    this.selectItem(nextGuidToSelect);
+                } else if (wasSelected) {
+                    this.selectedGuid = null;
+                }
             } else if (this.filterMode === 'unread' && isCurrentlyRead) {
                 // If it was read and now unread (Undo), add it back to the deck if missing
                 if (!this.currentDeckGuids.some(deckItem => deckItem.guid === guid)) {
@@ -444,8 +471,13 @@ export function rssApp(): AppState {
             this.undoItemGuid = null;
             this.undoItemIndex = null;
         },        selectItem: function(this: AppState, guid: string): void {
-            if (this.selectedGuid === guid) return;
+            if (this.selectedGuid === guid) {
+                // Even if already selected, clicking should close shortcuts if they are open
+                if (this.openShortcuts) this.openShortcuts = false;
+                return;
+            }
             this.selectedGuid = guid;
+            if (this.openShortcuts) this.openShortcuts = false;
             // Use the same scroll logic as keyboard manager
             import('./js/helpers/keyboardManager.ts').then(m => {
                 m.scrollSelectedIntoView(guid, this);
@@ -969,6 +1001,16 @@ export function rssApp(): AppState {
             }, { root: null, threshold: 0 });
         },
         _setupWatchers: function(this: AppState): void {
+            this.$watch("openShortcuts", async (isOpen: boolean) => {
+                if (isOpen) {
+                    document.body.classList.add('no-scroll');
+                    await saveCurrentScrollPosition();
+                } else {
+                    document.body.classList.remove('no-scroll');
+                    // Explicitly reset overflow to ensure it's not stuck
+                    document.body.style.overflow = '';
+                }
+            });
             this.$watch("openSettings", async (isOpen: boolean) => {
                 if (isOpen) {
                     this.modalView = 'main';
@@ -1014,6 +1056,9 @@ export function rssApp(): AppState {
             this.$watch('read', () => this.updateCounts());
             this.$watch('starred', () => this.updateCounts());
             this.$watch('currentDeckGuids', () => this.updateCounts());
+            this.$watch('selectedGuid', (newGuid: string | null) => {
+                if (newGuid) this.lastSelectedGuid = newGuid;
+            });
         },
         _setupEventListeners: function(this: AppState): void {
             const backgroundSync = async (): Promise<void> => {
