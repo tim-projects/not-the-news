@@ -6107,8 +6107,9 @@ function rssApp() {
     },
     _setupWatchers: function() {
       this.$watch("openShortcuts", async (isOpen) => {
+        const isMobile = window.innerWidth < 1024;
         if (isOpen) {
-          document.body.classList.add("no-scroll");
+          if (!isMobile) document.body.classList.add("no-scroll");
           await saveCurrentScrollPosition();
         } else {
           document.body.classList.remove("no-scroll");

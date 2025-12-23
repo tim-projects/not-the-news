@@ -1002,8 +1002,9 @@ export function rssApp(): AppState {
         },
         _setupWatchers: function(this: AppState): void {
             this.$watch("openShortcuts", async (isOpen: boolean) => {
+                const isMobile = window.innerWidth < 1024;
                 if (isOpen) {
-                    document.body.classList.add('no-scroll');
+                    if (!isMobile) document.body.classList.add('no-scroll');
                     await saveCurrentScrollPosition();
                 } else {
                     document.body.classList.remove('no-scroll');
