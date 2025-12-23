@@ -102,15 +102,19 @@ export const manageDailyDeck = async (
     // - All items in it have been shuffled out
     // - None of its items exist in the current entries (e.g. after a reset or rotation)
     const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
+    // A deck is effectively empty if every item in it is either read OR shuffled out
+    const isDeckEffectivelyEmpty = isDeckEmpty || existingDeck.every(item => 
+        readGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)
+    );
+    // We also want to know if it was specifically cleared by reading (for shuffle refund logic)
     const allItemsInDeckRead = !isDeckEmpty && existingDeck.every(item => readGuidsSet.has(item.guid));
     const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid));
-    const isDeckEffectivelyEmpty = isDeckEmpty || allItemsInDeckRead || allItemsInDeckShuffled;
 
     console.log('manageDailyDeck: Deck Status:', { 
         isDeckEmpty, 
-        allItemsInDeckRead, 
-        allItemsInDeckShuffled, 
         isDeckEffectivelyEmpty,
+        allItemsInDeckRead,
+        allItemsInDeckShuffled,
         existingDeckCount: existingDeck.length,
         currentDeckItemsCount: currentDeckItems.length
     });
@@ -130,11 +134,16 @@ export const manageDailyDeck = async (
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), Filter Mode Changed (${filterMode}), or Initial Load (${currentDeckItems.length === 0}).`);
 
         // If it's not a new day, not an initial load, but the deck is empty, increment shuffle count
-        // This handles the "cleared current deck" scenario the user mentioned.
+        // This handles the "cleared current deck" scenario.
+        // We ONLY refund the shuffle if the deck was cleared by READING all items (or a mix of reading and old shuffles).
+        // If it was cleared by a FRESH SHUFFLE (which processShuffle does by adding all deck items to shuffledOutGuids),
+        // then allItemsInDeckShuffled will be true, and we DO NOT refund it.
         if (!isNewDay && currentDeckItems.length > 0 && isDeckEffectivelyEmpty && filterMode === 'unread') {
-            console.log('[deckManager] Automatically incrementing shuffleCount due to empty deck.');
-            newShuffleCount++;
-            await saveShuffleState(newShuffleCount, newLastShuffleResetDate);
+            if (!allItemsInDeckShuffled) {
+                console.log('[deckManager] Automatically incrementing (refunding) shuffleCount due to deck cleared by reading.');
+                newShuffleCount++;
+                await saveShuffleState(newShuffleCount, newLastShuffleResetDate);
+            }
         }
 
         const newDeckItems = await generateNewDeck(
