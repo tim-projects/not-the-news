@@ -8,6 +8,11 @@
 
 html {
   color-scheme: light dark;
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
 }
 
 /* Define DARK theme as the DEFAULT in :root.
@@ -120,6 +125,8 @@ html.dark a:visited {
 /* Apply variables to body and html */
 body,
 html {
+  margin: 0;
+  padding: 0;
   color: var(--fg);
   word-break: break-word;
   font-size: calc(14px * var(--font-scale));
