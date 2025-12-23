@@ -57,13 +57,12 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
 
         case ' ':
         case 'n':
-            event.preventDefault();
+            e.preventDefault();
             if (app.selectedGuid) {
-                const currentGuid = app.selectedGuid;
-                // Move selection FIRST before it's removed from the unread list
-                await moveSelection(app, 1);
-                await app.toggleRead(currentGuid);
+                // Main toggleRead logic will now handle selecting the next item
+                await app.toggleRead(app.selectedGuid);
             } else if (app.filteredEntries.length > 0) {
+                // If nothing is selected, select the first unread item
                 app.selectedGuid = app.filteredEntries[0].guid;
                 scrollSelectedIntoView(app.selectedGuid, app);
             }

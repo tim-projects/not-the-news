@@ -421,7 +421,9 @@ export function rssApp(): AppState {
                 
                 // NOW move selection if we identified a next item
                 if (nextGuidToSelect) {
-                    this.selectItem(nextGuidToSelect);
+                    this.$nextTick(() => {
+                        this.selectItem(nextGuidToSelect as string);
+                    });
                 } else if (wasSelected) {
                     this.selectedGuid = null;
                 }
