@@ -96,6 +96,8 @@ export function rssApp(): AppState {
         starred: [],
         currentDeckGuids: [],
         shuffledOutGuids: [],
+        pregeneratedOnlineDeck: null,
+        pregeneratedOfflineDeck: null,
         errorMessage: '',
         isOnline: isOnline(),
         deckManaged: false,
@@ -924,6 +926,14 @@ export function rssApp(): AppState {
                 await this.loadCustomCss();
                 await this.loadThemeStyle();
                 await this.loadFontSize();
+
+                // Load pre-generated decks (local only)
+                const [onlineDeckRes, offlineDeckRes] = await Promise.all([
+                    loadSimpleState('pregeneratedOnlineDeck'),
+                    loadSimpleState('pregeneratedOfflineDeck')
+                ]);
+                this.pregeneratedOnlineDeck = onlineDeckRes.value;
+                this.pregeneratedOfflineDeck = offlineDeckRes.value;
             } catch (error: any) {
                 console.error('Error loading initial state:', error);
                 // Set default values in case of error
@@ -1134,14 +1144,17 @@ export function rssApp(): AppState {
                     return;
                 }
                 console.log('Starting scheduled background sync...');
-                try { // Added try-catch for error handling
-                    await processPendingOperations();
-                    const syncSuccess = await performFeedSync(this);
-                    await pullUserState();
-                    await this._loadAndManageAllData();
-                    this.deckManaged = true;
-                    console.log(`Scheduled sync complete. Success: ${syncSuccess}`);
-                } catch (error: any) {
+                    try {
+                        await processPendingOperations();
+                        const syncSuccess = await performFeedSync(this);
+                        await pullUserState();
+                        await this._loadAndManageAllData();
+                        this.deckManaged = true;
+                        console.log(`Scheduled sync complete. Success: ${syncSuccess}`);
+                        
+                        // After sync, pre-generate decks for next shuffle
+                        await this.pregenerateDecks();
+                    } catch (error) {
                     console.error('Periodic sync failed:', error);
                 }
             }, SYNC_INTERVAL_MS);
@@ -1171,9 +1184,8 @@ export function rssApp(): AppState {
         },
         handleEntryLinks: function(this: AppState, element: Element): void {
             if (!element) return;
-            const links = element.querySelectorAll('a');
-            links.forEach((link: HTMLAnchorElement) => {
-                if (link.hostname !== window.location.hostname) {
+            element.querySelectorAll('a').forEach(link => {
+                if ((link as HTMLAnchorElement).hostname !== window.location.hostname) {
                     if (this.openUrlsInNewTabEnabled) {
                         link.setAttribute('target', '_blank');
                         link.setAttribute('rel', 'noopener noreferrer');
@@ -1183,6 +1195,54 @@ export function rssApp(): AppState {
                 }
             });
         },
+
+        // --- Background Generation ---
+        pregenerateDecks: async function(this: AppState): Promise<void> {
+            if (this._isPregenerating) return;
+            this._isPregenerating = true;
+            console.log('[Background] Starting pre-generation of decks...');
+            
+            try {
+                // Pre-generate online deck (always do this if possible)
+                await this._generateAndSavePregeneratedDeck(true);
+                
+                // Pre-generate offline deck (optimized for offline reliability)
+                await this._generateAndSavePregeneratedDeck(false);
+                
+                console.log('[Background] Deck pre-generation completed.');
+            } catch (error) {
+                console.error('[Background] Deck pre-generation failed:', error);
+            } finally {
+                this._isPregenerating = false;
+            }
+        },
+
+        _generateAndSavePregeneratedDeck: async function(this: AppState, online: boolean): Promise<void> {
+            const { generateNewDeck } = await import('./js/helpers/dataUtils.ts');
+            const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+            
+            // We use current state but mimic the target connectivity
+            const deckItems = await generateNewDeck(
+                Array.from(this.entries),
+                this.read,
+                this.starred,
+                this.shuffledOutGuids,
+                'unread',
+                online // Target connectivity
+            );
+
+            const timestamp = new Date().toISOString();
+            const deckGuids = (deckItems || []).map(item => ({
+                guid: item.guid,
+                addedAt: timestamp
+            }));
+
+            const key = online ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
+            this[key] = deckGuids;
+            await saveSimpleState(key, deckGuids);
+            console.log(`[Background] Pregenerated ${online ? 'ONLINE' : 'OFFLINE'} deck saved. Size: ${deckGuids.length}`);
+        },
+
         $nextTick: function(this: AppState, callback: (this: AppState) => void) {
             return Alpine.nextTick(callback);
         },

@@ -1,28 +1,36 @@
-# Task: Help Modal Refactor and Star Animation Update
+# Current Task: Help Modal Refactor & UX Polish
 
-## Objective
-1. Set star animation opacity to 66%.
-2. Refactor the shortcuts help modal to look like a feed item and slide into view from the right, shifting the main feed to the left.
+## Objectives
+- [x] Refactor shortcuts UI into an integrated sticky column.
+- [x] Implement SVG drawing animations for star and read buttons.
+- [x] Standardize keyboard shortcuts (`u` for Undo, `t` for Top, `m` for Read).
+- [x] Implement 10s selection highlight fade.
+- [x] Fix mobile layout centering and scrolling (global `box-sizing`, `margin: 0`).
+- [x] Refactor Service Worker for SPA offline reliability.
+- [x] Ensure all themes support the shadows toggle with visible colors.
+- [x] Fix "Original Dark" theme loading bug (base class sync).
+- [x] Fix Shuffle Count revert bug (manual shuffle vs. auto-refresh).
+- [x] Implement background deck pre-generation (online & offline variants).
+- [ ] Update `processShuffle` to consume pre-generated decks for instant refreshes.
 
-## Implementation Steps
+## Progress
+- Refactored `shortcuts-section` into a sticky/sliding layout.
+- Standardized navigation keys and added navigation memory via `lastSelectedGuid`.
+- Implemented CSS keyframe-based selection fade (10s).
+- Successfully resolved mobile alignment issues by resetting `html/body` margins and applying global `border-box`.
+- Refactored SW to use Workbox `NavigationRoute` for reliable `index.html` fallback.
+- Added visible shadow colors to all theme CSS files and fixed `.no-shadows` global override.
+- Synchronized `localStorage` and `html` base classes in `main.ts` to fix theme persistence.
+- Refined `deckManager.ts` logic to prevent manual shuffles from being "refunded" by auto-refresh.
+- Added `pregeneratedOnlineDeck` and `pregeneratedOfflineDeck` to state and background tasks.
 
-### 1. Update Star Animation
-- [ ] Update `.star-outline` opacity to `0.66` in `src/css/content.css`.
+## Findings & Mitigations
+- **Race Condition in Deck Regeneration**: Occurred when marking the last item as read. Fixed by consolidating async lifecycle in `toggleRead` and adding explicit array reference updates (`this.deck = [...this.deck]`) to nudge Alpine.js reactivity.
+- **Theme Persistence Issue**: The base `light`/`dark` class was only set on explicit user toggle, causing refreshes to default to the system preference or a blank state before the app initialized. Fixed by adding a class-management step to `applyThemeStyle` and syncing `localStorage` early in `_loadInitialState`.
+- **Shuffle Count Bug**: Manual shuffles were being "refunded" because `manageDailyDeck` saw an empty deck and assumed it was an auto-refresh after reading. Mitigation: added `allItemsInDeckShuffled` check to specifically detect manual shuffles.
+- **Background Deck Generation**: Implemented separate online and offline decks stored locally (`localOnly`) to ensure the next "Shuffle" is near-instant regardless of connectivity state.
 
-### 2. Prepare Layout for Sliding Animation
-- [ ] Wrap `#header`, `#items`, and the new shortcuts panel in a sliding container.
-- [ ] Add CSS for the sliding transition in `src/css/layout.css`.
-- [ ] Define the `.shifted` state to move the container left.
-
-### 3. Refactor Shortcuts Help
-- [ ] Move shortcuts help content from a standard modal to a side panel in `src/index.html`.
-- [ ] Style the side panel to match an `.item` article in `src/css/content.css` or `src/css/modal.css`.
-- [ ] Implement the sliding logic controlled by `openShortcuts`.
-
-### 4. Animation and Centering
-- [ ] Ensure the shortcuts panel centers correctly on desktop when active.
-- [ ] Handle transition for closing (sliding back to the right).
-
-### 5. Verification
-- [ ] Build and test the sliding effect.
-- [ ] Ensure keyboard shortcuts still work correctly to toggle the state.
+## Next Steps
+- Implement consumption of pre-generated decks in `processShuffle`.
+- Final verification of instant-shuffle performance.
+- Perform final audit of offline mode behavior.

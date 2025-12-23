@@ -77,6 +77,8 @@ export interface AppState {
     starred: StarredItem[];
     currentDeckGuids: DeckItem[];
     shuffledOutGuids: ShuffledOutItem[];
+    pregeneratedOnlineDeck: DeckItem[] | null;
+    pregeneratedOfflineDeck: DeckItem[] | null;
     settingsButtonClicks?: number;
     errorMessage: string;
     isOnline: boolean;

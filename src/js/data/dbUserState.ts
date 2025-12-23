@@ -39,7 +39,9 @@ export const USER_STATE_DEFS: UserStateDefs = {
     keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },
     shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
-    shadowsEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true }
+    shadowsEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
+    pregeneratedOnlineDeck: { store: 'userSettings', type: 'simple', localOnly: true, default: null },
+    pregeneratedOfflineDeck: { store: 'userSettings', type: 'simple', localOnly: true, default: null }
 };
 
 interface SimpleStateValue {
