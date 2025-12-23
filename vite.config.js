@@ -13,7 +13,7 @@ export default defineConfig({
     // Output everything to the 'www' directory, which is outside the 'src' folder
     outDir: '../www',
     emptyOutDir: true,
-    minify: false, // Add this line to disable minification
+    minify: true,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'src/index.html'),
@@ -30,15 +30,12 @@ export default defineConfig({
   plugins: [
     VitePWA({
       strategies: 'injectManifest',
-      // The fix is here: Change srcDir to '' or '.'
       srcDir: '.',
       filename: 'sw.js',
-      
+      manifestFilename: 'manifest.json',
       injectManifest: {
         globPatterns: [
-          '**/*.{js,css,html,ico,png,svg,json}',
-          'images/*.{png,svg}',
-          'manifest.json'
+          '**/*.{js,css,html,ico,png,svg,json,ttf,woff,woff2}',
         ],
       },
       manifest: {
