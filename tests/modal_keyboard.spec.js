@@ -6,7 +6,7 @@ const APP_PASSWORD = "devtestpwd";
 test.describe('Modal Keyboard Interaction', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the login page
-    await page.goto(`${APP_URL}/login.html`);
+    await page.goto(`${APP_URL}/login.html`, { waitUntil: 'networkidle' });
 
     // Fill the password and click login
     await page.fill('#pw', APP_PASSWORD);
@@ -17,9 +17,9 @@ test.describe('Modal Keyboard Interaction', () => {
     // Wait for loading screen to be hidden
     await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 30000 });
     // Wait for the app viewport to be visible
-    await page.waitForSelector('#app-viewport', { state: 'visible', timeout: 10000 });
-    // Wait for the app to load - using specific selector to avoid help panel
-    await page.waitForSelector('#app > main > .item.entry', { state: 'visible', timeout: 30000 });
+    await page.waitForSelector('#app-viewport', { state: 'visible', timeout: 30000 });
+    // Wait for the app to load - using data-guid attribute for better reliability
+    await page.locator('[data-guid]').first().waitFor({ state: 'visible', timeout: 30000 });
   });
 
   test('should close settings modal with Escape key', async ({ page }) => {

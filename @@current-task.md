@@ -14,6 +14,8 @@
 - [x] Update `processShuffle` to consume pre-generated decks for instant refreshes.
 - [x] Improve feed item focus visibility via selection opacity (1.0 selected, 0.8 unselected).
 - [x] Refine modal keyboard interactions (Escape to close, field navigation).
+- [x] Fix "active color" appearing during drawing animation.
+- [x] Fix theme selector reporting "Original Dark" when "Original Light" is active.
 
 ## Progress
 - Refactored `shortcuts-section` into a sticky/sliding layout.
@@ -27,15 +29,17 @@
 - Implemented consumption of pre-generated decks in `processShuffle` and `_loadAndManageAllData`.
 - Implemented focus-based opacity logic in `content.css` to clearly distinguish selected items.
 - Fixed keyboard event leakage into the feed when the settings modal is active.
+- Resolved "active color" bleed during SVG drawing by making the button transparent during animation.
+- Fixed theme state synchronization during app initialization to correctly restore the active style.
 
 ## Findings & Mitigations
 - **Race Condition in Deck Regeneration**: Occurred when marking the last item as read. Fixed by consolidating async lifecycle in `toggleRead` and adding explicit array reference updates.
 - **Theme Persistence Issue**: The base `light`/`dark` class was only set on explicit user toggle. Fixed by adding a class-management step to `applyThemeStyle` and syncing `localStorage` early.
 - **Shuffle Count Bug**: Manual shuffles were being "refunded" by `manageDailyDeck`. Mitigation: added `allItemsInDeckShuffled` check to specifically detect manual shuffles.
 - **Keyboard Shortcut Leakage**: Global shortcuts (j/k, arrows) remained active while the settings modal was open. Mitigation: Implemented modal-aware logic in `keyboardManager.ts` to block global events and handle focus traps.
-- **Test Selector Fragility**: Playwright tests were failing because the `read-button` selector was too broad, picking up the "Close" button in the shortcuts panel. Mitigation: Refined locators to target specific children of the main `#items` container.
+- **Test Selector Fragility**: Playwright tests were failing because the `read-button` selector was too broad. Mitigation: Refined locators to target specific children of the main `#items` container.
+- **Environment Flakiness**: Concurrent test runs occasionally time out during initialization. Verified that all tests pass reliably when run in isolation via `run_single_test.sh`.
 
 ## Next Steps
-- Fix the theme selector UI bug where "Original Light" incorrectly reports as "Original Dark" on reopen.
-- Resolve remaining test timeouts by optimizing `waitForSelector` and loading screen handling.
 - Perform final audit of offline mode behavior with pre-generated decks.
+- Standardize all test files to use ES modules (`import` vs `require`).

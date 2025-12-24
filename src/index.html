@@ -95,7 +95,8 @@
                                                                                     </svg>
                                                                                     <button class="read-button" @click.stop="toggleRead(entry.guid)" 
                                                                                             :class="{ 
-                                                                                                'read': entry.isRead,
+                                                                                                'read': entry.isRead && readingGuid !== entry.guid,
+                                                                                                'animating': readingGuid === entry.guid,
                                                                                                 'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'read'
                                                                                             }" :disabled="readingGuid === entry.guid" aria-label="Mark as Read">
                                                                                         <svg class="star-button-animation-overlay" x-show="readingGuid === entry.guid">

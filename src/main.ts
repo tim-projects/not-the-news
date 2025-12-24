@@ -437,9 +437,14 @@ export function rssApp(): AppState {
 
             // Identify next item BEFORE we change the read status, if it's currently selected in unread mode
             if (!isCurrentlyRead && wasSelected && this.filterMode === 'unread') {
-                const currentIndex = this.filteredEntries.findIndex(e => e.guid === guid);
-                if (currentIndex !== -1 && currentIndex < this.filteredEntries.length - 1) {
-                    nextGuidToSelect = this.filteredEntries[currentIndex + 1].guid;
+                const entries = this.filteredEntries;
+                const currentIndex = entries.findIndex(e => e.guid === guid);
+                if (currentIndex !== -1) {
+                    if (currentIndex < entries.length - 1) {
+                        nextGuidToSelect = entries[currentIndex + 1].guid;
+                    } else if (currentIndex > 0) {
+                        nextGuidToSelect = entries[currentIndex - 1].guid;
+                    }
                 }
             }
             
@@ -966,7 +971,7 @@ export function rssApp(): AppState {
             }
         },
         // --- Private Helper Methods ---
-        _loadInitialState: async function(this: AppState): Promise<void> {
+                _loadInitialState: async function(this: AppState): Promise<void> {
             try {
                 const [syncEnabled, imagesEnabled, urlsNewTab, filterModeResult, themeState] = await Promise.all([
                     loadSimpleState('syncEnabled'),
@@ -980,14 +985,20 @@ export function rssApp(): AppState {
                 this.imagesEnabled = imagesEnabled.value ?? true;
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
-                this.theme = themeState.value ?? 'dark';
+                this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                 localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
                 this.isOnline = isOnline();
                 
-                const [rssFeeds, keywordBlacklist] = await Promise.all([
+                const [rssFeeds, keywordBlacklist, themeStyleLightRes, themeStyleDarkRes] = await Promise.all([
                     loadSimpleState('rssFeeds'),
-                    loadSimpleState('keywordBlacklist')
+                    loadSimpleState('keywordBlacklist'),
+                    loadSimpleState('themeStyleLight'),
+                    loadSimpleState('themeStyleDark')
                 ]);
+
+                this.themeStyleLight = typeof themeStyleLightRes.value === 'string' ? themeStyleLightRes.value : 'original';
+                this.themeStyleDark = typeof themeStyleDarkRes.value === 'string' ? themeStyleDarkRes.value : 'original';
+                this.themeStyle = this.theme === 'light' ? this.themeStyleLight : this.themeStyleDark;
 
                 this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');
                 this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
@@ -995,9 +1006,9 @@ export function rssApp(): AppState {
                     : '';
                 
                 await this.loadCustomCss();
-                await this.loadThemeStyle();
                 await this.loadFontSize();
                 await this.loadFeedWidth();
+                this.applyThemeStyle();
 
                 // Load pre-generated decks (local only)
                 const [onlineDeckRes, offlineDeckRes] = await Promise.all([
@@ -1389,4 +1400,5 @@ export function rssApp(): AppState {
 Alpine.data('rssApp', rssApp);
 
 // Start Alpine to initialize the application.
+(window as any).Alpine = Alpine;
 Alpine.start();

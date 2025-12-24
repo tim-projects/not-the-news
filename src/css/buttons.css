@@ -177,6 +177,13 @@ button.read-button:active {
   box-shadow: -1px 1px 0 1px var(--card-border), 0 0 0 3px var(--primary);
 }
 
+button.read-button.animating {
+  background-color: transparent !important;
+  color: transparent !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+
 button.star.starred {
   color: var(--gold-color);
   opacity: 1;
