@@ -105,8 +105,6 @@
     y: 2px;
     width: calc(100% - 4px);
     height: calc(100% - 4px);
-    rx: 100px;
-    ry: 100px;
     fill: none;
     stroke: var(--primary);
     stroke-width: 4px;

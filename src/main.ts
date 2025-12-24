@@ -115,6 +115,7 @@ export function rssApp(): AppState {
         undoTimerActive: false,
         undoItemGuid: null,
         undoItemIndex: null,
+        undoBtnRadius: 20,
         selectedGuid: null,
         selectedSubElement: 'item',
         selectedTimestamp: null,

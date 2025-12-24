@@ -96,6 +96,7 @@ export interface AppState {
     undoTimerActive: boolean;
     undoItemGuid: string | null;
     undoItemIndex: number | null;
+    undoBtnRadius: number;
     selectedGuid: string | null;
     selectedSubElement: 'item' | 'read' | 'star' | 'play';
     selectedTimestamp: number | null;

@@ -64,6 +64,20 @@ test.describe('Undo Mark as Read', () => {
         // Verify timer outline is active
         const timerOutline = undoNotification.locator('.undo-timer-outline');
         await expect(timerOutline).toHaveClass(/active/);
+
+        // Verify rx and ry attributes are set dynamically and are reasonable (not 100)
+        // Check for presence and value using regex
+        await expect(timerOutline).toHaveAttribute('rx', /^(?!100(\.0+)?$)\d+(\.\d+)?$/);
+        await expect(timerOutline).toHaveAttribute('ry', /^(?!100(\.0+)?$)\d+(\.\d+)?$/);
+        
+        // Get values to check they are equal (approximately)
+        const rx = await timerOutline.getAttribute('rx');
+        const ry = await timerOutline.getAttribute('ry');
+        
+        const rxNum = parseFloat(rx);
+        const ryNum = parseFloat(ry);
+        expect(rxNum).toBeGreaterThan(10); 
+        expect(Math.abs(rxNum - ryNum)).toBeLessThan(0.1);
     });
 
     test('should restore item when undo is clicked', async ({ page }) => {

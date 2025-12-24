@@ -120,6 +120,22 @@ export function showUndoNotification(app: AppState, guid: string, index: number 
     app.undoTimerActive = false;
 
     const startTimer = () => {
+        // Calculate correct radius for the timer outline
+        if ((app as any).$nextTick) {
+            (app as any).$nextTick(() => {
+                requestAnimationFrame(() => {
+                    const btn = document.querySelector('#undo-notification .undo-button');
+                    if (btn) {
+                        const height = btn.getBoundingClientRect().height;
+                        console.log(`[Undo] Measured button height: ${height}`);
+                        if (height > 10) {
+                            app.undoBtnRadius = (height / 2) - 2;
+                        }
+                    }
+                });
+            });
+        }
+
         app.undoTimerActive = true;
         undoTimeoutId = setTimeout(() => {
             app.showUndo = false;
