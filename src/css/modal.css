@@ -112,6 +112,12 @@ html.light .modal-content {
   font-size: 1.1em;
 }
 
+.settings-group select,
+.settings-group button,
+.configure-button {
+  font-size: 1.1em !important;
+}
+
 .settings-group span[id$="-text"] {
   flex-shrink: 0;
   margin-right: 0.5rem;
@@ -149,7 +155,9 @@ html.light .modal-content {
   padding: 0.25rem 0;
 }
 
-.settings-option span {
+.settings-option span,
+.settings-option label,
+.settings-option button {
   font-size: 1.1em;
   font-weight: normal;
 }

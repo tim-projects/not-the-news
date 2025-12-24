@@ -64,7 +64,7 @@ button.star {
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
-  opacity: 0.6;
+  opacity: 0.66;
   box-shadow: -2px -2px 0 1px var(--card-shadow-color);
   float: right;
   position: absolute;
@@ -99,12 +99,51 @@ button.star:active {
   box-shadow: -2px -2px 0 1px var(--card-shadow-color), 0 0 0 3px var(--primary);
 }
 
+button.play-button {
+  font-size: 18px;
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 20px 0 10px 0; /* Curve in top-left (20px) and bottom-right (10px) */
+  opacity: 0.66;
+  box-shadow: -2px -2px 0 1px var(--card-shadow-color);
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  margin: 0;
+  padding: 0 0 4px 0;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+}
+
+@media (min-width: 768px) {
+  button.play-button {
+    font-size: 24px;
+  }
+}
+
+button.play-button:hover {
+  color: var(--secondary);
+  background: var(--primary);
+  opacity: 1;
+}
+
+button.play-button.speaking {
+  color: var(--primary);
+  background: var(--secondary);
+  opacity: 1;
+}
+
 button.read-button {
   font-size: 18px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
-  opacity: 0.8;
+  opacity: 0.66;
   box-shadow: -1px 1px 0 1px var(--card-shadow-color);
   position: absolute;
   top: 1px;

@@ -155,6 +155,7 @@ export function mapRawItems(rawList: RawFeedItem[], fmtFn: (dateStr: string) => 
  * @param {Array<Object|string>} currentDeckItems - An array of the current deck's item objects (or GUIDs for legacy data).
  * @param {number} count - The desired size of the deck.
  * @param {string} filterMode - The current filter mode ('unread', 'read', 'starred').
+ * @param {boolean} [isOnlineOverride] - Optional override for online status (useful for pre-generation).
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of full item objects for the new deck.
  */
 export async function generateNewDeck(
@@ -162,9 +163,10 @@ export async function generateNewDeck(
     readItems: (ReadItem | string)[], // Can be ReadItem objects or just GUID strings (legacy)
     starredItems: (StarredItem | string)[], // Can be StarredItem objects or just GUID strings (legacy)
     shuffledOutItems: (DeckItem | string | ShuffledOutItem)[], // Can be DeckItem objects or just GUID strings (legacy)
-    filterMode: string
+    filterMode: string,
+    isOnlineOverride?: boolean
 ): Promise<MappedFeedItem[]> {
-    console.log("ENTERING generateNewDeck with filterMode:", filterMode);
+    console.log("ENTERING generateNewDeck with filterMode:", filterMode, "isOnlineOverride:", isOnlineOverride);
     console.log("generateNewDeck: allFeedItems count:", allFeedItems.length);
     console.log("generateNewDeck: readItems count:", readItems.length);
     try {
@@ -257,7 +259,9 @@ export async function generateNewDeck(
             }
         };
 
-        if (navigator.onLine) {
+        const isOnline = (typeof isOnlineOverride === 'boolean') ? isOnlineOverride : navigator.onLine;
+
+        if (isOnline) {
             const now = Date.now();
             const hasHyperlink = (item: MappedFeedItem) => /<a\s+href=/i.test(item.description);
             const hasQuestionMarkInTitle = (item: MappedFeedItem) => item.title?.includes('?');

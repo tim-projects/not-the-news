@@ -40,7 +40,8 @@ const getGuid = (item: string | { guid: string }): string => {
  * @param {number} shuffleCount Current shuffle count
  * @param {string} filterMode Current filter mode (optional, defaults to 'unread')
  * @param {string | null} lastShuffleResetDate Last shuffle reset date (optional)
- * @returns {Promise<{ deck: MappedFeedItem[]; currentDeckGuids: DeckItem[]; shuffledOutGuids: DeckItem[]; shuffleCount: number; lastShuffleResetDate: string; }>} Updated deck state
+ * @param {DeckItem[] | null} pregeneratedDeck Optional pre-generated deck to use if available
+ * @returns {Promise<{ deck: MappedFeedItem[]; currentDeckGuids: DeckItem[]; shuffledOutGuids: ShuffledOutItem[]; shuffleCount: number; lastShuffleResetDate: string; }>} Updated deck state
  */
 export const manageDailyDeck = async (
     entries: MappedFeedItem[],
@@ -49,17 +50,15 @@ export const manageDailyDeck = async (
     shuffledOutItems: ShuffledOutItem[],
     shuffleCount: number,
     filterMode: string = 'unread',
-    lastShuffleResetDate: string | null = null
+    lastShuffleResetDate: string | null = null,
+    pregeneratedDeck: DeckItem[] | null = null
 ): Promise<{ deck: MappedFeedItem[]; currentDeckGuids: DeckItem[]; shuffledOutGuids: ShuffledOutItem[]; shuffleCount: number; lastShuffleResetDate: string; }> => {
     console.log('manageDailyDeck: START');
-    console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, readItemsCount: readItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate });
-    console.log('[deckManager] DEBUG: Array.isArray(entries):', Array.isArray(entries), 'entries.length:', entries.length);
-    console.log('[deckManager] DEBUG: Array.isArray(entries):', Array.isArray(entries), 'entries.length:', entries.length);
+    console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, readItemsCount: readItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate, hasPregen: !!pregeneratedDeck });
 
     // Defensive checks to ensure all necessary data is in a valid state.
     if (!Array.isArray(entries) || entries.length === 0) {
         console.log('[deckManager] Skipping deck management: entries is empty.');
-        console.log('manageDailyDeck: END (skipped)');
         return {
             deck: [],
             currentDeckGuids: [],
@@ -69,26 +68,19 @@ export const manageDailyDeck = async (
         };
     }
 
-    // Standardize data arrays to handle potential inconsistencies.
-    const allItems = entries;
     const readItemsArray = Array.isArray(readItems) ? readItems : [];
     const starredItemsArray = Array.isArray(starredItems) ? starredItems : [];
     const shuffledOutItemsArray = Array.isArray(shuffledOutItems) ? shuffledOutItems : [];
     
-    // Load current deck from storage
     const { loadCurrentDeck } = await import('./userStateUtils.ts');
     const currentDeckItems = await loadCurrentDeck();
-    console.log('manageDailyDeck: Loaded currentDeckItems count:', currentDeckItems.length);
-
-    // Business logic operates on GUIDs. Extract them into Sets for efficient lookups.
+    
     const readGuidsSet = new Set(readItemsArray.map(getGuid));
     const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
     const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
     
-    // Map entries for quick lookup
     const entriesMap = new Map(entries.map(e => [e.guid, e]));
 
-    // Attempt to build the current deck from existing items
     let existingDeck: MappedFeedItem[] = currentDeckItems
         .map(di => entriesMap.get(getGuid(di)))
         .filter((item): item is MappedFeedItem => !!item);
@@ -96,28 +88,11 @@ export const manageDailyDeck = async (
     const today = new Date().toDateString();
     const isNewDay = lastShuffleResetDate !== today;
     
-    // REFINED: A deck is effectively empty if:
-    // - It has no items at all
-    // - All items in it have been read
-    // - All items in it have been shuffled out
-    // - None of its items exist in the current entries (e.g. after a reset or rotation)
     const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
-    // A deck is effectively empty if every item in it is either read OR shuffled out
     const isDeckEffectivelyEmpty = isDeckEmpty || existingDeck.every(item => 
         readGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)
     );
-    // We also want to know if it was specifically cleared by reading (for shuffle refund logic)
-    const allItemsInDeckRead = !isDeckEmpty && existingDeck.every(item => readGuidsSet.has(item.guid));
     const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid));
-
-    console.log('manageDailyDeck: Deck Status:', { 
-        isDeckEmpty, 
-        isDeckEffectivelyEmpty,
-        allItemsInDeckRead,
-        allItemsInDeckShuffled,
-        existingDeckCount: existingDeck.length,
-        currentDeckItemsCount: currentDeckItems.length
-    });
 
     let newDeck: MappedFeedItem[] = existingDeck;
     let newCurrentDeckGuids: DeckItem[] = currentDeckItems;
@@ -125,19 +100,9 @@ export const manageDailyDeck = async (
     let newShuffleCount: number = (typeof shuffleCount === 'number') ? shuffleCount : DAILY_SHUFFLE_LIMIT;
     let newLastShuffleResetDate: string = lastShuffleResetDate || today;
 
-    // Use the new, smarter variable in the condition
-    console.log('manageDailyDeck: Condition check:', { isNewDay, isDeckEffectivelyEmpty, filterModeIsNotUnread: filterMode !== 'unread', entriesCount: entries.length });
-    
-    // CRITICAL FIX: If the deck is empty but we HAVE entries, we MUST generate a new deck, 
-    // especially after a reset.
     if (isNewDay || isDeckEffectivelyEmpty || filterMode !== 'unread' || (currentDeckItems.length === 0 && entries.length > 0)) {
         console.log(`[deckManager] Resetting deck. Reason: New Day (${isNewDay}), Deck Effectively Empty (${isDeckEffectivelyEmpty}), Filter Mode Changed (${filterMode}), or Initial Load (${currentDeckItems.length === 0}).`);
 
-        // If it's not a new day, not an initial load, but the deck is empty, increment shuffle count
-        // This handles the "cleared current deck" scenario.
-        // We ONLY refund the shuffle if the deck was cleared by READING all items (or a mix of reading and old shuffles).
-        // If it was cleared by a FRESH SHUFFLE (which processShuffle does by adding all deck items to shuffledOutGuids),
-        // then allItemsInDeckShuffled will be true, and we DO NOT refund it.
         if (!isNewDay && currentDeckItems.length > 0 && isDeckEffectivelyEmpty && filterMode === 'unread') {
             if (!allItemsInDeckShuffled) {
                 console.log('[deckManager] Automatically incrementing (refunding) shuffleCount due to deck cleared by reading.');
@@ -146,26 +111,48 @@ export const manageDailyDeck = async (
             }
         }
 
-        const newDeckItems = await generateNewDeck(
-            allItems,
-            readItemsArray,
-            starredItemsArray,
-            shuffledOutItemsArray,
-            filterMode
-        );
-        console.log('manageDailyDeck: generateNewDeck returned count:', newDeckItems.length);
+        let newDeckItems: any[] = [];
 
+        // Check if we have a usable pre-generated deck
+        let usablePregen = false;
+        if (pregeneratedDeck && pregeneratedDeck.length > 0) {
+            // Verify it's not stale (has at least one unread item)
+            const hasUnread = pregeneratedDeck.some(item => !readGuidsSet.has(getGuid(item)));
+            if (hasUnread) {
+                usablePregen = true;
+            } else {
+                console.log('[deckManager] Pre-generated deck is stale (all items read). Falling back to manual generation.');
+            }
+        }
+
+        if (usablePregen && pregeneratedDeck) {
+            console.log('[deckManager] Using pre-generated deck inside manageDailyDeck');
+            newDeckItems = pregeneratedDeck;
+        } else {
+            console.log('[deckManager] Generating new deck from scratch inside manageDailyDeck');
+            newDeckItems = await generateNewDeck(
+                entries,
+                readItemsArray,
+                starredItemsArray,
+                shuffledOutItemsArray,
+                filterMode
+            );
+        }
+        
         const timestamp = new Date().toISOString();
         newCurrentDeckGuids = (newDeckItems || []).map(item => ({
-            guid: item.guid,
+            guid: getGuid(item),
             addedAt: timestamp
         }));
 
-        newDeck = (newDeckItems || []).map(item => ({
-            ...item,
-            isRead: readGuidsSet.has(item.guid),
-            isStarred: starredGuidsSet.has(item.guid)
-        }));
+        newDeck = (newDeckItems || [])
+            .map(item => entriesMap.get(getGuid(item)))
+            .filter((item): item is MappedFeedItem => !!item)
+            .map(item => ({
+                ...item,
+                isRead: readGuidsSet.has(item.guid),
+                isStarred: starredGuidsSet.has(item.guid)
+            }));
         
         await saveCurrentDeck(newCurrentDeckGuids);
 
@@ -178,7 +165,6 @@ export const manageDailyDeck = async (
             await saveSimpleState('lastShuffleResetDate', today);
         }
     } else {
-        // If we are NOT resetting, ensure the existing deck items have correct read/starred status
         newDeck = existingDeck.map(item => ({
             ...item,
             isRead: readGuidsSet.has(item.guid),
@@ -186,9 +172,6 @@ export const manageDailyDeck = async (
         }));
     }
 
-    console.log(`[deckManager] Deck management complete. Final deck size: ${newDeck.length}.`);
-    console.log('manageDailyDeck: END');
-    
     return {
         deck: newDeck || [],
         currentDeckGuids: newCurrentDeckGuids || [],
@@ -196,29 +179,6 @@ export const manageDailyDeck = async (
         shuffleCount: typeof newShuffleCount === 'number' ? newShuffleCount : DAILY_SHUFFLE_LIMIT,
         lastShuffleResetDate: typeof newLastShuffleResetDate === 'string' ? newLastShuffleResetDate : new Date().toDateString()
     };
-};
-
-/**
- * Legacy wrapper function that accepts the app object (for backward compatibility)
- * @param {AppState} app The main application object.
- */
-export const manageDailyDeckLegacy = async (app: AppState): Promise<void> => {
-    const result = await manageDailyDeck(
-        app.entries,
-        app.read,
-        app.starred, 
-        app.shuffledOutGuids, // Assuming app.shuffledOutItems is always DeckItem[]
-        app.shuffleCount,
-        app.filterMode,
-        app.lastShuffleResetDate
-    );
-    
-    // Update the app object with the results
-    app.deck = result.deck;
-    app.currentDeckGuids = result.currentDeckGuids;
-    app.shuffledOutGuids = result.shuffledOutGuids;
-    app.shuffleCount = result.shuffleCount;
-    app.lastShuffleResetDate = result.lastShuffleResetDate;
 };
 
 /**
@@ -240,7 +200,6 @@ export async function processShuffle(app: AppState): Promise<void> {
     const existingShuffledGuidsSet = new Set(existingShuffledGuids.map(getGuid));
     const updatedShuffledGuidsSet = new Set([...existingShuffledGuidsSet, ...visibleGuids]);
     
-    // Convert the combined set of GUIDs back to an array of objects with the correct timestamp.
     const timestamp = new Date().toISOString();
     const newShuffledOutGuids: ShuffledOutItem[] = Array.from(updatedShuffledGuidsSet).map(guid => ({
         guid,
@@ -250,17 +209,20 @@ export async function processShuffle(app: AppState): Promise<void> {
     app.shuffledOutGuids = newShuffledOutGuids;
     app.shuffleCount--;
 
-    // Persist the new state using the sync-capable function.
     const { overwriteArrayAndSyncChanges } = await import('../data/dbUserState.ts');
     await overwriteArrayAndSyncChanges('shuffledOutGuids', newShuffledOutGuids);
     await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate ?? new Date().toDateString());
 
     const shuffleDisplay = getShuffleCountDisplay();
     if (shuffleDisplay) {
-        shuffleDisplay.textContent = app.shuffleCount.toString(); // textContent expects string
+        shuffleDisplay.textContent = app.shuffleCount.toString();
     }
 
-    // Use the new manageDailyDeck function
+    // Use the optimized manageDailyDeck which supports pre-generated decks
+    const isOnline = app.isOnline;
+    const pregenKey = isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
+    const pregenDeck = app[pregenKey as keyof AppState] as DeckItem[] | null;
+
     const result = await manageDailyDeck(
         app.entries,
         app.read,
@@ -268,9 +230,10 @@ export async function processShuffle(app: AppState): Promise<void> {
         app.shuffledOutGuids,
         app.shuffleCount,
         app.filterMode,
-        app.lastShuffleResetDate
+        app.lastShuffleResetDate,
+        pregenDeck
     );
-    
+
     // Update the app object with the results
     app.deck = result.deck;
     app.currentDeckGuids = result.currentDeckGuids;
@@ -278,6 +241,23 @@ export async function processShuffle(app: AppState): Promise<void> {
     app.shuffleCount = result.shuffleCount;
     app.lastShuffleResetDate = result.lastShuffleResetDate;
 
+    // If pre-generated deck was used, clear it
+    if (pregenDeck && pregenDeck.length > 0 && app.currentDeckGuids.length > 0 && 
+        app.currentDeckGuids[0].guid === pregenDeck[0].guid) {
+        console.log(`[deckManager] Consumed pre-generated ${isOnline ? 'ONLINE' : 'OFFLINE'} deck in processShuffle.`);
+        app[pregenKey as keyof AppState] = null as any;
+        const { saveSimpleState: saveSimpleStateInternal } = await import('../data/dbUserState.ts');
+        await saveSimpleStateInternal(pregenKey, null);
+    }
+
+    // Automatically select the first item in the new deck
+    if (app.deck.length > 0) {
+        app.selectItem(app.deck[0].guid);
+    }
+
     displayTemporaryMessageInTitle('Feed shuffled!');
     console.log(`[deckManager] Deck shuffled. Remaining shuffles: ${app.shuffleCount}.`);
+
+    // Kick off a fresh pre-generation in the background
+    app.pregenerateDecks();
 }

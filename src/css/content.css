@@ -179,18 +179,38 @@ span.shuffle-count {
   margin-top: -0.15em;
 }
 
+/* Styles for news items */
+.item.entry {
+  opacity: 0.8;
+}
+
 /* Styles for read items */
 .item.entry.read {
-    opacity: 0.6;
-    background-color: var(--read-item-bg);
+  opacity: 0.5;
+  background-color: var(--read-item-bg);
 }
 
 /* Keyboard navigation focus styles */
 .item.entry.selected-item {
-    outline: none;
-    animation: selection-highlight 10s ease-out forwards;
+  opacity: 1;
+  outline: none;
+  animation: selection-highlight 10s ease-out forwards;
 }
 
+/* Sub-focus indicators for keyboard navigation */
+.sub-focused {
+  opacity: 1 !important;
+}
+
+/* Ensure buttons get a persistent highlight when focused */
+button.read-button.sub-focused,
+button.star.sub-focused,
+button.play-button.sub-focused {
+  border: 2px solid var(--primary) !important;
+  box-shadow: 0 0 10px var(--primary) !important;
+  opacity: 1 !important;
+  z-index: 100;
+}
 @keyframes selection-highlight {
     0% {
         border-color: var(--primary) !important;

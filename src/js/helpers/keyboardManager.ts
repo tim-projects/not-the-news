@@ -1,28 +1,156 @@
 import { AppState } from '@/types/app.ts';
 import { createStatusBarMessage } from '../ui/uiUpdaters.ts';
 
+const SELECTION_FADE_DURATION = 10000; // 10 seconds
+
 /**
- * Handles keyboard events for application navigation and actions.
- * @param {KeyboardEvent} event The keyboard event object.
- * @param {AppState} app The application state object.
+ * Handles vertical navigation (j/k, Up/Down).
+ * If the current item has been selected for more than 10 seconds,
+ * the first press will reselect it instead of moving.
+ */
+async function handleVerticalNavigation(app: AppState, direction: number): Promise<void> {
+    const now = Date.now();
+    const isSelectionOld = app.selectedGuid && app.selectedTimestamp && (now - app.selectedTimestamp > SELECTION_FADE_DURATION);
+
+    if (isSelectionOld) {
+        console.log('[Navigation] Selection is old (>10s). Reselecting current item.');
+        const currentGuid = app.selectedGuid;
+        // Temporarily clear to re-trigger watcher/animation
+        app.selectedGuid = null;
+        app.$nextTick(() => {
+            app.selectedGuid = currentGuid;
+        });
+    } else {
+        // Signal that we are scrolling via keyboard to suppress scroll-to-top button
+        const { setKeyboardScrolling } = await import('../ui/uiUpdaters.ts');
+        setKeyboardScrolling(true);
+        
+        await moveSelection(app, direction);
+        
+        // Reset after a delay to allow the scroll event to complete (increased to 1000ms)
+        setTimeout(() => setKeyboardScrolling(false), 1000);
+    }
+}
+
+/**
+ * Handles global keyboard shortcuts.
+ * @param {KeyboardEvent} event The keyboard event.
+ * @param {AppState} app The main application object.
  */
 export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppState): Promise<void> {
-    // 1. Check if we should ignore the shortcut (e.g., user is typing in an input)
     const target = event.target as HTMLElement;
-    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-    
-    if (isTyping) return;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+    }
 
-    // 2. Define action keys
     const key = event.key;
-    const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+    const ctrlOrMeta = event.ctrlKey || event.metaKey;
 
-    // 3. Handle shortcuts
-    // If shortcuts are open, only allow toggle (?), Escape, and Ctrl+k to close it.
-    if (app.openShortcuts && key !== '?' && key !== 'Escape' && !(key === 'k' && isCtrlOrCmd)) {
-        // Block keys that cause scrolling
-        const blockedKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'j', 'k'];
-        if (blockedKeys.includes(key)) {
+    // --- Settings Modal Navigation ---
+    if (app.openSettings) {
+        // Block global navigation while settings is open
+        const isNavigationKey = ['j', 'k', 's', 'L', 'i', 'o', 'Enter', 'r', 'm', 't', 'u', 'p', ' ', 'ArrowUp', 'ArrowDown'].includes(key);
+        
+        if (isNavigationKey && !ctrlOrMeta) {
+            // Allow Enter if it's on a button or select or link
+            const allowedTags = ['BUTTON', 'SELECT', 'A', 'INPUT', 'TEXTAREA'];
+            if (key === 'Enter' && allowedTags.includes(target.tagName)) {
+                // Let default handle it if it's an input or textarea, or button
+                return;
+            }
+            event.preventDefault();
+        }
+
+        const modal = document.querySelector('.modal-content');
+        if (!modal) {
+             // Fallback if modal DOM is missing but state is open
+             if (key === 'Escape') {
+                event.preventDefault();
+                app.openSettings = false;
+             }
+             return;
+        }
+
+        const selectors = 'button, select, input, textarea, [tabindex]:not([tabindex="-1"])';
+        const focusableElements = Array.from(modal.querySelectorAll(selectors))
+            .filter(el => {
+                const style = window.getComputedStyle(el);
+                return style.display !== 'none' && style.visibility !== 'hidden' && (el as HTMLElement).offsetParent !== null;
+            }) as HTMLElement[];
+
+        // Allow Escape to close even if no focusable elements
+        if (key === 'Escape') {
+            event.preventDefault();
+            app.openSettings = false;
+            return;
+        }
+
+        if (focusableElements.length === 0) return;
+
+        const first = focusableElements[0];
+        const last = focusableElements[focusableElements.length - 1];
+        const index = focusableElements.indexOf(document.activeElement as HTMLElement);
+
+        // Trap Tab
+        if (key === 'Tab') {
+            if (event.shiftKey) {
+                if (document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                }
+            }
+            else {
+                if (document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        }
+
+        // Arrow Key Selection within Settings
+        if (key === 'ArrowDown' || (key === 'j' && !ctrlOrMeta)) {
+            event.preventDefault();
+            const nextIndex = (index + 1) % focusableElements.length;
+            focusableElements[nextIndex].focus();
+        }
+
+        if (key === 'ArrowUp' || (key === 'k' && !ctrlOrMeta)) {
+            event.preventDefault();
+            const prevIndex = (index - 1 + focusableElements.length) % focusableElements.length;
+            focusableElements[prevIndex].focus();
+        }
+
+        // Slider (Range) Navigation
+        if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'range') {
+            if (key === 'ArrowLeft' || key === 'ArrowRight' || (key === 'h' && !ctrlOrMeta) || (key === 'l' && !ctrlOrMeta)) {
+                event.preventDefault();
+                const step = parseFloat((target as HTMLInputElement).step) || 1;
+                const currentValue = parseFloat((target as HTMLInputElement).value);
+                const isRight = key === 'ArrowRight' || key === 'l';
+                const newValue = isRight ? currentValue + step : currentValue - step;
+                
+                (target as HTMLInputElement).value = newValue.toString();
+                // Manually trigger events so Alpine.js sees the change
+                target.dispatchEvent(new Event('input', { bubbles: true }));
+                target.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Enter key as Click
+        if (key === 'Enter') {
+            // Standard buttons already handle Enter, but we ensure it works for all focused sub-elements
+            if (target.tagName !== 'SELECT') { // Don't click selects, as Enter might be used to confirm choice
+                event.preventDefault();
+                target.click();
+            }
+        }
+
+        return;
+    }
+
+    // Block most shortcuts if the shortcuts panel is open (except toggle/close)
+    if (app.openShortcuts && key !== '?' && key !== 'Escape' && !(key === 'k' && ctrlOrMeta)) {
+        if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'j', 'k'].includes(key)) {
             event.preventDefault();
         }
         return;
@@ -32,32 +160,62 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
         case 'j':
         case 'ArrowDown':
             event.preventDefault();
-            await moveSelection(app, 1);
+            await handleVerticalNavigation(app, 1);
             break;
 
         case 'k':
-            if (isCtrlOrCmd) {
+            if (ctrlOrMeta) {
                 event.preventDefault();
-                if (app.openShortcuts) {
-                    app.openShortcuts = false;
-                } else {
-                    app.openShortcuts = true;
-                }
-            }
-            else {
+                app.openShortcuts = !app.openShortcuts;
+            } else {
                 event.preventDefault();
-                await moveSelection(app, -1);
+                await handleVerticalNavigation(app, -1);
             }
             break;
 
         case 'ArrowUp':
             event.preventDefault();
-            await moveSelection(app, -1);
+            await handleVerticalNavigation(app, -1);
+            break;
+
+        case 'l':
+        case 'ArrowRight':
+            if (app.selectedGuid) {
+                event.preventDefault();
+                if (app.selectedSubElement === 'item') {
+                    app.selectedSubElement = 'read';
+                } else if (app.selectedSubElement === 'read') {
+                    app.selectedSubElement = 'star';
+                } else if (app.selectedSubElement === 'star') {
+                    app.selectedSubElement = 'play';
+                }
+            }
+            break;
+
+        case 'h':
+        case 'ArrowLeft':
+            if (app.selectedGuid) {
+                event.preventDefault();
+                if (app.selectedSubElement === 'play') {
+                    app.selectedSubElement = 'star';
+                } else if (app.selectedSubElement === 'star') {
+                    app.selectedSubElement = 'read';
+                } else if (app.selectedSubElement === 'read') {
+                    app.selectedSubElement = 'item';
+                }
+            }
+            break;
+
+        case 'p':
+            if (app.selectedGuid) {
+                event.preventDefault();
+                app.speakItem(app.selectedGuid);
+            }
             break;
 
         case ' ':
         case 'n':
-            e.preventDefault();
+            event.preventDefault();
             if (app.selectedGuid) {
                 // Main toggleRead logic will now handle selecting the next item
                 await app.toggleRead(app.selectedGuid);
@@ -90,9 +248,17 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
         case 'Enter':
             if (app.selectedGuid) {
                 event.preventDefault();
-                const item = app.filteredEntries.find(e => e.guid === app.selectedGuid);
-                if (item?.link) {
-                    window.open(item.link, '_blank', 'noopener,noreferrer');
+                if (app.selectedSubElement === 'read') {
+                    await app.toggleRead(app.selectedGuid);
+                } else if (app.selectedSubElement === 'star') {
+                    await app.toggleStar(app.selectedGuid);
+                } else if (app.selectedSubElement === 'play') {
+                    app.speakItem(app.selectedGuid);
+                } else {
+                    const item = app.filteredEntries.find(e => e.guid === app.selectedGuid);
+                    if (item?.link) {
+                        window.open(item.link, '_blank', 'noopener,noreferrer');
+                    }
                 }
             }
             break;
@@ -138,7 +304,7 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
             break;
 
         case 'z':
-            if (isCtrlOrCmd) {
+            if (ctrlOrMeta) {
                 event.preventDefault();
                 await app.undoMarkRead();
             }

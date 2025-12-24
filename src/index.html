@@ -68,26 +68,54 @@
                                 <p>There's nothing here.</p>
                             </div>
                         </template>
-                                    <template x-for="entry in filteredEntries" :key="entry.guid">
-                                        <div class="item entry" :class="{ 'selected-item': entry.guid === selectedGuid }" :data-guid="entry.guid" @click="selectItem(entry.guid)" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="transform scale-100 opacity-100" x-transition:leave-end="transform scale-95 opacity-0">
-                                            <div class="itemtitle">
-                                                <svg class="star-animation-overlay" x-show="starredGuid === entry.guid">
-                                                    <rect class="star-outline" pathLength="1" />
-                                                </svg>
-                                                <button class="read-button" @click.stop="toggleRead(entry.guid)" :class="{ 'read': entry.isRead }" :disabled="readingGuid === entry.guid" aria-label="Mark as Read">
-                                                    <svg class="star-button-animation-overlay" x-show="readingGuid === entry.guid">
-                                                        <path class="read-button-outline" d="M 2,2 L 44,2 A 10,10 0 0 1 54,12 L 54,54 L 22,54 A 20,20 0 0 1 2,34 Z" pathLength="1" />
-                                                    </svg>
-                                                    ✕
-                                                </button>
-                                                                        <div x-html="entry.title"></div>
-                                                                        <button class="star" @click.stop="toggleStar(entry.guid)" :class="{'starred': entry.isStarred}" aria-label="Star">
-                                                                            <svg class="star-button-animation-overlay" x-show="starredGuid === entry.guid">
-                                                                                <path class="star-button-outline" d="M 20,2 L 54,2 L 54,54 L 2,54 L 2,20 A 18,18 0 0 1 20,2 Z" pathLength="1" />
-                                                                            </svg>
-                                                                            ★
-                                                                        </button>
-                                                                    </div>                                <div class="itemdescription" x-init="handleEntryLinks($el)">
+                                                                                                            <template x-for="entry in filteredEntries" :key="entry.guid">
+                                                                                                                <div class="item entry" 
+                                                                                                                     :class="{ 
+                                                                                                                        'selected-item': entry.guid === selectedGuid,
+                                                                                                                        'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'item',
+                                                                                                                        'read': entry.isRead
+                                                                                                                     }" 
+                                                                                                                     :data-guid="entry.guid" @click="selectItem(entry.guid)" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="transform scale-100 opacity-100" x-transition:leave-end="transform scale-95 opacity-0">
+                                                                                                                    
+                                                                                                                    <button class="play-button"
+                                                                                                                            :class="{
+                                                                                                                                'speaking': speakingGuid === entry.guid,
+                                                                                                                                'sub-focused': selectedGuid === entry.guid && selectedSubElement === 'play'
+                                                                                                                            }"
+                                                                                                                            @click.stop="speakItem(entry.guid)"
+                                                                                                                            title="Read Out Loud">
+                                                                                                                        <span x-show="speakingGuid !== entry.guid">▶</span>
+                                                                                                                        <span x-show="speakingGuid === entry.guid">■</span>
+                                                                                                                    </button>
+                                                                        
+                                                                                                                    <div class="itemtitle">
+                                                                        
+                                                                                    <svg class="star-animation-overlay" x-show="starredGuid === entry.guid">
+                                                                                        <rect class="star-outline" pathLength="1" />
+                                                                                    </svg>
+                                                                                    <button class="read-button" @click.stop="toggleRead(entry.guid)" 
+                                                                                            :class="{ 
+                                                                                                'read': entry.isRead,
+                                                                                                'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'read'
+                                                                                            }" :disabled="readingGuid === entry.guid" aria-label="Mark as Read">
+                                                                                        <svg class="star-button-animation-overlay" x-show="readingGuid === entry.guid">
+                                                                                            <path class="read-button-outline" d="M 2,2 L 44,2 A 10,10 0 0 1 54,12 L 54,54 L 22,54 A 20,20 0 0 1 2,34 Z" pathLength="1" />
+                                                                                        </svg>
+                                                                                        ✕
+                                                                                    </button>
+                                                                                                            <div x-html="entry.title"></div>
+                                                                                                            <button class="star" @click.stop="toggleStar(entry.guid)" 
+                                                                                                                    :class="{
+                                                                                                                        'starred': entry.isStarred,
+                                                                                                                        'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'star'
+                                                                                                                    }" aria-label="Star">
+                                                                                                                <svg class="star-button-animation-overlay" x-show="starredGuid === entry.guid">
+                                                                                                                    <path class="star-button-outline" d="M 20,2 L 54,2 L 54,54 L 2,54 L 2,20 A 18,18 0 0 1 20,2 Z" pathLength="1" />
+                                                                                                                </svg>
+                                                                                                                ★
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                    <div class="itemdescription" x-init="handleEntryLinks($el)">
                                     <div class="itemfrom">
                                         <p class="source" x-text="`Source: ${entry.source}`"></p>
                                         <p class="pubdate" x-text="entry.pubDate"></p>
@@ -113,10 +141,11 @@
                         </div>
                         <div class="itemdescription">
                             <div class="shortcuts-list">
-                                <div class="shortcut-item"><span>Next/Previous</span><kbd>j</kbd> / <kbd>k</kbd> or <kbd>↓</kbd> / <kbd>↑</kbd></div>
+                                <div class="shortcut-item"><span>Navigate</span><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> or <kbd>←</kbd> <kbd>↓</kbd> <kbd>↑</kbd> <kbd>→</kbd></div>
                                 <div class="shortcut-item"><span>Mark Read & Next</span><kbd>Space</kbd> or <kbd>n</kbd></div>
                                 <div class="shortcut-item"><span>Star / Save</span><kbd>s</kbd> or <kbd>L</kbd></div>
                                 <div class="shortcut-item"><span>Toggle Images</span><kbd>i</kbd></div>
+                                <div class="shortcut-item"><span>Read Out Loud</span><kbd>p</kbd></div>
                                 <div class="shortcut-item"><span>Open in New Tab</span><kbd>o</kbd> or <kbd>Enter</kbd></div>
                                 <div class="shortcut-item"><span>Mark as Read</span><kbd>r</kbd> or <kbd>m</kbd></div>
                                 <div class="shortcut-item"><span>Scroll to Top</span><kbd>t</kbd></div>
@@ -141,6 +170,7 @@
                 
                 <div id="main-settings" x-show="modalView === 'main'">
                     <h2>APP</h2>
+                    <hr>
                     <div class="settings-group">
                         <label for="filter-selector">Filter View:</label>
                         <select id="filter-selector" x-model="filterMode" class="filter-select">
@@ -153,6 +183,7 @@
                     <div class="settings-group"><label for="sync-toggle">Auto-Sync Feed</label><div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div></div>
                     
                     <h2>SETTINGS</h2>
+                    <hr>
                     <div class="settings-group">
                         <label for="theme-style-selector">Theme:</label>
                         <select id="theme-style-selector" :value="themeStyle" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].parentElement.dataset.theme)" class="filter-select">
@@ -191,11 +222,21 @@
                             <button class="font-size-btn" @click="fontSize = Math.min(200, fontSize + 5); applyFontSize(); saveFontSize();" aria-label="Increase font size">+</button>
                         </div>
                     </div>
+                    <div class="settings-group d-none d-md-flex">
+                        <label for="feed-width-slider">Feed Width</label>
+                        <div class="d-flex align-items-center grow font-size-control">
+                            <span class="font-size-value" x-text="`${feedWidth}%`"></span >
+                            <button class="font-size-btn" @click="feedWidth = Math.max(25, feedWidth - 5); applyFeedWidth(); saveFeedWidth();" aria-label="Decrease feed width">-</button>
+                            <input type="range" id="feed-width-slider" min="25" max="95" step="5" x-model.number="feedWidth" @input="applyFeedWidth()" @change="saveFeedWidth()" class="font-size-range">
+                            <button class="font-size-btn" @click="feedWidth = Math.min(95, feedWidth + 5); applyFeedWidth(); saveFeedWidth();" aria-label="Increase feed width">+</button>
+                        </div>
+                    </div>
                     <div class="settings-option"><span>Custom CSS</span><button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button></div>
                     <div class="settings-group"><label for="images-toggle">Show Images</label><div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label><div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div></div>
                     <div class="settings-group"><label for="shadows-toggle">Item Shadows</label><div class="d-flex align-items-center"><span id="shadows-text" x-text="shadowsEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="shadows-toggle" x-model="shadowsEnabled"><span class="slider"></span></label></div></div>
                     
+                    <h2>RSS FEEDS</h2>
                     <hr>
                     <div class="settings-option"><span>RSS Feeds</span><button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button></div>
                     <div class="settings-option"><span>Keyword Blacklist</span><button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button></div>
@@ -250,7 +291,8 @@
 
         <div id="undo-notification" x-cloak x-show="showUndo" :class="{ 'visible': showUndo }">
             <button @click="undoMarkRead()" class="undo-button">
-                <span>Undo</span>
+                <span class="undo-label-desktop">Undo (u or ctrl+z)</span>
+                <span class="undo-label-mobile">Undo</span>
                 <svg class="undo-timer-svg">
                     <rect class="undo-timer-outline" pathLength="1" :class="{ 'active': undoTimerActive }" />
                 </svg>

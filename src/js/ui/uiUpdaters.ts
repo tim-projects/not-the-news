@@ -224,6 +224,11 @@ export function scrollToTop() {
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+let isKeyboardScrollingFlag = false;
+export function setKeyboardScrolling(active: boolean) {
+    isKeyboardScrollingFlag = active;
+}
+
 export const attachScrollToTopHandler = (() => {
     let inactivityTimeout: NodeJS.Timeout | undefined;
     let previousScrollPosition: number = 0;
@@ -233,6 +238,12 @@ export const attachScrollToTopHandler = (() => {
         if (!button) return;
 
         const handleScroll = (): void => {
+            if (isKeyboardScrollingFlag) {
+                button.classList.remove("visible");
+                previousScrollPosition = window.scrollY;
+                return;
+            }
+
             const currentScrollPosition: number = window.scrollY;
             button.classList.toggle("visible", currentScrollPosition < previousScrollPosition && currentScrollPosition > 0);
             previousScrollPosition = currentScrollPosition;

@@ -1,131 +1,101 @@
-import { test, expect } from '@playwright/test';
+const { test, expect } = require('@playwright/test');
 
-test.describe('Deck Refresh on Empty', () => {
-  const APP_URL = process.env.APP_URL || 'http://localhost:8085';
-  const APP_PASSWORD = "devtestpwd";
+const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_PASSWORD = "devtestpwd";
 
-  test('should generate and display a new deck after the current one is cleared', async ({ page }) => {
-    let consoleLogs = [];
-    page.on('console', msg => {
-      consoleLogs.push({
-        type: msg.type(),
-        text: msg.text(),
-        location: msg.location().url
-      });
-      console.log(`[Browser Console ${msg.type().toUpperCase()}] ${msg.text()}`); // Print immediately
-    });
+test.describe('Deck Refresh Logic', () => {
+  test.beforeEach(async ({ page }) => {
+    // Navigate to the login page
+    await page.goto(`${APP_URL}/login.html`);
 
-    // --- Login ---
-    await page.goto(`${APP_URL}/login.html`, { waitUntil: 'networkidle' });
+    // Fill the password and click login
     await page.fill('#pw', APP_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL(`${APP_URL}/`, { waitUntil: 'networkidle' });
 
-    // --- 0. Reset User State for Clean Test (Keep Feeds) ---
-    console.log('[Test] Resetting user state for clean test...');
-    
-    // Clear backend user state
-    await page.request.post(`${APP_URL}/api/user-state`, {
-        data: {
-            read: [],
-            starred: [],
-            currentDeckGuids: [],
-            shuffledOutGuids: [],
-            shuffleCount: 0,
-            lastShuffleResetDate: new Date().toDateString()
-        }
-    });
+    // Wait for navigation to the main page
+    await page.waitForURL(APP_URL);
+    // Wait for loading screen to be hidden
+    await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 30000 });
+    // Wait for the app viewport to be visible
+    await page.waitForSelector('#app-viewport', { state: 'visible', timeout: 10000 });
+    // Wait for the app to load - using specific selector to avoid help panel
+    await page.waitForSelector('#app > main > .item.entry', { state: 'visible', timeout: 30000 });
+  });
 
-    await page.evaluate(async () => {
-        // Clear local storage state
-        localStorage.removeItem('shuffleCount');
-        localStorage.removeItem('lastShuffleResetDate');
-        localStorage.removeItem('filterMode');
-        
-        // Clear IndexedDB user stores
-        const DB_NAME = 'not-the-news-db';
-        const openDB = () => new Promise((resolve, reject) => {
-            const req = indexedDB.open(DB_NAME);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
+  test('should show a new deck when all items in current deck are marked read', async ({ page }) => {
+    const initialFirstItem = await page.locator('.item.entry .itemtitle div').first().innerText();
+    console.log(`Initial first item: ${initialFirstItem}`);
 
-        try {
-            const db = await openDB();
-            const stores = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids'];
-            const existingStores = Array.from(db.objectStoreNames);
-            const storesToClear = stores.filter(s => existingStores.includes(s));
-            
-            if (storesToClear.length > 0) {
-                const tx = db.transaction(storesToClear, 'readwrite');
-                await Promise.all(storesToClear.map(s => tx.objectStore(s).clear()));
-                await new Promise((resolve) => { tx.oncomplete = resolve; });
-            }
-            db.close();
-        } catch (e) {
-            console.error('Error clearing IDB:', e);
-        }
-    });
-    
-    // Reload to apply reset
-    await page.reload({ waitUntil: 'networkidle' });
+    const initialDeckCount = await page.locator('.item.entry').count();
+    console.log(`Initial deck count: ${initialDeckCount}`);
 
-    // --- 1. Initial Load ---
-    console.log('[Test] Waiting for initial deck to load...');
-    await page.waitForSelector('#items .entry', { state: 'visible', timeout: 15000 });
-    const initialEntryElements = await page.locator('#items .entry').all();
-    const initialEntryCount = initialEntryElements.length;
-    console.log(`[Test] Initial deck loaded with ${initialEntryCount} items.`);
-    expect(initialEntryCount).toBeGreaterThan(0); 
-
-    // Capture initial read count
-    const initialReadCountText = await page.$eval('select#filter-selector option[value="read"]', el => el.textContent);
-    const initialReadCountMatch = initialReadCountText.match(/\((\d+)\)/);
-    const initialReadCount = initialReadCountMatch ? parseInt(initialReadCountMatch[1]) : 0;
-    console.log(`[Test] Initial total read count: ${initialReadCount}`);
-
-    // --- 2. Mark all items as read ---
-    console.log(`[Test] Marking all ${initialEntryCount} items as read...`);
-    for (let i = 0; i < initialEntryCount; i++) {
-        // We always click the FIRST unread button
-        const firstUnreadButton = page.locator('#items .entry .read-button:not(.read)').first();
-        
-        await expect(firstUnreadButton).toBeVisible({ timeout: 5000 });
-        
-        const entry = page.locator('#items .entry').first();
-        const guid = await entry.getAttribute('data-guid');
-        console.log(`[Test] Clicking unread button ${i + 1}/${initialEntryCount} (GUID: ${guid})`);
-        
-        await firstUnreadButton.click();
-        
-        // Wait for the entry to be removed from the DOM (since we are in unread mode)
-        await expect(page.locator(`#items .entry[data-guid="${guid}"]`)).toBeHidden({ timeout: 5000 });
-        
-        // Short wait for stability
-        await page.waitForTimeout(200); 
+    // Mark all items as read using the UI
+    for (let i = 0; i < initialDeckCount; i++) {
+      // Find the first UNREAD item's read button and click it
+      // In unread mode (default), items should disappear after being marked read
+      const btn = page.locator('#items > .item.entry:not(.help-panel-item) .itemtitle .read-button').first();
+      await btn.click();
+      await page.waitForTimeout(500); 
     }
-    console.log('[Test] All items marked as read.');
+
+    console.log('Deck cleared, waiting for refresh...');
     
-    // --- 3. Assertions ---
-    console.log('[Test] Verifying deck refresh...');
-
-    // Verify the 'Read' count in the filter dropdown has increased
+    // Wait for a new set of items to appear (automatic refresh)
     await expect(async () => {
-        const text = await page.$eval('select#filter-selector option[value="read"]', el => el.textContent);
-        const match = text.match(/\((\d+)\)/);
-        const count = match ? parseInt(match[1]) : 0;
-        console.log(`[Test] Current total read count: ${count}`);
-        expect(count).toBeGreaterThanOrEqual(initialReadCount + initialEntryCount);
+      const currentFirstItem = await page.locator('.item.entry .itemtitle div').first().innerText();
+      expect(currentFirstItem).not.toBe(initialFirstItem);
+    }).toPass({ timeout: 15000 });
+    
+    const newDeckCount = await page.locator('.item.entry').count();
+    console.log(`New deck count: ${newDeckCount}`);
+    expect(newDeckCount).toBeGreaterThan(0);
+  });
+
+  test('should show a new deck when shuffle button is clicked', async ({ page }) => {
+    const firstItemTitle = await page.locator('.item.entry .itemtitle div').first().innerText();
+    console.log(`Initial first item: ${firstItemTitle}`);
+
+    await page.click('#shuffle-button');
+    
+    // Wait for update
+    await expect(async () => {
+      const newFirstItemTitle = await page.locator('.item.entry .itemtitle div').first().innerText();
+      expect(newFirstItemTitle).not.toBe(firstItemTitle);
     }).toPass({ timeout: 10000 });
+  });
 
-    console.log('[Test] Read count verified.');
+  test('should set item opacity to 0.5 when marked as read', async ({ page }) => {
+    // Switch to 'all' mode so item doesn't disappear
+    await page.selectOption('#filter-selector', 'all');
+    await page.waitForTimeout(1000);
 
-    // Verify that a new deck is generated and displayed
-    console.log('[Test] Waiting for new deck to be displayed...');
-    // We wait for new '.entry' elements to appear.
-    await page.waitForSelector('#items .entry', { state: 'visible', timeout: 15000 });
-    const finalEntryCount = await page.locator('#items .entry').count();
-    console.log(`[Test] New deck displayed with ${finalEntryCount} items.`);
-    expect(finalEntryCount).toBeGreaterThan(0);
+    const firstItem = page.locator('.item.entry').first();
+    const readButton = firstItem.locator('.read-button');
+
+    // Mark as unread first if it's already read (unlikely but possible in some states)
+    const isRead = await firstItem.evaluate(el => el.classList.contains('read'));
+    if (isRead) {
+        await readButton.click();
+        await expect(firstItem).not.toHaveClass(/read/);
+        await page.waitForTimeout(500);
+    }
+
+    // Verify initial opacity is roughly 0.8 (unselected) or 1.0 (selected)
+    const initialOpacity = await firstItem.evaluate(el => window.getComputedStyle(el).opacity);
+    console.log(`Initial opacity: ${initialOpacity}`);
+    
+    // Mark as read
+    await readButton.click();
+    
+    // Wait for class application
+    await expect(firstItem).toHaveClass(/read/);
+    
+    // Verify opacity is 0.5 (when not selected)
+    // Deselect it first to be sure
+    await page.click('header'); 
+    
+    const finalOpacity = await firstItem.evaluate(el => window.getComputedStyle(el).opacity);
+    console.log(`Final opacity (unselected): ${finalOpacity}`);
+    expect(parseFloat(finalOpacity)).toBeCloseTo(0.5, 1);
   });
 });

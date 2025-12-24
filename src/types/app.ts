@@ -91,14 +91,18 @@ export interface AppState {
     themeStyleDark: string;
     customCss: string;
     fontSize: number;
+    feedWidth: number;
     showUndo: boolean;
     undoTimerActive: boolean;
     undoItemGuid: string | null;
     undoItemIndex: number | null;
     selectedGuid: string | null;
+    selectedSubElement: 'item' | 'read' | 'star' | 'play';
+    selectedTimestamp: number | null;
     lastSelectedGuid: string | null;
     starredGuid: string | null;
     readingGuid: string | null;
+    speakingGuid: string | null; // Track which item is being read out
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;
@@ -107,6 +111,8 @@ export interface AppState {
     staleItemObserver: IntersectionObserver | null;
     _initComplete: boolean;
     _isSyncing: boolean;
+    _isPregenerating: boolean; // Concurrency lock for background generation
+    lastShuffleResetDate: null | string;
 
     // --- Core Methods ---
     initApp(): Promise<void>;
@@ -122,24 +128,25 @@ export interface AppState {
     isRead(guid: string): boolean;
     toggleStar(guid: string): Promise<void>;
     toggleRead(guid: string): Promise<void>;
+    speakItem(guid: string): void; // New method for TTS
     undoMarkRead(): Promise<void>;
     selectItem(guid: string): void;
     processShuffle(): Promise<void>;
-    loadRssFeeds(): Promise<void>;
-    loadKeywordBlacklist(): Promise<void>;
-    loadCustomCss(): Promise<void>;
-    loadThemeStyle(): Promise<void>;
     loadFontSize(): Promise<void>;
+    loadFeedWidth(): Promise<void>;
+    loadThemeStyle(): Promise<void>;
     saveRssFeeds(): Promise<void>;
     saveKeywordBlacklist(): Promise<void>;
     saveCustomCss(): Promise<void>;
     saveThemeStyle(): Promise<void>;
     saveFontSize(): Promise<void>;
+    saveFeedWidth(): Promise<void>;
     resetCustomCss(): Promise<void>;
     generateCustomCssTemplate(): string;
     applyCustomCss(): void;
     applyThemeStyle(): void;
     applyFontSize(): void;
+    applyFeedWidth(): void;
     updateThemeAndStyle(newStyle: string, newTheme: 'light' | 'dark'): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;

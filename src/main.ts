@@ -110,14 +110,18 @@ export function rssApp(): AppState {
         themeStyleDark: 'original',
         customCss: '',
         fontSize: 100,
+        feedWidth: 50,
         showUndo: false,
         undoTimerActive: false,
         undoItemGuid: null,
         undoItemIndex: null,
         selectedGuid: null,
+        selectedSubElement: 'item',
+        selectedTimestamp: null,
         lastSelectedGuid: null,
         starredGuid: null,
         readingGuid: null,
+        speakingGuid: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -189,8 +193,14 @@ export function rssApp(): AppState {
                     // Keep loading screen visible for a moment longer if deck is empty
                     // This prevents a flash of blank screen before the message appears (if any)
                     await new Promise(resolve => setTimeout(resolve, 1000)); // Show message for 1 second
+                } else if (!this.selectedGuid) {
+                    // Auto-select first item on load if nothing is selected
+                    this.selectItem(this.deck[0].guid);
                 }
                 
+                // Kick off first background pre-generation
+                this.pregenerateDecks();
+
                 this.loading = false; // Hide main loading screen after all processing and messages are set
 
                 await this.updateSyncStatusMessage();
@@ -378,7 +388,49 @@ export function rssApp(): AppState {
                 }, 1000); // 0.5s for title + 0.5s for button
             }
             await toggleItemStateAndSync(this, guid, 'starred');
-        },        toggleRead: async function(this: AppState, guid: string): Promise<void> {
+        },
+
+        speakItem: function(this: AppState, guid: string): void {
+            if (this.speakingGuid === guid) {
+                // Toggle off
+                window.speechSynthesis.cancel();
+                this.speakingGuid = null;
+                return;
+            }
+
+            const entry = this.entries.find(e => e.guid === guid);
+            if (!entry) return;
+
+            // Stop any current speech
+            window.speechSynthesis.cancel();
+            
+            this.speakingGuid = guid;
+
+            // Simple HTML tag removal for description
+            const cleanDescription = entry.description.replace(/<[^>]*>?/gm, ' ');
+            const textToSpeak = `${entry.title}. ${cleanDescription}`;
+            
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            utterance.onend = () => {
+                if (this.speakingGuid === guid) {
+                    this.speakingGuid = null;
+                }
+            };
+
+            utterror.onerror = () => {
+                this.speakingGuid = null;
+            };
+
+            window.speechSynthesis.speak(utterance);
+        },
+        toggleRead: async function(this: AppState, guid: string): Promise<void> {
+            // Stop TTS if it's playing for the item being marked read (UX improvement)
+            if (this.speakingGuid === guid) {
+                window.speechSynthesis.cancel();
+                this.speakingGuid = null;
+            }
+
             const isCurrentlyRead = this.isRead(guid);
             const wasSelected = this.selectedGuid === guid;
             let nextGuidToSelect: string | null = null;
@@ -462,6 +514,11 @@ export function rssApp(): AppState {
                     await this._loadAndManageAllData();
                     // Nudge Alpine by creating a new array reference if not already done
                     this.deck = [...this.deck];
+                    
+                    // Select first item of the new deck
+                    if (this.deck.length > 0) {
+                        this.selectItem(this.deck[0].guid);
+                    }
                 } catch (error) {
                     console.error('[toggleRead] Error during deck refresh:', error);
                 } finally {
@@ -688,6 +745,20 @@ export function rssApp(): AppState {
                 },
                 applyFontSize: function(this: AppState): void {
                     document.documentElement.style.setProperty('--font-scale', (this.fontSize / 100).toString());
+                },
+                loadFeedWidth: async function(this: AppState): Promise<void> {
+                    const { loadSimpleState } = await import('./js/data/dbUserState.ts');
+                    const { value } = await loadSimpleState('feedWidth');
+                    this.feedWidth = (typeof value === 'number') ? value : 50;
+                    this.applyFeedWidth();
+                },
+                saveFeedWidth: async function(this: AppState): Promise<void> {
+                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                    await saveSimpleState('feedWidth', this.feedWidth);
+                    this.applyFeedWidth();
+                },
+                applyFeedWidth: function(this: AppState): void {
+                    document.documentElement.style.setProperty('--feed-width', `${this.feedWidth}%`);
                 },
                 updateCounts: async function(this: AppState): Promise<void> {
             updateCounts(this);
@@ -926,6 +997,7 @@ export function rssApp(): AppState {
                 await this.loadCustomCss();
                 await this.loadThemeStyle();
                 await this.loadFontSize();
+                await this.loadFeedWidth();
 
                 // Load pre-generated decks (local only)
                 const [onlineDeckRes, offlineDeckRes] = await Promise.all([
@@ -947,55 +1019,86 @@ export function rssApp(): AppState {
             }
         },
         
-                _loadAndManageAllData: async function(this: AppState): Promise<void> {
-            console.log('_loadAndManageAllData: START');
-            this.progressMessage = 'Loading saved feed items...'; // New message
+        _loadAndManageAllData: async function(this: AppState): Promise<void> {
+            console.log("_loadAndManageAllData: START");
+            this.progressMessage = "Loading saved feed items...";
             await this.loadFeedItemsFromDB();
             console.log(`_loadAndManageAllData: After loadFeedItemsFromDB. Entries: ${this.entries.length}`);
 
-            this.progressMessage = 'Loading user state from storage...'; // Existing message
-            const [starredState, shuffledOutState, currentDeckState, shuffleState] = await Promise.all([
+            this.progressMessage = "Loading user state from storage...";
+            // Load all necessary state in parallel
+            const [starredState, shuffledState, currentDeck, shuffleState] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
                 loadCurrentDeck(),
                 loadShuffleState()
             ]);
-            console.log("_loadAndManageAllData: Loaded starred state:", starredState.value); //debug
 
-            this.starred = Array.isArray(starredState.value) ? starredState.value : [];
-            this.shuffledOutGuids = Array.isArray(shuffledOutState.value) ? shuffledOutState.value : [];
-    
-            this.currentDeckGuids = Array.isArray(currentDeckState) ? currentDeckState : [];
-            console.log(`_loadAndManageAllData: Loaded currentDeckGuids:`, this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
-    
+            console.log("_loadAndManageAllData: Loaded starred state:", starredState.value);
+            this.starred = Array.isArray(starredState.value) ? starredState.value as StarredItem[] : [];
+            this.shuffledOutGuids = Array.isArray(shuffledState.value) ? shuffledState.value as ShuffledOutItem[] : [];
+            this.currentDeckGuids = Array.isArray(currentDeck) ? currentDeck : [];
+            console.log("_loadAndManageAllData: Loaded currentDeckGuids:", this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
+            
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            this.progressMessage = 'Pruning read items...'; // Existing message
+            this.progressMessage = "Pruning read items...";
+            // Prune old read items before we use them
             this.read = await loadAndPruneReadItems(Object.values(this.feedItems));
             console.log(`_loadAndManageAllData: After loadAndPruneReadItems. Read count: ${this.read.length}`);
-            console.log("[deckManager] Starting deck management with all data loaded.");
 
-            this.progressMessage = 'Organizing your deck...'; // New message
-            console.log('_loadAndManageAllData: Before manageDailyDeck', { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length, shuffleCount: this.shuffleCount });
-            const deckResult = await manageDailyDeck(
-                Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids, // Use shuffledOutGuids
-                this.shuffleCount, this.filterMode, this.lastShuffleResetDate
+            console.log("[deckManager] Starting deck management with all data loaded.");
+            this.progressMessage = "Organizing your deck...";
+
+            console.log("_loadAndManageAllData: Before manageDailyDeck", { readCount: this.read.length, currentDeckGuidsCount: this.currentDeckGuids.length, shuffleCount: this.shuffleCount });
+
+            const isOnline = this.isOnline;
+            const pregenKey = isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
+            const pregenDeck = this[pregenKey as keyof AppState] as DeckItem[] | null;
+            
+            const result = await manageDailyDeck(
+                Array.from(this.entries),
+                this.read,
+                this.starred,
+                this.shuffledOutGuids,
+                this.shuffleCount,
+                this.filterMode,
+                this.lastShuffleResetDate,
+                pregenDeck // Pass the pre-generated deck
             );
 
-            this.deck = deckResult.deck;
-            this.currentDeckGuids = deckResult.currentDeckGuids;
-            this.shuffledOutGuids = deckResult.shuffledOutGuids;
-            this.shuffleCount = deckResult.shuffleCount;
-            this.lastShuffleResetDate = deckResult.lastShuffleResetDate;
+            this.deck = result.deck;
+            this.currentDeckGuids = result.currentDeckGuids;
+            this.shuffledOutGuids = result.shuffledOutGuids;
+            this.shuffleCount = result.shuffleCount;
+            this.lastShuffleResetDate = result.lastShuffleResetDate;
 
-            console.log('_loadAndManageAllData: After manageDailyDeck. Deck size:', this.deck.length);
-            this.progressMessage = 'Displaying your feed...'; // New message
+            // If the pre-generated deck was used, clear it from state and DB
+            // We can infer usage if the returned currentDeckGuids length matches pregenDeck length 
+            // and the GUIDs match (simple check: first item guid matches)
+            // Or simpler: just check if manageDailyDeck returned a non-empty deck and we passed a pregen deck.
+            // But manageDailyDeck might NOT have used it (if deck wasn't empty).
+            // Let's rely on a GUID comparison of the first item to be reasonably sure.
+            if (pregenDeck && pregenDeck.length > 0 && this.currentDeckGuids.length > 0 && 
+                this.currentDeckGuids[0].guid === pregenDeck[0].guid) {
+                console.log(`[deckManager] Consumed pre-generated ${isOnline ? 'ONLINE' : 'OFFLINE'} deck in _loadAndManageAllData.`);
+                this[pregenKey as keyof AppState] = null as any;
+                const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                await saveSimpleState(pregenKey, null);
+                
+                // Trigger background generation for the NEXT deck
+                this.pregenerateDecks(); 
+            }
+
+            console.log("_loadAndManageAllData: After manageDailyDeck. Deck size:", this.deck.length);
+
+            this.progressMessage = "Displaying your feed...";
             await this.loadAndDisplayDeck();
-            console.log('_loadAndManageAllData: After loadAndDisplayDeck. Final Deck size:', this.deck.length);
+            console.log("_loadAndManageAllData: After loadAndDisplayDeck. Final Deck size:", this.deck.length);
 
             this.updateAllUI();
-            console.log('_loadAndManageAllData: END');
+            console.log("_loadAndManageAllData: END");
         },
         updateAllUI: async function(this: AppState): Promise<void> {
             await this.updateCounts();
@@ -1030,14 +1133,23 @@ export function rssApp(): AppState {
                     await saveCurrentScrollPosition();
                 } else {
                     document.body.classList.remove('no-scroll');
-                    // Explicitly reset overflow to ensure it's not stuck
                     document.body.style.overflow = '';
                 }
             });
-            this.$watch("openSettings", async (isOpen: boolean) => {
-                if (isOpen) {
+            this.$watch('openSettings', async (open: boolean) => {
+                const isMobile = window.innerWidth < 1024;
+                if (open) {
+                    if (!isMobile) document.body.classList.add('no-scroll');
                     this.modalView = 'main';
                     await manageSettingsPanelVisibility(this);
+                    
+                    // Focus logic
+                    this.$nextTick(() => {
+                        const modal = document.querySelector('.modal-content');
+                        const firstFocusable = modal?.querySelector('button, select, input, textarea') as HTMLElement;
+                        firstFocusable?.focus();
+                    });
+
                     const [rssFeeds, storedKeywords] = await Promise.all([
                         loadSimpleState('rssFeeds'),
                         loadSimpleState('keywordBlacklist')
@@ -1050,7 +1162,10 @@ export function rssApp(): AppState {
                     } else {
                         this.keywordBlacklistInput = '';
                     }
+                    await saveCurrentScrollPosition();
                 } else {
+                    document.body.classList.remove('no-scroll');
+                    document.body.style.overflow = '';
                     await saveCurrentScrollPosition();
                 }
             });
@@ -1080,7 +1195,14 @@ export function rssApp(): AppState {
             this.$watch('starred', () => this.updateCounts());
             this.$watch('currentDeckGuids', () => this.updateCounts());
             this.$watch('selectedGuid', (newGuid: string | null) => {
-                if (newGuid) this.lastSelectedGuid = newGuid;
+                if (newGuid) {
+                    this.lastSelectedGuid = newGuid;
+                    this.selectedTimestamp = Date.now();
+                    this.selectedSubElement = 'item'; // Reset focus to item itself on change
+                } else {
+                    this.selectedTimestamp = null;
+                    this.selectedSubElement = 'item';
+                }
             });
         },
         _setupEventListeners: function(this: AppState): void {
@@ -1124,6 +1246,18 @@ export function rssApp(): AppState {
             // Global Keyboard Shortcuts
             window.addEventListener('keydown', (e: KeyboardEvent) => {
                 handleKeyboardShortcuts(e, this);
+            });
+
+            // Re-trigger selection animation when returning to the app
+            window.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && this.selectedGuid) {
+                    console.log('[Visibility] App returned to foreground. Redrawing selection animation.');
+                    const currentGuid = this.selectedGuid;
+                    this.selectedGuid = null;
+                    this.$nextTick(() => {
+                        this.selectedGuid = currentGuid;
+                    });
+                }
             });
         },
         _startPeriodicSync: function(this: AppState): void {
