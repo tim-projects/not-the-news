@@ -11,7 +11,13 @@
 - [x] Fix "Original Dark" theme loading bug (base class sync).
 - [x] Fix Shuffle Count revert bug (manual shuffle vs. auto-refresh).
 - [x] Implement background deck pre-generation (online & offline variants).
-- [ ] Update `processShuffle` to consume pre-generated decks for instant refreshes.
+- [x] Update `processShuffle` to consume pre-generated decks for instant refreshes.
+- [x] Improve feed item focus visibility via selection opacity (1.0 selected, 0.8 unselected).
+- [x] Refine modal keyboard interactions (Escape to close, field navigation).
+- [x] Fix "active color" appearing during drawing animation.
+- [x] Fix theme selector reporting "Original Dark" when "Original Light" is active.
+- [x] Fix undo button outline shape to match button border radius dynamically.
+- [ ] Investigate and fix Unread count remaining at 0 after auto-refresh.
 
 ## Progress
 - Refactored `shortcuts-section` into a sticky/sliding layout.
@@ -22,15 +28,22 @@
 - Added visible shadow colors to all theme CSS files and fixed `.no-shadows` global override.
 - Synchronized `localStorage` and `html` base classes in `main.ts` to fix theme persistence.
 - Refined `deckManager.ts` logic to prevent manual shuffles from being "refunded" by auto-refresh.
-- Added `pregeneratedOnlineDeck` and `pregeneratedOfflineDeck` to state and background tasks.
+- Implemented consumption of pre-generated decks in `processShuffle` and `_loadAndManageAllData`.
+- Implemented focus-based opacity logic in `content.css` to clearly distinguish selected items.
+- Fixed keyboard event leakage into the feed when the settings modal is active.
+- Resolved "active color" bleed during SVG drawing by making the button transparent during animation.
+- Introduced `originalLight` and `originalDark` theme styles to resolve state confusion between light/dark modes.
+- Fixed Undo button SVG outline by calculating dynamic border radius based on button height.
 
 ## Findings & Mitigations
-- **Race Condition in Deck Regeneration**: Occurred when marking the last item as read. Fixed by consolidating async lifecycle in `toggleRead` and adding explicit array reference updates (`this.deck = [...this.deck]`) to nudge Alpine.js reactivity.
-- **Theme Persistence Issue**: The base `light`/`dark` class was only set on explicit user toggle, causing refreshes to default to the system preference or a blank state before the app initialized. Fixed by adding a class-management step to `applyThemeStyle` and syncing `localStorage` early in `_loadInitialState`.
-- **Shuffle Count Bug**: Manual shuffles were being "refunded" because `manageDailyDeck` saw an empty deck and assumed it was an auto-refresh after reading. Mitigation: added `allItemsInDeckShuffled` check to specifically detect manual shuffles.
-- **Background Deck Generation**: Implemented separate online and offline decks stored locally (`localOnly`) to ensure the next "Shuffle" is near-instant regardless of connectivity state.
+- **Race Condition in Deck Regeneration**: Occurred when marking the last item as read. Fixed by consolidating async lifecycle in `toggleRead` and adding explicit array reference updates.
+- **Theme Persistence Issue**: The base `light`/`dark` class was only set on explicit user toggle. Fixed by adding a class-management step to `applyThemeStyle` and syncing `localStorage` early.
+- **Shuffle Count Bug**: Manual shuffles were being "refunded" by `manageDailyDeck`. Mitigation: added `allItemsInDeckShuffled` check to specifically detect manual shuffles.
+- **Undo Button Outline Fix**: SVG `rx/ry` was hardcoded to 100, making it oval on short buttons. Mitigation: Added `undoBtnRadius` to state and used `requestAnimationFrame` to measure button height after it renders.
+- **Theme Style Confusion**: "Original" value was used for both Light and Dark modes, leading to UI selector mismatches. Mitigation: Explicitly separated values into `originalLight` and `originalDark`.
+- **Unread Count Bug**: Reports of unread count staying at 0 after a deck refresh. Potential mitigation: ensure `updateCounts` is called *after* `this.deck` and `this.currentDeckGuids` are fully populated in `_loadAndManageAllData`.
 
 ## Next Steps
-- Implement consumption of pre-generated decks in `processShuffle`.
-- Final verification of instant-shuffle performance.
+- Implement robust fix for Unread count UI synchronization.
 - Perform final audit of offline mode behavior.
+- Standardize all test files to use ES modules.

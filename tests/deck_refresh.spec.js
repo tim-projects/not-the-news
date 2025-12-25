@@ -16,9 +16,7 @@ test.describe('Deck Refresh Logic', () => {
     await page.waitForURL(APP_URL);
     // Wait for loading screen to be hidden
     await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 30000 });
-    // Wait for the app viewport to be visible
-    await page.waitForSelector('#app-viewport', { state: 'visible', timeout: 30000 });
-    // Wait for the app to load - using data-guid attribute for better reliability
+    // Wait for any visible content
     await page.locator('[data-guid]').first().waitFor({ state: 'visible', timeout: 30000 });
   });
 

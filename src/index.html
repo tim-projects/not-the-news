@@ -189,7 +189,7 @@
                         <label for="theme-style-selector">Theme:</label>
                         <select id="theme-style-selector" :value="themeStyle" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].parentElement.dataset.theme)" class="filter-select">
                             <optgroup label="Light Themes" data-theme="light">
-                                <option value="original">Original Light</option>
+                                <option value="originalLight">Original Light</option>
                                 <option value="sepia">Sepia</option>
                                 <option value="solarized">Solarized Light</option>
                                 <option value="github-light">GitHub Light</option>
@@ -201,7 +201,7 @@
                                 <option value="morning">Morning</option>
                             </optgroup>
                             <optgroup label="Dark Themes" data-theme="dark">
-                                <option value="original">Original Dark</option>
+                                <option value="originalDark">Original Dark</option>
                                 <option value="midnight">Midnight</option>
                                 <option value="nord">Nord</option>
                                 <option value="dracula">Dracula</option>

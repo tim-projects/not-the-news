@@ -105,9 +105,9 @@ export function rssApp(): AppState {
         syncStatusMessage: '',
         showSyncStatus: false,
         theme: 'dark', // Default theme
-        themeStyle: 'original',
-        themeStyleLight: 'original',
-        themeStyleDark: 'original',
+        themeStyle: 'originalDark',
+        themeStyleLight: 'originalLight',
+        themeStyleDark: 'originalDark',
         customCss: '',
         fontSize: 100,
         feedWidth: 50,
@@ -668,8 +668,8 @@ export function rssApp(): AppState {
                         loadSimpleState('themeStyleDark')
                     ]);
                     
-                    this.themeStyleLight = typeof lightRes.value === 'string' ? lightRes.value : 'original';
-                    this.themeStyleDark = typeof darkRes.value === 'string' ? darkRes.value : 'original';
+                    this.themeStyleLight = typeof lightRes.value === 'string' ? lightRes.value : 'originalLight';
+                    this.themeStyleDark = typeof darkRes.value === 'string' ? darkRes.value : 'originalDark';
                     
                     // If we just loaded, set themeStyle based on current theme to ensure consistency
                     if (this.theme === 'light') {
@@ -734,7 +734,7 @@ export function rssApp(): AppState {
                     // Manage theme style specific classes
                     const classesToRemove = Array.from(htmlEl.classList).filter(c => c.startsWith('theme-'));
                     htmlEl.classList.remove(...classesToRemove);
-                    if (this.themeStyle !== 'original') {
+                    if (this.themeStyle !== 'originalLight' && this.themeStyle !== 'originalDark') {
                         htmlEl.classList.add(`theme-${this.themeStyle}`);
                     }
                 },
@@ -997,8 +997,8 @@ export function rssApp(): AppState {
                     loadSimpleState('themeStyleDark')
                 ]);
 
-                this.themeStyleLight = typeof themeStyleLightRes.value === 'string' ? themeStyleLightRes.value : 'original';
-                this.themeStyleDark = typeof themeStyleDarkRes.value === 'string' ? themeStyleDarkRes.value : 'original';
+                this.themeStyleLight = typeof themeStyleLightRes.value === 'string' ? themeStyleLightRes.value : 'originalLight';
+                this.themeStyleDark = typeof themeStyleDarkRes.value === 'string' ? themeStyleDarkRes.value : 'originalDark';
                 this.themeStyle = this.theme === 'light' ? this.themeStyleLight : this.themeStyleDark;
 
                 this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');
