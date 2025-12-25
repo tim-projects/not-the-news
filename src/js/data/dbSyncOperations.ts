@@ -443,11 +443,6 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
 
         if (serverTime) await _saveSyncMetaState('lastFeedSync', serverTime);
         
-        // Trigger UI updates
-        app?.loadFeedItemsFromDB?.();
-        app?.loadAndDisplayDeck?.();
-        app?.updateCounts?.();
-
         return true;
 
     } catch (error: any) {

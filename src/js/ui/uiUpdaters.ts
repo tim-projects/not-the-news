@@ -205,33 +205,13 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
  * Updates the counts displayed on filter options.
  * @param {object} app The Alpine.js app state object.
 */
-export async function updateCounts(app: AppState): Promise<void> {
+export function updateCounts(app: AppState): void {
     if (!app?.entries?.length || !app.read || !app.starred || !app.currentDeckGuids) {
-        console.warn("Attempted to update counts with an invalid app object. Skipping.");
         return;
     }
-
-    const readSet = new Set(app.read.map(item => item.guid));
-    const starredSet = new Set(app.starred.map(item => item.guid));
-    // CHANGE: Per the new architecture, `app.currentDeckGuids` is an array of objects.
-    // We must extract the `guid` from each object before creating the Set.
-    const deckGuidsSet = new Set(app.currentDeckGuids.map(item => item.guid));
-    const entries = app.entries;
-
-    const allC = entries.length;
-    const readC = entries.filter(e => readSet.has(e.guid)).length;
-    const starredC = entries.filter(e => starredSet.has(e.guid)).length;
-    const unreadInDeckC = entries.filter(e => deckGuidsSet.has(e.guid) && !readSet.has(e.guid)).length;
-
-    const selector = getFilterSelector();
-    if (!selector) return;
-
-    const counts: { [key: string]: number } = { all: allC, read: readC, starred: starredC, unread: unreadInDeckC };
-    Array.from((selector as HTMLSelectElement).options as HTMLOptionsCollection).forEach((opt: HTMLOptionElement) => {
-        // Retain the filter name (e.g., "All") and update the count
-        const filterName = opt.text.split(' ')[0];
-        opt.text = `${filterName} (${counts[opt.value] ?? 0})`;
-    });
+    // This function now serves as a hook for any manual count-related logic.
+    // The actual UI updates are handled reactively by Alpine.js getters 
+    // (unreadCount, starredCount, etc.) and x-text bindings in index.html.
 }
 
 

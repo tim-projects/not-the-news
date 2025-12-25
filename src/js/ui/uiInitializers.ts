@@ -72,19 +72,10 @@ type GetToggleElementFunction = () => HTMLElement | null;
                 } else {
                     createStatusBarMessage(app, 'Sync finished with some issues.');
                 }
-                if (!app.currentDeckGuids?.length && app.entries?.length) {
-                    console.log("Deck is empty after sync. Rebuilding from all available items.");
-                    const now = new Date().toISOString();
-                    const readGuids = new Set(app.read?.map(h => h.guid));
-                    const shuffledOutGuids = new Set(app.shuffledOutGuids?.map(s => s.guid)); // Changed from shuffledOutItems
-                    app.currentDeckGuids = app.entries
-                        .filter(item => !readGuids.has(item.guid) && !shuffledOutGuids.has(item.guid))
-                        .map(item => ({
-                            guid: item.guid,
-                            addedAt: now
-                        }));
-                    await saveArrayState('currentDeckGuids', app.currentDeckGuids);
-                    console.log(`Rebuilt deck with ${app.currentDeckGuids.length} items.`);
+                
+                // Ensure application state is updated from DB after sync
+                if (app._loadAndManageAllData) {
+                    await app._loadAndManageAllData();
                 }
             }
         });

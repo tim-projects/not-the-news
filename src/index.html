@@ -175,10 +175,10 @@
                     <div class="settings-group">
                         <label for="filter-selector">Filter View:</label>
                         <select id="filter-selector" x-model="filterMode" class="filter-select">
-                            <option value="unread">Unread</option>
-                            <option value="starred" x-text="`Starred (${starred.length})`"></option>
-                            <option value="read" x-text="`Read (${read.length})`"></option>
-                            <option value="all">All</option>
+                            <option value="unread" x-text="`Unread (${unreadCount})`"></option>
+                            <option value="starred" x-text="`Starred (${starredCount})`"></option>
+                            <option value="read" x-text="`Read (${readCount})`"></option>
+                            <option value="all" x-text="`All (${allCount})`"></option>
                         </select>
                     </div>
                     <div class="settings-group"><label for="sync-toggle">Auto-Sync Feed</label><div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div></div>

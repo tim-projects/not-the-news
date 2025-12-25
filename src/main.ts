@@ -375,6 +375,25 @@ export function rssApp(): AppState {
             this._lastFilterHash = currentHash;
             return filtered;
         },
+        get allCount(): number {
+            return this.entries.length;
+        },
+        get starredCount(): number {
+            if (!this.entries.length) return 0;
+            const starredSet = new Set(this.starred.map(s => s.guid));
+            return this.entries.filter(e => starredSet.has(e.guid)).length;
+        },
+        get readCount(): number {
+            if (!this.entries.length) return 0;
+            const readSet = new Set(this.read.map(r => r.guid));
+            return this.entries.filter(e => readSet.has(e.guid)).length;
+        },
+        get unreadCount(): number {
+            if (!this.entries.length || !this.currentDeckGuids.length) return 0;
+            const readSet = new Set(this.read.map(r => r.guid));
+            const deckGuidsSet = new Set(this.currentDeckGuids.map(item => item.guid));
+            return this.entries.filter(e => deckGuidsSet.has(e.guid) && !readSet.has(e.guid)).length;
+        },
         // --- Action Methods ---
         isStarred: function(this: AppState, guid: string): boolean {
             return this.starred.some(e => e.guid === guid);
@@ -766,7 +785,7 @@ export function rssApp(): AppState {
                 applyFeedWidth: function(this: AppState): void {
                     document.documentElement.style.setProperty('--feed-width', `${this.feedWidth}%`);
                 },
-                updateCounts: async function(this: AppState): Promise<void> {
+                updateCounts: function(this: AppState): void {
             updateCounts(this);
         },        scrollToTop: function(this: AppState): void {
             scrollToTop();
@@ -1112,8 +1131,8 @@ export function rssApp(): AppState {
             this.updateAllUI();
             console.log("_loadAndManageAllData: END");
         },
-        updateAllUI: async function(this: AppState): Promise<void> {
-            await this.updateCounts();
+        updateAllUI: function(this: AppState): void {
+            this.updateCounts();
         },
         _reconcileAndRefreshUI: async function(this: AppState): Promise<void> {
             console.log('[UI] _reconcileAndRefreshUI: Initiating UI reconciliation and refresh.');

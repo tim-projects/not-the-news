@@ -117,7 +117,7 @@ export interface AppState {
 
     // --- Core Methods ---
     initApp(): Promise<void>;
-    updateCounts(): Promise<void>;
+    updateCounts(): void;
     performBackgroundSync(): Promise<void>;
     _reconcileAndRefreshUI(): Promise<void>;
     _initObservers(): void;
@@ -125,6 +125,10 @@ export interface AppState {
     loadAndDisplayDeck(): Promise<void>;
     loadFeedItemsFromDB(): Promise<void>;
     readonly filteredEntries: MappedFeedItem[];
+    readonly allCount: number;
+    readonly starredCount: number;
+    readonly readCount: number;
+    readonly unreadCount: number;
     isStarred(guid: string): boolean;
     isRead(guid: string): boolean;
     toggleStar(guid: string): Promise<void>;
