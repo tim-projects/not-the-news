@@ -158,13 +158,31 @@ p {
 
 /* Close Animation Sequence */
 .item.entry.is-closing .itemdescription {
+    animation: fold-and-vanish 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    pointer-events: none;
     max-height: 0 !important;
     opacity: 0 !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
-    pointer-events: none;
+}
+
+@keyframes fold-and-vanish {
+    0% {
+        max-height: 2000px;
+        opacity: 1;
+        padding-top: 1em;
+        padding-bottom: 2em;
+    }
+    100% {
+        max-height: 0;
+        opacity: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+    }
 }
 
 .item.entry.is-closing .itemtitle {
@@ -173,31 +191,22 @@ p {
 }
 
 .item.entry.is-closing {
-    animation: 
-        swipe-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards,
-        collapse-item 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
+    animation: swipe-and-collapse 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
     pointer-events: none;
     z-index: 100;
     overflow: hidden;
 }
 
-@keyframes swipe-left {
+@keyframes swipe-and-collapse {
     0% {
         transform: translateX(0);
-    }
-    100% {
-        transform: translateX(-100%);
-    }
-}
-
-@keyframes collapse-item {
-    0% {
-        max-height: 300px; /* Title area height */
+        max-height: calc(1.4em * 10); /* Accommodate title and margins */
         margin-top: var(--feed-gap);
         margin-bottom: var(--feed-gap);
         opacity: 1;
     }
     100% {
+        transform: translateX(-100%);
         max-height: 0;
         margin-top: 0;
         margin-bottom: 0;

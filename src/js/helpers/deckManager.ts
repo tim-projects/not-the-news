@@ -127,7 +127,20 @@ export const manageDailyDeck = async (
 
         if (usablePregen && pregeneratedDeck) {
             console.log('[deckManager] Using pre-generated deck inside manageDailyDeck');
-            newDeckItems = pregeneratedDeck;
+            newDeckItems = [...pregeneratedDeck];
+            
+            // TOP-UP LOGIC: If pregen is small, add more items from scratch
+            if (newDeckItems.length < 10) {
+                console.log(`[deckManager] Pregen is small (${newDeckItems.length}), topping up to 10.`);
+                const topUpItems = await generateNewDeck(
+                    entries,
+                    readItemsArray,
+                    starredItemsArray,
+                    [...shuffledOutItemsArray, ...newDeckItems.map(getGuid)],
+                    filterMode
+                );
+                newDeckItems = [...newDeckItems, ...topUpItems].slice(0, 10);
+            }
         } else {
             console.log('[deckManager] Generating new deck from scratch inside manageDailyDeck');
             newDeckItems = await generateNewDeck(

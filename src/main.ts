@@ -511,12 +511,18 @@ export function rssApp(): AppState {
             
             if (!isCurrentlyRead) {
                 this.readingGuid = guid;
-                // Stage 1: fold animation (500ms) + Stage 2: swipe animation (400ms) = 900ms total
-                // If we are in unread mode, we trigger the closing animation
+                // Phase 1: Fold animation (500ms)
                 if (this.filterMode === 'unread') {
                     this.closingGuid = guid;
-                    // Wait for both fold and swipe to complete
-                    await new Promise(resolve => setTimeout(resolve, 950));
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Select next item AFTER fold but DURING swipe for smoother feel
+                    if (nextGuidToSelect) {
+                        this.selectItem(nextGuidToSelect);
+                    }
+
+                    // Phase 2: Swipe animation (450ms)
+                    await new Promise(resolve => setTimeout(resolve, 450));
                 } else {
                     // Just the short delay for the button animation if not removing
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -548,12 +554,8 @@ export function rssApp(): AppState {
                 const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
                 await saveCurrentDeck(this.currentDeckGuids);
                 
-                // NOW move selection if we identified a next item
-                if (nextGuidToSelect) {
-                    this.$nextTick(() => {
-                        this.selectItem(nextGuidToSelect as string);
-                    });
-                } else if (wasSelected) {
+                // If we didn't select nextGuidToSelect during the animation, clear selection
+                if (!nextGuidToSelect && wasSelected) {
                     this.selectedGuid = null;
                 }
             } else if (this.filterMode === 'unread' && isCurrentlyRead) {
@@ -579,19 +581,18 @@ export function rssApp(): AppState {
                 showUndoNotification(this, guid, removedIndex);
             }
 
-            // If the deck is now empty in unread mode, trigger a deck refresh
-            if (this.filterMode === 'unread' && this.deck.length === 0) {
-                console.log('[toggleRead] Deck is empty, initiating refresh process.');
-                this.progressMessage = 'Generating new deck...';
-                this.loading = true; // Show loading screen while new deck is generated
+            // Check if we need to refresh the deck (if unread items in current deck are low)
+            const remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
+            if (this.filterMode === 'unread' && remainingUnreadInDeck < 3) {
+                console.log(`[toggleRead] Deck running low (${remainingUnreadInDeck} unread), initiating refresh.`);
+                // Show loading only if deck is totally empty, else do it in background
+                if (remainingUnreadInDeck === 0) {
+                    this.progressMessage = 'Generating new deck...';
+                    this.loading = true;
+                }
                 try {
-                    // We call _loadAndManageAllData to regenerate the deck
                     await this._loadAndManageAllData();
-                    // Nudge Alpine by creating a new array reference if not already done
-                    this.deck = [...this.deck];
-                    
-                    // Select first item of the new deck
-                    if (this.deck.length > 0) {
+                    if (remainingUnreadInDeck === 0 && this.deck.length > 0) {
                         this.selectItem(this.deck[0].guid);
                     }
                 } catch (error) {
@@ -600,7 +601,6 @@ export function rssApp(): AppState {
                     this.loading = false;
                     this.progressMessage = '';
                 }
-                console.log('[toggleRead] Deck refresh process completed. Deck size:', this.deck.length);
             }
         },        undoMarkRead: async function(this: AppState): Promise<void> {
             if (!this.undoItemGuid) return;
