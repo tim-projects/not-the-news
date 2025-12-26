@@ -585,7 +585,12 @@ export function rssApp(): AppState {
             let remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
             
             if (this.filterMode === 'unread' && remainingUnreadInDeck === 0) {
-                console.log("[toggleRead] Last item read. Waiting for undo period before potentially refreshing...");
+                console.log("[toggleRead] Last item read. Preloading next deck during undo period...");
+                
+                // Kick off background work while the user has a chance to undo
+                this.pregenerateDecks();
+                this.loadFeedItemsFromDB();
+
                 // Wait while undo is visible (max 5.5s)
                 while (this.showUndo) {
                     await new Promise(resolve => setTimeout(resolve, 100));
@@ -600,8 +605,13 @@ export function rssApp(): AppState {
 
             if (this.filterMode === 'unread' && remainingUnreadInDeck < 3) {
                 console.log(`[toggleRead] Deck running low (${remainingUnreadInDeck} unread), initiating refresh.`);
-                // Show loading only if deck is totally empty, else do it in background
-                if (remainingUnreadInDeck === 0) {
+                
+                // OPTIMIZATION: Check if we have a pre-generated deck ready to skip loading screen
+                const pregenKey = this.isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
+                const hasPregen = !!this[pregenKey as keyof AppState];
+
+                // Show loading only if deck is totally empty AND we don't have a pre-generated backup
+                if (remainingUnreadInDeck === 0 && !hasPregen) {
                     this.progressMessage = 'Generating new deck...';
                     this.loading = true;
                 }
@@ -970,6 +980,7 @@ export function rssApp(): AppState {
         },
         backupConfig: async function(this: AppState): Promise<void> {
             console.log('backupConfig called.');
+            this.showUndo = false;
             try {
                 this.progressMessage = 'Fetching configuration for backup...';
                 console.log('Fetching config for backup from:', '/api/admin/config-backup');
@@ -1241,6 +1252,7 @@ export function rssApp(): AppState {
             this.$watch('openSettings', async (open: boolean) => {
                 const isMobile = window.innerWidth < 1024;
                 if (open) {
+                    this.showUndo = false;
                     if (!isMobile) document.body.classList.add('no-scroll');
                     this.modalView = 'main';
                     await manageSettingsPanelVisibility(this);

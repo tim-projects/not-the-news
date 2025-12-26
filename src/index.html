@@ -81,7 +81,15 @@
                     <main id="items" @click.self="selectedGuid = null; openShortcuts = false">
                         <template x-if="filteredEntries.length === 0">
                             <div class="empty-state">
-                                <p>There's nothing here.</p>
+                                <div class="d-flex flex-column align-items-center">
+                                    <p x-text="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid))) ? 'You ran out of content. Add another feed..' : 'There\'s nothing here.'"></p>
+                                    <button x-show="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid)))" 
+                                            class="configure-button" 
+                                            style="margin-top: 1.5rem;"
+                                            @click="openSettings = true; loadRssFeeds(); modalView = 'rss'">
+                                        Add feed
+                                    </button>
+                                </div>
                             </div>
                         </template>
                                                                                                             <template x-for="entry in filteredEntries" :key="entry.guid">
@@ -184,10 +192,13 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0">
-            <div class="modal-content">                <button id="back-button" @click="modalView = 'main'" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
-                <button class="close" @click="openSettings = false">✕</button>
-                
-                <div id="main-settings" x-show="modalView === 'main'">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button id="back-button" @click="modalView = 'main'" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
+                    <button class="close" @click="openSettings = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div id="main-settings" x-show="modalView === 'main'">
                     <h2>APP</h2>
                     <hr>
                     <div class="settings-group">
@@ -403,22 +414,22 @@
                     </div>
                 </div>
 
-                <div id="advanced-settings-block" x-show="modalView === 'advanced'">
-                    <h2>Advanced Settings</h2>
-                    <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
-                    <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
-                    <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>
-                </div>
-            </div>
-        </div>
-
-        <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
+                                    <div id="advanced-settings-block" x-show="modalView === 'advanced'">
+                                        <h2>Advanced Settings</h2>
+                                        <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
+                                        <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
+                                        <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
              <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z" stroke-width="1.5" /></svg>
         </button>
 
         <div id="sync-status-message" x-cloak x-show="showSyncStatus" :class="{ 'visible': showSyncStatus }" x-text="syncStatusMessage"></div>
 
-        <div id="undo-notification" x-cloak x-show="showUndo" :class="{ 'visible': showUndo }">
+        <div id="undo-notification" x-cloak x-show="showUndo && !openSettings && !openShortcuts" :class="{ 'visible': showUndo && !openSettings && !openShortcuts }">
             <button @click="undoMarkRead()" class="undo-button">
                 <span class="undo-label-desktop">Undo (u or ctrl+z)</span>
                 <span class="undo-label-mobile">Undo</span>

@@ -132,8 +132,18 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
                 if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
 
                 // --- SOLUTION ---
-                // After successfully pushing a change, pull the latest state to ensure consistency.
-                pullUserState();
+                // After successfully pushing a change, pull the latest state to ensure consistency,
+                // BUT skip the key we just updated to avoid immediate overwrite if server is lagging.
+                let skipKey: string | null = null;
+                if (operation.key) {
+                    skipKey = operation.key;
+                } else if (operation.type === 'readDelta') {
+                    skipKey = 'read';
+                } else if (operation.type === 'starDelta') {
+                    skipKey = 'starred';
+                }
+                
+                pullUserState(false, skipKey ? [skipKey] : []);
                 // --- END SOLUTION ---
 
             } else {
@@ -183,12 +193,21 @@ export async function processPendingOperations(): Promise<void> {
         const responseData: SyncResponse = await response.json();
         console.log('[DB] Batch sync successful. Server response:', responseData);
 
+        const skipKeys: string[] = [];
         if (responseData.results && Array.isArray(responseData.results)) {
             await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('pendingOperations', 'readwrite');
                 for (const result of responseData.results as SyncResult[]) {
                     if (result.status === 'success' && result.id !== undefined) {
                         await tx.store.delete(result.id);
+                        
+                        // Identify key to skip to prevent race condition on immediate pull
+                        const originalOp = operations?.find(op => op.id === result.id);
+                        if (originalOp) {
+                            if (originalOp.key) skipKeys.push(originalOp.key);
+                            else if (originalOp.type === 'readDelta') skipKeys.push('read');
+                            else if (originalOp.type === 'starDelta') skipKeys.push('starred');
+                        }
                     } else {
                         console.warn(`[DB] Op ${result.id ?? 'N/A'} (${result.opType}) ${result.status}: ${result.reason || 'N/A'}`);
                     }
@@ -202,8 +221,8 @@ export async function processPendingOperations(): Promise<void> {
         if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
 
         // --- SOLUTION ---
-        // After a successful batch sync, pull the latest state.
-        pullUserState();
+        // After a successful batch sync, pull the latest state, skipping updated keys.
+        pullUserState(false, skipKeys);
         // --- END SOLUTION ---
 
     } catch (error: any) {
@@ -296,7 +315,7 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
 /**
  * Pulls the user state from the server.
  */
-export async function pullUserState(force: boolean = false): Promise<void> {
+export async function pullUserState(force: boolean = false, skipKeys: string[] = []): Promise<void> {
     if (!isOnline()) return;
 
     let { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
@@ -323,10 +342,12 @@ export async function pullUserState(force: boolean = false): Promise<void> {
 
     _lastPullAttemptTime = now;
     _isPullingUserState = true;
-    console.log(`[DB] Pulling user state (force=${force})...`);
+    console.log(`[DB] Pulling user state (force=${force}, skip=${skipKeys.join(',')})...`);
     
     try {
-        const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS).filter(([key, def]) => !def.localOnly && key !== 'syncEnabled') as [string, UserStateDef][];
+        const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS)
+            .filter(([key, def]) => !def.localOnly && key !== 'syncEnabled' && !skipKeys.includes(key)) as [string, UserStateDef][];
+        
         const results: { key: string, status: string | number, timestamp?: string }[] = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
         
         const newestOverallTimestamp: string = results.reduce((newest: string, result: { key: string, status: string | number, timestamp?: string }) => {
