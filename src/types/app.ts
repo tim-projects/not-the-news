@@ -64,6 +64,8 @@ export interface AppState {
     openSettings: boolean;
     openShortcuts: boolean;
     modalView: string;
+    showSearchBar: boolean;
+    searchQuery: string;
     shuffleCount: number;
     lastShuffleResetDate: string | null;
     syncEnabled: boolean;
@@ -173,6 +175,7 @@ export interface AppState {
     pregenerateDecks(): Promise<void>;
     _generateAndSavePregeneratedDeck(online: boolean): Promise<void>;
     loadCustomCss(): Promise<void>;
+    toggleSearch(): void;
 
     // Alpine.js specific properties (need to be declared if used in 'this' context)
     $nextTick: (callback: (this: AppState) => void) => Promise<void>;

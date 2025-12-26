@@ -286,6 +286,11 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
             await app.undoMarkRead();
             break;
 
+        case '/':
+            event.preventDefault();
+            app.toggleSearch();
+            break;
+
         case '?':
             event.preventDefault();
             if (app.openShortcuts) {

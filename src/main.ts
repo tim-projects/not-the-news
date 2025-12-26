@@ -73,6 +73,7 @@ import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from './types/app.ts';
+import { filterEntriesByQuery, toggleSearch } from './js/helpers/searchManager.ts';
 
 export function rssApp(): AppState {
     return {
@@ -85,6 +86,8 @@ export function rssApp(): AppState {
         openSettings: false,
         openShortcuts: false,
         modalView: 'main',
+        showSearchBar: false,
+        searchQuery: '',
         shuffleCount: 0,
         syncEnabled: true,
         imagesEnabled: true,
@@ -338,9 +341,9 @@ export function rssApp(): AppState {
         get filteredEntries(): MappedFeedItem[] {
             if (!Array.isArray(this.deck)) this.deck = [];
             
-            // --- FIX: Include deck content in hash to invalidate cache on shuffle ---
+            // --- FIX: Include deck content and search query in hash to invalidate cache ---
             const deckContentHash = this.deck.length > 0 ? this.deck[0].guid.substring(0, 8) : 'empty';
-            const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}-${deckContentHash}`;
+            const currentHash = `${this.entries.length}-${this.filterMode}-${this.read.length}-${this.starred.length}-${this.imagesEnabled}-${this.currentDeckGuids.length}-${this.deck.length}-${this.keywordBlacklistInput}-${this.searchQuery}-${deckContentHash}`;
             
             if (this.entries.length > 0 && currentHash === this._lastFilterHash && this._cachedFilteredEntries !== null) {
                 return this._cachedFilteredEntries;
@@ -373,6 +376,7 @@ export function rssApp(): AppState {
                 isStarred: starredMap.has(e.guid)
             }));
 
+            // Apply Keyword Blacklist
             const keywordBlacklist = (this.keywordBlacklistInput ?? '')
                 .split(/\r?\n/)
                 .map(kw => kw.trim().toLowerCase())
@@ -384,6 +388,9 @@ export function rssApp(): AppState {
                     return !keywordBlacklist.some(keyword => searchable.includes(keyword));
                 });
             }
+
+            // Apply Search Query
+            filtered = filterEntriesByQuery(filtered, this.searchQuery);
             
             this._cachedFilteredEntries = filtered;
             this._lastFilterHash = currentHash;
@@ -1388,6 +1395,10 @@ export function rssApp(): AppState {
                     }
                 }
             });
+        },
+
+        toggleSearch: function(this: AppState): void {
+            toggleSearch(this);
         },
 
         // --- Background Generation ---
