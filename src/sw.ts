@@ -45,8 +45,52 @@ registerRoute(
   })
 );
 
-// Explicitly bypass service worker for API calls
+// Explicitly bypass service worker for most API calls, EXCEPT search
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
+  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search'),
   new NetworkOnly()
+);
+
+// Offline Search Implementation
+registerRoute(
+  ({ url }) => url.pathname.includes('/api/search'),
+  async ({ url }) => {
+    const query = url.searchParams.get('q')?.toLowerCase() || '';
+    if (!query) {
+      return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const searchTerms = query.split(/\s+/).filter(Boolean);
+
+    try {
+      const results = await new Promise<any[]>((resolve, reject) => {
+        const request = indexedDB.open('not-the-news-db');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction('feedItems', 'readonly');
+          const store = tx.objectStore('feedItems');
+          const getAllRequest = store.getAll();
+          getAllRequest.onerror = () => reject(getAllRequest.error);
+          getAllRequest.onsuccess = () => {
+            const allItems = getAllRequest.result;
+            const filtered = allItems.filter((item: any) => {
+              const title = (item.title || '').toLowerCase();
+              const description = (item.description || '').toLowerCase();
+              const content = `${title} ${description}`;
+              return searchTerms.every(term => content.includes(term));
+            });
+            resolve(filtered);
+          };
+        };
+      });
+
+      return new Response(JSON.stringify(results), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      console.error('[SW] Search error:', error);
+      return new Response(JSON.stringify({ error: 'Search failed' }), { status: 500 });
+    }
+  }
 );
