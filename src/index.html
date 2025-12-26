@@ -209,9 +209,23 @@
                         </div>
                         <div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div>
                     </div>
-                    
-                    <h2>SETTINGS</h2>
-                    <hr>
+                    <div class="settings-group">
+                        <div class="setting-label-group">
+                            <label for="item-button-mode-selector">Item Button</label>
+                            <p class="setting-description">Choose the function of the button on each item.</p>
+                        </div>
+                        <select id="item-button-mode-selector" x-model="itemButtonMode" class="filter-select">
+                            <option value="play">Play (TTS)</option>
+                            <option value="hide">Hide</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <div class="setting-label-group">
+                            <label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label>
+                            <p class="setting-description">Always open article links in a new browser tab.</p>
+                        </div>
+                        <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
+                    </div>
                     <div class="settings-option">
                         <div class="setting-label-group">
                             <span>Appearance</span>
@@ -321,27 +335,10 @@
                     </div>
                     <div class="settings-group">
                         <div class="setting-label-group">
-                            <label for="item-button-mode-selector">Item Button</label>
-                            <p class="setting-description">Choose the function of the button on each item.</p>
-                        </div>
-                        <select id="item-button-mode-selector" x-model="itemButtonMode" class="filter-select">
-                            <option value="play">Play (TTS)</option>
-                            <option value="hide">Hide</option>
-                        </select>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
                             <label for="images-toggle">Show Images</label>
                             <p class="setting-description">Toggle visibility of images in the feed.</p>
                         </div>
                         <div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label>
-                            <p class="setting-description">Always open article links in a new browser tab.</p>
-                        </div>
-                        <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
                     </div>
                     <div class="settings-group">
                         <div class="setting-label-group">

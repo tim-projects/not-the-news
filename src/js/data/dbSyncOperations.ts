@@ -429,7 +429,15 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
 
         if (guidsToFetch.length > 0) {
             // --- Priority Sync Stage ---
-            const currentDeckGuids = new Set((app.currentDeckGuids || []).map(d => d.guid));
+            let currentDeckGuids = new Set((app.currentDeckGuids || []).map(d => d.guid));
+            
+            // If this is a fresh load (no current deck), pick the first 10 new items as priority
+            if (currentDeckGuids.size === 0) {
+                console.log('[DB] No current deck found. Prioritizing first 10 items for initial load.');
+                const firstTen = guidsToFetch.slice(0, 10);
+                firstTen.forEach(g => currentDeckGuids.add(g));
+            }
+
             const priorityGuids = guidsToFetch.filter(guid => currentDeckGuids.has(guid));
             const remainingGuids = guidsToFetch.filter(guid => !currentDeckGuids.has(guid));
 
