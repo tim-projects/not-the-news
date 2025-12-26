@@ -74,6 +74,10 @@ export interface AppState {
     openUrlsInNewTabEnabled: boolean;
     rssFeedsInput: string;
     keywordBlacklistInput: string;
+    discoveryUrl: string;
+    isDiscovering: boolean;
+    discoveryResults: string[];
+    discoveryError: string;
     shadowsEnabled: boolean;
     entries: MappedFeedItem[];
     read: ReadItem[];
@@ -176,6 +180,7 @@ export interface AppState {
     _generateAndSavePregeneratedDeck(online: boolean): Promise<void>;
     loadCustomCss(): Promise<void>;
     toggleSearch(): void;
+    discoverFeed(): Promise<void>;
 
     // Alpine.js specific properties (need to be declared if used in 'this' context)
     $nextTick: (callback: (this: AppState) => void) => Promise<void>;

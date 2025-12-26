@@ -342,6 +342,28 @@
 
                 <div id="rss-settings-block" x-show="modalView === 'rss'">
                     <h2>Configure RSS Feeds</h2>
+                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(var(--primary-rgb), 0.05);">
+                        <label for="discovery-input" style="font-weight: bold; margin-bottom: 0.5rem;">Auto-Discover Feed</label>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="discovery-input" x-model="discoveryUrl" @keydown.enter="discoverFeed()" placeholder="Enter website URL (e.g. example.com)" class="settings-input grow" style="flex-grow: 1;">
+                            <button id="discover-btn" class="settings-button" @click="discoverFeed()" :disabled="isDiscovering" style="margin: 0; min-width: auto; height: auto; padding: 0.5rem 1rem;">
+                                <span x-show="!isDiscovering">Find Feed</span>
+                                <span x-show="isDiscovering">Scanning…</span>
+                            </button>
+                        </div>
+                        <p class="setting-description" style="margin-top: 0.5rem;">Enter a website URL to automatically find its RSS feed.</p>
+                        
+                        <div id="discovery-results" x-show="discoveryResults.length > 0" class="discovery-results-list" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                            <p style="font-weight: bold; margin-bottom: 0.5rem;">Found feeds:</p>
+                            <template x-for="foundUrl in discoveryResults" :key="foundUrl">
+                                <div class="d-flex justify-between align-items-center" style="margin-bottom: 0.5rem; background: var(--card-bg); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--card-border);">
+                                    <code x-text="foundUrl" style="word-break: break-all; font-size: 0.8rem; flex-grow: 1; margin-right: 1rem;"></code>
+                                    <button class="configure-button" @click="rssFeedsInput += '\n' + foundUrl; rssFeedsInput = rssFeedsInput.trim(); discoveryResults = discoveryResults.filter(u => u !== foundUrl); createStatusBarMessage($data, 'Feed added!')" style="font-size: 0.8rem !important; padding: 0.25rem 0.5rem; margin: 0;">Add</button>
+                                </div>
+                            </template>
+                        </div>
+                        <div x-show="discoveryError" x-text="discoveryError" style="color: #ff4444; font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    </div>
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
                         <button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save Feeds</button>

@@ -74,6 +74,7 @@ import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from './types/app.ts';
 import { filterEntriesByQuery, toggleSearch } from './js/helpers/searchManager.ts';
+import { discoverFeed } from './js/helpers/discoveryManager.ts';
 
 export function rssApp(): AppState {
     return {
@@ -96,6 +97,10 @@ export function rssApp(): AppState {
         shadowsEnabled: true,
         rssFeedsInput: '',
         keywordBlacklistInput: '',
+        discoveryUrl: '',
+        isDiscovering: false,
+        discoveryResults: [],
+        discoveryError: '',
         entries: [],
         read: [],
         starred: [],
@@ -1399,6 +1404,10 @@ export function rssApp(): AppState {
 
         toggleSearch: function(this: AppState): void {
             toggleSearch(this);
+        },
+
+        discoverFeed: async function(this: AppState): Promise<void> {
+            await discoverFeed(this);
         },
 
         // --- Background Generation ---

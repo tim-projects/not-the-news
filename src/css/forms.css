@@ -28,6 +28,24 @@
   outline: none;
 }
 
+.settings-input {
+  padding: 0.5em 0.8em;
+  font-size: inherit;
+  border-radius: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--fg);
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
 select#filter-selector,
 select#theme-style-selector {
   background: var(--card-bg);

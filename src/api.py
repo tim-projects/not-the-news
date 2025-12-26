@@ -347,6 +347,67 @@ def _load_feed_items():
     api_logger.debug(f"Found {len(items)} items in feed.xml")
     return items
 
+import requests
+import re
+from urllib.parse import urljoin
+
+@app.route("/api/discover-feed", methods=["GET"])
+def discover_feed():
+    _authenticate_request()
+    site_url = request.args.get("url")
+    if not site_url:
+        return jsonify({"error": "URL parameter is required"}), 400
+    
+    if not site_url.startswith(('http://', 'https://')):
+        site_url = 'https://' + site_url
+
+    api_logger.info(f"Attempting to discover feeds for: {site_url}")
+    
+    try:
+        # Use a realistic User-Agent to avoid being blocked by some sites
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(site_url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        content = response.text
+        
+        # Regex to find <link rel="alternate" ... type="application/(rss|atom)+xml" ... href="...">
+        # This is a bit flexible to handle different attribute orders
+        feed_links = []
+        
+        # Look for both RSS and Atom
+        patterns = [
+            r'<link[^>]+type=["\']application/rss\+xml["\'][^>]+href=["\']([^"\']+)["\']',
+            r'<link[^>]+href=["\']([^"\']+)["\'][^>]+type=["\']application/rss\+xml["\']',
+            r'<link[^>]+type=["\']application/atom\+xml["\'][^>]+href=["\']([^"\']+)["\']',
+            r'<link[^>]+href=["\']([^"\']+)["\'][^>]+type=["\']application/atom\+xml["\']'
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                # Convert relative URLs to absolute
+                absolute_url = urljoin(site_url, html.unescape(match))
+                if absolute_url not in feed_links:
+                    feed_links.append(absolute_url)
+        
+        # Also check if the URL itself IS a feed (crude check)
+        if not feed_links:
+            # If the response content looks like XML and contains <rss or <feed, it might be a feed already
+            if '<rss' in content.lower() or '<feed' in content.lower() or '<?xml' in content.lower():
+                feed_links.append(site_url)
+
+        return jsonify({"url": site_url, "feeds": feed_links}), 200
+
+    except requests.RequestException as e:
+        api_logger.error(f"Failed to fetch URL {site_url}: {e}")
+        return jsonify({"error": f"Failed to fetch website: {str(e)}"}), 500
+    except Exception as e:
+        api_logger.exception(f"Unexpected error during feed discovery: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
 @app.route("/api/time", methods=["GET"])
 def time():
     now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
