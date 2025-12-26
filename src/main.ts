@@ -582,7 +582,22 @@ export function rssApp(): AppState {
             }
 
             // Check if we need to refresh the deck (if unread items in current deck are low)
-            const remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
+            let remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
+            
+            if (this.filterMode === 'unread' && remainingUnreadInDeck === 0) {
+                console.log("[toggleRead] Last item read. Waiting for undo period before potentially refreshing...");
+                // Wait while undo is visible (max 5.5s)
+                while (this.showUndo) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                // Re-calculate after potential undo
+                remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
+                if (remainingUnreadInDeck > 0) {
+                    console.log("[toggleRead] Undo detected, skipping refresh.");
+                    return;
+                }
+            }
+
             if (this.filterMode === 'unread' && remainingUnreadInDeck < 3) {
                 console.log(`[toggleRead] Deck running low (${remainingUnreadInDeck} unread), initiating refresh.`);
                 // Show loading only if deck is totally empty, else do it in background
