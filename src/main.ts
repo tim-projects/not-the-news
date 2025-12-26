@@ -67,6 +67,7 @@ import {
     initItemButtonMode,
     initShadowsToggle,
     initCurvesToggle,
+    initFlickToSelectToggle,
     initUrlsNewTabToggle,
     initScrollPosition
 } from './js/ui/uiInitializers.ts';
