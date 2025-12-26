@@ -33,8 +33,15 @@ body.no-scroll #app-viewport {
 }
 
 #app-viewport.shifted #sliding-container {
-  /* Shift left by 60vw to keep 40% of feed visible and center the help column content */
-  transform: translateX(calc(-60vw - var(--feed-gap)));
+  /* On mobile, shift fully to the help section */
+  transform: translateX(calc(-100vw - var(--feed-gap)));
+}
+
+@media (min-width: 1024px) {
+  #app-viewport.shifted #sliding-container {
+    /* On desktop, keep 40% of feed visible and center the help column content */
+    transform: translateX(calc(-60vw - var(--feed-gap)));
+  }
 }
 
 #main-section {
