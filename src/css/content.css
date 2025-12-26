@@ -174,19 +174,38 @@ p {
 }
 
 .item.entry.is-closing {
-    animation: swipe-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards; /* 0.5s delay to wait for fold */
+    animation: 
+        swipe-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards,
+        collapse-item 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
     pointer-events: none;
     z-index: 100;
+    overflow: hidden;
 }
 
 @keyframes swipe-left {
     0% {
         transform: translateX(0);
-        opacity: 1;
     }
     100% {
         transform: translateX(-100%);
+    }
+}
+
+@keyframes collapse-item {
+    0% {
+        max-height: 300px; /* Title area height */
+        margin-top: var(--feed-gap);
+        margin-bottom: var(--feed-gap);
+        opacity: 1;
+    }
+    100% {
+        max-height: 0;
+        margin-top: 0;
+        margin-bottom: 0;
         opacity: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
     }
 }
 
