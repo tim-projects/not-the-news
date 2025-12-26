@@ -12,7 +12,8 @@ import {
     getSyncToggle,
     getImagesToggle,
     getOpenUrlsInNewTabToggle,
-    getShadowsToggle
+    getShadowsToggle,
+    getCurvesToggle
 } from './uiElements.ts';
 
 import {
@@ -27,7 +28,8 @@ type GetToggleElementFunction = () => HTMLElement | null;
         imagesEnabled: 'Images',
         itemButtonMode: 'Item Button',
         openUrlsInNewTabEnabled: 'Open in New Tab',
-        shadowsEnabled: 'Shadows'
+        shadowsEnabled: 'Shadows',
+        curvesEnabled: 'Curves'
     };
     
     /**
@@ -97,6 +99,10 @@ type GetToggleElementFunction = () => HTMLElement | null;
 
     export async function initShadowsToggle(app: AppState): Promise<void> {
         await setupBooleanToggle(app, getShadowsToggle, 'shadowsEnabled');
+    }
+
+    export async function initCurvesToggle(app: AppState): Promise<void> {
+        await setupBooleanToggle(app, getCurvesToggle, 'curvesEnabled');
     }
     
     export async function initUrlsNewTabToggle(app: AppState): Promise<void> {

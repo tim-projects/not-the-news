@@ -79,6 +79,7 @@ export interface AppState {
     discoveryResults: string[];
     discoveryError: string;
     shadowsEnabled: boolean;
+    curvesEnabled: boolean;
     entries: MappedFeedItem[];
     read: ReadItem[];
     starred: StarredItem[];

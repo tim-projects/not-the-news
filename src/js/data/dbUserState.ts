@@ -42,6 +42,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     shuffleCount: { store: 'userSettings', type: 'simple', localOnly: false, default: 2 },
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
     shadowsEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
+    curvesEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     pregeneratedOnlineDeck: { store: 'userSettings', type: 'simple', localOnly: true, default: null },
     pregeneratedOfflineDeck: { store: 'userSettings', type: 'simple', localOnly: true, default: null }
 };

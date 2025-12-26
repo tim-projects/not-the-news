@@ -122,6 +122,31 @@ html.dark a:visited {
   color: grey;
 }
 
+body.no-curves {
+  --border-radius: 0 !important;
+}
+
+body.no-curves .item,
+body.no-curves .modal-content,
+body.no-curves button,
+body.no-curves .filter-select,
+body.no-curves .settings-input,
+body.no-curves .settings-textarea,
+body.no-curves img.entry-image,
+body.no-curves .itemdescription img,
+body.no-curves #sync-status-message,
+body.no-curves .undo-button,
+body.no-curves .search-btn,
+body.no-curves .search-container,
+body.no-curves kbd,
+body.no-curves .switch .slider {
+  border-radius: 0 !important;
+}
+
+body.no-curves .switch .slider::before {
+  border-radius: 0 !important;
+}
+
 /* Apply variables to body and html */
 body,
 html {

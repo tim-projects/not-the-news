@@ -56,8 +56,8 @@ export function parseRssFeedsConfig(value: any): string[] {
     if (Array.isArray(value)) {
         // Flat array of strings or objects
         value.forEach((item: any) => {
-            if (typeof item === 'string' && item.trim()) {
-                allUrls.push(item.trim());
+            if (typeof item === 'string') {
+                allUrls.push(item); // Include empty strings to preserve lines
             } else if (item && typeof item === 'object' && item.url) {
                 allUrls.push(item.url.trim());
             }

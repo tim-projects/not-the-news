@@ -48,11 +48,11 @@ def load_rss_feeds():
             # Case 2: Flat list of strings (user-saved data)
             elif isinstance(feeds_data, list):
                 for item in feeds_data:
-                    if isinstance(item, str) and is_valid_url(item):
+                    if isinstance(item, str) and item.strip() and is_valid_url(item):
                         all_urls.append(item)
                     elif isinstance(item, dict) and 'url' in item: # Handle array of objects if needed
                         url = item['url']
-                        if isinstance(url, str) and is_valid_url(url):
+                        if isinstance(url, str) and url.strip() and is_valid_url(url):
                             all_urls.append(url)
 
             return all_urls

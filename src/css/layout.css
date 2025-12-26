@@ -252,7 +252,7 @@ body.no-scroll {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 0.75em 3.5rem 0.2em 1.8em;
+  padding: 0.75em 4.5rem 0.2em 1.8em;
   border-bottom: 1px solid var(--card-border);
   font-family: 'Playfair Display', serif;
   font-weight: 400;
@@ -425,7 +425,7 @@ ul.feed-list,
 
   .itemtitle {
     font-size: 1.75rem !important;
-    padding: 0.75em 3.5rem 0.2em 1.2em;
+    padding: 0.75em 4.5rem 0.2em 1.2em;
   }
 
   .item {

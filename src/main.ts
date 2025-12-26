@@ -66,6 +66,7 @@ import {
     initImagesToggle,
     initItemButtonMode,
     initShadowsToggle,
+    initCurvesToggle,
     initUrlsNewTabToggle,
     initScrollPosition
 } from './js/ui/uiInitializers.ts';
@@ -95,6 +96,7 @@ export function rssApp(): AppState {
         itemButtonMode: 'play',
         openUrlsInNewTabEnabled: true,
         shadowsEnabled: true,
+        curvesEnabled: true,
         rssFeedsInput: '',
         keywordBlacklistInput: '',
         discoveryUrl: '',
@@ -197,6 +199,7 @@ export function rssApp(): AppState {
                 initImagesToggle(this);
                 initItemButtonMode(this);
                 initShadowsToggle(this);
+                initCurvesToggle(this);
                 initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
                 this.$nextTick(() => {
@@ -668,7 +671,7 @@ export function rssApp(): AppState {
             this.applyCustomCss();
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
-            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
+            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim());
             try {
                 await saveSimpleState('rssFeeds', rssFeedsArray);
                 this.rssFeedsInput = rssFeedsArray.join('\n');
@@ -1069,19 +1072,21 @@ export function rssApp(): AppState {
         // --- Private Helper Methods ---
                 _loadInitialState: async function(this: AppState): Promise<void> {
             try {
-                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState] = await Promise.all([
+                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState] = await Promise.all([
                     loadSimpleState('syncEnabled'),
                     loadSimpleState('imagesEnabled'),
                     loadSimpleState('itemButtonMode'),
                     loadSimpleState('openUrlsInNewTabEnabled'),
                     loadFilterMode(), // loadFilterMode directly returns string, not object with value
-                    loadSimpleState('theme')
+                    loadSimpleState('theme'),
+                    loadSimpleState('curvesEnabled')
                 ]);
 
                 this.syncEnabled = syncEnabled.value ?? true;
                 this.imagesEnabled = imagesEnabled.value ?? true;
                 this.itemButtonMode = itemButtonMode.value ?? 'play';
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
+                this.curvesEnabled = curvesState.value ?? true;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                 localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
@@ -1311,6 +1316,12 @@ export function rssApp(): AppState {
             });
             // Initial state for shadows
             document.body.classList.toggle('no-shadows', !this.shadowsEnabled);
+
+            this.$watch('curvesEnabled', (enabled: boolean) => {
+                document.body.classList.toggle('no-curves', !enabled);
+            });
+            // Initial state for curves
+            document.body.classList.toggle('no-curves', !this.curvesEnabled);
             
             this.$watch('entries', () => this.updateCounts());
             this.$watch('read', () => this.updateCounts());

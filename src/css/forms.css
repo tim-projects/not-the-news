@@ -176,7 +176,7 @@ html.dark .switch input:checked+.slider {
   background-color: var(--card-bg);
   color: var(--fg);
   resize: vertical;
-  border-radius: var(--border-radius);
+  border-radius: 4px;
   overflow-y: auto;
   font-family: monospace;
   font-size: 1rem;

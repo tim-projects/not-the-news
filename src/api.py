@@ -121,6 +121,8 @@ USER_STATE_SERVER_DEFAULTS = {
 
             'shadowsEnabled': {'type': 'simple', 'default': True},
 
+            'curvesEnabled': {'type': 'simple', 'default': True},
+
             'itemButtonMode': {'type': 'simple', 'default': 'play'},
 
             'showSearchBar': {'type': 'simple', 'default': False},
@@ -189,13 +191,15 @@ def _seed_initial_configs():
             api_logger.info(f"Seeding rssFeeds.json from {feeds_txt_source_path}...")
             try:
                 with open(feeds_txt_source_path, 'r', encoding='utf-8') as f:
-                    urls = [line.strip() for line in f if line.strip()]
+                    lines = [line.strip() for line in f]
                 
                 nested_feeds = {}
                 default_category = "Miscellaneous"
                 default_subcategory = "Default"
                 nested_feeds[default_category] = {}
-                nested_feeds[default_category][default_subcategory] = [{"url": url} for url in urls]
+                # Filter out actual feed objects but preserve empty strings in the flat list if it was one
+                # However, since we are building a nested structure here for first seed, we skip empty lines
+                nested_feeds[default_category][default_subcategory] = [{"url": line} for line in lines if line]
                 
                 _save_state("rssFeeds", nested_feeds)
                 api_logger.info(f"Successfully seeded rssFeeds.json from feeds.txt.")
@@ -689,7 +693,8 @@ def reset_app_data():
             "themeStyleLight.json",
             "themeStyleDark.json",
             "fontSize.json",
-            "customCss.json"
+            "customCss.json",
+            "curvesEnabled.json"
         ]
         
         api_logger.debug("Clearing transient user state files...")
