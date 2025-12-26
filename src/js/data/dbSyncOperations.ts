@@ -400,6 +400,10 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
             const BATCH_SIZE: number = 50;
             const newItems: FeedItem[] = [];
             for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
+                if (!isOnline()) {
+                    console.warn('[DB] Offline mid-sync. Aborting feed fetch.');
+                    return false;
+                }
                 const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
                 const itemsResponse: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
                     method: 'POST',
@@ -456,8 +460,12 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
  * @returns {Promise<boolean>} True if sync was successful, false otherwise.
  */
 export async function performFullSync(app: AppState): Promise<boolean> {
+    if (!isOnline()) {
+        console.log('[DB] Skipping full sync: Offline.');
+        return true;
+    }
     const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
-    if (!isOnline() || !syncEnabled) return true;
+    if (!syncEnabled) return true;
     
     console.log('[DB] Full sync initiated.');
     try {

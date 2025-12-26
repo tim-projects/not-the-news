@@ -24,9 +24,3 @@ playwright_test_output.log
 podman_full_logs.log
 archive
 GEMINI-PLAN-MODE
-issues.md
-current-task.md
-next-tasks.md
-report.md
-tasks-completed.md
-TODO.txt

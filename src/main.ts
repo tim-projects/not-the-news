@@ -147,19 +147,28 @@ export function rssApp(): AppState {
                 
                 this._initImageObserver();
 
+                // Refresh online status immediately before potentially starting sync
+                this.isOnline = isOnline();
+
                 if (this.isOnline) {
                     this.progressMessage = 'Syncing latest content...'; // Set specific sync message
-                    // Push any pending local changes first.
-                    await processPendingOperations();
-                    // Pull user state first, as feed items depend on it.
-                    await pullUserState(); // This fetches user preferences like rssFeeds from backend
-                    // Then sync feed items.
-                    const syncSuccess = await performFeedSync(this);
                     
-                    // Now that both syncs are complete, load all data into app state.
+                    // STABILITY: Double-check connectivity before each network call
+                    if (isOnline()) await processPendingOperations();
+                    if (isOnline()) await pullUserState(); // This fetches user preferences like rssFeeds from backend
+                    
+                    let syncSuccess = true;
+                    if (isOnline()) {
+                        syncSuccess = await performFeedSync(this);
+                    }
+                    
+                    // Now that syncs are attempted (or skipped if offline), load data.
                     await this._loadAndManageAllData();
-                    if (syncSuccess) {
+                    
+                    if (syncSuccess && this.isOnline) {
                         createStatusBarMessage(this, "Initial sync complete!");
+                    } else if (!this.isOnline) {
+                        createStatusBarMessage(this, "Sync skipped (Offline).");
                     } else {
                         createStatusBarMessage(this, "Sync finished with some issues. Check console for details.");
                     }
