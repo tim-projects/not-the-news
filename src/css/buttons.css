@@ -27,7 +27,7 @@ button:disabled {
 }
 
 button.close {
-  font-size: 24px;
+  font-size: 18px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
@@ -46,6 +46,12 @@ button.close {
   cursor: pointer;
 }
 
+@media (min-width: 768px) {
+  button.close {
+    font-size: 24px;
+  }
+}
+
 button.close:hover {
   color: var(--secondary);
   background: var(--primary);
@@ -60,7 +66,7 @@ button.close:active {
 }
 
 button.star {
-  font-size: 28px;
+  font-size: 24px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
@@ -139,7 +145,7 @@ button.play-button.speaking {
 }
 
 button.read-button {
-  font-size: 18px;
+  font-size: 16px;
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
@@ -295,6 +301,15 @@ button.star.starred:active {
   justify-content: center;
 }
 
+@media (max-width: 767px) {
+  .shuffle-btn,
+  .settings-btn,
+  .help-btn,
+  .search-btn {
+    font-size: 0.8rem;
+  }
+}
+
 .help-btn {
     padding-top: 0;
 }
@@ -328,7 +343,7 @@ button.star.starred:active {
   left: 1px;
   background: var(--bg);
   color: var(--fg);
-  font-size: 25px;
+  font-size: 18px;
   cursor: pointer;
   padding: 0 0 4px 0; /* Push content up slightly for visual centering */
   width: 56px;
@@ -342,6 +357,12 @@ button.star.starred:active {
   opacity: 0.8;
   box-shadow: 1px 1px 0 1px var(--card-shadow-color);
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+@media (min-width: 768px) {
+  #back-button {
+    font-size: 25px;
+  }
 }
 
 #back-button:hover {
