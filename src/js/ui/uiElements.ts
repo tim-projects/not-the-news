@@ -13,6 +13,7 @@ export const getImagesToggle = () => document.getElementById('images-toggle');
 export const getOpenUrlsInNewTabToggle = () => document.getElementById('open-urls-in-new-tab-toggle');
 export const getShadowsToggle = () => document.getElementById('shadows-toggle');
 export const getCurvesToggle = () => document.getElementById('curves-toggle');
+export const getFlickToSelectToggle = () => document.getElementById('flick-to-select-toggle');
 
 // Display elements
 export const getShuffleCountDisplay = () => document.getElementById('shuffle-count-display');

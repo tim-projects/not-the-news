@@ -97,6 +97,7 @@ export function rssApp(): AppState {
         openUrlsInNewTabEnabled: true,
         shadowsEnabled: true,
         curvesEnabled: true,
+        flickToSelectEnabled: true,
         rssFeedsInput: '',
         keywordBlacklistInput: '',
         discoveryUrl: '',
@@ -200,6 +201,7 @@ export function rssApp(): AppState {
                 initItemButtonMode(this);
                 initShadowsToggle(this);
                 initCurvesToggle(this);
+                initFlickToSelectToggle(this);
                 initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
                 this.$nextTick(() => {
@@ -209,6 +211,7 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Setting up app watchers...';
                 this._setupWatchers();
                 this._setupEventListeners();
+                this._setupFlickToSelectListeners();
                 this._startPeriodicSync();
                 this._initScrollObserver();
                 this._initObservers();
@@ -243,6 +246,7 @@ export function rssApp(): AppState {
                 this.pregenerateDecks();
 
                 this.loading = false; // Hide main loading screen after all processing and messages are set
+                this._initComplete = true;
 
                 await this.updateSyncStatusMessage();
             } catch (error: any) {
@@ -694,6 +698,11 @@ export function rssApp(): AppState {
                 this.lastShuffleResetDate = deckResult.lastShuffleResetDate;
 
                 await this.loadAndDisplayDeck();
+                
+                if (this.deck.length > 0) {
+                    this.selectItem(this.deck[0].guid);
+                }
+
                 this.progressMessage = '';
                 this.loading = false;
                 if (!syncSuccess) {
@@ -1072,14 +1081,15 @@ export function rssApp(): AppState {
         // --- Private Helper Methods ---
                 _loadInitialState: async function(this: AppState): Promise<void> {
             try {
-                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState] = await Promise.all([
+                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState] = await Promise.all([
                     loadSimpleState('syncEnabled'),
                     loadSimpleState('imagesEnabled'),
                     loadSimpleState('itemButtonMode'),
                     loadSimpleState('openUrlsInNewTabEnabled'),
                     loadFilterMode(), // loadFilterMode directly returns string, not object with value
                     loadSimpleState('theme'),
-                    loadSimpleState('curvesEnabled')
+                    loadSimpleState('curvesEnabled'),
+                    loadSimpleState('flickToSelectEnabled')
                 ]);
 
                 this.syncEnabled = syncEnabled.value ?? true;
@@ -1087,6 +1097,7 @@ export function rssApp(): AppState {
                 this.itemButtonMode = itemButtonMode.value ?? 'play';
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.curvesEnabled = curvesState.value ?? true;
+                this.flickToSelectEnabled = flickState.value ?? true;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                 localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
@@ -1216,6 +1227,12 @@ export function rssApp(): AppState {
             console.log("_loadAndManageAllData: After loadAndDisplayDeck. Final Deck size:", this.deck.length);
 
             this.updateAllUI();
+
+            if (this._initComplete && this.deck.length > 0 && !this.showUndo) {
+                console.log("[_loadAndManageAllData] Auto-selecting first item after refresh.");
+                this.selectItem(this.deck[0].guid);
+            }
+
             console.log("_loadAndManageAllData: END");
         },
         updateAllUI: function(this: AppState): void {
@@ -1392,6 +1409,87 @@ export function rssApp(): AppState {
                     });
                 }
             });
+        },
+        _setupFlickToSelectListeners: function(this: AppState): void {
+            let lastFlickTime = 0;
+            const FLICK_COOLDOWN = 800; // ms
+            const VELOCITY_THRESHOLD = 0.5; // pixels per ms
+            const DISTANCE_THRESHOLD = 50; // pixels
+            const WHEEL_DELTA_THRESHOLD = 100;
+
+            const getTargetGuid = (direction: number): string | null => {
+                const entries = this.filteredEntries;
+                if (entries.length === 0) return null;
+                
+                const currentIndex = this.selectedGuid ? entries.findIndex(e => e.guid === this.selectedGuid) : -1;
+                let nextIndex = currentIndex + direction;
+                
+                if (nextIndex < 0) nextIndex = 0;
+                if (nextIndex >= entries.length) nextIndex = entries.length - 1;
+                
+                return entries[nextIndex].guid;
+            };
+
+            const isCurrentItemLong = () => {
+                if (!this.selectedGuid) return false;
+                const el = document.querySelector(`.entry[data-guid="${this.selectedGuid}"]`) as HTMLElement;
+                if (!el) return false;
+                return el.offsetHeight > window.innerHeight * 0.8;
+            };
+
+            const triggerFlickSelection = (direction: number) => {
+                const now = Date.now();
+                if (now - lastFlickTime < FLICK_COOLDOWN) return;
+                
+                const targetGuid = getTargetGuid(direction);
+                if (!targetGuid || targetGuid === this.selectedGuid) return;
+
+                console.log(`[Flick] Triggering selection move: direction=${direction}`);
+                lastFlickTime = now;
+                
+                // Kill current inertia/scrolling
+                window.scrollTo(window.scrollX, window.scrollY);
+                
+                // Trigger smooth scroll to target
+                this.selectItem(targetGuid);
+            };
+
+            // --- Mouse Wheel Flick ---
+            window.addEventListener('wheel', (e: WheelEvent) => {
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar || !isCurrentItemLong()) return;
+
+                if (Math.abs(e.deltaY) > WHEEL_DELTA_THRESHOLD) {
+                    // We don't preventDefault, but we do intercept and override if it's a "flick"
+                    triggerFlickSelection(e.deltaY > 0 ? 1 : -1);
+                }
+            }, { passive: true });
+
+            // --- Touch Flick ---
+            let touchStartY = 0;
+            let touchStartTime = 0;
+
+            window.addEventListener('touchstart', (e: TouchEvent) => {
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar || !isCurrentItemLong()) return;
+                touchStartY = e.touches[0].clientY;
+                touchStartTime = Date.now();
+            }, { passive: true });
+
+            window.addEventListener('touchend', (e: TouchEvent) => {
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar || !isCurrentItemLong()) return;
+                
+                const touchEndY = e.changedTouches[0].clientY;
+                const touchEndTime = Date.now();
+                
+                const distanceY = touchEndY - touchStartY;
+                const duration = touchEndTime - touchStartTime;
+                
+                if (duration > 0) {
+                    const velocity = Math.abs(distanceY) / duration;
+                    if (velocity > VELOCITY_THRESHOLD && Math.abs(distanceY) > DISTANCE_THRESHOLD) {
+                        triggerFlickSelection(distanceY < 0 ? 1 : -1);
+                    }
+                }
+            }, { passive: true });
         },
         _startPeriodicSync: function(this: AppState): void {
             let lastActivityTimestamp = Date.now();

@@ -123,6 +123,8 @@ USER_STATE_SERVER_DEFAULTS = {
 
             'curvesEnabled': {'type': 'simple', 'default': True},
 
+            'flickToSelectEnabled': {'type': 'simple', 'default': True},
+
             'itemButtonMode': {'type': 'simple', 'default': 'play'},
 
             'showSearchBar': {'type': 'simple', 'default': False},
@@ -694,7 +696,8 @@ def reset_app_data():
             "themeStyleDark.json",
             "fontSize.json",
             "customCss.json",
-            "curvesEnabled.json"
+            "curvesEnabled.json",
+            "flickToSelectEnabled.json"
         ]
         
         api_logger.debug("Clearing transient user state files...")

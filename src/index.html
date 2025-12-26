@@ -365,6 +365,13 @@
                         </div>
                         <div class="d-flex align-items-center"><span id="curves-text" x-text="curvesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="curves-toggle" x-model="curvesEnabled"><span class="slider"></span></label></div>
                     </div>
+                    <div class="settings-group">
+                        <div class="setting-label-group">
+                            <label for="flick-to-select-toggle">Flick to Select</label>
+                            <p class="setting-description">Fast scroll/swipe moves between items.</p>
+                        </div>
+                        <div class="d-flex align-items-center"><span id="flick-to-select-text" x-text="flickToSelectEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="flick-to-select-toggle" x-model="flickToSelectEnabled"><span class="slider"></span></label></div>
+                    </div>
                 </div>
 
                 <div id="rss-settings-block" x-show="modalView === 'rss'">

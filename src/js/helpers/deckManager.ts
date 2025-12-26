@@ -269,7 +269,12 @@ export async function processShuffle(app: AppState): Promise<void> {
 
     // Automatically select the first item in the new deck
     if (app.deck.length > 0) {
-        app.selectItem(app.deck[0].guid);
+        app.selectedGuid = null; // Clear to ensure watcher triggers and animation plays
+        app.$nextTick(() => {
+            if (app.deck.length > 0) {
+                app.selectItem(app.deck[0].guid);
+            }
+        });
     }
 
     displayTemporaryMessageInTitle('Feed shuffled!');

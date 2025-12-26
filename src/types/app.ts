@@ -80,6 +80,7 @@ export interface AppState {
     discoveryError: string;
     shadowsEnabled: boolean;
     curvesEnabled: boolean;
+    flickToSelectEnabled: boolean;
     entries: MappedFeedItem[];
     read: ReadItem[];
     starred: StarredItem[];
@@ -174,6 +175,7 @@ export interface AppState {
     updateAllUI(): void;
     _setupWatchers(): void;
     _setupEventListeners(): void;
+    _setupFlickToSelectListeners(): void;
     _startPeriodicSync(): void;
     _initScrollObserver(): void;
     handleEntryLinks(element: Element): void;
