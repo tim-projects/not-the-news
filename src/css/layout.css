@@ -210,8 +210,6 @@ body.no-scroll {
 
 #items {
   width: 100%;
-  display: flex;
-  flex-direction: column;
   flex-grow: 1;
   overflow-x: hidden;
 }
@@ -248,7 +246,7 @@ body.no-scroll {
   margin: var(--feed-gap) auto;
   float: none;
   overflow: visible;
-  max-height: 2000px;
+  max-height: 10000px;
   transition: transform .25s ease, max-height .25s ease, padding .25s ease, opacity .25s ease;
 }
 

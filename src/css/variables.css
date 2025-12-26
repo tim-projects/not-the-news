@@ -147,6 +147,11 @@ body.no-curves .switch .slider::before {
   border-radius: 0 !important;
 }
 
+body.no-curves .undo-timer-outline {
+  rx: 0 !important;
+  ry: 0 !important;
+}
+
 /* Apply variables to body and html */
 body,
 html {

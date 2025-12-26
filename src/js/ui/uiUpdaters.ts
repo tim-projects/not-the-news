@@ -123,12 +123,14 @@ export function showUndoNotification(app: AppState, guid: string, index: number 
             (app as any).$nextTick(() => {
                 requestAnimationFrame(() => {
                     const btn = document.querySelector('#undo-notification .undo-button');
-                    if (btn) {
+                    if (btn && app.curvesEnabled) {
                         const height = btn.getBoundingClientRect().height;
                         console.log(`[Undo] Measured button height: ${height}`);
                         if (height > 10) {
                             app.undoBtnRadius = (height / 2) - 2;
                         }
+                    } else if (btn && !app.curvesEnabled) {
+                        app.undoBtnRadius = 0;
                     }
                 });
             });

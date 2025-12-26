@@ -68,7 +68,8 @@ import {
     initShadowsToggle,
     initCurvesToggle,
     initUrlsNewTabToggle,
-    initScrollPosition
+    initScrollPosition,
+    initFlickToSelectToggle
 } from './js/ui/uiInitializers.ts';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
@@ -1336,9 +1337,16 @@ export function rssApp(): AppState {
 
             this.$watch('curvesEnabled', (enabled: boolean) => {
                 document.body.classList.toggle('no-curves', !enabled);
+                if (!enabled) {
+                    this.undoBtnRadius = 0;
+                } else {
+                    // Trigger a re-calculation of radius next time undo is shown
+                    this.undoBtnRadius = 20; 
+                }
             });
             // Initial state for curves
             document.body.classList.toggle('no-curves', !this.curvesEnabled);
+            if (!this.curvesEnabled) this.undoBtnRadius = 0;
             
             this.$watch('entries', () => this.updateCounts());
             this.$watch('read', () => this.updateCounts());
