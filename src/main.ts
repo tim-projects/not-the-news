@@ -1404,14 +1404,23 @@ export function rssApp(): AppState {
             const WHEEL_COOLDOWN = 500; // ms
             const WHEEL_THRESHOLD = 50;
 
+            const isCurrentItemLong = () => {
+                if (!this.selectedGuid) return false;
+                const el = document.querySelector(`.entry[data-guid="${this.selectedGuid}"]`) as HTMLElement;
+                if (!el) return false;
+                // Threshold: If item is taller than 80% of viewport, we consider it "long" and candidate for flicking away
+                return el.offsetHeight > window.innerHeight * 0.8;
+            };
+
             window.addEventListener('wheel', (e: WheelEvent) => {
                 if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
+                if (!isCurrentItemLong()) return; // Only flick away long items
 
                 const now = Date.now();
                 if (now - lastWheelTime < WHEEL_COOLDOWN) return;
 
                 if (Math.abs(e.deltaY) > WHEEL_THRESHOLD) {
-                    console.log(`[Flick] Fast wheel detected: deltaY=${e.deltaY}`);
+                    console.log(`[Flick] Fast wheel detected on long item: deltaY=${e.deltaY}`);
                     e.preventDefault();
                     lastWheelTime = now;
                     handleVerticalNavigation(this, e.deltaY > 0 ? 1 : -1);
@@ -1431,6 +1440,7 @@ export function rssApp(): AppState {
 
             window.addEventListener('touchend', (e: TouchEvent) => {
                 if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
+                if (!isCurrentItemLong()) return; // Only flick away long items
                 
                 const touchEndY = e.changedTouches[0].clientY;
                 const touchEndTime = Date.now();
@@ -1441,7 +1451,7 @@ export function rssApp(): AppState {
                 if (duration > 0) {
                     const velocity = Math.abs(distanceY) / duration;
                     if (velocity > TOUCH_VELOCITY_THRESHOLD && Math.abs(distanceY) > TOUCH_DISTANCE_THRESHOLD) {
-                        console.log(`[Flick] Touch flick detected: velocity=${velocity.toFixed(2)}, distanceY=${distanceY}`);
+                        console.log(`[Flick] Touch flick detected on long item: velocity=${velocity.toFixed(2)}, distanceY=${distanceY}`);
                         // e.preventDefault(); // Prevents normal scroll - can be tricky on touchend
                         handleVerticalNavigation(this, distanceY < 0 ? 1 : -1);
                     }
