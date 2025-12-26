@@ -245,7 +245,11 @@ export async function processShuffle(app: AppState): Promise<void> {
     if (pregenDeck && pregenDeck.length > 0 && app.currentDeckGuids.length > 0 && 
         app.currentDeckGuids[0].guid === pregenDeck[0].guid) {
         console.log(`[deckManager] Consumed pre-generated ${isOnline ? 'ONLINE' : 'OFFLINE'} deck in processShuffle.`);
-        app[pregenKey as keyof AppState] = null as any;
+        if (pregenKey === 'pregeneratedOnlineDeck') {
+            app.pregeneratedOnlineDeck = null;
+        } else {
+            app.pregeneratedOfflineDeck = null;
+        }
         const { saveSimpleState: saveSimpleStateInternal } = await import('../data/dbUserState.ts');
         await saveSimpleStateInternal(pregenKey, null);
     }

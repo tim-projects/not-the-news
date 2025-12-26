@@ -156,6 +156,11 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
         return;
     }
 
+    // Skip custom navigation if Shift is held (allows normal browser scrolling)
+    if (event.shiftKey && ['j', 'k', 'ArrowDown', 'ArrowUp'].includes(key)) {
+        return;
+    }
+
     switch (key) {
         case 'j':
         case 'ArrowDown':

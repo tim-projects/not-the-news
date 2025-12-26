@@ -3,8 +3,6 @@ import { AppState } from '@/types/app.ts';
 
 import {
     // @ts-ignore
-    getMainSettingsBlock, 
-    getFilterSelector,    // Will be typed later
     getNtnTitleH2
 } from './uiElements.js'; // Will be converted later
 import { saveSimpleState } from '../data/database.ts'; // Changed to .ts

@@ -68,6 +68,7 @@ export interface AppState {
     lastShuffleResetDate: string | null;
     syncEnabled: boolean;
     imagesEnabled: boolean;
+    itemButtonMode: 'hide' | 'play';
     openUrlsInNewTabEnabled: boolean;
     rssFeedsInput: string;
     keywordBlacklistInput: string;
@@ -113,7 +114,6 @@ export interface AppState {
     _initComplete: boolean;
     _isSyncing: boolean;
     _isPregenerating: boolean; // Concurrency lock for background generation
-    lastShuffleResetDate: null | string;
 
     // --- Core Methods ---
     initApp(): Promise<void>;
@@ -140,6 +140,8 @@ export interface AppState {
     loadFontSize(): Promise<void>;
     loadFeedWidth(): Promise<void>;
     loadThemeStyle(): Promise<void>;
+    loadRssFeeds(): Promise<void>;
+    loadKeywordBlacklist(): Promise<void>;
     saveRssFeeds(): Promise<void>;
     saveKeywordBlacklist(): Promise<void>;
     saveCustomCss(): Promise<void>;
@@ -167,6 +169,9 @@ export interface AppState {
     _startPeriodicSync(): void;
     _initScrollObserver(): void;
     handleEntryLinks(element: Element): void;
+    pregenerateDecks(): Promise<void>;
+    _generateAndSavePregeneratedDeck(online: boolean): Promise<void>;
+    loadCustomCss(): Promise<void>;
 
     // Alpine.js specific properties (need to be declared if used in 'this' context)
     $nextTick: (callback: (this: AppState) => void) => Promise<void>;

@@ -42,7 +42,7 @@ interface SyncResponse {
 interface AppState { // Minimal AppState interface needed for performFeedSync
     loadFeedItemsFromDB?: () => Promise<void>;
     loadAndDisplayDeck?: () => Promise<void>;
-    updateCounts?: () => Promise<void>;
+    updateCounts?: () => void;
     progressMessage?: string;
 }
 

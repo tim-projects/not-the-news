@@ -112,6 +112,19 @@ html.light .modal-content {
   font-size: 1.1em;
 }
 
+.setting-label-group {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.setting-description {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin: 0;
+    line-height: 1.2;
+}
+
 .settings-group select,
 .settings-group button,
 .configure-button {

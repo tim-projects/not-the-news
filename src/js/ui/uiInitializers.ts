@@ -6,8 +6,7 @@ import { AppState } from '../../types/app.ts';
 import {
     loadSimpleState,
     saveSimpleState,
-    performFullSync,
-    saveArrayState
+    performFullSync
 } from '../data/database.ts';
 import {
     getSyncToggle,
@@ -26,6 +25,7 @@ type GetToggleElementFunction = () => HTMLElement | null;
     const SETTING_LABELS: Record<string, string> = {
         syncEnabled: 'Auto-Sync',
         imagesEnabled: 'Images',
+        itemButtonMode: 'Item Button',
         openUrlsInNewTabEnabled: 'Open in New Tab',
         shadowsEnabled: 'Shadows'
     };
@@ -83,6 +83,16 @@ type GetToggleElementFunction = () => HTMLElement | null;
     
     export async function initImagesToggle(app: AppState): Promise<void> {
         await setupBooleanToggle(app, getImagesToggle, 'imagesEnabled');
+    }
+
+    export async function initItemButtonMode(app: AppState): Promise<void> {
+        const selectEl = document.getElementById('item-button-mode-selector');
+        if (!selectEl) return;
+        selectEl.addEventListener('change', async () => {
+            const newValue = app.itemButtonMode;
+            await saveSimpleState('itemButtonMode', newValue);
+            createStatusBarMessage(app, `Item Button set to ${newValue}.`);
+        });
     }
 
     export async function initShadowsToggle(app: AppState): Promise<void> {

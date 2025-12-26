@@ -64,6 +64,7 @@ import {
 import {
     initSyncToggle,
     initImagesToggle,
+    initItemButtonMode,
     initShadowsToggle,
     initUrlsNewTabToggle,
     initScrollPosition
@@ -71,7 +72,7 @@ import {
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
-import { MappedFeedItem, DeckItem, AppState } from './types/app.ts';
+import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from './types/app.ts';
 
 export function rssApp(): AppState {
     return {
@@ -87,6 +88,7 @@ export function rssApp(): AppState {
         shuffleCount: 0,
         syncEnabled: true,
         imagesEnabled: true,
+        itemButtonMode: 'play',
         openUrlsInNewTabEnabled: true,
         shadowsEnabled: true,
         rssFeedsInput: '',
@@ -131,6 +133,7 @@ export function rssApp(): AppState {
         _initComplete: false,
         staleItemObserver: null,
         _isSyncing: false,
+        _isPregenerating: false,
         lastShuffleResetDate: null, // Initialized as null
 
         // --- Core Methods ---
@@ -169,6 +172,7 @@ export function rssApp(): AppState {
                 // initTheme is no longer needed as we handle it via _loadInitialState and toggleTheme
                 initSyncToggle(this);
                 initImagesToggle(this);
+                initItemButtonMode(this);
                 initShadowsToggle(this);
                 initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
@@ -438,7 +442,7 @@ export function rssApp(): AppState {
                 }
             };
 
-            utterror.onerror = () => {
+            utterance.onerror = () => {
                 this.speakingGuid = null;
             };
 
@@ -993,9 +997,10 @@ export function rssApp(): AppState {
         // --- Private Helper Methods ---
                 _loadInitialState: async function(this: AppState): Promise<void> {
             try {
-                const [syncEnabled, imagesEnabled, urlsNewTab, filterModeResult, themeState] = await Promise.all([
+                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState] = await Promise.all([
                     loadSimpleState('syncEnabled'),
                     loadSimpleState('imagesEnabled'),
+                    loadSimpleState('itemButtonMode'),
                     loadSimpleState('openUrlsInNewTabEnabled'),
                     loadFilterMode(), // loadFilterMode directly returns string, not object with value
                     loadSimpleState('theme')
@@ -1003,6 +1008,7 @@ export function rssApp(): AppState {
 
                 this.syncEnabled = syncEnabled.value ?? true;
                 this.imagesEnabled = imagesEnabled.value ?? true;
+                this.itemButtonMode = itemButtonMode.value ?? 'play';
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
@@ -1114,7 +1120,11 @@ export function rssApp(): AppState {
             if (pregenDeck && pregenDeck.length > 0 && this.currentDeckGuids.length > 0 && 
                 this.currentDeckGuids[0].guid === pregenDeck[0].guid) {
                 console.log(`[deckManager] Consumed pre-generated ${isOnline ? 'ONLINE' : 'OFFLINE'} deck in _loadAndManageAllData.`);
-                this[pregenKey as keyof AppState] = null as any;
+                if (pregenKey === 'pregeneratedOnlineDeck') {
+                    this.pregeneratedOnlineDeck = null;
+                } else {
+                    this.pregeneratedOfflineDeck = null;
+                }
                 const { saveSimpleState } = await import('./js/data/dbUserState.ts');
                 await saveSimpleState(pregenKey, null);
                 

@@ -137,7 +137,7 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should display header elements', async ({ page }) => {
         await expect(page.locator('#header')).toBeVisible();
-        await expect(page.locator('#ntn-title')).toHaveText('Not The News');
+        await expect(page.locator('#ntn-title h2')).toHaveText('Not The News');
         await expect(page.locator('#shuffle-button')).toBeVisible();
         await expect(page.locator('#settings-button')).toBeVisible();
     });

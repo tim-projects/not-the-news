@@ -41,6 +41,9 @@ body.no-scroll #app-viewport {
   width: 100vw;
   flex-shrink: 0;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 #shortcuts-section {
@@ -120,15 +123,17 @@ body.no-scroll {
 
 #items {
   width: 100%;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
   overflow-x: hidden;
 }
 
 .empty-state {
   display: flex;
+  flex-grow: 1;
   justify-content: center;
   align-items: center;
-  min-height: 80vh;
   width: 100%;
   text-align: center;
 }
@@ -165,7 +170,7 @@ body.no-scroll {
   font-family: 'Playfair Display', serif;
   font-weight: 400;
   text-transform: capitalize;
-  min-height: calc(1.4em * 4);
+  min-height: 120px;
   margin-top: 0;
   position: relative;
 }
