@@ -71,7 +71,7 @@ import {
     initScrollPosition
 } from './js/ui/uiInitializers.ts';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
-import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
+import { handleKeyboardShortcuts, handleVerticalNavigation } from './js/helpers/keyboardManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from './types/app.ts';
 import { filterEntriesByQuery, toggleSearch } from './js/helpers/searchManager.ts';
@@ -97,6 +97,7 @@ export function rssApp(): AppState {
         openUrlsInNewTabEnabled: true,
         shadowsEnabled: true,
         curvesEnabled: true,
+        flickToSelectEnabled: true,
         rssFeedsInput: '',
         keywordBlacklistInput: '',
         discoveryUrl: '',
@@ -200,6 +201,7 @@ export function rssApp(): AppState {
                 initItemButtonMode(this);
                 initShadowsToggle(this);
                 initCurvesToggle(this);
+                initFlickToSelectToggle(this);
                 initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
                 this.$nextTick(() => {
@@ -209,6 +211,7 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Setting up app watchers...';
                 this._setupWatchers();
                 this._setupEventListeners();
+                this._setupFlickToSelectListeners();
                 this._startPeriodicSync();
                 this._initScrollObserver();
                 this._initObservers();
@@ -1072,14 +1075,15 @@ export function rssApp(): AppState {
         // --- Private Helper Methods ---
                 _loadInitialState: async function(this: AppState): Promise<void> {
             try {
-                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState] = await Promise.all([
+                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState] = await Promise.all([
                     loadSimpleState('syncEnabled'),
                     loadSimpleState('imagesEnabled'),
                     loadSimpleState('itemButtonMode'),
                     loadSimpleState('openUrlsInNewTabEnabled'),
                     loadFilterMode(), // loadFilterMode directly returns string, not object with value
                     loadSimpleState('theme'),
-                    loadSimpleState('curvesEnabled')
+                    loadSimpleState('curvesEnabled'),
+                    loadSimpleState('flickToSelectEnabled')
                 ]);
 
                 this.syncEnabled = syncEnabled.value ?? true;
@@ -1087,6 +1091,7 @@ export function rssApp(): AppState {
                 this.itemButtonMode = itemButtonMode.value ?? 'play';
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.curvesEnabled = curvesState.value ?? true;
+                this.flickToSelectEnabled = flickState.value ?? true;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                 localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
@@ -1392,6 +1397,55 @@ export function rssApp(): AppState {
                     });
                 }
             });
+        },
+        _setupFlickToSelectListeners: function(this: AppState): void {
+            let lastWheelTime = 0;
+            const WHEEL_COOLDOWN = 500; // ms
+            const WHEEL_THRESHOLD = 50;
+
+            window.addEventListener('wheel', (e: WheelEvent) => {
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
+
+                const now = Date.now();
+                if (now - lastWheelTime < WHEEL_COOLDOWN) return;
+
+                if (Math.abs(e.deltaY) > WHEEL_THRESHOLD) {
+                    console.log(`[Flick] Fast wheel detected: deltaY=${e.deltaY}`);
+                    e.preventDefault();
+                    lastWheelTime = now;
+                    handleVerticalNavigation(this, e.deltaY > 0 ? 1 : -1);
+                }
+            }, { passive: false });
+
+            let touchStartY = 0;
+            let touchStartTime = 0;
+            const TOUCH_VELOCITY_THRESHOLD = 0.5; // pixels per ms
+            const TOUCH_DISTANCE_THRESHOLD = 50; // pixels
+
+            window.addEventListener('touchstart', (e: TouchEvent) => {
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
+                touchStartY = e.touches[0].clientY;
+                touchStartTime = Date.now();
+            }, { passive: true });
+
+            window.addEventListener('touchend', (e: TouchEvent) => {
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
+                
+                const touchEndY = e.changedTouches[0].clientY;
+                const touchEndTime = Date.now();
+                
+                const distanceY = touchEndY - touchStartY;
+                const duration = touchEndTime - touchStartTime;
+                
+                if (duration > 0) {
+                    const velocity = Math.abs(distanceY) / duration;
+                    if (velocity > TOUCH_VELOCITY_THRESHOLD && Math.abs(distanceY) > TOUCH_DISTANCE_THRESHOLD) {
+                        console.log(`[Flick] Touch flick detected: velocity=${velocity.toFixed(2)}, distanceY=${distanceY}`);
+                        // e.preventDefault(); // Prevents normal scroll - can be tricky on touchend
+                        handleVerticalNavigation(this, distanceY < 0 ? 1 : -1);
+                    }
+                }
+            }, { passive: true });
         },
         _startPeriodicSync: function(this: AppState): void {
             let lastActivityTimestamp = Date.now();

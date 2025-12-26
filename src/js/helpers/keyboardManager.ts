@@ -8,7 +8,7 @@ const SELECTION_FADE_DURATION = 10000; // 10 seconds
  * If the current item has been selected for more than 10 seconds,
  * the first press will reselect it instead of moving.
  */
-async function handleVerticalNavigation(app: AppState, direction: number): Promise<void> {
+export async function handleVerticalNavigation(app: AppState, direction: number): Promise<void> {
     const now = Date.now();
     const isSelectionOld = app.selectedGuid && app.selectedTimestamp && (now - app.selectedTimestamp > SELECTION_FADE_DURATION);
 
