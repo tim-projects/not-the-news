@@ -1,5 +1,6 @@
 logs/
 *.swp
+*.swo
 *.old
 *.bak
 data/config/config.php
