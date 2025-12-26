@@ -366,6 +366,8 @@ button.star.starred:active {
   padding: 0.5rem 1rem;
   border: none;
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .configure-button:hover {
@@ -392,6 +394,8 @@ button.star.starred:active {
   border: none;
   cursor: pointer;
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .settings-group button:hover {
@@ -465,6 +469,8 @@ html.dark .cog-wheel-button:hover {
 @media (max-width: 767px) {
   .modal-content button {
     font-size: 0.9rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
   
   #back-button,

@@ -121,6 +121,12 @@ USER_STATE_SERVER_DEFAULTS = {
 
             'shadowsEnabled': {'type': 'simple', 'default': True},
 
+            'itemButtonMode': {'type': 'simple', 'default': 'play'},
+
+            'showSearchBar': {'type': 'simple', 'default': False},
+
+            'searchQuery': {'type': 'simple', 'default': ''},
+
     }
 
     

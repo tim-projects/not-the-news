@@ -68,12 +68,6 @@ img.loaded,
   display: none !important;
 }
 
-.itemdescription {
-  font-family: auto;
-  padding: 0.25em 1.8em 2em;
-  width: auto;
-}
-
 table {
   min-width: -webkit-fill-available;
 }
@@ -156,7 +150,7 @@ p {
 }
 
 .itemdescription {
-  padding: 1em 1.8em 2em !important;
+  padding: 1em 1.8em 2em;
   overflow: hidden;
   max-height: 2000px; /* Large enough for content */
   transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.5s ease, margin 0.5s ease;
@@ -164,25 +158,13 @@ p {
 
 /* Close Animation Sequence */
 .item.entry.is-closing .itemdescription {
-    animation: fold-and-vanish 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
     pointer-events: none;
-}
-
-@keyframes fold-and-vanish {
-    0% {
-        max-height: 2000px;
-        opacity: 1;
-    }
-    99% {
-        max-height: 0;
-        opacity: 0;
-        display: block;
-    }
-    100% {
-        max-height: 0;
-        opacity: 0;
-        display: none;
-    }
 }
 
 .item.entry.is-closing .itemtitle {
