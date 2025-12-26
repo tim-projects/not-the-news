@@ -73,9 +73,10 @@
                                                                                                                      :class="{ 
                                                                                                                         'selected-item': entry.guid === selectedGuid,
                                                                                                                         'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'item',
-                                                                                                                        'read': entry.isRead
+                                                                                                                        'read': entry.isRead,
+                                                                                                                        'is-closing': entry.guid === closingGuid
                                                                                                                      }" 
-                                                                                                                     :data-guid="entry.guid" @click="selectItem(entry.guid)" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="transform scale-100 opacity-100" x-transition:leave-end="transform scale-95 opacity-0">
+                                                                                                                     :data-guid="entry.guid" @click="selectItem(entry.guid)">
                                                                                                                     
                                                                                                                     <button class="play-button" x-show="itemButtonMode === 'play'"
                                                                                                                             :class="{

@@ -125,6 +125,7 @@ export function rssApp(): AppState {
         starredGuid: null,
         readingGuid: null,
         speakingGuid: null,
+        closingGuid: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
         scrollObserver: null,
@@ -483,9 +484,18 @@ export function rssApp(): AppState {
             
             if (!isCurrentlyRead) {
                 this.readingGuid = guid;
-                // Short delay to allow animation to show
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Stage 1: fold animation (400ms) + Stage 2: swipe animation (400ms) = 800ms total
+                // If we are in unread mode, we trigger the closing animation
+                if (this.filterMode === 'unread') {
+                    this.closingGuid = guid;
+                    // Wait for both fold and swipe to complete
+                    await new Promise(resolve => setTimeout(resolve, 850));
+                } else {
+                    // Just the short delay for the button animation if not removing
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
                 this.readingGuid = null;
+                this.closingGuid = null;
             }
 
             let removedIndex: number | null = null;

@@ -105,6 +105,7 @@ export interface AppState {
     starredGuid: string | null;
     readingGuid: string | null;
     speakingGuid: string | null; // Track which item is being read out
+    closingGuid: string | null; // Track item animating out
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;
