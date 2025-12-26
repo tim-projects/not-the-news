@@ -47,7 +47,13 @@ registerRoute(
 
 // Explicitly bypass service worker for most API calls, EXCEPT search
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search'),
+  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search') && !url.pathname.includes('/discover-feed'),
+  new NetworkOnly()
+);
+
+// Discovery API - Always Network
+registerRoute(
+  ({ url }) => url.pathname.includes('/api/discover-feed'),
   new NetworkOnly()
 );
 

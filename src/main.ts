@@ -167,8 +167,13 @@ export function rssApp(): AppState {
                     if (isOnline()) await pullUserState(); // This fetches user preferences like rssFeeds from backend
                     
                     let syncSuccess = true;
-                    if (isOnline()) {
-                        syncSuccess = await performFeedSync(this);
+                    try {
+                        if (isOnline()) {
+                            syncSuccess = await performFeedSync(this);
+                        }
+                    } catch (syncError) {
+                        console.error("Priority sync failed:", syncError);
+                        syncSuccess = false;
                     }
                     
                     // Now that syncs are attempted (or skipped if offline), load data.
@@ -216,9 +221,14 @@ export function rssApp(): AppState {
                     // Keep loading screen visible for a moment longer if deck is empty
                     // This prevents a flash of blank screen before the message appears (if any)
                     await new Promise(resolve => setTimeout(resolve, 1000)); // Show message for 1 second
-                } else if (!this.selectedGuid) {
-                    // Auto-select first item on load if nothing is selected
-                    this.selectItem(this.deck[0].guid);
+                } else {
+                    // Stabilization delay to ensure data is propagated to Alpine components
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    if (!this.selectedGuid) {
+                        // Auto-select first item on load if nothing is selected
+                        this.selectItem(this.deck[0].guid);
+                    }
                 }
                 
                 // Kick off first background pre-generation

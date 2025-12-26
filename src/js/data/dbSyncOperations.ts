@@ -437,14 +437,21 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
 
             // Fetch priority items first
             const priorityItems = await _fetchItemsInBatches(priorityGuids, app, guidsToFetch.length, 0);
-            if (priorityItems === null) return false;
+            
+            if (priorityItems) {
+                // Save priority items immediately so the UI can refresh
+                await withDb(async (db: IDBPDatabase) => {
+                    const tx = db.transaction('feedItems', 'readwrite');
+                    for (const item of priorityItems) if (item.guid) await tx.store.put(item);
+                    await tx.done;
+                });
 
-            // Save priority items immediately so the UI can refresh
-            await withDb(async (db: IDBPDatabase) => {
-                const tx = db.transaction('feedItems', 'readwrite');
-                for (const item of priorityItems) if (item.guid) await tx.store.put(item);
-                await tx.done;
-            });
+                // Trigger immediate refresh of priority items in memory
+                if (app && app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
+                if (app && app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
+            } else {
+                console.warn('[DB] Priority sync failed or was aborted. Continuing with background sync and local data.');
+            }
 
             // --- Background Sync Stage ---
             if (remainingGuids.length > 0) {
@@ -459,8 +466,9 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
                             await tx.done;
                         });
                         console.log(`[DB] Background sync complete: ${backgroundItems.length} items saved.`);
-                        // Notify the app to update if needed (optional, might cause re-renders)
+                        // Notify the app to update
                         if (app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
+                        if (app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
                         if (app.updateCounts) app.updateCounts();
                     }
                 })();
