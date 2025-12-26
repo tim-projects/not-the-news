@@ -44,6 +44,7 @@ interface AppState { // Minimal AppState interface needed for performFeedSync
     loadAndDisplayDeck?: () => Promise<void>;
     updateCounts?: () => void;
     progressMessage?: string;
+    currentDeckGuids?: { guid: string }[];
 }
 
 
@@ -357,6 +358,41 @@ export async function getAllFeedItems(): Promise<FeedItem[]> {
 }
 
 /**
+ * Helper to fetch a list of GUIDs from the server in batches.
+ */
+async function _fetchItemsInBatches(guids: string[], app: AppState | null, totalOverall: number, currentOverallOffset: number): Promise<FeedItem[] | null> {
+    const BATCH_SIZE = 50;
+    const items: FeedItem[] = [];
+    
+    for (let i = 0; i < guids.length; i += BATCH_SIZE) {
+        if (!isOnline()) {
+            console.warn('[DB] Offline mid-sync. Aborting batch fetch.');
+            return null;
+        }
+        const batch = guids.slice(i, i + BATCH_SIZE);
+        const response = await fetch(`${API_BASE_URL}/api/feed-items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ guids: batch })
+        });
+
+        if (response.ok) {
+            const fetched: FeedItem[] = await response.json();
+            items.push(...fetched);
+            
+            if (app) {
+                const totalFetchedSoFar = currentOverallOffset + items.length;
+                app.progressMessage = `Fetching feed content... (${totalFetchedSoFar}/${totalOverall})`;
+            }
+        } else {
+            console.error(`[DB] Failed to fetch batch. Status: ${response.status}`);
+            return null;
+        }
+    }
+    return items;
+}
+
+/**
  * Performs a feed synchronization, fetching new or updated items.
  * @returns {Promise<boolean>} True if sync was successful, false otherwise.
  */
@@ -387,54 +423,52 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
         const localGuids = new Set(localItems.map(item => item.guid));
 
         const guidsToFetch = [...serverGuids].filter(guid => !localGuids.has(guid));
-        console.log(`[DB] GUIDs to fetch: ${guidsToFetch.length}`, guidsToFetch);
         const guidsToDelete = [...localGuids].filter(guid => !serverGuids.has(guid));
 
-        console.log(`[DB] New GUIDs: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
-
-        const totalToFetch = guidsToFetch.length;
-        let fetchedSoFar = 0;
+        console.log(`[DB] GUIDs to fetch: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
 
         if (guidsToFetch.length > 0) {
-            // ✅ STABILITY FIX: Re-introduce batching for fetching item bodies to avoid network errors on large updates.
-            const BATCH_SIZE: number = 50;
-            const newItems: FeedItem[] = [];
-            for (let i = 0; i < guidsToFetch.length; i += BATCH_SIZE) {
-                if (!isOnline()) {
-                    console.warn('[DB] Offline mid-sync. Aborting feed fetch.');
-                    return false;
-                }
-                const batch = guidsToFetch.slice(i, i + BATCH_SIZE);
-                const itemsResponse: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ guids: batch })
-                });
+            // --- Priority Sync Stage ---
+            const currentDeckGuids = new Set((app.currentDeckGuids || []).map(d => d.guid));
+            const priorityGuids = guidsToFetch.filter(guid => currentDeckGuids.has(guid));
+            const remainingGuids = guidsToFetch.filter(guid => !currentDeckGuids.has(guid));
 
-                if (itemsResponse.ok) {
-                    const fetchedItems: FeedItem[] = await itemsResponse.json();
-                    console.log(`[DB] Fetched batch of ${fetchedItems.length} items:`, fetchedItems);
-                    newItems.push(...fetchedItems);
-                    
-                    fetchedSoFar += fetchedItems.length;
-                    if (app) {
-                        app.progressMessage = `Fetching feed content... (${fetchedSoFar}/${totalToFetch})`;
-                    }
-                } else {
-                    console.error(`[DB] Failed to fetch a batch of feed items. Status: ${itemsResponse.status}`);
-                    return false;
-                }
-            }
-            
+            console.log(`[DB] Priority sync: ${priorityGuids.length} items from current deck.`);
+
+            // Fetch priority items first
+            const priorityItems = await _fetchItemsInBatches(priorityGuids, app, guidsToFetch.length, 0);
+            if (priorityItems === null) return false;
+
+            // Save priority items immediately so the UI can refresh
             await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
-                for (const item of newItems) if (item.guid) await tx.store.put(item);
+                for (const item of priorityItems) if (item.guid) await tx.store.put(item);
                 await tx.done;
             });
+
+            // --- Background Sync Stage ---
+            if (remainingGuids.length > 0) {
+                console.log(`[DB] Queuing background sync for ${remainingGuids.length} remaining items.`);
+                // We DON'T await this, letting it run in the background
+                (async () => {
+                    const backgroundItems = await _fetchItemsInBatches(remainingGuids, null, guidsToFetch.length, priorityItems.length);
+                    if (backgroundItems) {
+                        await withDb(async (db: IDBPDatabase) => {
+                            const tx = db.transaction('feedItems', 'readwrite');
+                            for (const item of backgroundItems) if (item.guid) await tx.store.put(item);
+                            await tx.done;
+                        });
+                        console.log(`[DB] Background sync complete: ${backgroundItems.length} items saved.`);
+                        // Notify the app to update if needed (optional, might cause re-renders)
+                        if (app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
+                        if (app.updateCounts) app.updateCounts();
+                    }
+                })();
+            }
         }
         
         if (guidsToDelete.length > 0) {
-            const guidToIdMap = new Map<string, number>(localItems.map(item => [item.guid, (item as any).id])); // Assuming item.id exists and is number
+            const guidToIdMap = new Map<string, number>(localItems.map(item => [item.guid, (item as any).id])); 
             await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
                 for (const guid of guidsToDelete) {
