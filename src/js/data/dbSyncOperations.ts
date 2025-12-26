@@ -453,12 +453,14 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
                 console.warn('[DB] Priority sync failed or was aborted. Continuing with background sync and local data.');
             }
 
+            const priorityCount = priorityItems ? priorityItems.length : 0;
+
             // --- Background Sync Stage ---
             if (remainingGuids.length > 0) {
                 console.log(`[DB] Queuing background sync for ${remainingGuids.length} remaining items.`);
                 // We DON'T await this, letting it run in the background
                 (async () => {
-                    const backgroundItems = await _fetchItemsInBatches(remainingGuids, null, guidsToFetch.length, priorityItems.length);
+                    const backgroundItems = await _fetchItemsInBatches(remainingGuids, null, guidsToFetch.length, priorityCount);
                     if (backgroundItems) {
                         await withDb(async (db: IDBPDatabase) => {
                             const tx = db.transaction('feedItems', 'readwrite');

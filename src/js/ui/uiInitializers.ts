@@ -122,6 +122,8 @@ export async function initScrollPosition(app: AppState): Promise<void> {
         if (itemIsInDeck) {
             const targetEl = document.querySelector(`.entry[data-guid="${lastViewedItemId}"]`);
             if (targetEl) {
+                // Restore selection
+                app.selectedGuid = lastViewedItemId;
                 // Use 'auto' for instant scroll on load.
                 targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
                 // Restore the fine-tuned vertical offset if it exists.

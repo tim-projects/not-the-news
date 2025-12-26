@@ -226,8 +226,13 @@ export function rssApp(): AppState {
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
                     if (!this.selectedGuid) {
-                        // Auto-select first item on load if nothing is selected
-                        this.selectItem(this.deck[0].guid);
+                        const { value: lastId } = await loadSimpleState('lastViewedItemId');
+                        const isRestoring = lastId && this.deck.some(item => item.guid === lastId);
+                        
+                        if (!isRestoring && this.deck.length > 0) {
+                            // Auto-select first item only if we aren't restoring a previous position
+                            this.selectItem(this.deck[0].guid);
+                        }
                     }
                 }
                 
