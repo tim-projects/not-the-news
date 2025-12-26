@@ -1,4 +1,5 @@
 import { AppState } from '@/types/app.ts';
+import { createStatusBarMessage } from '../ui/uiUpdaters.ts';
 
 /**
  * Attempts to discover RSS/Atom feeds from a website URL via the backend API.
@@ -33,6 +34,7 @@ export async function discoverFeed(app: AppState): Promise<void> {
         app.discoveryResults = result.feeds;
         if (result.feeds.length === 0) {
             app.discoveryError = 'No feeds found on this website.';
+            createStatusBarMessage(app, 'No RSS feeds found at this URL.');
         }
     } catch (error: any) {
         console.error('[Discovery] Error:', error);
