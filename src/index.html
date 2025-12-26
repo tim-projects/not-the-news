@@ -212,6 +212,50 @@
                     
                     <h2>SETTINGS</h2>
                     <hr>
+                    <div class="settings-option">
+                        <div class="setting-label-group">
+                            <span>Appearance</span>
+                            <p class="setting-description">Customize themes, fonts, and layout.</p>
+                        </div>
+                        <button id="configure-appearance-btn" class="configure-button" @click="modalView = 'appearance'">Configure</button>
+                    </div>
+                    
+                    <h2>RSS FEEDS</h2>
+                    <hr>
+                    <div class="settings-option">
+                        <div class="setting-label-group">
+                            <span>RSS Feeds</span>
+                            <p class="setting-description">Manage your news sources.</p>
+                        </div>
+                        <button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button>
+                    </div>
+                    <div class="settings-option">
+                        <div class="setting-label-group">
+                            <span>Keyword Blacklist</span>
+                            <p class="setting-description">Filter out items containing specific words.</p>
+                        </div>
+                        <button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button>
+                    </div>
+                    <hr>
+                    <div class="settings-option">
+                        <div class="setting-label-group">
+                            <label for="install-button">Install as App</label>
+                            <p class="setting-description">Add Not The News to your home screen.</p>
+                        </div>
+                        <button id="install-button" class="configure-button">Install</button>
+                    </div>
+                    <div class="settings-option">
+                        <div class="setting-label-group">
+                            <span>Advanced Settings</span>
+                            <p class="setting-description">Reset data or backup your configuration.</p>
+                        </div>
+                        <button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button>
+                    </div>
+                </div>
+
+                <div id="appearance-settings-block" x-show="modalView === 'appearance'">
+                    <h2>APPEARANCE</h2>
+                    <hr>
                     <div class="settings-group">
                         <div class="setting-label-group">
                             <label for="theme-style-selector">Theme:</label>
@@ -305,38 +349,6 @@
                             <p class="setting-description">Add a subtle shadow effect to each news item.</p>
                         </div>
                         <div class="d-flex align-items-center"><span id="shadows-text" x-text="shadowsEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="shadows-toggle" x-model="shadowsEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    
-                    <h2>RSS FEEDS</h2>
-                    <hr>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>RSS Feeds</span>
-                            <p class="setting-description">Manage your news sources.</p>
-                        </div>
-                        <button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button>
-                    </div>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>Keyword Blacklist</span>
-                            <p class="setting-description">Filter out items containing specific words.</p>
-                        </div>
-                        <button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button>
-                    </div>
-                    <hr>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <label for="install-button">Install as App</label>
-                            <p class="setting-description">Add Not The News to your home screen.</p>
-                        </div>
-                        <button id="install-button" class="configure-button">Install</button>
-                    </div>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>Advanced Settings</span>
-                            <p class="setting-description">Reset data or backup your configuration.</p>
-                        </div>
-                        <button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button>
                     </div>
                 </div>
 

@@ -1259,7 +1259,15 @@ export function rssApp(): AppState {
             this.$watch('openUrlsInNewTabEnabled', () => {
                 document.querySelectorAll('.itemdescription').forEach((el: Element) => this.handleEntryLinks(el));
             });
-            this.$watch("modalView", async () => manageSettingsPanelVisibility(this));
+            this.$watch("modalView", async () => {
+                await manageSettingsPanelVisibility(this);
+                this.$nextTick(() => {
+                    const modal = document.querySelector('.modal-content');
+                    // Find the first visible focusable element in the current view
+                    const firstFocusable = modal?.querySelector('div[style*="display: block"] button, div[style*="display: block"] select, div[style*="display: block"] input, div[style*="display: block"] textarea') as HTMLElement;
+                    firstFocusable?.focus();
+                });
+            });
             this.$watch('filterMode', async (newMode: string) => {
                 await setFilterMode(this, newMode);
                 if (newMode === 'unread') {

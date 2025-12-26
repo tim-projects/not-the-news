@@ -157,18 +157,20 @@ export function showUndoNotification(app: AppState, guid: string, index: number 
  */
 export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     const mainSettings = document.getElementById('main-settings');
+    const appearanceSettings = document.getElementById('appearance-settings-block');
     const rssSettings = document.getElementById('rss-settings-block');
     const keywordsSettings = document.getElementById('keywords-settings-block');
     const cssSettings = document.getElementById('css-settings-block');
     const advancedSettings = document.getElementById('advanced-settings-block');
 
-    if (!mainSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings) {
+    if (!mainSettings || !appearanceSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings) {
         console.warn('One or more settings panels not found.');
         return Promise.resolve();
     }
 
     // Hide all panels initially
     mainSettings.style.display = 'none';
+    appearanceSettings.style.display = 'none';
     rssSettings.style.display = 'none';
     keywordsSettings.style.display = 'none';
     cssSettings.style.display = 'none';
@@ -178,6 +180,9 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     switch (app.modalView) {
         case 'main':
             mainSettings.style.display = 'block';
+            break;
+        case 'appearance':
+            appearanceSettings.style.display = 'block';
             break;
         case 'rss':
             rssSettings.style.display = 'block';
