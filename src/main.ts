@@ -73,6 +73,7 @@ import {
 } from './js/ui/uiInitializers.ts';
 import { manageDailyDeck, processShuffle } from './js/helpers/deckManager.ts';
 import { handleKeyboardShortcuts } from './js/helpers/keyboardManager.ts';
+import { speakItem, stopSpeech } from './js/helpers/ttsManager.ts';
 import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from './types/app.ts';
 import { filterEntriesByQuery, toggleSearch } from './js/helpers/searchManager.ts';
@@ -129,6 +130,7 @@ export function rssApp(): AppState {
         undoTimerActive: false,
         undoItemGuid: null,
         undoItemIndex: null,
+        undoStack: [],
         undoBtnRadius: 20,
         selectedGuid: null,
         selectedSubElement: 'item',
@@ -159,6 +161,15 @@ export function rssApp(): AppState {
                 await this._loadInitialState();
                 
                 this._initImageObserver();
+
+                // Warm up TTS voices
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.getVoices();
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        const voices = window.speechSynthesis.getVoices();
+                        console.log(`[TTS] Voices loaded: ${voices.length} available.`);
+                    };
+                }
 
                 // Refresh online status immediately before potentially starting sync
                 this.isOnline = isOnline();
@@ -214,6 +225,7 @@ export function rssApp(): AppState {
                 this._setupEventListeners();
                 this._setupFlickToSelectListeners();
                 this._startPeriodicSync();
+                this._startWorkerFeedSync();
                 this._initScrollObserver();
                 this._initObservers();
 
@@ -448,7 +460,8 @@ export function rssApp(): AppState {
             return this.starred.some(e => e.guid === guid);
         },        isRead: function(this: AppState, guid: string): boolean {
             return this.read.some(e => e.guid === guid);
-        },        toggleStar: async function(this: AppState, guid: string): Promise<void> {
+        },
+        toggleStar: async function(this: AppState, guid: string): Promise<void> {
             const isStarring = !this.starred.some(item => item.guid === guid);
             if (isStarring) {
                 this.starredGuid = guid;
@@ -456,48 +469,26 @@ export function rssApp(): AppState {
                     if (this.starredGuid === guid) this.starredGuid = null;
                 }, 1000); // 0.5s for title + 0.5s for button
             }
+
+            // --- IMMEDIATE STATE UPDATE ---
+            this.deck = this.deck.map(item =>
+                item.guid === guid ? { ...item, isStarred: isStarring } : item
+            );
+            this.entries = this.entries.map(item =>
+                item.guid === guid ? { ...item, isStarred: isStarring } : item
+            );
+
             await toggleItemStateAndSync(this, guid, 'starred');
         },
 
         speakItem: function(this: AppState, guid: string): void {
-            if (this.speakingGuid === guid) {
-                // Toggle off
-                window.speechSynthesis.cancel();
-                this.speakingGuid = null;
-                return;
-            }
-
-            const entry = this.entries.find(e => e.guid === guid);
-            if (!entry) return;
-
-            // Stop any current speech
-            window.speechSynthesis.cancel();
-            
-            this.speakingGuid = guid;
-
-            // Simple HTML tag removal for description
-            const cleanDescription = entry.description.replace(/<[^>]*>?/gm, ' ');
-            const textToSpeak = `${entry.title}. ${cleanDescription}`;
-            
-            const utterance = new SpeechSynthesisUtterance(textToSpeak);
-            
-            utterance.onend = () => {
-                if (this.speakingGuid === guid) {
-                    this.speakingGuid = null;
-                }
-            };
-
-            utterance.onerror = () => {
-                this.speakingGuid = null;
-            };
-
-            window.speechSynthesis.speak(utterance);
+            speakItem(this, guid);
         },
+
         toggleRead: async function(this: AppState, guid: string): Promise<void> {
             // Stop TTS if it's playing for the item being marked read (UX improvement)
             if (this.speakingGuid === guid) {
-                window.speechSynthesis.cancel();
-                this.speakingGuid = null;
+                stopSpeech(this);
             }
 
             const isCurrentlyRead = this.isRead(guid);
@@ -540,8 +531,8 @@ export function rssApp(): AppState {
             }
 
             let removedIndex: number | null = null;
-            await toggleItemStateAndSync(this, guid, 'read');
             
+            // --- IMMEDIATE STATE UPDATE ---
             // Directly update the item's read status in the current deck and entries
             this.deck = this.deck.map(item =>
                 item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
@@ -549,6 +540,9 @@ export function rssApp(): AppState {
             this.entries = this.entries.map(item =>
                 item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
             );
+
+            // Trigger the sync and array updates (now backgrounded in the helper)
+            await toggleItemStateAndSync(this, guid, 'read');
 
             if (this.filterMode === 'unread' && !isCurrentlyRead) {
                 // If it was unread and now read, remove it from the deck in unread mode
@@ -603,6 +597,10 @@ export function rssApp(): AppState {
                 while (this.showUndo) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
+                
+                // If the user didn't undo, we clear the stack permanently before refresh
+                this.undoStack = [];
+                
                 // Re-calculate after potential undo
                 remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
                 if (remainingUnreadInDeck > 0) {
@@ -636,10 +634,27 @@ export function rssApp(): AppState {
                 }
             }
         },        undoMarkRead: async function(this: AppState): Promise<void> {
-            if (!this.undoItemGuid) return;
-            const guid = this.undoItemGuid;
-            this.showUndo = false;
+            if (this.undoStack.length === 0) {
+                this.showUndo = false;
+                return;
+            }
+            
+            const lastAction = this.undoStack.pop();
+            if (!lastAction) return;
+
+            const guid = lastAction.guid;
+            // Temporarily set these for any logic that depends on single-item undo state
+            this.undoItemGuid = guid;
+            this.undoItemIndex = lastAction.index;
+
+            // If we've popped the last item, hide the notification
+            if (this.undoStack.length === 0) {
+                this.showUndo = false;
+            }
+
             await this.toggleRead(guid);
+            
+            // Clear temp state
             this.undoItemGuid = null;
             this.undoItemIndex = null;
         },        selectItem: function(this: AppState, guid: string): void {
@@ -1169,7 +1184,7 @@ export function rssApp(): AppState {
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
 
-            this.progressMessage = "Pruning read items...";
+            this.progressMessage = "Optimizing local storage...";
             // Prune old read items before we use them
             this.read = await loadAndPruneReadItems(Object.values(this.feedItems));
             console.log(`_loadAndManageAllData: After loadAndPruneReadItems. Read count: ${this.read.length}`);
@@ -1438,13 +1453,6 @@ export function rssApp(): AppState {
                 return entries[nextIndex].guid;
             };
 
-            const isCurrentItemLong = () => {
-                if (!this.selectedGuid) return false;
-                const el = document.querySelector(`.entry[data-guid="${this.selectedGuid}"]`) as HTMLElement;
-                if (!el) return false;
-                return el.offsetHeight > window.innerHeight * 0.8;
-            };
-
             const triggerFlickSelection = (direction: number) => {
                 const now = Date.now();
                 if (now - lastFlickTime < FLICK_COOLDOWN) return;
@@ -1464,7 +1472,7 @@ export function rssApp(): AppState {
 
             // --- Mouse Wheel Flick ---
             window.addEventListener('wheel', (e: WheelEvent) => {
-                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar || !isCurrentItemLong()) return;
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
 
                 if (Math.abs(e.deltaY) > WHEEL_DELTA_THRESHOLD) {
                     // We don't preventDefault, but we do intercept and override if it's a "flick"
@@ -1477,13 +1485,13 @@ export function rssApp(): AppState {
             let touchStartTime = 0;
 
             window.addEventListener('touchstart', (e: TouchEvent) => {
-                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar || !isCurrentItemLong()) return;
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
                 touchStartY = e.touches[0].clientY;
                 touchStartTime = Date.now();
             }, { passive: true });
 
             window.addEventListener('touchend', (e: TouchEvent) => {
-                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar || !isCurrentItemLong()) return;
+                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
                 
                 const touchEndY = e.changedTouches[0].clientY;
                 const touchEndTime = Date.now();
@@ -1531,6 +1539,25 @@ export function rssApp(): AppState {
                     console.error('Periodic sync failed:', error);
                 }
             }, SYNC_INTERVAL_MS);
+        },
+        _startWorkerFeedSync: function(this: AppState): void {
+            // Trigger an initial sync shortly after startup
+            setTimeout(() => {
+                fetch(`${window.location.origin}/api/feed-sync`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => console.log('[Worker Sync] Startup sync triggered:', d))
+                    .catch(e => console.error('[Worker Sync] Startup sync failed:', e));
+            }, 5000);
+
+            // Periodically trigger worker to fetch and process RSS feeds (every 10 minutes)
+            setInterval(() => {
+                if (!this.isOnline || !this.syncEnabled) return;
+                console.log('[Worker Sync] Triggering background feed processing...');
+                fetch(`${window.location.origin}/api/feed-sync`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => console.log('[Worker Sync] Background sync complete:', d))
+                    .catch(e => console.error('[Worker Sync] Background sync failed:', e));
+            }, 10 * 60 * 1000);
         },
         _initScrollObserver: function(this: AppState): void {
             const observer = new IntersectionObserver(async () => {

@@ -421,109 +421,44 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
     const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) {
         if (syncEnabled) console.log('[DB] Offline. Skipping feed sync.');
-        return true; // Not an error
+        return true;
     }
     
-    console.log('[DB] Fetching feed items from server.');
+    console.log('[DB] Fetching feed items from worker.');
 
     try {
-        const { value: lastFeedSyncTime } = await loadSimpleState('lastFeedSync') as SimpleStateValue;
-        const response: Response = await fetch(`${API_BASE_URL}/api/feed-guids?since=${lastFeedSyncTime || ''}`);
+        // 1. Fetch current feed from worker (which handles the RSS parsing/cleaning)
+        const response: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
 
-        if (response.status === 304) {
-            console.log('[DB] Feed not modified.');
-            return true;
-        }
-        if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-guids`);
+        if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-items`);
 
-        const responseData: { guids: string[], serverTime: string } = await response.json();
-        console.log('[DB] /api/feed-guids response:', responseData);
-        const { guids: serverGuidsList, serverTime } = responseData;
-        const serverGuids = new Set(serverGuidsList);
-        const localItems: FeedItem[] = await getAllFeedItems();
-        const localGuids = new Set(localItems.map(item => item.guid));
+        const items: FeedItem[] = await response.json();
+        console.log(`[DB] Received ${items.length} items from worker.`);
 
-        const guidsToFetch = [...serverGuids].filter(guid => !localGuids.has(guid));
-        const guidsToDelete = [...localGuids].filter(guid => !serverGuids.has(guid));
-
-        console.log(`[DB] GUIDs to fetch: ${guidsToFetch.length}, Deleting: ${guidsToDelete.length}`);
-
-        if (guidsToFetch.length > 0) {
-            // --- Priority Sync Stage ---
-            let currentDeckGuids = new Set((app.currentDeckGuids || []).map(d => d.guid));
-            
-            // If this is a fresh load (no current deck), pick the first 10 new items as priority
-            if (currentDeckGuids.size === 0) {
-                console.log('[DB] No current deck found. Prioritizing first 10 items for initial load.');
-                const firstTen = guidsToFetch.slice(0, 10);
-                firstTen.forEach(g => currentDeckGuids.add(g));
-            }
-
-            const priorityGuids = guidsToFetch.filter(guid => currentDeckGuids.has(guid));
-            const remainingGuids = guidsToFetch.filter(guid => !currentDeckGuids.has(guid));
-
-            console.log(`[DB] Priority sync: ${priorityGuids.length} items from current deck.`);
-
-            // Fetch priority items first
-            const priorityItems = await _fetchItemsInBatches(priorityGuids, app, guidsToFetch.length, 0);
-            
-            if (priorityItems) {
-                // Save priority items immediately so the UI can refresh
-                await withDb(async (db: IDBPDatabase) => {
-                    const tx = db.transaction('feedItems', 'readwrite');
-                    for (const item of priorityItems) if (item.guid) await tx.store.put(item);
-                    await tx.done;
-                });
-
-                // Trigger immediate refresh of priority items in memory
-                if (app && app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
-                if (app && app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
-            } else {
-                console.warn('[DB] Priority sync failed or was aborted. Continuing with background sync and local data.');
-            }
-
-            const priorityCount = priorityItems ? priorityItems.length : 0;
-
-            // --- Background Sync Stage ---
-            if (remainingGuids.length > 0) {
-                console.log(`[DB] Queuing background sync for ${remainingGuids.length} remaining items.`);
-                // We DON'T await this, letting it run in the background
-                (async () => {
-                    const backgroundItems = await _fetchItemsInBatches(remainingGuids, null, guidsToFetch.length, priorityCount);
-                    if (backgroundItems) {
-                        await withDb(async (db: IDBPDatabase) => {
-                            const tx = db.transaction('feedItems', 'readwrite');
-                            for (const item of backgroundItems) if (item.guid) await tx.store.put(item);
-                            await tx.done;
-                        });
-                        console.log(`[DB] Background sync complete: ${backgroundItems.length} items saved.`);
-                        // Notify the app to update
-                        if (app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
-                        if (app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
-                        if (app.updateCounts) app.updateCounts();
-                    }
-                })();
-            }
-        }
-        
-        if (guidsToDelete.length > 0) {
-            const guidToIdMap = new Map<string, number>(localItems.map(item => [item.guid, (item as any).id])); 
+        if (items.length > 0) {
             await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
-                for (const guid of guidsToDelete) {
-                    const id = guidToIdMap.get(guid);
-                    if (id !== undefined) await tx.store.delete(id);
+                // Clear old items and replace with fresh ones from worker
+                await tx.store.clear();
+                for (const item of items) {
+                    if (item.guid) await tx.store.put(item);
                 }
                 await tx.done;
             });
-        }
 
-        if (serverTime) await _saveSyncMetaState('lastFeedSync', serverTime);
+            // Trigger immediate refresh in UI
+            if (app && app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
+            if (app && app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
+            if (app && app.updateCounts) app.updateCounts();
+        }
         
         return true;
 
     } catch (error: any) {
-        console.error('[DB] Failed to synchronize feed:', error);
+        console.error('[DB] Failed to synchronize feed from worker:', error);
         return false;
     }
 }

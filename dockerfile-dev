@@ -81,15 +81,17 @@ WORKDIR /app
 RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
 
 # NEW: Copy Python backend files and entrypoint into the image
+COPY package.json package-lock.json /app/
 COPY src/api.py /app/src/api.py
 COPY rss/ /app/rss/
+COPY worker/ /app/worker/
 COPY build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh # Make the entrypoint executable
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
-# Ensure appuser has read/write access to the frontend assets
-RUN chown -R appuser:appgroup /app/www
+# Ensure appuser has read/write access to the frontend assets and worker folder
+RUN chown -R appuser:appgroup /app/www /app/worker
 
 # These files/folders will be mounted as volumes during development
 # COPY rss/ /rss/

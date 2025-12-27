@@ -53,18 +53,12 @@ function sanitizeForIndexedDB(obj: any): any {
 export async function toggleItemStateAndSync(app: AppState, guid: string, stateKey: 'read' | 'starred'): Promise<void> {
     const isCurrentlyActive = (app[stateKey] as Array<ReadItem | StarredItem>).some(item => item.guid === guid);
     const action = isCurrentlyActive ? 'remove' : 'add';
-        const timestamp = new Date().toISOString();
-        const itemObject: ReadItem | StarredItem = stateKey === 'read'
-            ? { guid, readAt: timestamp }
-            : { guid, starredAt: timestamp };
+    const timestamp = new Date().toISOString();
+    const itemObject: ReadItem | StarredItem = stateKey === 'read'
+        ? { guid, readAt: timestamp }
+        : { guid, starredAt: timestamp };
 
-    // Correctly call updateArrayState with the required arguments:
-    // 1. storeName (string)
-    // 2. item (object with .guid)
-    // 3. add (boolean)
-    await updateArrayState(stateKey, itemObject, action === 'add');
-
-    // Update the local application state to match the database operation
+    // --- IMMEDIATE UI UPDATE ---
     if (action === 'add') {
         if (stateKey === 'read') {
             app.read = [...app.read, itemObject as ReadItem];
@@ -79,18 +73,28 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
         }
     }
     
-    // Update UI counts
     if (typeof app.updateCounts === 'function') app.updateCounts();
 
-    // Queue the change for server-side synchronization
-    const opType = `${stateKey}Delta`;
-    const pendingOp: PendingOperation = {
-        type: opType,
-        guid: guid,
-        action: action,
-        timestamp: timestamp
-    };
-    await queueAndAttemptSyncOperation(pendingOp);
+    // --- BACKGROUND DB & SYNC OPERATIONS ---
+    // We do NOT await these, allowing the function to return immediately.
+    (async () => {
+        try {
+            // 1. Local DB write
+            await updateArrayState(stateKey, itemObject, action === 'add');
+
+            // 2. Queue for server sync
+            const opType = `${stateKey}Delta`;
+            const pendingOp: PendingOperation = {
+                type: opType,
+                guid: guid,
+                action: action,
+                timestamp: timestamp
+            };
+            await queueAndAttemptSyncOperation(pendingOp);
+        } catch (error) {
+            console.error(`[Background State Update] Failed for ${stateKey} on ${guid}:`, error);
+        }
+    })();
 }
 
 export async function pruneStaleRead(feedItems: any[], readItems: ReadItem[], currentTS: number): Promise<ReadItem[]> {
@@ -101,18 +105,28 @@ export async function pruneStaleRead(feedItems: any[], readItems: ReadItem[], cu
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
     return readItems.filter(item => {
-        if (!item || !item.guid) return false;
+        if (!item || !item.guid) {
+            console.log("[Pruning] Removing invalid/empty read item.");
+            return false;
+        }
 
         const normalizedGuid = String(item.guid).trim().toLowerCase();
-        if (validFeedGuids.has(normalizedGuid)) return true;
+        const isInFeed = validFeedGuids.has(normalizedGuid);
+        if (isInFeed) return true;
 
         // Use the timestamp on the object for pruning logic
         if (item.readAt) {
             const readAtTS = new Date(item.readAt).getTime();
             if (!isNaN(readAtTS)) {
-                return (currentTS - readAtTS) < THIRTY_DAYS_MS;
+                const ageDays = (currentTS - readAtTS) / (24 * 60 * 60 * 1000);
+                const isFresh = ageDays < 30;
+                if (!isFresh) {
+                    console.log(`[Pruning] Removing stale read item ${normalizedGuid} (age: ${ageDays.toFixed(1)} days)`);
+                }
+                return isFresh;
             }
         }
+        
         // If an item somehow has no timestamp, don't prune it.
         return true; 
     });
@@ -142,10 +156,14 @@ export async function loadAndPruneReadItems(feedItems: any[]): Promise<ReadItem[
         }
     }
 
+    console.log(`[Pruning] Checking ${normalizedItems.length} read items against ${feedItems.length} feed items.`);
     const prunedItems = await pruneStaleRead(feedItems, normalizedItems, Date.now());
 
     if (prunedItems.length !== normalizedItems.length) {
+        console.log(`[Pruning] ${normalizedItems.length - prunedItems.length} items pruned.`);
         needsResave = true;
+    } else {
+        console.log("[Pruning] No items were pruned.");
     }
 
     if (needsResave) {

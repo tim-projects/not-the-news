@@ -101,56 +101,50 @@ export function createStatusBarMessage(app: AppState, message: string): void {
     }
 }
 
-/**
- * Shows an undo notification with a countdown.
- * @param {AppState} app The Alpine.js app state.
- * @param {string} guid The GUID of the item to potentially undo.
- */
-let undoTimeoutId: any;
+let At: any;
 export function showUndoNotification(app: AppState, guid: string, index: number | null = null): void {
-    if (undoTimeoutId) {
-        clearTimeout(undoTimeoutId);
-    }
-
+    if (At) clearTimeout(At);
+    
+    // Add to stack
+    app.undoStack.push({ guid, index });
+    
+    // Keep these for backward compatibility/current UI logic if needed
     app.undoItemGuid = guid;
     app.undoItemIndex = index;
+    
     app.showUndo = true;
     app.undoTimerActive = false;
 
-    const startTimer = () => {
-        // Calculate correct radius for the timer outline
-        if ((app as any).$nextTick) {
-            (app as any).$nextTick(() => {
-                requestAnimationFrame(() => {
-                    const btn = document.querySelector('#undo-notification .undo-button');
-                    if (btn && app.curvesEnabled) {
-                        const height = btn.getBoundingClientRect().height;
-                        console.log(`[Undo] Measured button height: ${height}`);
-                        if (height > 10) {
-                            app.undoBtnRadius = (height / 2) - 2;
-                        }
-                    } else if (btn && !app.curvesEnabled) {
-                        app.undoBtnRadius = 0;
-                    }
-                });
-            });
-        }
+    // Use nextTick or a short delay to ensure DOM element exists before measuring
+    (app as any).$nextTick(() => {
+        requestAnimationFrame(() => {
+            const btn = document.querySelector('#undo-notification .undo-button');
+            if (btn && app.curvesEnabled) {
+                const height = btn.getBoundingClientRect().height;
+                console.log(`[Undo] Measured button height: ${height}`);
+                if (height > 10) {
+                    app.undoBtnRadius = (height / 2) - 2;
+                }
+            } else if (btn && !app.curvesEnabled) {
+                app.undoBtnRadius = 0;
+            }
+            
+            // Re-activate timer in next frame to trigger CSS animation restart
+            app.undoTimerActive = true;
+        });
+    });
 
-        app.undoTimerActive = true;
-        undoTimeoutId = setTimeout(() => {
-            app.showUndo = false;
-            app.undoTimerActive = false;
-            setTimeout(() => {
-                if (!app.showUndo) app.undoItemGuid = null;
-            }, 500); // Wait for fade out animation
-        }, 5000);
-    };
-
-    if ((app as any).$nextTick) {
-        (app as any).$nextTick(startTimer);
-    } else {
-        setTimeout(startTimer, 10);
-    }
+    At = setTimeout(() => {
+        app.showUndo = false;
+        app.undoTimerActive = false;
+        // Keep GUID for a moment longer to prevent flicker if user tries to click just as it fades
+        setTimeout(() => {
+            if (!app.showUndo) {
+                app.undoItemGuid = null;
+                app.undoStack = []; // Clear stack when notification expires
+            }
+        }, 500);
+    }, 5000);
 }
 
 /**

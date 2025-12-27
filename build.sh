@@ -75,7 +75,7 @@ echo "Starting build process..."
     podman rm -f ntn && \
     podman container prune -f && \
     podman build "${BUILD_ARGS[@]}" -t not-the-news . && \
-    podman run -d -p 8080:80 -p 8443:443 -v not-the-news_volume:/data --name ntn not-the-news
+    podman run -d -p 80:80 -p 443:443 -v not-the-news_volume:/data --name ntn not-the-news
 ) || {
     echo "Build failed!" >&2
     exit 1

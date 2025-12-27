@@ -105,6 +105,7 @@ export interface AppState {
     undoTimerActive: boolean;
     undoItemGuid: string | null;
     undoItemIndex: number | null;
+    undoStack: { guid: string, index: number | null }[];
     undoBtnRadius: number;
     selectedGuid: string | null;
     selectedSubElement: 'item' | 'read' | 'star' | 'play';
@@ -177,6 +178,7 @@ export interface AppState {
     _setupEventListeners(): void;
     _setupFlickToSelectListeners(): void;
     _startPeriodicSync(): void;
+    _startWorkerFeedSync(): void;
     _initScrollObserver(): void;
     handleEntryLinks(element: Element): void;
     pregenerateDecks(): Promise<void>;

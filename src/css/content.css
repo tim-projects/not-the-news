@@ -353,6 +353,14 @@ body.no-curves .read-button-outline {
     animation: draw-outline 0.5s ease-in-out forwards;
 }
 
+.tts-highlight {
+    background-color: var(--primary);
+    color: white;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: bold;
+}
+
 @keyframes draw-outline {
     from {
         stroke-dashoffset: 1;

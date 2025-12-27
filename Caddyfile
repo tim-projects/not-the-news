@@ -31,7 +31,7 @@
 
    # API endpoints with authentication
    handle /api/login* {
-     reverse_proxy 127.0.0.1:4575
+     reverse_proxy 127.0.0.1:8787
    }
 
    @protected_api {
@@ -41,15 +41,17 @@
      path /api/time*
      path /api/feed-guids*
      path /api/feed-items*
+     path /api/feed-sync*
      path /api/admin/*
    }
    handle @protected_api {
      @unauth {
        not header Cookie auth*
+       not header Authorization *
      }
      respond @unauth "Unauthorized" 401
      
-     reverse_proxy 127.0.0.1:4575
+     reverse_proxy 127.0.0.1:8787
    }
 
    # Handle feed.xml (accessible without auth)
@@ -69,6 +71,7 @@
    handle {
      @unauth {
        not header Cookie auth*
+       not header Authorization *
        not path /sw.js
        not path /login.html
        not path /manifest.json
@@ -140,7 +143,7 @@ http://localhost {
 
    # API endpoints with authentication
    handle /api/login* {
-     reverse_proxy 127.0.0.1:4575
+     reverse_proxy 127.0.0.1:8787
    }
 
    @protected_api {
@@ -150,15 +153,17 @@ http://localhost {
      path /api/time*
      path /api/feed-guids*
      path /api/feed-items*
+     path /api/feed-sync*
      path /api/admin/*
    }
    handle @protected_api {
      @unauth {
        not header Cookie auth*
+       not header Authorization *
      }
      respond @unauth "Unauthorized" 401
      
-     reverse_proxy 127.0.0.1:4575
+     reverse_proxy 127.0.0.1:8787
    }
 
    # Handle feed.xml (accessible without auth)
@@ -178,6 +183,7 @@ http://localhost {
    handle {
      @unauth {
        not header Cookie auth*
+       not header Authorization *
        not path /sw.js
        not path /login.html
        not path /manifest.json

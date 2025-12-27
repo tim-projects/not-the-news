@@ -19,6 +19,10 @@ gosu appuser /venv/bin/python3 /tmp/reconstruct_api.py
 gosu appuser /venv/bin/gunicorn --chdir /app --bind 0.0.0.0:4575 --workers 1 \
 --threads 3 --access-logfile - --error-logfile - src.api:app --log-level info &
 
+# Start the Cloudflare Worker locally using Wrangler
+cd /app/worker && gosu appuser npm install && gosu appuser env HOME=/tmp npx wrangler dev --port 8787 --ip 0.0.0.0 --var APP_PASSWORD:$APP_PASSWORD &
+cd /app
+
 gosu appuser /venv/bin/python3 /rss/run.py --daemon > /tmp/rss_run.log 2>&1 &
 caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
 wait

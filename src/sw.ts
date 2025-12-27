@@ -48,13 +48,32 @@ registerRoute(
 // Explicitly bypass service worker for most API calls, EXCEPT search
 registerRoute(
   ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search') && !url.pathname.includes('/discover-feed'),
-  new NetworkOnly()
+  async (params) => {
+    try {
+      return await new NetworkOnly().handle(params);
+    } catch (error) {
+      console.warn('[SW] API call failed (likely offline):', params.url.pathname);
+      return new Response(JSON.stringify({ error: 'Network error', offline: true }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
 );
 
-// Discovery API - Always Network
+// Discovery API - Always Network with error handling
 registerRoute(
   ({ url }) => url.pathname.includes('/api/discover-feed'),
-  new NetworkOnly()
+  async (params) => {
+    try {
+      return await new NetworkOnly().handle(params);
+    } catch (error) {
+      return new Response(JSON.stringify({ error: 'Discovery unavailable offline' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
 );
 
 // Offline Search Implementation

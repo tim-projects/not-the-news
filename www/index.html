@@ -30,9 +30,9 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-D460qnkE.js"></script>
+  <script type="module" crossorigin src="/assets/main-DlhtMgQa.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/main-aFq8_29W.css">
-  <link rel="stylesheet" crossorigin href="/assets/modal-DdUrcYqK.css">
+  <link rel="stylesheet" crossorigin href="/assets/modal-DtFtjQ0g.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -116,7 +116,7 @@
                                                                                                                         <span x-show="speakingGuid === entry.guid">■</span>
                                                                                                                     </button>
                                                                         
-                                                                                                                    <div class="itemtitle" @click.stop="if (window.innerWidth < 768 && selectedGuid !== entry.guid) { selectItem(entry.guid); $event.preventDefault(); }">
+                                                                                                                    <div class="itemtitle" @click="if (window.innerWidth < 768 && selectedGuid !== entry.guid) { selectItem(entry.guid); $event.stopPropagation(); $event.preventDefault(); }">
                                                                         
                                                                                     <svg class="star-animation-overlay" x-show="starredGuid === entry.guid">
                                                                                         <rect class="star-outline" pathLength="1" />

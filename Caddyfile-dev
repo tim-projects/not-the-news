@@ -37,7 +37,7 @@ https://vscode.tail06b521.ts.net:443 {
 
    # API endpoints with authentication
    handle /api/login* {
-     reverse_proxy localhost:4575
+     reverse_proxy localhost:8787
    }
 
    @protected_api {
@@ -57,7 +57,7 @@ https://vscode.tail06b521.ts.net:443 {
      }
      respond @unauth "Unauthorized" 401
      
-     reverse_proxy localhost:4575
+     reverse_proxy localhost:8787
    }
 
    # Handle feed.xml (accessible without auth)
@@ -133,7 +133,7 @@ http://localhost:80 {
 
    # API endpoints with authentication
    handle /api/login* {
-     reverse_proxy 127.0.0.1:4575
+     reverse_proxy 127.0.0.1:8787
    }
 
    @protected_api {
@@ -153,7 +153,7 @@ http://localhost:80 {
      }
      respond @unauth "Unauthorized" 401
      
-     reverse_proxy 127.0.0.1:4575
+     reverse_proxy 127.0.0.1:8787
    }
 
    # Handle feed.xml (accessible without auth)

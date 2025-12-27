@@ -271,9 +271,17 @@ export async function pruneStaleReadItems(readItems: { guid: string, readAt: str
     const now = Date.now();
 
     const prunedReadItems = readItems.filter(item => {
-        if (validFeedGuids.has(item.guid)) return true;
+        const isInFeed = validFeedGuids.has(item.guid);
+        if (isInFeed) return true;
+        
         const readAtTimestamp = new Date(item.readAt).getTime();
-        return (now - readAtTimestamp) < THIRTY_DAYS_MS;
+        const ageDays = (now - readAtTimestamp) / (24 * 60 * 60 * 1000);
+        const isFresh = ageDays < 30;
+        
+        if (!isFresh) {
+            console.log(`[Pruning] Item ${item.guid} is stale (age: ${ageDays.toFixed(1)} days) and not in current feed.`);
+        }
+        return isFresh;
     });
 
     if (prunedReadItems.length < readItems.length) {

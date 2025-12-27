@@ -193,6 +193,23 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
                     app.selectedSubElement = 'star';
                 } else if (app.selectedSubElement === 'star') {
                     app.selectedSubElement = 'play';
+                    // Auto-scroll to play button if it's off-screen
+                    setTimeout(() => {
+                        const itemEl = document.querySelector(`.entry[data-guid="${app.selectedGuid}"]`) as HTMLElement;
+                        const playBtn = itemEl?.querySelector('.play-button') as HTMLElement;
+                        if (itemEl && playBtn) {
+                            const itemRect = itemEl.getBoundingClientRect();
+                            const playRect = playBtn.getBoundingClientRect();
+                            const viewportHeight = window.innerHeight;
+                            
+                            // If the bottom of the item is below the viewport
+                            if (itemRect.bottom > viewportHeight) {
+                                // Scroll just enough to show the play button with a small margin
+                                const scrollAmount = playRect.bottom - viewportHeight + 20;
+                                window.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                            }
+                        }
+                    }, 50);
                 }
             }
             break;

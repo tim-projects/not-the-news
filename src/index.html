@@ -113,7 +113,7 @@
                                                                                                                         <span x-show="speakingGuid === entry.guid">■</span>
                                                                                                                     </button>
                                                                         
-                                                                                                                    <div class="itemtitle" @click.stop="if (window.innerWidth < 768 && selectedGuid !== entry.guid) { selectItem(entry.guid); $event.preventDefault(); }">
+                                                                                                                    <div class="itemtitle" @click="if (window.innerWidth < 768 && selectedGuid !== entry.guid) { selectItem(entry.guid); $event.stopPropagation(); $event.preventDefault(); }">
                                                                         
                                                                                     <svg class="star-animation-overlay" x-show="starredGuid === entry.guid">
                                                                                         <rect class="star-outline" pathLength="1" />

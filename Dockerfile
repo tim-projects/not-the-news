@@ -18,10 +18,23 @@ RUN npm run build
 
 ##############################################################################
 # 1. Base image (now main Caddy stage)
-FROM not-the-news-caddy
+FROM node:20-slim
 
-# Install Brotli, redis runtime libraries (libbrotlidec.so.1, libbrotlienc.so.1)
-RUN apk add --no-cache brotli-libs redis
+# Install Brotli, redis, and other dependencies
+RUN apt-get update && apt-get install -y \
+    caddy \
+    redis-server \
+    redis-tools \
+    bash \
+    procps \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    gnupg \
+    gosu \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 ##############################################################################
 # 2. Build args & env
@@ -34,22 +47,11 @@ ENV DOMAIN=${DOMAIN} \
     ACME_CA=https://acme-v02.api.letsencrypt.org/directory
 
 ##############################################################################
-# 3. System deps
-RUN apk add --no-cache \
-      bash procps python3 py3-pip py3-virtualenv ca-certificates \
-      curl \
-      gnupg \
-    && update-ca-certificates \
-    && GOSU_VERSION="1.16" \
-    && ALPINE_ARCH="$(apk --print-arch)" \
-    && case "${ALPINE_ARCH}" in \
-        x86_64) GOSU_ARCH="amd64" ;; \
-        aarch64) GOSU_ARCH="arm64" ;; \
-        armhf) GOSU_ARCH="armhf" ;; \
-        *) echo "Unsupported architecture: ${ALPINE_ARCH}"; exit 1 ;; \
-       esac \
-    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}" \
-    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${GOSU_ARCH}.asc" \
+# 3. System deps & Gosu
+RUN GOSU_VERSION="1.16" \
+    && dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
+    && curl -Lo /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${dpkgArch}" \
+    && curl -Lo /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${dpkgArch}.asc" \
     && export GNUPGHOME="$(mktemp -d)" \
     && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
     && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
@@ -71,15 +73,23 @@ RUN pip install \
 WORKDIR /app
 
 # Create appuser and appgroup
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup -h /app -D
+RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /app --create-home appuser
 
 # Create logs directory for Gunicorn and other app logs
 RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
-COPY rss/ /rss/
+
+# NEW: Copy Python backend files and entrypoint into the image
+COPY package.json package-lock.json /app/
+COPY src/api.py /app/src/api.py
+COPY rss/ /app/rss/
+COPY worker/ /app/worker/
+COPY build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh # Make the entrypoint executable
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
-COPY src/api.py /app/www/api.py
+# Ensure appuser has read/write access to everything in /app
+RUN chown -R appuser:appgroup /app
 
 # Copy the reconstruction script and run it to fix api.py
 COPY reconstruct_api.py /tmp/reconstruct_api.py
@@ -91,13 +101,6 @@ COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
 COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
 
 COPY data/ /data/feed/
-
-COPY build_entrypoint.sh /build_entrypoint.sh
-
-##############################################################################
-# 6. Build entrypoint
-RUN cp /build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh && \
-    chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ##############################################################################
 # 7. copy Caddyfile (persist to /data, allow ACME_CA override)
