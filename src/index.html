@@ -430,6 +430,7 @@
 
                                     <div id="advanced-settings-block" x-show="modalView === 'advanced'">
                                         <h2>Advanced Settings</h2>
+                                        <div class="settings-option"><span>Logout from Firebase</span><button id="logout-button" class="configure-button" @click="logout()">Logout</button></div>
                                         <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
                                         <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
                                         <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>

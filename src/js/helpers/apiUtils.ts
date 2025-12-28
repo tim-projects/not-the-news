@@ -20,6 +20,18 @@
  * to centralize API call robustness, these functions should be updated to utilize it.
  */
 
+import { auth } from '../firebase';
+
+/**
+ * Retrieves the Firebase ID token for the currently logged-in user.
+ * @returns {Promise<string | null>} The ID token or null if not logged in.
+ */
+const getAuthToken = async (): Promise<string | null> => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    return user.getIdToken();
+};
+
 /**
  * Handles the response from a fetch request, checking for errors and parsing JSON.
  * @private
@@ -29,6 +41,10 @@
  * @throws {Error} If the response status is not 'ok'.
  */
 const handleResponse = async (response: Response, filename: string): Promise<any> => {
+    if (response.status === 401) {
+        window.location.href = '/login.html';
+        return;
+    }
     if (!response.ok) {
         throw new Error(`Failed to process configuration file '${filename}': ${response.status} ${response.statusText}`);
     }
@@ -50,36 +66,26 @@ const buildConfigUrl = (endpoint: string, filename: string): URL => {
 
 /**
  * Loads the content of a specified configuration file from the server.
- * This function interacts with the `/load-config` endpoint on the server,
- * which is designed to serve static configuration files.
- *
- * @async
- * @param {string} filename - The name of the configuration file to load (e.g., 'rssFeeds.txt', 'config.json').
- * @returns {Promise<object>} A promise that resolves to the JSON response from the server.
- * The response is expected to contain a 'content' field with the file's data.
- * @throws {Error} If the network request fails or the server returns an error status.
  */
 export const loadConfigFile = async (filename: string): Promise<object> => {
-    const response = await fetch(buildConfigUrl('load-config', filename));
+    const token = await getAuthToken();
+    const response = await fetch(buildConfigUrl('load-config', filename), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+    });
     return handleResponse(response, filename);
 };
 
 /**
  * Saves content to a specified configuration file on the server.
- * This function interacts with the `/save-config` endpoint on the server,
- * allowing the client to update server-side configuration files.
- *
- * @async
- * @param {string} filename - The name of the configuration file to save (e.g., 'rssFeeds.txt', 'config.json').
- * @param {string} content - The string content to be written to the file.
- * @returns {Promise<object>} A promise that resolves to the JSON response from the server,
- * typically indicating success (e.g., `{status: "ok"}`).
- * @throws {Error} If the network request fails or the server returns an error status.
  */
 export const saveConfigFile = async (filename: string, content: string): Promise<object> => {
+    const token = await getAuthToken();
     const response = await fetch(buildConfigUrl('save-config', filename), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ content }),
     });
     return handleResponse(response, filename);
@@ -87,13 +93,16 @@ export const saveConfigFile = async (filename: string, content: string): Promise
 
 /**
  * Loads a specific user state key from the server.
- * @async
- * @param {string} key - The user state key to load (e.g., 'rssFeeds', 'keywordBlacklist').
- * @returns {Promise<object>} A promise that resolves to the user state data.
- * @throws {Error} If the network request fails or the server returns an error status.
  */
 export const loadUserState = async (key: string): Promise<object> => {
-    const response = await fetch(`/api/user-state/${key}`);
+    const token = await getAuthToken();
+    const response = await fetch(`/api/user-state/${key}`, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+    });
+    if (response.status === 401) {
+        window.location.href = '/login.html';
+        throw new Error('Unauthorized');
+    }
     if (!response.ok) {
         throw new Error(`Failed to load user state for key '${key}': ${response.status} ${response.statusText}`);
     }
@@ -102,18 +111,21 @@ export const loadUserState = async (key: string): Promise<object> => {
 
 /**
  * Saves a simple user state key-value pair to the server.
- * @async
- * @param {string} key - The user state key to save.
- * @param {any} value - The value to save for the given key.
- * @returns {Promise<object>} A promise that resolves to the server's response.
- * @throws {Error} If the network request fails or the server returns an error status.
  */
 export const saveUserState = async (key: string, value: any): Promise<object> => {
+    const token = await getAuthToken();
     const response = await fetch('/api/user-state', {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify([{ type: "simpleUpdate", key: key, value: value }]),
     });
+    if (response.status === 401) {
+        window.location.href = '/login.html';
+        throw new Error('Unauthorized');
+    }
     if (!response.ok) {
         throw new Error(`Failed to save user state for key '${key}': ${response.status} ${response.statusText}`);
     }

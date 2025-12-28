@@ -30,9 +30,10 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-DlhtMgQa.js"></script>
+  <script type="module" crossorigin src="/assets/main-CPB3FW5R.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-DnO1Il_1.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-DtFtjQ0g.css">
   <link rel="stylesheet" crossorigin href="/assets/main-aFq8_29W.css">
-  <link rel="stylesheet" crossorigin href="/assets/modal-DtFtjQ0g.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -433,6 +434,7 @@
 
                                     <div id="advanced-settings-block" x-show="modalView === 'advanced'">
                                         <h2>Advanced Settings</h2>
+                                        <div class="settings-option"><span>Logout from Firebase</span><button id="logout-button" class="configure-button" @click="logout()">Logout</button></div>
                                         <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
                                         <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
                                         <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>

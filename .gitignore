@@ -24,3 +24,5 @@ playwright_test_output.log
 podman_full_logs.log
 archive
 GEMINI-PLAN-MODE
+.env
+.env.local

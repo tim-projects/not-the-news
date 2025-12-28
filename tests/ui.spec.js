@@ -39,70 +39,18 @@ test.describe('UI Elements and Interactions', () => {
         });
 
         console.log('Navigating to login page...');
-        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 }); // Increased timeout for goto
+        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 });
         console.log('Login page loaded.');
 
-        // Attempting login via API call...
-        console.log('Attempting login via API call...');
-        const loginResponse = await request.post(`${APP_URL}/api/login`, {
-            data: { password: APP_PASSWORD },
-            headers: { 'Content-Type': 'application/json' }
-        });
+        // Attempting login via UI bypass...
+        console.log('Attempting login via UI bypass...');
+        await page.fill('#email', 'test@example.com');
+        await page.fill('#pw', APP_PASSWORD);
+        await page.click('#login-btn');
 
-        await expect(loginResponse.status()).toBe(200);
-        console.log(`Login API call successful with status: ${loginResponse.status()}`);
-
-        // --- NEW: Extract and set authentication cookie ---
-        const setCookieHeader = loginResponse.headers()['set-cookie'];
-        if (setCookieHeader) {
-            console.log(`Debug: Raw Set-Cookie header: ${setCookieHeader}`);
-            // Assuming the 'auth' cookie is the one we need and it's the first in the header
-            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
-            if (authCookieString) {
-                console.log(`Debug: Auth cookie string found: ${authCookieString}`);
-                const parts = authCookieString.split(';');
-                const nameValue = parts[0].trim().split('=');
-                const cookieName = nameValue[0];
-                const cookieValue = nameValue[1];
-
-                let domain = new URL(APP_URL).hostname; // Derive domain from APP_URL
-                let path = '/';
-                
-                // Attempt to parse domain and path from cookie string
-                parts.slice(1).forEach(part => {
-                    const trimmedPart = part.trim();
-                    if (trimmedPart.toLowerCase().startsWith('domain=')) {
-                        domain = trimmedPart.substring(7);
-                    } else if (trimmedPart.toLowerCase().startsWith('path=')) {
-                        path = trimmedPart.substring(5);
-                    }
-                });
-
-                console.log(`Debug: Attempting to add cookie - Name: ${cookieName}, Value: ${cookieValue}, Domain: ${domain}, Path: ${path}`);
-                // Add the cookie to the Playwright page context
-                await page.context().addCookies([
-                    {
-                        name: cookieName,
-                        value: cookieValue,
-                        domain: domain,
-                        path: path,
-                        expires: -1 // Session cookie (or derive from attributes if present)
-                    }
-                ]);
-                console.log(`Authentication cookie '${cookieName}' set in browser context.`);
-                const currentCookies = await page.context().cookies();
-                console.log('Debug: Cookies in browser context after adding auth cookie:', JSON.stringify(currentCookies, null, 2));
-            } else {
-                console.error('Error: Auth cookie not found in Set-Cookie header!');
-            }
-        } else {
-            console.error('Error: No Set-Cookie header found in login response!');
-        }
-        // --- END NEW ---
-
-        // After successful API login and cookie setup, navigate to the main app URL
-        console.log('Navigating to main app URL after successful login API call and cookie setup...');
-        await page.goto(APP_URL, { timeout: 60000 });
+        // Wait for redirect to main app URL
+        console.log('Waiting for redirect to main app URL...');
+        await page.waitForURL(APP_URL, { timeout: 60000 });
         console.log('Navigated to main app URL.');
 
         // --- NEW: Unregister all service workers as a diagnostic step ---
@@ -129,9 +77,34 @@ test.describe('UI Elements and Interactions', () => {
         
         // Removed waitForLoadState('networkidle') as it can hang with Service Workers/Background Sync
 
+        // NEW: Ensure at least one feed is configured
+        const configResponse = await page.evaluate(async () => {
+            const resp = await fetch('/api/user-state/rssFeeds');
+            return await resp.json();
+        });
+        
+        if (!configResponse.value || Object.keys(configResponse.value).length === 0) {
+            console.log('No feeds configured in test environment. Adding Hacker News...');
+            await page.evaluate(async () => {
+                await fetch('/api/user-state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify([{
+                        type: 'simpleUpdate',
+                        key: 'rssFeeds',
+                        value: { "Tech": { "Default": [{ "url": "https://news.ycombinator.com/rss" }] } }
+                    }])
+                });
+                // Trigger sync
+                await fetch('/api/feed-sync', { method: 'POST' });
+            });
+            // Wait a moment for worker to finish first sync
+            await page.waitForTimeout(5000);
+        }
+
         // NEW: Wait for at least one feed item to be visible
         console.log('Waiting for at least one feed item (.item) to be visible...');
-        await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
+        await page.waitForSelector('.entry:not(.help-panel-item)', { state: 'visible', timeout: 60000 });
         console.log('At least one feed item is visible.');
     }); // Correctly close beforeEach
 

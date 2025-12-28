@@ -78,6 +78,21 @@ import { isOnline } from './js/utils/connectivity.ts';
 import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from './types/app.ts';
 import { filterEntriesByQuery, toggleSearch } from './js/helpers/searchManager.ts';
 import { discoverFeed } from './js/helpers/discoveryManager.ts';
+import { auth } from './js/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+// Enforce authentication before initializing the app
+onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        // If not logged in, redirect to login page
+        // We check if we are already on login.html to avoid infinite redirects
+        if (!window.location.pathname.endsWith('login.html')) {
+            window.location.href = '/login.html';
+        }
+    } else {
+        console.log(`[Auth] User logged in: ${user.email} (${user.uid})`);
+    }
+});
 
 export function rssApp(): AppState {
     return {
@@ -309,6 +324,16 @@ export function rssApp(): AppState {
             } else {
                 this.showSyncStatus = false;
                 this.syncStatusMessage = '';
+            }
+        },
+        
+        logout: async function(this: AppState): Promise<void> {
+            try {
+                await signOut(auth);
+                // Redirect will be handled by onAuthStateChanged in main.ts
+            } catch (error: any) {
+                console.error("Logout error:", error);
+                createStatusBarMessage(this, `Logout failed: ${error.message}`);
             }
         },
         

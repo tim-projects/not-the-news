@@ -19,42 +19,28 @@ COPY . .
 RUN npm run build
 
 ##############################################################################
-# 1. Main Development Container (now based on node:20-slim again)
-FROM localhost/local-node:20-slim
+# 1. Main Development Container
+FROM node:20-slim
 
-# First, install 'retry' separately for robust package installations
-RUN for i in $(seq 1 5); do apt-get update --fix-missing && apt-get install -y --no-install-recommends retry && break || sleep 10; done \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Caddy from apt, and other general system dependencies
-RUN for i in $(seq 1 5); do apt-get clean && apt-get update --fix-missing && apt-get install -y \
+# Install Caddy, Redis, and other dependencies
+RUN apt-get update && apt-get install -y \
     caddy \
-    \
+    redis-server \
+    redis-tools \
     bash \
     procps \
-    python3.11 \
-    python3-pip \
-    python3.11-venv \
     curl \
     gnupg \
     gosu \
     strace \
     git \
-    redis-server \
-    redis-tools \
     brotli \
     ca-certificates \
     iproute2 \
-    && break || sleep 10; done \
     && rm -rf /var/lib/apt/lists/*
 
-# Create /rss/ directory for volume mounting
-RUN mkdir -p /rss/
-
 # Create appuser and appgroup early for permissions
-RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup \
-    && chown appuser:appgroup /tmp # Ensure /tmp is writable for non-root user
-
+RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /app --create-home appuser
 
 ##############################################################################
 # 2. Build args & env
@@ -66,38 +52,22 @@ ENV DOMAIN=${DOMAIN} \
     APP_PASSWORD=${APP_PASSWORD}
 
 ##############################################################################
-# 3. Python venv & packages
-RUN python3.11 -m venv /venv
-ENV PATH="/venv/bin:$PATH"
-COPY requirements.txt .
-RUN pip install -r requirements.txt \
-    && rm -rf /root/.cache/pip
-
-##############################################################################
 # 4. Copy code & initial data
 WORKDIR /app
 
-# Create logs directory for Gunicorn and other app logs
+# Create logs directory
 RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
 
-# NEW: Copy Python backend files and entrypoint into the image
+# Copy source files and entrypoint into the image
 COPY package.json package-lock.json /app/
-COPY src/api.py /app/src/api.py
-COPY rss/ /app/rss/
 COPY worker/ /app/worker/
 COPY build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh # Make the entrypoint executable
 
 # IMPORTANT: This line now copies the 'www' folder, which Vite will generate.
 COPY --from=frontend-builder /app/www/ /app/www/
-# Ensure appuser has read/write access to the frontend assets and worker folder
-RUN chown -R appuser:appgroup /app/www /app/worker
-
-# These files/folders will be mounted as volumes during development
-# COPY rss/ /rss/
-# COPY src/api.py /app/www/api.py
-# COPY reconstruct_api.py /tmp/reconstruct_api.py
-# COPY build_entrypoint.sh /build_entrypoint.sh
+# Ensure appuser has read/write access to everything in /app
+RUN chown -R appuser:appgroup /app
 
 # Ensure clean copy of ui.spec.js by removing any old version first
 RUN rm -f /app/tests/ui.spec.js
@@ -105,23 +75,11 @@ RUN rm -f /app/tests/ui.spec.js
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
 COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
-COPY data/ /data/feed/
-
-
-##############################################################################
-# 5. Build entrypoint
-# The entrypoint script will be mounted as a volume
-# This section remains commented out because build_entrypoint.sh is volume mounted
-# RUN cp /build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh && \
-#     chmod +x /usr/local/bin/docker-entrypoint.sh
-
-##############################################################################
-
 
 ##############################################################################
 # 7. Declare the data volume & expose ports
 VOLUME /data
-EXPOSE 80 443 4575
+EXPOSE 80 443
 
 ##############################################################################
 # 8. Entrypoint + default CMD

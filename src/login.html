@@ -107,45 +107,20 @@
         <h2>Not The News</h2>
       </div>
     <form id="login-form">
-      <p>Please log in below. Enter the password you used when building the docker container:</p>
-      <input type="password" placeholder="Enter password" required id="pw" autofocus>
-      <button type="submit">Login</button>
+      <div id="auth-message" style="margin-bottom: 1rem; color: #ff4444; display: none;"></div>
+      <input type="email" id="email" placeholder="Email" required autofocus>
+      <input type="password" id="pw" placeholder="Password" required>
+      <div class="auth-buttons">
+        <button type="submit" id="login-btn">Login</button>
+        <button type="button" id="signup-btn" style="margin-top: 0.5rem; background-color: transparent; border: 1px solid var(--primary); color: var(--fg);">Sign Up</button>
+        <div style="margin: 1rem 0; opacity: 0.5;">— OR —</div>
+        <button type="button" id="google-btn" style="background-color: white; color: #757575; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 18px; height: 18px; margin: 0;">
+          Continue with Google
+        </button>
+      </div>
     </form>
   </div>
-  <script>
-    // This script is for the login form submission, not theme initialization.
-    document.getElementById("login-form").addEventListener('submit', async e => {
-      e.preventDefault();
-      const form = e.target;
-      const btn = form.querySelector('button');
-      const pwInput = document.getElementById("pw");
-      const pw = pwInput.value.trim();
-
-      if (!pw) {
-        alert("Please enter a password");
-        return;
-      }
-
-      btn.disabled = true;
-      try {
-        const res = await fetch("/api/login", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password: pw })
-        });
-        if (res.status === 200) {
-          window.location.href = "/";
-        } else {
-          pwInput.value = "";
-          alert("Invalid password");
-        }
-      } catch (error) {
-        alert("Network error, please try again");
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  </script>
+  <script type="module" src="/js/login.ts"></script>
 </body>
 </html>

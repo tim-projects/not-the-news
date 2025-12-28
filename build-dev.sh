@@ -136,12 +136,11 @@ echo "Starting build process..."
     podman build -f dockerfile-dev "${BUILD_ARGS[@]}" -t not-the-news-dev . && \
     podman run -d -p 8085:80 -p 8443:443 \
         -v "$VOLUME_NAME":/data \
-        -v "$(pwd)"/reconstruct_api.py:/tmp/reconstruct_api.py \
         -v "$(pwd)"/build_entrypoint.sh:/usr/local/bin/docker-entrypoint.sh \
+        -v "$(pwd)"/.env:/app/.env \
         -v "$(pwd)"/Caddyfile-dev:/etc/caddy/Caddyfile \
-        -v "$(pwd)"/data/config/feeds.txt:/data/config/feeds.txt \
-        -v "$(pwd)"/data/config/filter_keywords.txt:/data/config/filter_keywords.txt \
-        -v "$(pwd)"/rss/:/rss/ \
+        -v "$(pwd)"/data/config/rssFeeds.json:/data/config/rssFeeds.json \
+        -v "$(pwd)"/data/config/keywordBlacklist.json:/data/config/keywordBlacklist.json \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.crt:/etc/caddy/certs/vscode.tail06b521.ts.net.crt \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.key:/etc/caddy/certs/vscode.tail06b521.ts.net.key \
         --name ntn-dev not-the-news-dev

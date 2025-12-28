@@ -17,19 +17,16 @@ RUN npm run build
 #    rm -r /app/www/src
 
 ##############################################################################
-# 1. Base image (now main Caddy stage)
+# 1. Base image
 FROM node:20-slim
 
-# Install Brotli, redis, and other dependencies
+# Install Caddy, Redis, and other dependencies
 RUN apt-get update && apt-get install -y \
     caddy \
     redis-server \
     redis-tools \
     bash \
     procps \
-    python3 \
-    python3-pip \
-    python3-venv \
     curl \
     gnupg \
     gosu \
@@ -59,29 +56,17 @@ RUN GOSU_VERSION="1.16" \
     && chmod +x /usr/local/bin/gosu
 
 ##############################################################################
-# 4. Python venv & packages
-RUN python3 -m venv /venv
-ENV PATH="/venv/bin:$PATH"
-RUN pip install \
-      feedparser feedgen requests python-dateutil \
-      Flask==2.2.5 Werkzeug==2.3.7 bleach markdown \
-      gunicorn Flask-Caching redis \
-    && rm -rf /root/.cache/pip
-
-##############################################################################
-# 5. Copy code & initial data
+# 4. Copy code & initial data
 WORKDIR /app
 
 # Create appuser and appgroup
 RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /app --create-home appuser
 
-# Create logs directory for Gunicorn and other app logs
+# Create logs directory
 RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
 
-# NEW: Copy Python backend files and entrypoint into the image
+# NEW: Copy source files and entrypoint into the image
 COPY package.json package-lock.json /app/
-COPY src/api.py /app/src/api.py
-COPY rss/ /app/rss/
 COPY worker/ /app/worker/
 COPY build_entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh # Make the entrypoint executable
@@ -91,16 +76,9 @@ COPY --from=frontend-builder /app/www/ /app/www/
 # Ensure appuser has read/write access to everything in /app
 RUN chown -R appuser:appgroup /app
 
-# Copy the reconstruction script and run it to fix api.py
-COPY reconstruct_api.py /tmp/reconstruct_api.py
-RUN /venv/bin/python3 /tmp/reconstruct_api.py
-RUN rm /tmp/reconstruct_api.py
-
 # Copy initial configuration files into the image
 COPY ./data/config/rssFeeds.json /data/config/rssFeeds.json
 COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
-
-COPY data/ /data/feed/
 
 ##############################################################################
 # 7. copy Caddyfile (persist to /data, allow ACME_CA override)
@@ -112,7 +90,7 @@ RUN sed -i "s|{\$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
 ##############################################################################
 # 8. Declare the data volume & expose ports
 VOLUME /data
-EXPOSE 80 443 4575
+EXPOSE 80 443
 
 ##############################################################################
 # 9. Entrypoint + default CMD

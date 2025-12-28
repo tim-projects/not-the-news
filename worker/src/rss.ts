@@ -78,9 +78,10 @@ function prettifyItem(item: any): any {
     return item;
 }
 
-export async function processFeeds(feedUrls: string[]): Promise<FeedItem[]> {
+export async function processFeeds(feedUrls: string[], blacklist: string[]): Promise<FeedItem[]> {
     const allItems: FeedItem[] = [];
     const seenGuids = new Set<string>();
+    const normalizedBlacklist = blacklist.map(kw => String(kw).toLowerCase().trim()).filter(kw => kw.length > 0);
 
     for (const url of feedUrls) {
         try {
@@ -90,8 +91,19 @@ export async function processFeeds(feedUrls: string[]): Promise<FeedItem[]> {
             for (const entry of feed.items) {
                 const guid = entry.guid || entry.link || '';
                 if (!guid || seenGuids.has(guid)) continue;
-                seenGuids.add(guid);
 
+                // Keyword filtering
+                const title = entry.title || '';
+                const description = entry.content || entry.summary || entry.description || '';
+                const searchableText = `${title} ${description}`.toLowerCase();
+                
+                const isBlacklisted = normalizedBlacklist.some(kw => searchableText.includes(kw));
+                if (isBlacklisted) {
+                    console.log(`[RSS] Filtering blacklisted item: ${title.substring(0, 50)}...`);
+                    continue;
+                }
+
+                seenGuids.add(guid);
                 const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
                 
                 let item: any = {

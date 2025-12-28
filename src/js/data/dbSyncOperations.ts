@@ -91,6 +91,18 @@ async function _addPendingOperationToBuffer(operation: Operation): Promise<numbe
     });
 }
 
+import { auth } from '../firebase';
+
+/**
+ * Retrieves the Firebase ID token for the currently logged-in user.
+ * @returns {Promise<string | null>} The ID token or null if not logged in.
+ */
+const getAuthToken = async (): Promise<string | null> => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    return user.getIdToken();
+};
+
 /**
  * --- MODIFIED: Queues any user operation and attempts an immediate sync if online. ---
  * The logic is now generalized and not limited to specific operation types.
@@ -112,9 +124,13 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
         if (isOnline() && syncEnabled) {
             console.log(`[DB] Attempting immediate sync for ${operation.type} (ID: ${generatedId}).`);
             const syncPayload: Operation[] = [{ ...operation, id: generatedId }];
+            const token = await getAuthToken();
             const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify(syncPayload)
             });
 
@@ -180,9 +196,13 @@ export async function processPendingOperations(): Promise<void> {
     console.log(`[DB] Sending ${operations.length} batched operations to /api/user-state.`);
 
     try {
+        const token = await getAuthToken();
         const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            },
             body: JSON.stringify(operations)
         });
 
@@ -264,7 +284,11 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
     const { value: localData, lastModified } = def.type === 'array' ? await loadArrayState(def.store) : await loadSimpleState(key, def.store) as SimpleStateValue;
     const localTimestamp: string = lastModified || '';
     
-    const headers: { [key: string]: string } = { 'Content-Type': 'application/json' };
+    const token = await getAuthToken();
+    const headers: { [key: string]: string } = { 
+        'Content-Type': 'application/json',
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
     if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
     try {

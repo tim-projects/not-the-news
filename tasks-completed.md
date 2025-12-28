@@ -89,4 +89,48 @@ I have completed all requested tasks.
 ## Next Steps
 - Implement robust fix for Unread count UI synchronization.
 - Perform final audit of offline mode behavior.
-- Standardize all test files to use ES modules.
+- Standardize all test files to use ES modules.# Current Tasks - Cloudflare Worker Migration & UX Refinement
+
+## 1. Migrate Python API to Cloudflare Worker - DONE
+- **Progress:** Successfully replaced the entire Python/Flask/Gunicorn backend with a TypeScript-based Cloudflare Worker running locally via `wrangler dev`.
+- **Functionality:** 
+    - Ported all endpoints: `/api/login`, `/api/user-state`, `/api/time`, `/api/feed-guids`, and `/api/feed-items`.
+    - Integrated RSS processing (fetch, parse, clean, prettify) directly into the Worker using `rss-parser` and `sanitize-html`.
+    - Removed Python, pip, Gunicorn, and venv from `Dockerfile` and `build_entrypoint.sh`.
+- **Findings:** 
+    - `wrangler dev` uses a strict sandbox that prevents creating directories or writing to files in the mounted `/data` volume (EACCES/EPERM errors).
+    - The `--node-compat` flag is deprecated in Wrangler v4; use `nodejs_compat` in `wrangler.jsonc`.
+- **Mitigations:** 
+    - Redirected all Worker-side persistence to `/tmp` to bypass sandbox restrictions in the dev container.
+    - Simplified `saveState` and `syncFeeds` logic to handle ephemeral storage gracefully.
+
+## 2. Implement Word-by-Word TTS Highlighting - DONE
+- **Progress:** Refactored TTS logic into a dedicated `src/js/helpers/ttsManager.ts` library.
+- **Features:** 
+    - Precise word highlighting by pre-processing descriptions into `span`-wrapped words.
+    - Syncing speech `onboundary` events with DOM element highlighting.
+    - Improved reliability for Brave and Android by calling `resume()` before `speak()`.
+    - Added a "warm-up" listener during `initApp` to ensure voices are ready.
+- **Findings:** Brave/Android often require an explicit `resume()` and a small delay to produce audio. Long-running speech in Chrome requires a "keep-alive" heartbeat (pause/resume toggle every 10s).
+
+## 3. Keyboard & Selection Fixes - DONE
+- **Progress:** 
+    - Implemented auto-scroll logic in `keyboardManager.ts` to ensure the "Play" button is visible when selected via keyboard, even on long items.
+    - Restored click-to-select functionality on desktop by refining event propagation.
+    - Fixed the "Flick to Select" gesture by restoring the missing `triggerFlickSelection` function.
+- **Findings:** Previous layout changes (Flexbox on `#items`) had altered vertical spacing and caused item descriptions to overflow into adjacent items.
+- **Mitigations:** Removed `display: flex` from `#items` and increased `max-height` to `10000px` for items and descriptions.
+
+## 4. Multi-Level Undo Implementation - DONE
+- **Progress:** 
+    - Added `undoStack` to `AppState` to allow unwinding an entire deck (up to 10 items).
+    - Refactored `showUndoNotification` to queue multiple GUIDs and reset the 5s timer on each new action.
+    - Refactored `undoMarkRead` to pop items from the stack one by one.
+- **Mitigations:** Ensured the `undoStack` is cleared before starting a deck refresh to prevent GUID conflicts.
+
+## 5. System Stability & Parity - DONE
+- **Progress:** 
+    - Synchronized `Dockerfile`, `build.sh`, and `Caddyfile` logic between Dev and Prod.
+    - Updated Prod to use Debian-based `node:20-slim` for environment consistency.
+    - Added missing state keys (`itemButtonMode`, `curvesEnabled`, etc.) to `reconstruct_api.py` (backwards compatibility).
+- **Result:** Fully functional, Python-free build verified by Playwright tests.
