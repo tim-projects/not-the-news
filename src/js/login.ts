@@ -16,17 +16,22 @@ const signupBtn = document.getElementById("signup-btn") as HTMLButtonElement;
 const googleBtn = document.getElementById("google-btn") as HTMLButtonElement;
 const authMessage = document.getElementById("auth-message") as HTMLDivElement;
 
-console.log("[Auth] Login script loaded");
-console.log("[Auth] Google button element:", googleBtn);
+console.log("[Auth] Login script loaded. Form found:", !!loginForm);
 
 const showMessage = (msg: string) => {
-    authMessage.textContent = msg;
-    authMessage.style.display = 'block';
+    if (authMessage) {
+        authMessage.textContent = msg;
+        authMessage.style.display = 'block';
+    } else {
+        alert(msg);
+    }
 };
 
 const clearMessage = () => {
-    authMessage.textContent = '';
-    authMessage.style.display = 'none';
+    if (authMessage) {
+        authMessage.textContent = '';
+        authMessage.style.display = 'none';
+    }
 };
 
 // Redirect if already logged in
@@ -37,75 +42,95 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    clearMessage();
-    
-    const email = emailInput.value.trim();
-    const password = pwInput.value;
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearMessage();
+        
+        const email = emailInput?.value.trim();
+        const password = pwInput?.value;
 
-    if (!email || !password) {
-        showMessage("Email and password required");
-        return;
-    }
-
-    // TEST ACCOUNT BYPASS
-    // Allow test@example.com with the dev password to log in anonymously
-    if (email === 'test@example.com' && password === 'devtestpwd') {
-        console.log("[Auth] Using test account bypass...");
-        loginBtn.disabled = true;
-        try {
-            await signInAnonymously(auth);
+        if (!email || !password) {
+            showMessage("Email and password required");
             return;
-        } catch (error: any) {
-            console.error("Anonymous login error:", error);
         }
-    }
 
-    loginBtn.disabled = true;
-    try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle redirect
-    } catch (error: any) {
-        console.error("Login error:", error);
-        showMessage(error.message || "Failed to login");
-        loginBtn.disabled = false;
-    }
-});
+        // TEST ACCOUNT BYPASS
+        // Allow test@example.com with the dev password to log in
+        if (email === 'test@example.com' && password === 'devtestpwd') {
+            console.log("[Auth] Using test account bypass...");
+            if (loginBtn) loginBtn.disabled = true;
+            try {
+                // Try anonymous first
+                await signInAnonymously(auth);
+                return;
+            } catch (anonError: any) {
+                console.warn("[Auth] Anonymous login failed, trying email signup for test account:", anonError.message);
+                try {
+                    // Fallback to real account for test credentials
+                    await signInWithEmailAndPassword(auth, email, password);
+                    return;
+                } catch (signInError: any) {
+                    try {
+                        await createUserWithEmailAndPassword(auth, email, password);
+                        return;
+                    } catch (createError: any) {
+                        console.error("[Auth] Bypass failed completely:", createError.message);
+                    }
+                }
+            }
+        }
 
-signupBtn.addEventListener('click', async () => {
-    clearMessage();
-    const email = emailInput.value.trim();
-    const password = pwInput.value;
+        if (loginBtn) loginBtn.disabled = true;
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            // onAuthStateChanged will handle redirect
+        } catch (error: any) {
+            console.error("Login error:", error);
+            showMessage(error.message || "Failed to login");
+            if (loginBtn) loginBtn.disabled = false;
+        }
+    });
+    loginForm.dataset.authReady = "true";
+}
 
-    if (!email || !password) {
-        showMessage("Email and password required for signup");
-        return;
-    }
+if (signupBtn) {
+    signupBtn.addEventListener('click', async () => {
+        clearMessage();
+        const email = emailInput?.value.trim();
+        const password = pwInput?.value;
 
-    signupBtn.disabled = true;
-    try {
-        await createUserWithEmailAndPassword(auth, email, password);
-        showMessage("Account created! Logging in...");
-    } catch (error: any) {
-        console.error("Signup error:", error);
-        showMessage(error.message || "Failed to create account");
-        signupBtn.disabled = false;
-    }
-});
+        if (!email || !password) {
+            showMessage("Email and password required for signup");
+            return;
+        }
 
-googleBtn?.addEventListener('click', async () => {
-    console.log("[Auth] Google button clicked");
-    clearMessage();
-    const provider = new GoogleAuthProvider();
-    googleBtn.disabled = true;
-    try {
-        console.log("[Auth] Calling signInWithPopup...");
-        await signInWithPopup(auth, provider);
-        console.log("[Auth] signInWithPopup returned");
-    } catch (error: any) {
-        console.error("Google login error:", error);
-        showMessage(error.message || "Failed to login with Google");
-        googleBtn.disabled = false;
-    }
-});
+        signupBtn.disabled = true;
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+            showMessage("Account created! Logging in...");
+        } catch (error: any) {
+            console.error("Signup error:", error);
+            showMessage(error.message || "Failed to create account");
+            signupBtn.disabled = false;
+        }
+    });
+}
+
+if (googleBtn) {
+    googleBtn.addEventListener('click', async () => {
+        console.log("[Auth] Google button clicked");
+        clearMessage();
+        const provider = new GoogleAuthProvider();
+        googleBtn.disabled = true;
+        try {
+            console.log("[Auth] Calling signInWithPopup...");
+            await signInWithPopup(auth, provider);
+            console.log("[Auth] signInWithPopup returned");
+        } catch (error: any) {
+            console.error("Google login error:", error);
+            showMessage(error.message || "Failed to login with Google");
+            googleBtn.disabled = false;
+        }
+    });
+}

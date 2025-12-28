@@ -60,6 +60,18 @@ fi
     podman system prune -f # Added for --no-cache builds
 }
 
+# Load environment variables from .env if it exists
+if [ -f ".env" ]; then
+    echo "Loading .env for build arguments..."
+    # We want to extract VITE_FIREBASE_* variables
+    while IFS='=' read -r key value; do
+        if [[ $key == VITE_FIREBASE_* ]]; then
+            echo "Found build arg: $key"
+            BUILD_ARGS+=("--build-arg" "$key=$value")
+        fi
+    done < .env
+fi
+
 # Build process
 echo "Starting build process..."
 (

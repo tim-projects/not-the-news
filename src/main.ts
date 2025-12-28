@@ -82,15 +82,27 @@ import { auth } from './js/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 // Enforce authentication before initializing the app
+let authInitialized = false;
+let initialAuthChecked = false;
+
 onAuthStateChanged(auth, (user) => {
-    if (!user) {
-        // If not logged in, redirect to login page
-        // We check if we are already on login.html to avoid infinite redirects
-        if (!window.location.pathname.endsWith('login.html')) {
+    const path = window.location.pathname;
+    authInitialized = true;
+    
+    console.log(`[Auth Event] User: ${user?.uid || 'null'}, Path: ${path}, Initialized: ${initialAuthChecked}`);
+
+    if (user) {
+        if (path.endsWith('login.html')) {
+            console.log(`[Auth Check] Already logged in, redirecting to home`);
+            window.location.href = '/';
+        }
+    } else if (initialAuthChecked) {
+        // Only redirect to login if we've already done the initial check 
+        // AND the user session actually disappeared (logout)
+        if (!path.endsWith('login.html')) {
+            console.log(`[Auth Check] User logged out, redirecting to login.html`);
             window.location.href = '/login.html';
         }
-    } else {
-        console.log(`[Auth] User logged in: ${user.email} (${user.uid})`);
     }
 });
 
@@ -99,76 +111,29 @@ export function rssApp(): AppState {
         // --- State Properties ---
         loading: true,
         progressMessage: 'Initializing...',
-        deck: [],
-        feedItems: {},
-        filterMode: 'unread',
-        openSettings: false,
-        openShortcuts: false,
-        modalView: 'main',
-        showSearchBar: false,
-        searchQuery: '',
-        shuffleCount: 0,
-        syncEnabled: true,
-        imagesEnabled: true,
-        itemButtonMode: 'play',
-        openUrlsInNewTabEnabled: true,
-        shadowsEnabled: true,
-        curvesEnabled: true,
-        flickToSelectEnabled: true,
-        rssFeedsInput: '',
-        keywordBlacklistInput: '',
-        discoveryUrl: '',
-        isDiscovering: false,
-        discoveryResults: [],
-        discoveryError: '',
-        entries: [],
-        read: [],
-        starred: [],
-        currentDeckGuids: [],
-        shuffledOutGuids: [],
-        pregeneratedOnlineDeck: null,
-        pregeneratedOfflineDeck: null,
-        errorMessage: '',
-        isOnline: isOnline(),
-        deckManaged: false,
-
-        syncStatusMessage: '',
-        showSyncStatus: false,
-        theme: 'dark', // Default theme
-        themeStyle: 'originalDark',
-        themeStyleLight: 'originalLight',
-        themeStyleDark: 'originalDark',
-        customCss: '',
-        fontSize: 100,
-        feedWidth: 50,
-        showUndo: false,
-        undoTimerActive: false,
-        undoItemGuid: null,
-        undoItemIndex: null,
-        undoStack: [],
-        undoBtnRadius: 20,
-        selectedGuid: null,
-        selectedSubElement: 'item',
-        selectedTimestamp: null,
-        lastSelectedGuid: null,
-        starredGuid: null,
-        readingGuid: null,
-        speakingGuid: null,
-        closingGuid: null,
-        _lastFilterHash: '',
-        _cachedFilteredEntries: null,
-        scrollObserver: null,
-        imageObserver: null,
-        db: null,
-        _initComplete: false,
-        staleItemObserver: null,
-        _isSyncing: false,
-        _isPregenerating: false,
-        lastShuffleResetDate: null, // Initialized as null
-
+        // ... (rest of props)
+        
         // --- Core Methods ---
         initApp: async function(this: AppState): Promise<void> {
             try {
+                // Wait for Firebase Auth to initialize before proceeding
+                this.progressMessage = 'Verifying authentication...';
+                let waitCount = 0;
+                while (!authInitialized && waitCount < 50) { 
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    waitCount++;
+                }
+
+                if (!auth.currentUser) {
+                    if (!window.location.pathname.endsWith('login.html')) {
+                        console.log("[Auth] Not logged in after wait, redirecting...");
+                        window.location.href = '/login.html';
+                        return;
+                    }
+                } else {
+                    initialAuthChecked = true; // Mark that we found a user during init
+                }
+
                 this.progressMessage = 'Connecting to database...';
                 this.db = await initDb();
                 

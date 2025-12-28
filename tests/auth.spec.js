@@ -8,11 +8,14 @@ test.describe('Authentication Flow', () => {
             console.log(`[Browser Console] ${message.type().toUpperCase()}: ${message.text()}`);
         });
         await page.goto(`${APP_URL}/login.html`);
+        // Wait for script to attach listeners
+        await page.waitForSelector('#login-form[data-auth-ready="true"]', { timeout: 10000 });
     });
 
     test('should show error on empty login', async ({ page }) => {
         await page.click('#login-btn');
         const message = page.locator('#auth-message');
+        await page.waitForSelector('#auth-message', { state: 'visible', timeout: 5000 });
         await expect(message).toBeVisible();
         await expect(message).toContainText('Email and password required');
     });
@@ -36,16 +39,18 @@ test.describe('Authentication Flow', () => {
         console.log(`Attempting signup with ${testEmail}`);
         await page.click('#signup-btn');
         
-        // If signup is disabled or fails, we should see an error
-        const message = page.locator('#auth-message');
-        await expect(message).toBeVisible({ timeout: 15000 });
-        
-        const text = await message.textContent();
-        console.log(`Signup response message: ${text}`);
-        
-        if (text?.includes('Account created')) {
-            await page.waitForURL(`${APP_URL}/`, { timeout: 15000 });
-            await expect(page).toHaveURL(`${APP_URL}/`);
+        // Wait for either the success message OR the redirect to home
+        await Promise.race([
+            page.waitForURL(`${APP_URL}/`, { timeout: 15000 }),
+            page.waitForSelector('#auth-message:has-text("Account created")', { timeout: 15000 })
+        ]);
+
+        if (page.url() === `${APP_URL}/`) {
+            console.log("Signup successful (redirected immediately)");
+        } else {
+            const text = await page.locator('#auth-message').textContent();
+            console.log(`Signup response message: ${text}`);
+            await expect(page).toHaveURL(`${APP_URL}/`, { timeout: 15000 });
         }
     });
 

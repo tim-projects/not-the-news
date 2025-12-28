@@ -125,6 +125,18 @@ fi
     podman system prune -f # Added for --no-cache builds
 }
 
+# Load environment variables from .env if it exists
+if [ -f ".env" ]; then
+    echo "Loading .env for build arguments..."
+    # We want to extract VITE_FIREBASE_* variables
+    while IFS='=' read -r key value; do
+        if [[ $key == VITE_FIREBASE_* ]]; then
+            echo "Found build arg: $key"
+            BUILD_ARGS+=("--build-arg" "$key=$value")
+        fi
+    done < .env
+fi
+
 # Build process
 echo "Starting build process..."
 (
@@ -143,7 +155,9 @@ echo "Starting build process..."
         -v "$(pwd)"/data/config/keywordBlacklist.json:/data/config/keywordBlacklist.json \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.crt:/etc/caddy/certs/vscode.tail06b521.ts.net.crt \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.key:/etc/caddy/certs/vscode.tail06b521.ts.net.key \
-        --name ntn-dev not-the-news-dev
+        --name ntn-dev not-the-news-dev && \
+    echo "Build and run successful. Cleaning up unused Podman resources to save space..." && \
+    podman system prune -a -f
 ) || {
     echo "Build failed!" >&2
     exit 1

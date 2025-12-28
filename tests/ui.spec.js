@@ -38,20 +38,34 @@ test.describe('UI Elements and Interactions', () => {
             console.log(`Console ${message.type().toUpperCase()}: ${message.text()}`);
         });
 
+        page.on('pageerror', err => {
+            console.error(`Page Error: ${err.message}\nStack: ${err.stack}`);
+        });
+
         console.log('Navigating to login page...');
         await page.goto(`${APP_URL}/login.html`, { timeout: 60000 });
-        console.log('Login page loaded.');
+        await page.waitForSelector('#login-form[data-auth-ready="true"]', { timeout: 10000 });
+        console.log('Login page loaded and script attached.');
 
         // Attempting login via UI bypass...
         console.log('Attempting login via UI bypass...');
         await page.fill('#email', 'test@example.com');
         await page.fill('#pw', APP_PASSWORD);
+        
+        console.log('Clicking login button...');
         await page.click('#login-btn');
 
         // Wait for redirect to main app URL
-        console.log('Waiting for redirect to main app URL...');
-        await page.waitForURL(APP_URL, { timeout: 60000 });
-        console.log('Navigated to main app URL.');
+        console.log('Waiting for redirect to main app URL (timeout 60s)...');
+        try {
+            await page.waitForURL(APP_URL, { timeout: 60000 });
+            console.log('Navigated to main app URL.');
+        } catch (e) {
+            console.error('Timed out waiting for redirect. Current URL:', page.url());
+            const content = await page.content();
+            console.log('Page content at timeout:', content.substring(0, 1000));
+            throw e;
+        }
 
         // --- NEW: Unregister all service workers as a diagnostic step ---
         // console.log('Attempting to unregister all service workers...');
