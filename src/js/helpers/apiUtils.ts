@@ -22,6 +22,8 @@
 
 import { auth } from '../firebase';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+
 /**
  * Retrieves the Firebase ID token for the currently logged-in user.
  * @returns {Promise<string | null>} The ID token or null if not logged in.
@@ -59,7 +61,7 @@ const handleResponse = async (response: Response, filename: string): Promise<any
  * @returns {URL} A URL object with the filename properly encoded.
  */
 const buildConfigUrl = (endpoint: string, filename: string): URL => {
-    const url = new URL(`/${endpoint}`, window.location.origin);
+    const url = new URL(`/${endpoint}`, API_BASE_URL);
     url.searchParams.append('filename', filename);
     return url;
 };
@@ -96,7 +98,7 @@ export const saveConfigFile = async (filename: string, content: string): Promise
  */
 export const loadUserState = async (key: string): Promise<object> => {
     const token = await getAuthToken();
-    const response = await fetch(`/api/user-state/${key}`, {
+    const response = await fetch(`${API_BASE_URL}/api/user-state/${key}`, {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
     });
     if (response.status === 401) {
@@ -114,7 +116,7 @@ export const loadUserState = async (key: string): Promise<object> => {
  */
 export const saveUserState = async (key: string, value: any): Promise<object> => {
     const token = await getAuthToken();
-    const response = await fetch('/api/user-state', {
+    const response = await fetch(`${API_BASE_URL}/api/user-state`, {
         method: "POST",
         headers: { 
             "Content-Type": "application/json",

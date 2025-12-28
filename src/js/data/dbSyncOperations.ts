@@ -15,7 +15,7 @@ type IDBPDatabase = any;
 type SimpleStateValue = any;
 type UserStateDef = any;
 
-const API_BASE_URL: string = window.location.origin;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 interface Operation {
     id?: number;
@@ -415,9 +415,13 @@ async function _fetchItemsInBatches(guids: string[], app: AppState | null, total
             return null;
         }
         const batch = guids.slice(i, i + BATCH_SIZE);
+        const token = await getAuthToken();
         const response = await fetch(`${API_BASE_URL}/api/feed-items`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ guids: batch })
         });
 
@@ -452,9 +456,13 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
 
     try {
         // 1. Fetch current feed from worker (which handles the RSS parsing/cleaning)
+        const token = await getAuthToken();
         const response: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            }
         });
 
         if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-items`);

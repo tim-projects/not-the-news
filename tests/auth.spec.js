@@ -73,6 +73,7 @@ test.describe('Authentication Flow', () => {
         // Open settings
         await page.click('#settings-button');
         await page.click('#configure-advanced-settings-btn');
+        await page.waitForSelector('#advanced-settings-block', { state: 'visible' });
         
         // Click logout
         await page.click('#logout-button');
