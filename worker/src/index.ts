@@ -1,82 +1,187 @@
 import { MappedFeedItem, ReadItem, StarredItem, DeckItem, ShuffledOutItem, PendingOperation } from '../../src/types/app';
 import { processFeeds, FeedItem } from './rss';
-import fs from 'node:fs';
-import path from 'node:path';
 import * as jose from 'jose';
 
 // Minimal types for the worker
 interface Env {
     APP_PASSWORD?: string;
     FIREBASE_PROJECT_ID?: string;
+    FIREBASE_SERVICE_ACCOUNT_EMAIL?: string;
+    FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
 }
 
-const DATA_DIR = fs.existsSync('/data') ? '/data' : '/tmp';
-const USER_STATE_ROOT = path.join(DATA_DIR, 'user_state');
+/**
+ * Helper to get a Google OAuth2 Access Token for Firestore
+ */
+async function getGoogleAccessToken(env: Env): Promise<string> {
+    const email = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY;
+
+    if (!email || !privateKey) {
+        throw new Error("Missing Firestore Service Account credentials in environment.");
+    }
+
+    const cleanedKey = privateKey.replace(/\\n/g, '\n');
+    const algorithm = 'RS256';
+    const pkcs8 = await jose.importPKCS8(cleanedKey, algorithm);
+
+    const jwt = await new jose.SignJWT({
+        scope: 'https://www.googleapis.com/auth/datastore',
+    })
+        .setProtectedHeader({ alg: algorithm })
+        .setIssuer(email)
+        .setSubject(email)
+        .setAudience('https://oauth2.googleapis.com/token')
+        .setExpirationTime('1h')
+        .setIssuedAt()
+        .sign(pkcs8);
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: jwt,
+        }),
+    });
+
+    const data: any = await response.json();
+    if (!data.access_token) {
+        throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
+    }
+    return data.access_token;
+}
 
 class Storage {
     static memCache: Record<string, any> = {};
 
-    static ensureDirs(uid: string) {
-        const userDir = path.join(USER_STATE_ROOT, uid);
-        try {
-            if (!fs.existsSync(DATA_DIR)) {
-                fs.mkdirSync(DATA_DIR, { recursive: true });
+    /**
+     * Firestore Helper: Convert any value to Firestore JSON format
+     */
+    static toFirestoreValue(value: any): any {
+        if (value === null || value === undefined) return { nullValue: null };
+        if (typeof value === 'boolean') return { booleanValue: value };
+        if (typeof value === 'number') return { doubleValue: value };
+        if (typeof value === 'string') return { stringValue: value };
+        if (Array.isArray(value)) return { arrayValue: { values: value.map(v => this.toFirestoreValue(v)) } };
+        if (typeof value === 'object') {
+            const fields: Record<string, any> = {};
+            for (const k in value) {
+                fields[k] = this.toFirestoreValue(value[k]);
             }
-            if (!fs.existsSync(USER_STATE_ROOT)) {
-                fs.mkdirSync(USER_STATE_ROOT, { recursive: true });
-            }
-            if (!fs.existsSync(userDir)) {
-                fs.mkdirSync(userDir, { recursive: true });
-            }
-        } catch (e: any) {
-            console.error(`[Worker] Directory creation failed. Error: ${e.message}`);
+            return { mapValue: { fields } };
         }
+        return { stringValue: String(value) };
     }
 
-    static getUserStatePath(uid: string, key: string): string {
-        return path.join(USER_STATE_ROOT, uid, `${key}.json`);
+    /**
+     * Firestore Helper: Parse Firestore JSON format back to JS
+     */
+    static fromFirestoreValue(fValue: any): any {
+        if ('nullValue' in fValue) return null;
+        if ('booleanValue' in fValue) return fValue.booleanValue;
+        if ('doubleValue' in fValue) return fValue.doubleValue;
+        if ('integerValue' in fValue) return parseInt(fValue.integerValue);
+        if ('stringValue' in fValue) return fValue.stringValue;
+        if ('arrayValue' in fValue) return (fValue.arrayValue.values || []).map((v: any) => this.fromFirestoreValue(v));
+        if ('mapValue' in fValue) {
+            const result: Record<string, any> = {};
+            const fields = fValue.mapValue.fields || {};
+            for (const k in fields) {
+                result[k] = this.fromFirestoreValue(fields[k]);
+            }
+            return result;
+        }
+        return null;
     }
 
-    static loadState(uid: string, key: string): { value: any, lastModified: string | null } {
+    static async loadState(uid: string, key: string, env: Env): Promise<{ value: any, lastModified: string | null }> {
         const cacheKey = `${uid}:${key}`;
-        // Check memory cache first
-        if (this.memCache[cacheKey]) {
-            return this.memCache[cacheKey];
-        }
+        if (this.memCache[cacheKey]) return this.memCache[cacheKey];
 
-        const filePath = this.getUserStatePath(uid, key);
-        
-        if (!fs.existsSync(filePath)) {
+        const projectId = env.FIREBASE_PROJECT_ID;
+        const token = await getGoogleAccessToken(env);
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/state/${key}`;
+
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.status === 404) {
             const def = USER_STATE_SERVER_DEFAULTS[key];
             return { value: def ? def.default : null, lastModified: null };
         }
-        try {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const parsed = JSON.parse(content);
-            this.memCache[cacheKey] = parsed; // Populate cache
-            return parsed;
-        } catch (e) {
-            console.error(`[Worker] Error loading state for ${key}:`, e);
-            return { value: null, lastModified: null };
+
+        if (!response.ok) {
+            console.error(`[Firestore] Load Error ${response.status} for ${key}`);
+            const def = USER_STATE_SERVER_DEFAULTS[key];
+            return { value: def ? def.default : null, lastModified: null };
         }
+
+        const data: any = await response.json();
+        const value = this.fromFirestoreValue(data.fields.value);
+        const lastModified = data.updateTime;
+
+        const result = { value, lastModified };
+        this.memCache[cacheKey] = result;
+        return result;
     }
 
-    static saveState(uid: string, key: string, value: any): string {
-        this.ensureDirs(uid);
-        const now = new Date().toISOString();
-        const data = { value, lastModified: now };
-        
-        // Update memory cache
-        const cacheKey = `${uid}:${key}`;
-        this.memCache[cacheKey] = data;
+    static async saveState(uid: string, key: string, value: any, env: Env): Promise<string> {
+        const projectId = env.FIREBASE_PROJECT_ID;
+        const token = await getGoogleAccessToken(env);
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/state/${key}`;
 
-        const filePath = this.getUserStatePath(uid, key);
-        try {
-            fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-        } catch (e: any) {
-            console.error(`[Worker] Failed to write to ${filePath}: ${e.message}`);
+        const firestoreData = {
+            fields: {
+                value: this.toFirestoreValue(value)
+            }
+        };
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(firestoreData)
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            console.error(`[Firestore] Save Error ${response.status} for ${key}: ${err}`);
+            return new Date().toISOString();
         }
-        return now;
+
+        const data: any = await response.json();
+        const lastModified = data.updateTime;
+
+        // Update cache
+        this.memCache[`${uid}:${key}`] = { value, lastModified };
+        return lastModified;
+    }
+
+    static async resetUser(uid: string, env: Env): Promise<void> {
+        // Firestore REST API doesn't support deleting a whole collection easily,
+        // but we can delete individual documents if we knew them.
+        // For simplicity, we just clear the keys we know about.
+        const keys = Object.keys(USER_STATE_SERVER_DEFAULTS);
+        for (const key of keys) {
+            const projectId = env.FIREBASE_PROJECT_ID;
+            const token = await getGoogleAccessToken(env);
+            const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/state/${key}`;
+            await fetch(url, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        }
+        
+        // Clear memCache
+        for (const cacheKey in Storage.memCache) {
+            if (cacheKey.startsWith(`${uid}:`)) {
+                delete Storage.memCache[cacheKey];
+            }
+        }
     }
 }
 
@@ -93,7 +198,7 @@ async function verifyFirebaseToken(token: string, projectId: string) {
     return payload;
 }
 
-// In-memory cache for feed items (Global for now, but feeds could be user-specific later)
+// Global cache for feeds (to avoid repeated parsing)
 let cachedFeedItems: FeedItem[] = [];
 let lastSyncTime: string | null = null;
 
@@ -158,8 +263,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 }
 
 async function syncFeeds(uid: string, env: Env): Promise<Response> {
-    const { value: feedsConfig } = Storage.loadState(uid, 'rssFeeds');
-    const { value: blacklist } = Storage.loadState(uid, 'keywordBlacklist');
+    const { value: feedsConfig } = await Storage.loadState(uid, 'rssFeeds', env);
+    const { value: blacklist } = await Storage.loadState(uid, 'keywordBlacklist', env);
     
     // Extract URLs from nested or flat config
     const feedUrls: string[] = [];
@@ -190,19 +295,11 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
         const items = await processFeeds(feedUrls, blacklist || []);
         
         // Merge with existing global cache to avoid losing items other users might need
-        // (This is a bit simplistic, but works for now)
         const existingGuids = new Set(cachedFeedItems.map(i => i.guid));
         const newItems = items.filter(i => !existingGuids.has(i.guid));
         cachedFeedItems.push(...newItems);
         
         lastSyncTime = new Date().toISOString();
-        // Save cached items to disk
-        const cachePath = path.join(DATA_DIR, 'feed_cache.json');
-        try {
-            fs.writeFileSync(cachePath, JSON.stringify({ items: cachedFeedItems, lastSyncTime }));
-        } catch (e: any) {
-            console.error(`[Worker] Failed to write feed cache to ${cachePath}: ${e.message}`);
-        }
         
         return new Response(JSON.stringify({ status: 'ok', count: items.length }), {
             headers: { 'Content-Type': 'application/json' }
@@ -214,20 +311,6 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        // Hydrate cache if empty
-        if (cachedFeedItems.length === 0) {
-            const cachePath = path.join(DATA_DIR, 'feed_cache.json');
-            if (fs.existsSync(cachePath)) {
-                try {
-                    const cache = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
-                    cachedFeedItems = cache.items;
-                    lastSyncTime = cache.lastSyncTime;
-                } catch (e) {
-                    console.error('[Worker] Cache hydration failed:', e);
-                }
-            }
-        }
-
         const url = new URL(request.url);
         const pathName = url.pathname;
 
@@ -252,21 +335,12 @@ export default {
         } else if (cookie?.includes('auth=seeding')) {
             uid = 'seeding-user'; // Special UID for initial seeding
         } else if (pathName.startsWith('/api/') && pathName !== '/api/time' && pathName !== '/api/login') {
-            // For now, allow transition but log it
-            console.warn(`[Worker] Unauthenticated request to ${pathName}`);
-            // In a strict multi-user app, we would return 401 here.
-            // return new Response('Unauthorized', { status: 401 });
-            
-            // Temporary: map unauthenticated users to a "legacy" UID or just block them?
-            // The user wants multi-user, so let's enforce it for API calls.
             if (pathName !== '/api/login') {
                  return new Response('Unauthorized: No Token Provided', { status: 401 });
             }
         }
 
         if (pathName === '/api/login' && request.method === 'POST') {
-            // Legacy login - we can keep it for a while or remove it.
-            // Let's keep it but it won't be used by the new frontend.
             return new Response(JSON.stringify({ error: 'Use Firebase Auth' }), { status: 410 });
         }
 
@@ -281,10 +355,6 @@ export default {
         }
 
         if (pathName === '/api/feed-guids') {
-            // Filter guids based on user's feeds
-            const { value: feedsConfig } = Storage.loadState(uid, 'rssFeeds');
-            // For now, just return all guids to avoid complexity, but in the future
-            // we should only return items belonging to the user's feeds.
             return new Response(JSON.stringify({
                 guids: cachedFeedItems.map(i => i.guid),
                 serverTime: lastSyncTime || new Date().toISOString()
@@ -315,7 +385,7 @@ export default {
         if (pathName.startsWith('/api/user-state/')) {
             const key = pathName.split('/').pop();
             if (key) {
-                const state = Storage.loadState(uid, key);
+                const state = await Storage.loadState(uid, key, env);
                 if (state.value === null && !USER_STATE_SERVER_DEFAULTS[key]) {
                     return new Response('Not Found', { status: 404 });
                 }
@@ -330,17 +400,17 @@ export default {
             const results = [];
             for (const op of operations) {
                 if (op.type === 'simpleUpdate') {
-                    const lastModified = Storage.saveState(uid, op.key, op.value);
+                    const lastModified = await Storage.saveState(uid, op.key, op.value, env);
                     results.push({ id: op.id, status: 'success', lastModified });
                 } else if (op.type === 'readDelta' || op.type === 'starDelta') {
                     const key = op.type === 'readDelta' ? 'read' : 'starred';
-                    const { value: current } = Storage.loadState(uid, key);
+                    const { value: current } = await Storage.loadState(uid, key, env);
                     const arr = Array.isArray(current) ? current : [];
                     const filtered = arr.filter((i: any) => i.guid !== op.guid);
                     if (op.action === 'add') {
                         filtered.push({ guid: op.guid, timestamp: new Date().toISOString() });
                     }
-                    const lastModified = Storage.saveState(uid, key, filtered);
+                    const lastModified = await Storage.saveState(uid, key, filtered, env);
                     results.push({ id: op.id, status: 'success', lastModified });
                 }
             }
@@ -352,7 +422,7 @@ export default {
         if (pathName === '/api/admin/config-backup') {
             const config: Record<string, any> = {};
             for (const key in USER_STATE_SERVER_DEFAULTS) {
-                const state = Storage.loadState(uid, key);
+                const state = await Storage.loadState(uid, key, env);
                 if (state.value !== null) config[key] = state.value;
             }
             return new Response(JSON.stringify(config), {
@@ -364,7 +434,7 @@ export default {
             const config = await request.json();
             for (const key in config) {
                 if (USER_STATE_SERVER_DEFAULTS[key]) {
-                    Storage.saveState(uid, key, config[key]);
+                    await Storage.saveState(uid, key, config[key], env);
                 }
             }
             return new Response(JSON.stringify({ status: 'ok' }), {
@@ -373,19 +443,7 @@ export default {
         }
 
         if (pathName === '/api/admin/reset-app' && request.method === 'POST') {
-            const userDir = path.join(USER_STATE_ROOT, uid);
-            if (fs.existsSync(userDir)) {
-                const files = fs.readdirSync(userDir);
-                for (const file of files) {
-                    fs.unlinkSync(path.join(userDir, file));
-                }
-            }
-            // Clear memCache for this user
-            for (const cacheKey in Storage.memCache) {
-                if (cacheKey.startsWith(`${uid}:`)) {
-                    delete Storage.memCache[cacheKey];
-                }
-            }
+            await Storage.resetUser(uid, env);
             return new Response(JSON.stringify({ status: 'ok' }), {
                 headers: { 'Content-Type': 'application/json' }
             });

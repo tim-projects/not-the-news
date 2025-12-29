@@ -125,16 +125,16 @@ fi
     podman system prune -f # Added for --no-cache builds
 }
 
-# Load environment variables from .env if it exists
-if [ -f ".env" ]; then
-    echo "Loading .env for build arguments..."
+# Load environment variables from .env.development if it exists
+if [ -f ".env.development" ]; then
+    echo "Loading .env.development for build arguments..."
     # We want to extract VITE_FIREBASE_* variables
     while IFS='=' read -r key value; do
         if [[ $key == VITE_FIREBASE_* ]]; then
             echo "Found build arg: $key"
             BUILD_ARGS+=("--build-arg" "$key=$value")
         fi
-    done < .env
+    done < .env.development
 fi
 
 # Build process
@@ -149,7 +149,7 @@ echo "Starting build process..."
     podman run -d -p 8085:80 -p 8443:443 \
         -v "$VOLUME_NAME":/data \
         -v "$(pwd)"/build_entrypoint.sh:/usr/local/bin/docker-entrypoint.sh \
-        -v "$(pwd)"/.env:/app/.env \
+        -v "$(pwd)"/.env.development:/app/.env \
         -v "$(pwd)"/Caddyfile-dev:/etc/caddy/Caddyfile \
         -v "$(pwd)"/data/config/rssFeeds.json:/data/config/rssFeeds.json \
         -v "$(pwd)"/data/config/keywordBlacklist.json:/data/config/keywordBlacklist.json \

@@ -31,8 +31,8 @@ ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID \
     VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
 
-# NEW STEP: Build the frontend assets using Vite
-RUN npm run build
+# NEW STEP: Build the frontend assets using Vite in development mode
+RUN npm run build -- --mode development
 
 ##############################################################################
 # 1. Main Development Container

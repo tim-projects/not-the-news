@@ -110,10 +110,17 @@ if [ -f "/app/.env" ]; then
     # Export VITE_ variables and also map them to worker-expected names
     export $(grep -v '^#' /app/.env | xargs)
     export FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
+    export FIREBASE_SERVICE_ACCOUNT_EMAIL=${FIREBASE_SERVICE_ACCOUNT_EMAIL}
+    export FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY=${FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY}
 fi
 
 # Start the Cloudflare Worker locally using Wrangler
-cd /app/worker && gosu appuser npm install && gosu appuser env HOME=/tmp npx wrangler dev --port 8787 --ip 0.0.0.0 --var APP_PASSWORD:$APP_PASSWORD --var FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID &
+cd /app/worker && gosu appuser npm install && gosu appuser env HOME=/tmp \
+    APP_PASSWORD=$APP_PASSWORD \
+    FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID \
+    FIREBASE_SERVICE_ACCOUNT_EMAIL=$FIREBASE_SERVICE_ACCOUNT_EMAIL \
+    FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY="$FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY" \
+    npx wrangler dev --port 8787 --ip 0.0.0.0 &
 
 # Run seed script in background (will wait for worker)
 gosu appuser node /app/seed_config.js &
