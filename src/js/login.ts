@@ -59,23 +59,34 @@ if (loginForm) {
         // Allow test@example.com with the dev password to log in
         if (email === 'test@example.com' && password === 'devtestpwd') {
             console.log("[Auth] Using test account bypass...");
-            if (loginBtn) loginBtn.disabled = true;
+            if (loginBtn) {
+                loginBtn.disabled = true;
+                loginBtn.dataset.authStatus = "attempting_bypass";
+            }
             try {
                 // Try anonymous first
                 await signInAnonymously(auth);
+                if (loginBtn) loginBtn.dataset.authStatus = "success_anon";
                 return;
             } catch (anonError: any) {
                 console.warn("[Auth] Anonymous login failed, trying email signup for test account:", anonError.message);
+                if (loginBtn) loginBtn.dataset.authStatus = "trying_email_fallback";
                 try {
                     // Fallback to real account for test credentials
                     await signInWithEmailAndPassword(auth, email, password);
+                    if (loginBtn) loginBtn.dataset.authStatus = "success_email";
                     return;
                 } catch (signInError: any) {
                     try {
                         await createUserWithEmailAndPassword(auth, email, password);
+                        if (loginBtn) loginBtn.dataset.authStatus = "success_created";
                         return;
                     } catch (createError: any) {
                         console.error("[Auth] Bypass failed completely:", createError.message);
+                        if (loginBtn) {
+                            loginBtn.dataset.authStatus = "failed";
+                            loginBtn.disabled = false;
+                        }
                     }
                 }
             }

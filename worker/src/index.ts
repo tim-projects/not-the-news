@@ -103,17 +103,20 @@ class Storage {
         const token = await getGoogleAccessToken(env);
         const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/state/${key}`;
 
+        console.log(`[Firestore] GET ${url}`);
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.status === 404) {
+            console.log(`[Firestore] ${key} not found (404), using defaults.`);
             const def = USER_STATE_SERVER_DEFAULTS[key];
             return { value: def ? def.default : null, lastModified: null };
         }
 
         if (!response.ok) {
-            console.error(`[Firestore] Load Error ${response.status} for ${key}`);
+            const errBody = await response.text();
+            console.error(`[Firestore] Load Error ${response.status} for ${key}: ${errBody}`);
             const def = USER_STATE_SERVER_DEFAULTS[key];
             return { value: def ? def.default : null, lastModified: null };
         }
@@ -132,6 +135,7 @@ class Storage {
         const token = await getGoogleAccessToken(env);
         const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/state/${key}`;
 
+        console.log(`[Firestore] PATCH ${url}`);
         const firestoreData = {
             fields: {
                 value: this.toFirestoreValue(value)
@@ -153,6 +157,7 @@ class Storage {
             return new Date().toISOString();
         }
 
+        console.log(`[Firestore] Successfully saved ${key}`);
         const data: any = await response.json();
         const lastModified = data.updateTime;
 
@@ -344,11 +349,32 @@ export default {
             return new Response(JSON.stringify({ error: 'Use Firebase Auth' }), { status: 410 });
         }
 
-        if (pathName === '/api/time') {
-            return new Response(JSON.stringify({ time: new Date().toISOString() }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+        // Admin endpoints (internal use during seed)
+        if (url.pathname === '/api/admin/config-restore' && request.method === 'POST') {
+            try {
+                const config = await request.json() as any;
+                const uid = 'admin-seed'; // Use a special UID for seeding or just map to a default user
+                
+                if (config.rssFeeds) {
+                    await Storage.saveState(uid, 'rssFeeds', config.rssFeeds, env);
+                }
+                if (config.keywordBlacklist) {
+                    await Storage.saveState(uid, 'keywordBlacklist', config.keywordBlacklist, env);
+                }
+                
+                return new Response(JSON.stringify({ status: 'ok' }), {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (e: any) {
+                return new Response(JSON.stringify({ error: e.message }), {
+                    status: 500,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
         }
+
+        // Time endpoint (auth check)
+        if (url.pathname === '/api/time') {
 
         if (pathName === '/api/feed-sync' && request.method === 'POST') {
             return syncFeeds(uid, env);
@@ -431,15 +457,24 @@ export default {
         }
 
         if (pathName === '/api/admin/config-restore' && request.method === 'POST') {
-            const config = await request.json();
-            for (const key in config) {
-                if (USER_STATE_SERVER_DEFAULTS[key]) {
-                    await Storage.saveState(uid, key, config[key], env);
+            try {
+                const config = await request.json() as any;
+                const targetUid = uid === 'unknown' ? 'admin-seed' : uid;
+                
+                for (const key in config) {
+                    if (USER_STATE_SERVER_DEFAULTS[key]) {
+                        await Storage.saveState(targetUid, key, config[key], env);
+                    }
                 }
+                return new Response(JSON.stringify({ status: 'ok' }), {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (e: any) {
+                return new Response(JSON.stringify({ error: e.message }), {
+                    status: 500,
+                    headers: { 'Content-Type': 'application/json' }
+                });
             }
-            return new Response(JSON.stringify({ status: 'ok' }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
         }
 
         if (pathName === '/api/admin/reset-app' && request.method === 'POST') {
@@ -450,5 +485,5 @@ export default {
         }
 
         return new Response('Not Found', { status: 404 });
-    },
+    }
 };

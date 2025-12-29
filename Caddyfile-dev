@@ -51,12 +51,6 @@ https://vscode.tail06b521.ts.net:443 {
      path /api/admin/*
    }
    handle @protected_api {
-     @unauth {
-       not header Cookie auth*
-       not header Authorization *
-     }
-     respond @unauth "Unauthorized" 401
-     
      reverse_proxy localhost:8787
    }
 
@@ -73,21 +67,8 @@ https://vscode.tail06b521.ts.net:443 {
      file_server
    }
 
-   # Main application with auth redirect for everything else
+   # Main application - no proxy level redirect, main.ts handles it
    handle {
-     @unauth {
-       not header Cookie auth*
-       not path /sw.js
-       not path /login.html
-       not path /manifest.json
-       not path_regexp ^.*\.(css|js|svg|ttf|woff|woff2|png|jpg|jpeg|gif|ico|webp)$
-       not path /js/*
-       not path /images/*
-       not path /assets/*
-       not path /feed.xml
-     }
-     redir @unauth /login.html 302
-
      root * /app/www
      try_files {path} /index.html
      file_server
@@ -147,12 +128,6 @@ http://localhost:80 {
      path /api/admin/*
    }
    handle @protected_api {
-     @unauth {
-       not header Cookie auth*
-       not header Authorization *
-     }
-     respond @unauth "Unauthorized" 401
-     
      reverse_proxy 127.0.0.1:8787
    }
 
@@ -169,21 +144,8 @@ http://localhost:80 {
      file_server
    }
 
-   # Main application with auth redirect for everything else
+   # Main application - no proxy level redirect, main.ts handles it
    handle {
-     @unauth {
-       not header Cookie auth*
-       not path /sw.js
-       not path /login.html
-       not path /manifest.json
-       not path_regexp ^.*\.(css|js|svg|ttf|woff|woff2|png|jpg|jpeg|gif|ico|webp)$
-       not path /js/*
-       not path /images/*
-       not path /assets/*
-       not path /feed.xml
-     }
-     redir @unauth /login.html 302
-
      root * /app/www
      try_files {path} /index.html
      file_server

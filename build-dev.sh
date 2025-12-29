@@ -127,11 +127,18 @@ fi
 
 # Load environment variables from .env.development if it exists
 if [ -f ".env.development" ]; then
-    echo "Loading .env.development for build arguments..."
-    # We want to extract VITE_FIREBASE_* variables
-    while IFS='=' read -r key value; do
+    echo "Loading and exporting .env.development..."
+    # Source the file and export everything in it
+    set -a
+    source .env.development
+    set +a
+    
+    # Still add them to BUILD_ARGS for the build stage
+    while IFS='=' read -r key value || [ -n "$key" ]; do
+        key=$(echo "$key" | tr -d '\r' | xargs)
+        value=$(echo "$value" | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')
+        [[ -z "$key" || "$key" =~ ^# ]] && continue
         if [[ $key == VITE_FIREBASE_* ]]; then
-            echo "Found build arg: $key"
             BUILD_ARGS+=("--build-arg" "$key=$value")
         fi
     done < .env.development
@@ -155,9 +162,14 @@ echo "Starting build process..."
         -v "$(pwd)"/data/config/keywordBlacklist.json:/data/config/keywordBlacklist.json \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.crt:/etc/caddy/certs/vscode.tail06b521.ts.net.crt \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.key:/etc/caddy/certs/vscode.tail06b521.ts.net.key \
-        --name ntn-dev not-the-news-dev && \
-    echo "Build and run successful. Cleaning up unused Podman resources to save space..." && \
-    podman system prune -a -f
+        -e VITE_FIREBASE_API_KEY="$VITE_FIREBASE_API_KEY" \
+        -e VITE_FIREBASE_AUTH_DOMAIN="$VITE_FIREBASE_AUTH_DOMAIN" \
+        -e VITE_FIREBASE_PROJECT_ID="$VITE_FIREBASE_PROJECT_ID" \
+        -e VITE_FIREBASE_STORAGE_BUCKET="$VITE_FIREBASE_STORAGE_BUCKET" \
+        -e VITE_FIREBASE_MESSAGING_SENDER_ID="$VITE_FIREBASE_MESSAGING_SENDER_ID" \
+        -e VITE_FIREBASE_APP_ID="$VITE_FIREBASE_APP_ID" \
+        -e API_BASE_URL="http://localhost:8085" \
+        --name ntn-dev not-the-news-dev
 ) || {
     echo "Build failed!" >&2
     exit 1

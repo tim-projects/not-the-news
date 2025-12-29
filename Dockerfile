@@ -2,15 +2,8 @@
 # Stage 0: Frontend Assets Builder with Vite
 # This stage builds your Vite assets (www folder)
 FROM node:20-slim as frontend-builder
-WORKDIR /app
-# Copy package.json and package-lock.json first to leverage Docker cache
-COPY package.json package-lock.json ./
-# Use npm ci for clean install if package-lock.json exists, otherwise npm install
-RUN npm ci || npm install
-# Copy all source files required for the build (e.g., src/, public/ if any)
-COPY . .
 
-# Pass build arguments to Vite
+# Pass build arguments to Vite stage - MUST BE BEFORE WORKDIR
 ARG VITE_FIREBASE_API_KEY
 ARG VITE_FIREBASE_AUTH_DOMAIN
 ARG VITE_FIREBASE_PROJECT_ID
@@ -25,12 +18,17 @@ ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID \
     VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
 
+WORKDIR /app
+# Copy package.json and package-lock.json first to leverage Docker cache
+COPY package.json package-lock.json ./
+# Use npm ci for clean install if package-lock.json exists, otherwise npm install
+RUN npm ci || npm install
+# Copy all source files required for the build (e.g., src/, public/ if any)
+COPY . .
+
 # Run the Vite build command to generate the 'www' directory
-# This uses the `build` script we added to your package.json
-RUN npm run build
-#RUN mv /app/www/src/index.html /app/www/ && \
-#    mv /app/www/src/login.html /app/www/ && \
-#    rm -r /app/www/src
+RUN rm -rf www && \
+    npm run build
 
 ##############################################################################
 # 1. Base image
@@ -99,7 +97,7 @@ COPY ./data/config/keywordBlacklist.json /data/config/keywordBlacklist.json
 ##############################################################################
 # 7. copy Caddyfile (persist to /data, allow ACME_CA override)
 COPY Caddyfile /etc/caddy/Caddyfile
-RUN sed -i "s|{\$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
+RUN sed -i "s|{$EMAIL}|${EMAIL}|g" /etc/caddy/Caddyfile && \
     sed -i "s|{\$ACME_CA:[^}]*}|${ACME_CA}|g" /etc/caddy/Caddyfile && \
     sed -i "s|{\$DOMAIN}|${DOMAIN}|g" /etc/caddy/Caddyfile
 

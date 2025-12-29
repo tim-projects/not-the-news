@@ -4,19 +4,8 @@
 # Stage 0: Frontend Assets Builder with Vite
 # This stage builds your Vite assets (www folder)
 FROM localhost/local-node:20-slim as frontend-builder
-WORKDIR /app
-# Copy package.json and package-lock.json first to leverage Docker cache
-COPY package.json package-lock.json ./
-# Use npm ci for clean install if package-lock.json exists, otherwise npm install
-RUN npm ci || npm install
-# Install Playwright dependencies and browsers
-RUN apt-get update && apt-get install -y \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-# Copy all source files required for the build (e.g., src/, public/ if any)
-COPY . .
 
-# Pass build arguments to Vite
+# Pass build arguments to Vite stage - MUST BE BEFORE WORKDIR
 ARG VITE_FIREBASE_API_KEY
 ARG VITE_FIREBASE_AUTH_DOMAIN
 ARG VITE_FIREBASE_PROJECT_ID
@@ -31,8 +20,25 @@ ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID \
     VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
 
+WORKDIR /app
+# Copy package.json and package-lock.json first to leverage Docker cache
+COPY package.json package-lock.json ./
+# Use npm ci for clean install if package-lock.json exists, otherwise npm install
+RUN npm ci || npm install
+# Install Playwright dependencies and browsers
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+# Copy all source files required for the build (e.g., src/, public/ if any)
+COPY . .
+
+# DEBUG: Verify variables are present
+RUN echo "Checking build environment..." && \
+    if [ -z "$VITE_FIREBASE_API_KEY" ]; then echo "ERROR: VITE_FIREBASE_API_KEY is empty in builder stage!"; exit 1; fi
+
 # NEW STEP: Build the frontend assets using Vite in development mode
-RUN npm run build -- --mode development
+RUN rm -rf www && \
+    npm run build:dev
 
 ##############################################################################
 # 1. Main Development Container

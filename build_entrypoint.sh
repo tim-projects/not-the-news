@@ -107,11 +107,62 @@ chown -R appuser:appgroup /app/worker/data
 # Load environment variables from .env if it exists
 if [ -f "/app/.env" ]; then
     echo "[Entrypoint] Loading .env file..."
-    # Export VITE_ variables and also map them to worker-expected names
-    export $(grep -v '^#' /app/.env | xargs)
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip comments and empty lines
+        [[ $line =~ ^#.*$ ]] && continue
+        [[ -z $line ]] && continue
+        
+        # Split into key and value
+        key=$(echo "$line" | cut -d '=' -f 1)
+        value=$(echo "$line" | cut -d '=' -f 2- | sed 's/^"//;s/"$//')
+        
+        export "$key"="$value"
+    done < "/app/.env"
+
+    # Map VITE_ variables to worker-expected names
     export FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
     export FIREBASE_SERVICE_ACCOUNT_EMAIL=${FIREBASE_SERVICE_ACCOUNT_EMAIL}
     export FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY=${FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY}
+    export API_BASE_URL=${VITE_API_BASE_URL}
+    
+    echo "[Entrypoint] Fixing asset permissions and injecting Firebase config..."
+    # We must ensure we can write to these files even if built by root
+    chown -R appuser:appgroup /app/www/
+    
+    # We target ALL files in /app/www/ to be absolutely sure
+    # We use a pattern that matches the placeholder exactly
+    find /app/www/ -type f -exec sed -i "s|VITE_FIREBASE_API_KEY_PLACEHOLDER|$VITE_FIREBASE_API_KEY|g" {} +
+    find /app/www/ -type f -exec sed -i "s|VITE_FIREBASE_AUTH_DOMAIN_PLACEHOLDER|$VITE_FIREBASE_AUTH_DOMAIN|g" {} +
+    find /app/www/ -type f -exec sed -i "s|VITE_FIREBASE_PROJECT_ID_PLACEHOLDER|$VITE_FIREBASE_PROJECT_ID|g" {} +
+    find /app/www/ -type f -exec sed -i "s|VITE_FIREBASE_STORAGE_BUCKET_PLACEHOLDER|$VITE_FIREBASE_STORAGE_BUCKET|g" {} +
+    find /app/www/ -type f -exec sed -i "s|VITE_FIREBASE_MESSAGING_SENDER_ID_PLACEHOLDER|$VITE_FIREBASE_MESSAGING_SENDER_ID|g" {} +
+    find /app/www/ -type f -exec sed -i "s|VITE_FIREBASE_APP_ID_PLACEHOLDER|$VITE_FIREBASE_APP_ID|g" {} +
+
+    # VERIFICATION - check if the injection happened in the config object specifically
+    echo "[Entrypoint] Verifying injection..."
+    if grep -r "apiKey:\"AIzaSy" /app/www/assets/ > /dev/null; then
+        echo "[Entrypoint] SUCCESS: Firebase API Key found in built assets!"
+    else
+        echo "[Entrypoint] ERROR: API Key NOT found in assets!"
+        exit 1
+    fi
+    
+    echo "[Entrypoint] Injection Proof (first match):"
+    FILE_MATCH=$(grep -l "AIzaSy" /app/www/assets/*.js | head -n 1)
+    if [ -n "$FILE_MATCH" ]; then
+        grep -o "apiKey:\"AIzaSy[^\"]*\"" "$FILE_MATCH"
+    else
+        echo "[Entrypoint] ERROR: API Key NOT FOUND in assets!"
+    fi
+
+    echo "[Entrypoint] Debug: FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
+    echo "[Entrypoint] Debug: API_BASE_URL=$API_BASE_URL"
+    echo "[Entrypoint] Debug: FIREBASE_SERVICE_ACCOUNT_EMAIL=$FIREBASE_SERVICE_ACCOUNT_EMAIL"
+    if [ -n "$FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY" ]; then
+        echo "[Entrypoint] Debug: FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY is set (length: ${#FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY})"
+    else
+        echo "[Entrypoint] Debug: FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY is NOT set"
+    fi
 fi
 
 # Start the Cloudflare Worker locally using Wrangler
@@ -120,6 +171,7 @@ cd /app/worker && gosu appuser npm install && gosu appuser env HOME=/tmp \
     FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID \
     FIREBASE_SERVICE_ACCOUNT_EMAIL=$FIREBASE_SERVICE_ACCOUNT_EMAIL \
     FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY="$FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY" \
+    API_BASE_URL=$API_BASE_URL \
     npx wrangler dev --port 8787 --ip 0.0.0.0 &
 
 # Run seed script in background (will wait for worker)
