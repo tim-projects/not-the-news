@@ -17,6 +17,11 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
     const email = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
     const privateKey = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
+    console.log(`[Auth] Attempting token for: ${email}`);
+    if (privateKey) {
+        console.log(`[Auth] Private key length: ${privateKey.length}, starts with: ${privateKey.substring(0, 20)}`);
+    }
+
     if (!email || !privateKey) {
         throw new Error("Missing Firestore Service Account credentials in environment.");
     }
@@ -349,32 +354,13 @@ export default {
             return new Response(JSON.stringify({ error: 'Use Firebase Auth' }), { status: 410 });
         }
 
-        // Admin endpoints (internal use during seed)
-        if (url.pathname === '/api/admin/config-restore' && request.method === 'POST') {
-            try {
-                const config = await request.json() as any;
-                const uid = 'admin-seed'; // Use a special UID for seeding or just map to a default user
-                
-                if (config.rssFeeds) {
-                    await Storage.saveState(uid, 'rssFeeds', config.rssFeeds, env);
-                }
-                if (config.keywordBlacklist) {
-                    await Storage.saveState(uid, 'keywordBlacklist', config.keywordBlacklist, env);
-                }
-                
-                return new Response(JSON.stringify({ status: 'ok' }), {
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            } catch (e: any) {
-                return new Response(JSON.stringify({ error: e.message }), {
-                    status: 500,
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
+        // Time endpoint
+        if (pathName === '/api/time') {
+            const now = new Date();
+            return new Response(JSON.stringify({ time: now.toISOString(), timestamp: now.getTime() }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
-
-        // Time endpoint (auth check)
-        if (url.pathname === '/api/time') {
 
         if (pathName === '/api/feed-sync' && request.method === 'POST') {
             return syncFeeds(uid, env);
@@ -445,6 +431,7 @@ export default {
             });
         }
 
+        // Admin endpoints (internal use during seed or by admins)
         if (pathName === '/api/admin/config-backup') {
             const config: Record<string, any> = {};
             for (const key in USER_STATE_SERVER_DEFAULTS) {
@@ -459,7 +446,7 @@ export default {
         if (pathName === '/api/admin/config-restore' && request.method === 'POST') {
             try {
                 const config = await request.json() as any;
-                const targetUid = uid === 'unknown' ? 'admin-seed' : uid;
+                const targetUid = uid === 'anonymous' ? 'admin-seed' : uid;
                 
                 for (const key in config) {
                     if (USER_STATE_SERVER_DEFAULTS[key]) {

@@ -63,8 +63,11 @@ fi
 # Load environment variables from .env if it exists
 if [ -f ".env" ]; then
     echo "Loading .env for build arguments..."
-    # We want to extract VITE_FIREBASE_* variables
-    while IFS='=' read -r key value; do
+    # Still add them to BUILD_ARGS for the build stage
+    while IFS='=' read -r key value || [ -n "$key" ]; do
+        key=$(echo "$key" | tr -d '\r' | xargs)
+        value=$(echo "$value" | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')
+        [[ -z "$key" || "$key" =~ ^# ]] && continue
         if [[ $key == VITE_FIREBASE_* ]]; then
             echo "Found build arg: $key"
             BUILD_ARGS+=("--build-arg" "$key=$value")

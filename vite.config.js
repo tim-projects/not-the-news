@@ -6,6 +6,13 @@ export default defineConfig({
   // Set the root to the 'src' directory
   root: 'src',
 
+  // Look for .env files in the project root
+  envDir: '../',
+
+  resolve: {
+    dedupe: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+  },
+
   // Configure the public directory to be the one at the same level as src/
   publicDir: '../public',
 

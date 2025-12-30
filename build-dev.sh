@@ -162,12 +162,7 @@ echo "Starting build process..."
         -v "$(pwd)"/data/config/keywordBlacklist.json:/data/config/keywordBlacklist.json \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.crt:/etc/caddy/certs/vscode.tail06b521.ts.net.crt \
         -v /etc/ssl/certs/vscode.tail06b521.ts.net.key:/etc/caddy/certs/vscode.tail06b521.ts.net.key \
-        -e VITE_FIREBASE_API_KEY="$VITE_FIREBASE_API_KEY" \
-        -e VITE_FIREBASE_AUTH_DOMAIN="$VITE_FIREBASE_AUTH_DOMAIN" \
-        -e VITE_FIREBASE_PROJECT_ID="$VITE_FIREBASE_PROJECT_ID" \
-        -e VITE_FIREBASE_STORAGE_BUCKET="$VITE_FIREBASE_STORAGE_BUCKET" \
-        -e VITE_FIREBASE_MESSAGING_SENDER_ID="$VITE_FIREBASE_MESSAGING_SENDER_ID" \
-        -e VITE_FIREBASE_APP_ID="$VITE_FIREBASE_APP_ID" \
+        --env-file .env.development \
         -e API_BASE_URL="http://localhost:8085" \
         --name ntn-dev not-the-news-dev
 ) || {

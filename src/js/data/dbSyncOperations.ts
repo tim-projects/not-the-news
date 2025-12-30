@@ -95,12 +95,26 @@ import { auth } from '../firebase';
 
 /**
  * Retrieves the Firebase ID token for the currently logged-in user.
+ * Includes a small retry loop to handle the race condition during app initialization.
  * @returns {Promise<string | null>} The ID token or null if not logged in.
  */
-const getAuthToken = async (): Promise<string | null> => {
-    const user = auth.currentUser;
-    if (!user) return null;
-    return user.getIdToken();
+const getAuthToken = async (maxRetries = 10): Promise<string | null> => {
+    let retries = 0;
+    while (retries < maxRetries) {
+        const user = auth.currentUser;
+        if (user) {
+            try {
+                return await user.getIdToken();
+            } catch (e) {
+                console.error("[Auth] Failed to get ID token:", e);
+            }
+        }
+        // Small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 200));
+        retries++;
+    }
+    console.warn(`[Auth] Could not obtain token after ${maxRetries} attempts.`);
+    return null;
 };
 
 /**
@@ -125,11 +139,16 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
             console.log(`[DB] Attempting immediate sync for ${operation.type} (ID: ${generatedId}).`);
             const syncPayload: Operation[] = [{ ...operation, id: generatedId }];
             const token = await getAuthToken();
+            if (!token) {
+                console.warn(`[DB] No auth token available for immediate sync, buffering op ${generatedId}.`);
+                return;
+            }
+
             const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                    "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify(syncPayload)
             });
@@ -197,11 +216,16 @@ export async function processPendingOperations(): Promise<void> {
 
     try {
         const token = await getAuthToken();
+        if (!token) {
+            console.warn('[DB] No auth token available for batch sync.');
+            return;
+        }
+
         const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify(operations)
         });
@@ -285,9 +309,14 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
     const localTimestamp: string = lastModified || '';
     
     const token = await getAuthToken();
+    if (!token) {
+        console.warn(`[DB] No auth token available for ${key}, skipping pull.`);
+        return { key, status: 'no_token' };
+    }
+
     const headers: { [key: string]: string } = { 
         'Content-Type': 'application/json',
-        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        "Authorization": `Bearer ${token}`
     };
     if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
@@ -416,11 +445,16 @@ async function _fetchItemsInBatches(guids: string[], app: AppState | null, total
         }
         const batch = guids.slice(i, i + BATCH_SIZE);
         const token = await getAuthToken();
+        if (!token) {
+            console.warn('[DB] No auth token available for batch fetch.');
+            return null;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/feed-items`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({ guids: batch })
         });
@@ -457,11 +491,16 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
     try {
         // 1. Fetch current feed from worker (which handles the RSS parsing/cleaning)
         const token = await getAuthToken();
+        if (!token) {
+            console.warn('[DB] No auth token available for feed sync.');
+            return false;
+        }
+
         const response: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
             method: 'GET',
             headers: { 
                 'Content-Type': 'application/json',
-                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                "Authorization": `Bearer ${token}`
             }
         });
 

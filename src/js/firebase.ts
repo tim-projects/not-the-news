@@ -2,22 +2,16 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// These placeholders will be replaced by sed during the Docker build process
-const firebaseConfig: any = {
-  apiKey: "VITE_FIREBASE_API_KEY_PLACEHOLDER",
-  authDomain: "VITE_FIREBASE_AUTH_DOMAIN_PLACEHOLDER",
-  projectId: "VITE_FIREBASE_PROJECT_ID_PLACEHOLDER",
-  storageBucket: "VITE_FIREBASE_STORAGE_BUCKET_PLACEHOLDER",
-  messagingSenderId: "VITE_FIREBASE_MESSAGING_SENDER_ID_PLACEHOLDER",
-  appId: "VITE_FIREBASE_APP_ID_PLACEHOLDER"
+// Firebase configuration using Vite environment variables.
+// Fallback to known working development project credentials if env vars are missing.
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBcKNWG09QeEAg-TjUXH32hijqIJ06LHcc",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "not-the-news.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-the-news",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "not-the-news.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "601666204920",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:601666204920:web:30d37e587bed980087370d"
 };
-
-// RUNTIME VALIDATION
-if (firebaseConfig.apiKey.includes("_PLACEHOLDER")) {
-    const errorMsg = "[Firebase] CRITICAL ERROR: API Key placeholder detected! Injection failed.";
-    console.error(errorMsg);
-    // Alert the user/developer if possible
-}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

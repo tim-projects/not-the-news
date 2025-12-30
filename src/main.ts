@@ -111,7 +111,71 @@ export function rssApp(): AppState {
         // --- State Properties ---
         loading: true,
         progressMessage: 'Initializing...',
-        // ... (rest of props)
+        deck: [],
+        feedItems: {},
+        filterMode: 'unread',
+        openSettings: false,
+        openShortcuts: false,
+        modalView: 'main',
+        showSearchBar: false,
+        searchQuery: '',
+        shuffleCount: 0,
+        lastShuffleResetDate: null,
+        syncEnabled: true,
+        imagesEnabled: true,
+        itemButtonMode: 'play',
+        openUrlsInNewTabEnabled: true,
+        rssFeedsInput: '',
+        keywordBlacklistInput: '',
+        discoveryUrl: '',
+        isDiscovering: false,
+        discoveryResults: [],
+        discoveryError: '',
+        shadowsEnabled: true,
+        curvesEnabled: true,
+        flickToSelectEnabled: true,
+        entries: [],
+        read: [],
+        starred: [],
+        currentDeckGuids: [],
+        shuffledOutGuids: [],
+        pregeneratedOnlineDeck: null,
+        pregeneratedOfflineDeck: null,
+        errorMessage: '',
+        isOnline: isOnline(),
+        deckManaged: false,
+        syncStatusMessage: '',
+        showSyncStatus: false,
+        theme: 'dark',
+        themeStyle: 'originalDark',
+        themeStyleLight: 'originalLight',
+        themeStyleDark: 'originalDark',
+        customCss: '',
+        fontSize: 100,
+        feedWidth: 50,
+        showUndo: false,
+        undoTimerActive: false,
+        undoItemGuid: null,
+        undoItemIndex: null,
+        undoStack: [],
+        undoBtnRadius: 20,
+        selectedGuid: null,
+        selectedSubElement: 'item',
+        selectedTimestamp: null,
+        lastSelectedGuid: null,
+        starredGuid: null,
+        readingGuid: null,
+        speakingGuid: null,
+        closingGuid: null,
+        db: null,
+        _lastFilterHash: '',
+        _cachedFilteredEntries: null,
+        scrollObserver: null,
+        imageObserver: null,
+        staleItemObserver: null,
+        _initComplete: false,
+        _isSyncing: false,
+        _isPregenerating: false,
         
         // --- Core Methods ---
         initApp: async function(this: AppState): Promise<void> {
@@ -132,6 +196,7 @@ export function rssApp(): AppState {
                     }
                 } else {
                     initialAuthChecked = true; // Mark that we found a user during init
+                    console.log("[Auth] User verified, proceeding with data initialization.");
                 }
 
                 this.progressMessage = 'Connecting to database...';
@@ -154,7 +219,7 @@ export function rssApp(): AppState {
                 // Refresh online status immediately before potentially starting sync
                 this.isOnline = isOnline();
 
-                if (this.isOnline) {
+                if (this.isOnline && initialAuthChecked) {
                     this.progressMessage = 'Syncing latest content...'; // Set specific sync message
                     
                     // STABILITY: Double-check connectivity before each network call

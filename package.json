@@ -30,7 +30,6 @@
   },
   "dependencies": {
     "alpinejs": "^3.14.9",
-    "firebase": "^12.7.0",
-    "nvm": "^0.0.4"
+    "firebase": "^12.7.0"
   }
 }

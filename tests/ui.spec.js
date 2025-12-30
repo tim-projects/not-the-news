@@ -89,28 +89,29 @@ test.describe('UI Elements and Interactions', () => {
         await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
         console.log('Header is visible. Main UI rendered.');
         
-        // Removed waitForLoadState('networkidle') as it can hang with Service Workers/Background Sync
-
-        // NEW: Ensure at least one feed is configured
-        const configResponse = await page.evaluate(async () => {
-            const resp = await fetch('/api/user-state/rssFeeds');
-            return await resp.json();
+        // NEW: Ensure at least one feed is configured using the app's own state
+        const feedsCount = await page.evaluate(async () => {
+            const app = window.Alpine.$data(document.getElementById('app'));
+            if (!app) return 0;
+            // Wait for initial load if needed
+            let attempts = 0;
+            while (!app.rssFeedsInput && attempts < 20) {
+                await app.loadRssFeeds();
+                if (app.rssFeedsInput) break;
+                await new Promise(r => setTimeout(r, 200));
+                attempts++;
+            }
+            return app.rssFeedsInput.trim().length;
         });
         
-        if (!configResponse.value || Object.keys(configResponse.value).length === 0) {
+        if (feedsCount === 0) {
             console.log('No feeds configured in test environment. Adding Hacker News...');
             await page.evaluate(async () => {
-                await fetch('/api/user-state', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify([{
-                        type: 'simpleUpdate',
-                        key: 'rssFeeds',
-                        value: { "Tech": { "Default": [{ "url": "https://news.ycombinator.com/rss" }] } }
-                    }])
-                });
-                // Trigger sync
-                await fetch('/api/feed-sync', { method: 'POST' });
+                const app = window.Alpine.$data(document.getElementById('app'));
+                app.rssFeedsInput = 'https://news.ycombinator.com/rss';
+                await app.saveRssFeeds();
+                // Trigger worker sync via the app's established endpoint if possible, 
+                // but saveRssFeeds already triggers a full sync.
             });
             // Wait a moment for worker to finish first sync
             await page.waitForTimeout(5000);

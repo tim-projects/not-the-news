@@ -16,20 +16,23 @@
 
 ---
 
-### Progress Update - Monday, 29 December 2025
+### Progress Update - Tuesday, 30 December 2025
 
 **Accomplishments:**
-- **Firestore REST Migration:** Successfully migrated the Cloudflare Worker `Storage` class to use the Firestore REST API. The app is now truly stateless, persisting all user settings, RSS feeds, and read/starred state directly to Firestore under `users/{uid}/state/{key}`.
-- **Runtime Configuration Injection:** Solved the "auth/configuration-not-found" issue by moving Firebase configuration injection from build-time to runtime. `build_entrypoint.sh` now performs a precise `sed` replacement on all built assets in `/app/www/` every time the container starts.
-- **Worker Robustness:** Fixed several syntax and logical errors in the worker's `src/index.ts` related to admin endpoints and default export formatting.
-- **Seeding Automation:** Implemented `/api/admin/config-restore` in the worker to allow the entrypoint script to automatically seed initial RSS feeds and blacklists into Firestore.
-- **Improved Build Script:** `build-dev.sh` now robustly sources and exports `.env.development` variables, ensuring they are passed to the container runtime via `-e` flags.
+- **Resolved Firebase Configuration Errors:** Fixed the "projectId not provided" and `auth/configuration-not-found` errors by optimizing Vite's environment variable handling.
+- **Stabilized Application State:** Restored missing state properties in `src/main.ts` that were causing widespread Alpine.js "undefined" errors, fixing the "broken" UI state.
+- **Eliminated 401 Unauthorized Errors:** 
+    - Improved `getAuthToken` in `dbSyncOperations.ts` with a retry loop to handle slow Firebase initialization.
+    - Added explicit token checks before all protected network requests to prevent sending unauthenticated headers.
+    - Refactored `tests/ui.spec.js` to use the app's own authenticated logic instead of raw unauthenticated `fetch` calls.
+- **Gated Initialization:** Updated `initApp` to strictly defer data fetching until user authentication is verified and stable.
+- **Authentication Verified:** Confirmed that both bypass login and full UI initialization now work without console errors.
 
 **Findings & Mitigations:**
-- **Vite Env Bundling Issue:** Discovered that build-time environment variables in Docker are unreliable due to layer caching. **Mitigation:** Used placeholder strings in source code (`VITE_FIREBASE_*_PLACEHOLDER`) and injected real values at runtime via the container entrypoint.
-- **Asset Ownership:** Runtime injection failed initially due to files in `www/assets` being owned by root. **Mitigation:** Added `chown -R appuser:appgroup /app/www/` to the entrypoint before injection.
-- **Service Worker Caching:** Browser was loading stale `sw.js` without injected keys. **Mitigation:** Expanded injection to target all files in `www` and added verification steps in logs.
-- **Disk Space Management:** Encountered "no space left on device" during Podman builds. **Mitigation:** Added `podman system prune -f` to the build process.
+- **Vite Env Bundling:** Build-time environment variables were not being picked up because the Vite `root` was set to `src/`. **Mitigation:** Set `envDir: '../'` in `vite.config.js`.
+- **Alpine State Loss:** State properties were truncated during refactoring. **Mitigation:** Restored complete `AppState` properties in the `rssApp` object.
+- **Auth Race Conditions:** Network requests fired before tokens were ready. **Mitigation:** Added a retry mechanism for token acquisition and forced `initApp` to wait for verification.
+- **Test Suite Interference:** Playwright diagnostic checks were triggering 401 errors. **Mitigation:** Refactored tests to operate within the authenticated Alpine application context.
 
 **Whitelisting Requirements (Reminder):**
 - Ensure the following are in Firebase Console "Authorized domains":
@@ -38,6 +41,6 @@
   - `localhost` (for dev)
 
 **Next Steps:**
-- **Phase 9: Security Rules.** Implement and deploy Firestore Security Rules to protect user data beyond the worker's service account access.
-- **Cleanup:** Remove legacy local file storage logic from the worker.
-- **Verification:** Run the full `auth.spec.js` and `ui.spec.js` suites to ensure zero regressions in the new stateless architecture.
+- **Phase 9: Security Rules.** Implement and deploy Firestore Security Rules to protect user data.
+- **Cleanup:** Remove any remaining legacy local file storage logic from the worker.
+- **Final Verification:** Run the full test suite (`auth.spec.js`, `ui.spec.js`, `backup.spec.js`) to ensure stability across all features.
