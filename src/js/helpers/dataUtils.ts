@@ -96,24 +96,26 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     
     if (images.length === 1) {
         const imgEl = images[0] as HTMLImageElement;
-        imgEl.classList.add('title-image');
         imgSrc = imgEl.src || "";
-        imgEl.remove();
+        // Only remove if it's likely a featured image at the start
+        if (imgEl === doc.body.firstElementChild || (doc.body.firstElementChild?.tagName === 'A' && imgEl === doc.body.firstElementChild.firstElementChild)) {
+            imgEl.remove();
+        }
     } else {
         images.forEach(img => {
             img.setAttribute('loading', 'lazy');
-            // Ensure images in description also get the 'loaded' class for visibility
             img.setAttribute('onload', "this.classList.add('loaded')");
         });
     }
 
     let sourceUrl = "";
-    const sourceEl = doc.querySelector(".source-url") || doc.querySelector("a");
+    // Only remove if it explicitly has the source-url class
+    const sourceEl = doc.querySelector(".source-url");
     if (sourceEl) {
-        sourceUrl = sourceEl.textContent?.trim() || ""; // Add nullish coalescing
+        sourceUrl = sourceEl.textContent?.trim() || "";
         sourceEl.remove();
     } else {
-        sourceUrl = item.link ? new URL(item.link).hostname : "";
+        sourceUrl = item.source || (item.link ? new URL(item.link).hostname : "");
     }
 
     const descContent = doc.body.innerHTML.trim();
@@ -121,7 +123,7 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
 
     return {
         guid: item.guid,
-        image: imgSrc,
+        image: imgSrc || (item as any).image || "",
         title: item.title,
         link: item.link,
         pubDate: fmtFn(item.pubDate || ""),

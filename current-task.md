@@ -19,6 +19,10 @@
 ### Progress Update - Tuesday, 30 December 2025
 
 **Accomplishments:**
+- **Authentication & Authorization:**
+    - Configured Authorized Domains in Firebase Console (`news.loveopenly.net`, `vscode.tail06b521.ts.net`, `localhost`).
+    - Implemented Google and Email/Password login providers.
+    - Verified email login functionality in the development environment.
 - **Standardized E2E Test Suite:**
     - Created `tests/test-helper.js` to centralize authenticated login and feed seeding logic.
     - Refactored 10+ test files (including `shuffle`, `unread`, `undo`, `config`, `theme`, `tts`, `flick`, etc.) to use modern Firebase-aware setup patterns.
@@ -35,17 +39,18 @@
 - **Stabilized Application State:** Restored missing state properties in `src/main.ts` that were causing widespread Alpine.js "undefined" errors.
 
 **Findings & Mitigations:**
+- **Hosting Strategy:** Evaluated Firebase Hosting vs. Cloudflare Pages.
+    - *Finding:* Firebase Hosting (Spark plan) has a 360MB/day transfer limit, which might be tight.
+    - *Decision:* Selected **Cloudflare Pages** for frontend hosting due to unlimited free bandwidth and native integration with the existing Cloudflare Worker backend.
+- **RSS Item Descriptions:** RSS feed items were missing description text. 
+    - *Mitigation:* Refactored `mapRawItem` to stop aggressive removal of content-bearing links/images. Improved worker-side field selection (adding `content:encoded` and `contentSnippet` support) and added debug logging. Implementation complete, ready for verification.
 - **Alpine Proxies vs. StructuredClone:** `structuredClone` is incompatible with Alpine.js Proxies used in the app state. **Mitigation:** Employed JSON-based sanitization for reliable IndexedDB storage.
 - **Test Environment Isolation:** Tests were failing due to unseeded data or lingering unauthenticated states. **Mitigation:** Implemented `ensureFeedsSeeded` helper and forced explicit login bypass in `beforeEach` hooks.
 - **UI Navigation Latency:** Tests were frequently timing out while waiting for nested settings sub-menus. **Mitigation:** Added explicit waits for sub-menu visibility and manual `change` event dispatching for reactive elements.
 
-**Whitelisting Requirements (Reminder):**
-- Ensure the following are in Firebase Console "Authorized domains":
-  - `news.loveopenly.net`
-  - `vscode.tail06b521.ts.net`
-  - `localhost` (for dev)
-
 **Next Steps:**
+- **Deployment:** Configure Cloudflare Pages for frontend hosting.
+- **Verification:** Verify RSS description fixes in the live dev environment.
 - **Phase 9: Security Rules.** Implement and deploy Firestore Security Rules to protect user data.
 - **Cleanup:** Remove any remaining legacy local file storage logic from the worker.
 - **Comprehensive Run:** Execute the entire `npx playwright test` suite one last time to confirm total project stability.

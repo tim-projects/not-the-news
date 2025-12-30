@@ -73,7 +73,13 @@ function prettifyItem(item: any): any {
         item.image = imgMatch[1];
     }
 
+    const beforeLen = item.description?.length || 0;
     item.description = cleanHtml(item.description || '');
+    const afterLen = item.description?.length || 0;
+    
+    if (beforeLen > 0 && afterLen === 0) {
+        console.log(`[RSS] WARNING: Sanitization removed entire description for item: ${item.title}`);
+    }
     
     return item;
 }
@@ -94,7 +100,8 @@ export async function processFeeds(feedUrls: string[], blacklist: string[]): Pro
 
                 // Keyword filtering
                 const title = entry.title || '';
-                const description = entry.content || entry.summary || entry.description || '';
+                const rawDescription = entry['content:encoded'] || entry.content || entry.description || entry.summary || '';
+                const description = typeof rawDescription === 'string' ? rawDescription : (entry.contentSnippet || '');
                 const searchableText = `${title} ${description}`.toLowerCase();
                 
                 const isBlacklisted = normalizedBlacklist.some(kw => searchableText.includes(kw));
@@ -106,12 +113,16 @@ export async function processFeeds(feedUrls: string[], blacklist: string[]): Pro
                 seenGuids.add(guid);
                 const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
                 
+                if (!description) {
+                    console.log(`[RSS] WARNING: No description found for item: ${title}`);
+                }
+
                 let item: any = {
                     guid,
                     title: entry.title,
                     link: entry.link,
                     pubDate,
-                    description: entry.content || entry.summary || entry.description || '',
+                    description: description,
                     source: feed.title || extractDomain(entry.link || ''),
                     image: '',
                     timestamp: new Date(pubDate).getTime()
