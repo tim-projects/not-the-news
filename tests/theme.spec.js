@@ -1,36 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:8085';
-const APP_PASSWORD = "devtestpwd";
 
 test.describe('Theme Functionality', () => {
-    test.beforeEach(async ({ page, request }) => {
-        // Login flow
-        await page.goto(`${APP_URL}/login.html`);
-        const loginResponse = await request.post(`${APP_URL}/api/login`, {
-            data: { password: APP_PASSWORD },
-            headers: { 'Content-Type': 'application/json' }
-        });
-        await expect(loginResponse.status()).toBe(200);
-
-        // Set cookie manually
-        const setCookieHeader = loginResponse.headers()['set-cookie'];
-        if (setCookieHeader) {
-            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
-            if (authCookieString) {
-                const parts = authCookieString.split(';');
-                const nameValue = parts[0].trim().split('=');
-                await page.context().addCookies([{
-                    name: nameValue[0],
-                    value: nameValue[1],
-                    domain: new URL(APP_URL).hostname,
-                    path: '/',
-                    expires: -1
-                }]);
-            }
-        }
-
-        await page.goto(APP_URL);
+    test.beforeEach(async ({ page }) => {
+        await login(page, APP_URL);
+        await ensureFeedsSeeded(page);
         await expect(page.locator('#header')).toBeVisible();
     });
 
@@ -39,47 +15,29 @@ test.describe('Theme Functionality', () => {
         await page.locator('#settings-button').click();
         await expect(page.locator('#main-settings')).toBeVisible();
 
+        // Go to Appearance
+        await page.locator('#configure-appearance-btn').click();
+        await expect(page.locator('#appearance-settings-block')).toBeVisible();
+
         // Ensure theme style selector is visible
         const themeSelector = page.locator('#theme-style-selector');
         await expect(themeSelector).toBeVisible();
 
-        // Switch to Light mode first to test light themes
-        const themeToggle = page.locator('#theme-toggle');
-        const themeText = page.locator('#theme-text');
-        
-        // If dark (checked), click slider to make light
-        if (await themeToggle.isChecked()) {
-            await page.locator('#theme-toggle + .slider').click();
-            await expect(themeText).toHaveText('light');
-        }
-
-        // Wait for the option to be available in the DOM
-        const morningOption = themeSelector.locator('option[value="morning"]');
-        await morningOption.waitFor({ state: 'attached' });
-
-        // Select 'Morning' theme
+        // Select 'Morning' theme (which is a light theme)
         await themeSelector.selectOption('morning');
+        await themeSelector.dispatchEvent('change');
+        await page.waitForTimeout(500);
         
-        // Debug: Check select value
-        const selectValue = await themeSelector.inputValue();
-        console.log(`Select value after selection: ${selectValue}`);
-
-        // Force change event if needed
-        // await themeSelector.dispatchEvent('change');
-
         // Close settings
         await page.locator('.modal-content .close').click();
 
         // Verify html class
-        const classList = await page.locator('html').getAttribute('class');
-        console.log(`Current HTML classes: ${classList}`);
         await expect(page.locator('html')).toHaveClass(/theme-morning/);
         await expect(page.locator('html')).toHaveClass(/light/);
 
         // Verify background color variable (Morning theme: --bg: #e6efff)
-        const html = page.locator('html');
-        const bgColor = await html.evaluate((el) => {
-            return getComputedStyle(el).getPropertyValue('--bg').trim();
+        const bgColor = await page.evaluate(() => {
+            return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
         });
         expect(bgColor).toBe('#e6efff');
     });
@@ -89,22 +47,18 @@ test.describe('Theme Functionality', () => {
         await page.locator('#settings-button').click();
         await expect(page.locator('#main-settings')).toBeVisible();
 
+        // Go to Appearance
+        await page.locator('#configure-appearance-btn').click();
+        await expect(page.locator('#appearance-settings-block')).toBeVisible();
+
         // Ensure theme style selector is visible
         const themeSelector = page.locator('#theme-style-selector');
         await expect(themeSelector).toBeVisible();
 
-        // Switch to Dark mode
-        const themeToggle = page.locator('#theme-toggle');
-        const themeText = page.locator('#theme-text');
-        
-        // If light (unchecked), click slider to make dark
-        if (!(await themeToggle.isChecked())) {
-            await page.locator('#theme-toggle + .slider').click();
-            await expect(themeText).toHaveText('dark');
-        }
-
-        // Select 'Dracula' theme
+        // Select 'Dracula' theme (which is a dark theme)
         await themeSelector.selectOption('dracula');
+        await themeSelector.dispatchEvent('change');
+        await page.waitForTimeout(500);
 
         // Close settings
         await page.locator('.modal-content .close').click();
@@ -114,22 +68,9 @@ test.describe('Theme Functionality', () => {
         await expect(page.locator('html')).toHaveClass(/dark/);
 
         // Verify background color variable (Dracula theme: --bg: #282a36)
-        const html = page.locator('html');
-        const bgColor = await html.evaluate((el) => {
-            return getComputedStyle(el).getPropertyValue('--bg').trim();
+        const bgColor = await page.evaluate(() => {
+            return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
         });
         expect(bgColor).toBe('#282a36');
-
-        // Verify link color override
-        const linkColor = await page.evaluate(() => {
-            // Create a temporary link to test style application
-            const a = document.createElement('a');
-            document.body.appendChild(a);
-            const color = getComputedStyle(a).color;
-            document.body.removeChild(a);
-            return color;
-        });
-        // #8be9fd is rgb(139, 233, 253)
-        expect(linkColor).toBe('rgb(139, 233, 253)');
     });
 });

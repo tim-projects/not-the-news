@@ -19,29 +19,26 @@ import {
  * @returns {object} A sanitized, cloneable copy of the object.
  */
 function sanitizeForIndexedDB(obj: any): any {
-    if (typeof structuredClone === 'function') {
-        try {
-            return structuredClone(obj);
-        } catch (e) {
-            console.error("structuredClone failed, falling back to manual sanitization.", e);
-        }
+    // Safest way to clone pure data objects and "un-proxy" Alpine/Vue objects
+    try {
+        return JSON.parse(JSON.stringify(obj));
+    } catch (e) {
+        console.error("JSON serialization failed during sanitization, using manual fallback.", e);
     }
 
-    // Fallback for older browsers or complex, non-cloneable data
-    // This is a manual recursive check that omits functions.
+    // Fallback manual recursive check that omits non-serializable properties
     const sanitized: { [key: string]: any } = {};
     for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
             const value = obj[key];
-            if (typeof value === 'object' && value !== null) {
-                // Recursively sanitize nested objects and arrays
+            const type = typeof value;
+            if (type === 'object' && value !== null) {
                 if (Array.isArray(value)) {
                     sanitized[key] = value.map(item => sanitizeForIndexedDB(item));
                 } else {
                     sanitized[key] = sanitizeForIndexedDB(value);
                 }
-            } else if (typeof value !== 'function') {
-                // Copy primitive values, but omit functions
+            } else if (type !== 'function' && type !== 'symbol' && type !== 'undefined') {
                 sanitized[key] = value;
             }
         }

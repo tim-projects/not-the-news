@@ -1,36 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:8085';
 const APP_PASSWORD = "devtestpwd";
 
 test.describe('Undo Mark as Read', () => {
-    test.beforeEach(async ({ page, request }) => {
-        console.log('Navigating to login page...');
-        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 });
+    test.beforeEach(async ({ page }) => {
+        await login(page, APP_URL);
+        await ensureFeedsSeeded(page);
 
-        const loginResponse = await request.post(`${APP_URL}/api/login`, {
-            data: { password: APP_PASSWORD },
-            headers: { 'Content-Type': 'application/json' }
-        });
-        await expect(loginResponse.status()).toBe(200);
-
-        const setCookieHeader = loginResponse.headers()['set-cookie'];
-        if (setCookieHeader) {
-            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
-            if (authCookieString) {
-                const parts = authCookieString.split(';');
-                const nameValue = parts[0].trim().split('=');
-                await page.context().addCookies([{
-                    name: nameValue[0],
-                    value: nameValue[1],
-                    domain: new URL(APP_URL).hostname,
-                    path: '/',
-                    expires: -1
-                }]);
-            }
-        }
-
-        await page.goto(APP_URL, { timeout: 60000 });
         await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
         await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
     });

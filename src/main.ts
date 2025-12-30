@@ -731,6 +731,7 @@ export function rssApp(): AppState {
             try {
                 const result = await loadSimpleState('rssFeeds');
                 this.rssFeedsInput = parseRssFeedsConfig(result.value).join('\n');
+                console.log(`[DEBUG] Content for rssFeeds input: ${this.rssFeedsInput}`);
             } catch (error) {
                 console.error('Error loading RSS feeds:', error);
             }
@@ -738,6 +739,7 @@ export function rssApp(): AppState {
             const { loadSimpleState } = await import('./js/data/dbUserState.ts');
             const { value } = await loadSimpleState('keywordBlacklist');
             this.keywordBlacklistInput = Array.isArray(value) ? value.join('\n') : '';
+            console.log(`[DEBUG] Content for keywordBlacklist input: ${this.keywordBlacklistInput}`);
         },
         loadCustomCss: async function(this: AppState): Promise<void> {
             const { loadSimpleState } = await import('./js/data/dbUserState.ts');
@@ -753,6 +755,17 @@ export function rssApp(): AppState {
                 createStatusBarMessage(this, 'RSS Feeds saved!');
                 this.loading = true;
                 this.progressMessage = 'Saving feeds and performing full sync...';
+                
+                // Trigger worker to start fetching these new feeds immediately
+                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                const token = await getAuthToken();
+                if (token) {
+                    await fetch(`${window.location.origin}/api/feed-sync`, { 
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).catch(e => console.error('[Worker Sync] Immediate sync failed:', e));
+                }
+
                 const syncSuccess = await performFullSync(this);
                 await this.loadFeedItemsFromDB();
                 
@@ -1030,12 +1043,14 @@ export function rssApp(): AppState {
 
                 // 4. Call backend to reset server-side data
                 console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
+                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                const token = await getAuthToken();
                 const response = await fetch('/api/admin/reset-app', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    credentials: 'include' // Important for sending cookies
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    }
                 });
 
                 if (!response.ok) {
@@ -1067,9 +1082,13 @@ export function rssApp(): AppState {
             try {
                 this.progressMessage = 'Fetching configuration for backup...';
                 console.log('Fetching config for backup from:', '/api/admin/config-backup');
+                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                const token = await getAuthToken();
                 const response = await fetch('/api/admin/config-backup', {
                     method: 'GET',
-                    credentials: 'include'
+                    headers: {
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    }
                 });
 
                 if (!response.ok) {
@@ -1119,13 +1138,15 @@ export function rssApp(): AppState {
 
                 const configToRestore = JSON.parse(fileContent);
 
+                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                const token = await getAuthToken();
                 const response = await fetch('/api/admin/config-restore', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                     },
-                    body: JSON.stringify(configToRestore),
-                    credentials: 'include'
+                    body: JSON.stringify(configToRestore)
                 });
 
                 if (!response.ok) {
@@ -1597,21 +1618,44 @@ export function rssApp(): AppState {
         },
         _startWorkerFeedSync: function(this: AppState): void {
             // Trigger an initial sync shortly after startup
-            setTimeout(() => {
-                fetch(`${window.location.origin}/api/feed-sync`, { method: 'POST' })
-                    .then(r => r.json())
-                    .then(d => console.log('[Worker Sync] Startup sync triggered:', d))
-                    .catch(e => console.error('[Worker Sync] Startup sync failed:', e));
+            setTimeout(async () => {
+                if (!this.isOnline || !this.syncEnabled) return;
+                try {
+                    const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                    const token = await getAuthToken();
+                    if (!token) return;
+
+                    fetch(`${window.location.origin}/api/feed-sync`, { 
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                        .then(r => r.json())
+                        .then(d => console.log('[Worker Sync] Startup sync triggered:', d))
+                        .catch(e => console.error('[Worker Sync] Startup sync failed:', e));
+                } catch (err) {
+                    console.error('[Worker Sync] Setup failed:', err);
+                }
             }, 5000);
 
             // Periodically trigger worker to fetch and process RSS feeds (every 10 minutes)
-            setInterval(() => {
+            setInterval(async () => {
                 if (!this.isOnline || !this.syncEnabled) return;
                 console.log('[Worker Sync] Triggering background feed processing...');
-                fetch(`${window.location.origin}/api/feed-sync`, { method: 'POST' })
-                    .then(r => r.json())
-                    .then(d => console.log('[Worker Sync] Background sync complete:', d))
-                    .catch(e => console.error('[Worker Sync] Background sync failed:', e));
+                try {
+                    const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                    const token = await getAuthToken();
+                    if (!token) return;
+
+                    fetch(`${window.location.origin}/api/feed-sync`, { 
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                        .then(r => r.json())
+                        .then(d => console.log('[Worker Sync] Background sync complete:', d))
+                        .catch(e => console.error('[Worker Sync] Background sync failed:', e));
+                } catch (err) {
+                    console.error('[Worker Sync] Periodic setup failed:', err);
+                }
             }, 10 * 60 * 1000);
         },
         _initScrollObserver: function(this: AppState): void {

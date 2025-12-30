@@ -1,17 +1,20 @@
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 test.describe('Flick to Select', () => {
+  const APP_URL = 'http://localhost:8085';
+
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:8085');
-    // Wait for app to initialize and loading screen to disappear
-    await page.waitForSelector('#loading-screen', { state: 'hidden' });
+    await login(page, APP_URL);
+    await ensureFeedsSeeded(page);
     // Ensure there are items
-    await page.waitForSelector('.entry');
+    await page.waitForSelector('.entry', { state: 'visible', timeout: 60000 });
   });
 
   test('should select next item on wheel flick down', async ({ page }) => {
     // Get initial selected item
-    const firstItem = page.locator('.entry').first();
+    const items = page.locator('.entry:not(.help-panel-item)');
+    const firstItem = items.first();
     const firstGuid = await firstItem.getAttribute('data-guid');
     
     // Ensure first item is selected (auto-select logic)
@@ -21,7 +24,7 @@ test.describe('Flick to Select', () => {
     await page.mouse.wheel(0, 500);
     
     // Wait for selection to change
-    const secondItem = page.locator('.entry').nth(1);
+    const secondItem = items.nth(1);
     await expect(secondItem).toHaveClass(/selected-item/);
     
     const secondGuid = await secondItem.getAttribute('data-guid');
@@ -30,7 +33,8 @@ test.describe('Flick to Select', () => {
 
   test('should select previous item on wheel flick up', async ({ page }) => {
     // Select second item first
-    const secondItem = page.locator('.entry').nth(1);
+    const items = page.locator('.entry:not(.help-panel-item)');
+    const secondItem = items.nth(1);
     await secondItem.click();
     await expect(secondItem).toHaveClass(/selected-item/);
 
@@ -38,12 +42,13 @@ test.describe('Flick to Select', () => {
     await page.mouse.wheel(0, -500);
     
     // Wait for selection to change back to first
-    const firstItem = page.locator('.entry').first();
+    const firstItem = items.first();
     await expect(firstItem).toHaveClass(/selected-item/);
   });
 
   test('should not change selection on small scroll', async ({ page }) => {
-    const firstItem = page.locator('.entry').first();
+    const items = page.locator('.entry:not(.help-panel-item)');
+    const firstItem = items.first();
     await expect(firstItem).toHaveClass(/selected-item/);
 
     // Small scroll (less than 100 threshold)
@@ -52,7 +57,7 @@ test.describe('Flick to Select', () => {
     // Should still be on first item (give it a moment)
     await page.waitForTimeout(500);
     await expect(firstItem).toHaveClass(/selected-item/);
-    const secondItem = page.locator('.entry').nth(1);
+    const secondItem = items.nth(1);
     await expect(secondItem).not.toHaveClass(/selected-item/);
   });
 });

@@ -1,127 +1,25 @@
 import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:8085'; // Explicitly use HTTP for APP_URL here
 const APP_PASSWORD = "devtestpwd";
 
 test.describe('UI Elements and Interactions', () => {
-    test.beforeEach(async ({ page, request }) => { // Added 'request' to the fixture
-        page.on('request', request => {
-            console.log(`Request: ${request.method()} ${request.url()}`);
-        });
-
-        page.on('response', async response => {
-            const request = response.request();
-            // Log only XHR/Fetch responses
-            if (request.resourceType() === 'xhr' || request.resourceType() === 'fetch') {
-                if (response.status() >= 300 && response.status() <= 399) {
-                    console.log(`Response (XHR/Fetch - Redirect): ${response.status()} ${response.url()}`);
-                    return;
-                }
-                try {
-                    const json = await response.json();
-                    console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${JSON.stringify(json, null, 2)}`);
-                } catch (e) {
-                    // Not all XHR/Fetch responses are JSON, log as text
-                    try {
-                        const text = await response.text();
-                        console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: ${text}`);
-                    } catch (err) {
-                        console.log(`Response (XHR/Fetch): ${response.status()} ${response.url()}\nBody: [Could not read body: ${err.message}]`);
-                    }
-                }
-            } else {
-                console.log(`Response: ${response.status()} ${response.url()}`);
-            }
-        });
-
-        page.on('console', message => {
-            console.log(`Console ${message.type().toUpperCase()}: ${message.text()}`);
-        });
-
-        page.on('pageerror', err => {
-            console.error(`Page Error: ${err.message}\nStack: ${err.stack}`);
-        });
-
-        console.log('Navigating to login page...');
-        await page.goto(`${APP_URL}/login.html`, { timeout: 60000 });
-        await page.waitForSelector('#login-form[data-auth-ready="true"]', { timeout: 10000 });
-        console.log('Login page loaded and script attached.');
-
-        // Attempting login via UI bypass...
-        console.log('Attempting login via UI bypass...');
-        await page.fill('#email', 'test@example.com');
-        await page.fill('#pw', APP_PASSWORD);
-        
-        console.log('Clicking login button...');
-        await page.click('#login-btn');
-
-        // Wait for redirect to main app URL
-        console.log('Waiting for redirect to main app URL (timeout 60s)...');
-        try {
-            await page.waitForURL(APP_URL, { timeout: 60000 });
-            console.log('Navigated to main app URL.');
-        } catch (e) {
-            console.error('Timed out waiting for redirect. Current URL:', page.url());
-            const content = await page.content();
-            console.log('Page content at timeout:', content.substring(0, 1000));
-            throw e;
-        }
-
-        // --- NEW: Unregister all service workers as a diagnostic step ---
-        // console.log('Attempting to unregister all service workers...');
-        // await page.evaluate(() => {
-        //     if ('serviceWorker' in navigator) {
-        //         navigator.serviceWorker.getRegistrations().then(registrations => {
-        //             for (let registration of registrations) {
-        //                 registration.unregister();
-        //                 console.log('Service Worker unregistered:', registration.scope);
-        //             }
-        //         });
-        //     }
-        // });
-        // await page.waitForTimeout(1000); // Give some time for unregistration to take effect
-        // console.log('Service worker unregistration attempted.');
-        // --- END NEW ---
+    test.beforeEach(async ({ page }) => {
+        await login(page, APP_URL);
+        await ensureFeedsSeeded(page);
 
         await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
         console.log('Loading screen not visible.');
 
         await expect(page.locator('#header')).toBeVisible({ timeout: 60000 });
         console.log('Header is visible. Main UI rendered.');
-        
-        // NEW: Ensure at least one feed is configured using the app's own state
-        const feedsCount = await page.evaluate(async () => {
-            const app = window.Alpine.$data(document.getElementById('app'));
-            if (!app) return 0;
-            // Wait for initial load if needed
-            let attempts = 0;
-            while (!app.rssFeedsInput && attempts < 20) {
-                await app.loadRssFeeds();
-                if (app.rssFeedsInput) break;
-                await new Promise(r => setTimeout(r, 200));
-                attempts++;
-            }
-            return app.rssFeedsInput.trim().length;
-        });
-        
-        if (feedsCount === 0) {
-            console.log('No feeds configured in test environment. Adding Hacker News...');
-            await page.evaluate(async () => {
-                const app = window.Alpine.$data(document.getElementById('app'));
-                app.rssFeedsInput = 'https://news.ycombinator.com/rss';
-                await app.saveRssFeeds();
-                // Trigger worker sync via the app's established endpoint if possible, 
-                // but saveRssFeeds already triggers a full sync.
-            });
-            // Wait a moment for worker to finish first sync
-            await page.waitForTimeout(5000);
-        }
 
         // NEW: Wait for at least one feed item to be visible
         console.log('Waiting for at least one feed item (.item) to be visible...');
         await page.waitForSelector('.entry:not(.help-panel-item)', { state: 'visible', timeout: 60000 });
         console.log('At least one feed item is visible.');
-    }); // Correctly close beforeEach
+    });
 
     test('should display header elements', async ({ page }) => {
         await expect(page.locator('#header')).toBeVisible();
@@ -183,9 +81,10 @@ test.describe('UI Elements and Interactions', () => {
 
     test('should toggle images enabled', async ({ page }) => {
         await page.locator('#settings-button').click();
-        await expect(page.locator('.modal')).toBeVisible(); // Ensure modal is open
-        await expect(page.locator('#main-settings')).toBeVisible();
-        await page.waitForLoadState('networkidle'); // Added explicit wait
+        await expect(page.locator('.modal')).toBeVisible();
+        await page.locator('#configure-appearance-btn').click();
+        await expect(page.locator('#appearance-settings-block')).toBeVisible();
+        
         const imagesToggle = page.locator('label[for="images-toggle"]');
         const imagesText = page.locator('#images-text');
         await expect(imagesToggle).toBeVisible();
@@ -416,7 +315,7 @@ test.describe('UI Elements and Interactions', () => {
         try {
             // Wait for loading screen to disappear
             await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
-            await expect(page.locator('#ntn-title')).toHaveText('Not The News', { timeout: 30000 });
+            await expect(page.locator('#ntn-title h2')).toHaveText('Not The News', { timeout: 30000 });
         } catch (e) {
             console.log('Failed to find #ntn-title or loading screen did not hide. Current page content:', await page.content());
             throw e;

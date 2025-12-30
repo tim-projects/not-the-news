@@ -19,20 +19,25 @@
 ### Progress Update - Tuesday, 30 December 2025
 
 **Accomplishments:**
-- **Resolved Firebase Configuration Errors:** Fixed the "projectId not provided" and `auth/configuration-not-found` errors by optimizing Vite's environment variable handling.
-- **Stabilized Application State:** Restored missing state properties in `src/main.ts` that were causing widespread Alpine.js "undefined" errors, fixing the "broken" UI state.
-- **Eliminated 401 Unauthorized Errors:** 
-    - Improved `getAuthToken` in `dbSyncOperations.ts` with a retry loop to handle slow Firebase initialization.
-    - Added explicit token checks before all protected network requests to prevent sending unauthenticated headers.
-    - Refactored `tests/ui.spec.js` to use the app's own authenticated logic instead of raw unauthenticated `fetch` calls.
-- **Gated Initialization:** Updated `initApp` to strictly defer data fetching until user authentication is verified and stable.
-- **Authentication Verified:** Confirmed that both bypass login and full UI initialization now work without console errors.
+- **Standardized E2E Test Suite:**
+    - Created `tests/test-helper.js` to centralize authenticated login and feed seeding logic.
+    - Refactored 10+ test files (including `shuffle`, `unread`, `undo`, `config`, `theme`, `tts`, `flick`, etc.) to use modern Firebase-aware setup patterns.
+    - Resolved widespread test failures caused by legacy authentication logic and UI structure changes.
+- **Authenticated Admin & Worker Endpoints:**
+    - Added mandatory authentication tokens to `backupConfig`, `restoreConfig`, `resetApplicationData`, and background worker feed-sync tasks.
+    - Exported `getAuthToken` from `dbSyncOperations.ts` to allow widespread usage in core application logic.
+- **Resolved Data Persistence Bugs:**
+    - Fixed a critical `DataCloneError` in `sanitizeForIndexedDB` by switching from `structuredClone` to `JSON.parse(JSON.stringify())`, which correctly handles Alpine.js Proxy objects.
+    - Standardized backup filename matching in tests to support ISO-formatted timestamps.
+- **Improved UI Reactivity & Robustness:**
+    - Enhanced theme selection logic in `index.html` using `closest('optgroup')` for better reliability.
+    - Restored missing `[DEBUG]` console logs to support automated verification of configuration settings.
+- **Stabilized Application State:** Restored missing state properties in `src/main.ts` that were causing widespread Alpine.js "undefined" errors.
 
 **Findings & Mitigations:**
-- **Vite Env Bundling:** Build-time environment variables were not being picked up because the Vite `root` was set to `src/`. **Mitigation:** Set `envDir: '../'` in `vite.config.js`.
-- **Alpine State Loss:** State properties were truncated during refactoring. **Mitigation:** Restored complete `AppState` properties in the `rssApp` object.
-- **Auth Race Conditions:** Network requests fired before tokens were ready. **Mitigation:** Added a retry mechanism for token acquisition and forced `initApp` to wait for verification.
-- **Test Suite Interference:** Playwright diagnostic checks were triggering 401 errors. **Mitigation:** Refactored tests to operate within the authenticated Alpine application context.
+- **Alpine Proxies vs. StructuredClone:** `structuredClone` is incompatible with Alpine.js Proxies used in the app state. **Mitigation:** Employed JSON-based sanitization for reliable IndexedDB storage.
+- **Test Environment Isolation:** Tests were failing due to unseeded data or lingering unauthenticated states. **Mitigation:** Implemented `ensureFeedsSeeded` helper and forced explicit login bypass in `beforeEach` hooks.
+- **UI Navigation Latency:** Tests were frequently timing out while waiting for nested settings sub-menus. **Mitigation:** Added explicit waits for sub-menu visibility and manual `change` event dispatching for reactive elements.
 
 **Whitelisting Requirements (Reminder):**
 - Ensure the following are in Firebase Console "Authorized domains":
@@ -43,4 +48,4 @@
 **Next Steps:**
 - **Phase 9: Security Rules.** Implement and deploy Firestore Security Rules to protect user data.
 - **Cleanup:** Remove any remaining legacy local file storage logic from the worker.
-- **Final Verification:** Run the full test suite (`auth.spec.js`, `ui.spec.js`, `backup.spec.js`) to ensure stability across all features.
+- **Comprehensive Run:** Execute the entire `npx playwright test` suite one last time to confirm total project stability.

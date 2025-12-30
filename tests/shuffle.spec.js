@@ -1,93 +1,34 @@
 import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:8085';
 const APP_PASSWORD = "devtestpwd";
 
 test.describe('Shuffle Persistence', () => {
-    test.beforeEach(async ({ page, request }) => {
+    test.beforeEach(async ({ page }) => {
         page.on('console', msg => console.log(`BROWSER CONSOLE: ${msg.text()}`));
 
-        // --- NEW: Restore sample config to ensure feeds exist BEFORE first login ---
-        const config = {
-            "rssFeeds": [
-                "https://www.nasa.gov/news-release/feed/",
-                "https://www.theverge.com/rss/index.xml",
-                "https://feeds.bbci.co.uk/news/rss.xml",
-                "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
-            ],
-            "keywordBlacklist": ["test"],
-            "syncEnabled": true
-        };
-        const restoreResponse = await request.post(`${APP_URL}/api/admin/config-restore`, {
-            data: config,
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': APP_PASSWORD
-            }
-        });
-        await expect(restoreResponse.status()).toBe(200);
-        // --- END NEW ---
+        await login(page, APP_URL);
+        await ensureFeedsSeeded(page);
 
-        // Login flow
-        await page.goto(`${APP_URL}/login.html`);
-        const loginResponse = await request.post(`${APP_URL}/api/login`, {
-            data: { password: APP_PASSWORD },
-            headers: { 'Content-Type': 'application/json' }
-        });
-        await expect(loginResponse.status()).toBe(200);
-
-        const setCookieHeader = loginResponse.headers()['set-cookie'];
-        if (setCookieHeader) {
-            const authCookieString = setCookieHeader.split(',').find(s => s.trim().startsWith('auth='));
-            if (authCookieString) {
-                const parts = authCookieString.split(';');
-                const nameValue = parts[0].trim().split('=');
-                await page.context().addCookies([{
-                    name: nameValue[0],
-                    value: nameValue[1],
-                    domain: new URL(APP_URL).hostname,
-                    path: '/',
-                    expires: -1
-                }]);
-            }
-        }
-
-        // Trigger explicit sync
-        console.log("Triggering manual feed sync...");
-        const syncResponse = await request.post(`${APP_URL}/api/feed-sync`, {
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': APP_PASSWORD
-            }
-        });
-        const syncStatus = syncResponse.status();
-        const syncBody = await syncResponse.text();
-        console.log(`Manual feed sync status: ${syncStatus}`);
-        console.log(`Manual feed sync response: ${syncBody}`);
-        await expect(syncStatus).toBe(200);
-
-        await page.goto(APP_URL);
         await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
         await expect(page.locator('#header')).toBeVisible();
         
-        // Wait for feed items to be synced and loaded
-        console.log("Waiting for .item to be visible...");
+        // Wait for feed items to be visible
         await page.waitForSelector('.item', { state: 'visible', timeout: 60000 });
-        console.log("Feed items visible.");
     });
 
-    test.afterEach(async ({ request }) => {
-        // Reset shuffle count after each test so manual testing is easier
-        await request.post(`${APP_URL}/api/user-state`, {
-            data: [
-                { type: 'simpleUpdate', key: 'shuffleCount', value: 2, id: Date.now() },
-                { type: 'simpleUpdate', key: 'lastShuffleResetDate', value: null, id: Date.now() + 1 }
-            ],
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': APP_PASSWORD
-            }
-        });
+    test.afterEach(async ({ page }) => {
+        // Reset shuffle count via Alpine if still on the page
+        try {
+            await page.evaluate(async () => {
+                const app = window.Alpine.$data(document.getElementById('app'));
+                app.shuffleCount = 2;
+                await app.saveSimpleSetting('shuffleCount', 2);
+            });
+        } catch (e) {
+            // Ignore if page was closed/navigated
+        }
     });
 
     test('should decrement shuffle count and persist after refresh', async ({ page }) => {

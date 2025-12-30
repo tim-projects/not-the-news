@@ -1,22 +1,13 @@
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:8085';
-const APP_PASSWORD = "devtestpwd";
 
 test.describe('Modal Keyboard Interaction', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the login page
-    await page.goto(`${APP_URL}/login.html`, { waitUntil: 'networkidle' });
-
-    // Fill the password and click login
-    await page.fill('#pw', APP_PASSWORD);
-    await page.click('button[type="submit"]');
-
-    // Wait for navigation to the main page
-    await page.waitForURL(APP_URL);
-    // Wait for loading screen to be hidden
-    await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 30000 });
-    // Wait for any visible content
+    await login(page, APP_URL);
+    await ensureFeedsSeeded(page);
+    await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
     await page.locator('[data-guid]').first().waitFor({ state: 'visible', timeout: 30000 });
   });
 

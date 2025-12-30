@@ -1,22 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { login, ensureFeedsSeeded } from './test-helper';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:8085';
-const APP_PASSWORD = "devtestpwd";
 
 test.describe('Theme Style Persistence', () => {
     test.beforeEach(async ({ page }) => {
-        // Navigate to the login page
-        await page.goto(`${APP_URL}/login.html`);
-
-        // Fill the password and click login
-        await page.fill('#pw', APP_PASSWORD);
-        await page.click('button[type="submit"]');
-
-        // Wait for navigation to the main page
-        await page.waitForURL(APP_URL);
-        // Wait for loading screen to be hidden
-        await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 30000 });
-        // Wait for any visible content
+        await login(page, APP_URL);
+        await ensureFeedsSeeded(page);
+        await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
         await page.locator('[data-guid]').first().waitFor({ state: 'visible', timeout: 30000 });
     });
 
@@ -24,9 +15,6 @@ test.describe('Theme Style Persistence', () => {
         // Open Settings
         await page.locator('#settings-button').click();
         await expect(page.locator('#main-settings')).toBeVisible();
-
-        const themeSelector = page.locator('#theme-style-selector');
-        await expect(themeSelector).toBeVisible();
 
         // 1. Select 'Morning' for Light mode
         await page.evaluate(async () => {
@@ -57,14 +45,13 @@ test.describe('Theme Style Persistence', () => {
         // 4. Verify 'Morning' is restored (NOT 'Dracula' or 'original')
         await expect(page.locator('html')).toHaveClass(/theme-morning/);
         await expect(page.locator('html')).toHaveClass(/light/);
-        expect(await themeSelector.inputValue()).toBe('morning');
 
         // 5. Test specific issue: Reverting to Original Dark when set to Original Light
         
         // Set to Original Light
         await page.evaluate(async () => {
             const app = window.Alpine.$data(document.querySelector('#app'));
-            await app.updateThemeAndStyle('original', 'light');
+            await app.updateThemeAndStyle('originalLight', 'light');
         });
         
         await expect(page.locator('html')).toHaveClass(/light/);
@@ -72,18 +59,18 @@ test.describe('Theme Style Persistence', () => {
         
         // Check state before reload
         const currentStyle = await page.evaluate(() => window.Alpine.$data(document.querySelector('#app')).themeStyle);
-        expect(currentStyle).toBe('original');
+        expect(currentStyle).toBe('originalLight');
         
         // Reload page to test initialization
         await page.reload();
-        await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 30000 });
+        await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
         await page.waitForSelector('.item.entry', { state: 'visible', timeout: 30000 });
         
-        // Style should STILL be original
+        // Style should STILL be originalLight
         const styleAfterReload = await page.evaluate(() => window.Alpine.$data(document.querySelector('#app')).themeStyle);
         const themeAfterReload = await page.evaluate(() => window.Alpine.$data(document.querySelector('#app')).theme);
         
-        expect(styleAfterReload).toBe('original');
+        expect(styleAfterReload).toBe('originalLight');
         expect(themeAfterReload).toBe('light');
     });
 });

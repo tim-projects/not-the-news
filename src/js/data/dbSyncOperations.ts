@@ -98,7 +98,7 @@ import { auth } from '../firebase';
  * Includes a small retry loop to handle the race condition during app initialization.
  * @returns {Promise<string | null>} The ID token or null if not logged in.
  */
-const getAuthToken = async (maxRetries = 10): Promise<string | null> => {
+export const getAuthToken = async (maxRetries = 10): Promise<string | null> => {
     let retries = 0;
     while (retries < maxRetries) {
         const user = auth.currentUser;
