@@ -124,6 +124,16 @@ export interface AppState {
     _initComplete: boolean;
     _isSyncing: boolean;
     _isPregenerating: boolean; // Concurrency lock for background generation
+    
+    // --- Backup & Restore ---
+    backupSelections: {
+        feeds: boolean;
+        appearance: boolean;
+        history: boolean;
+        settings: boolean;
+    };
+    showRestorePreview: boolean;
+    restoreData: any | null;
 
     // --- Core Methods ---
     initApp(): Promise<void>;
@@ -171,6 +181,7 @@ export interface AppState {
     resetApplicationData(): Promise<void>;
     backupConfig(): Promise<void>;
     restoreConfig(event: Event): Promise<void>;
+    confirmRestore(): Promise<void>;
     _loadInitialState(): Promise<void>;
     _loadAndManageAllData(initialEntries?: MappedFeedItem[]): Promise<void>;
     updateAllUI(): void;

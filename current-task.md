@@ -34,6 +34,10 @@
     - Fixed a critical `DataCloneError` in `sanitizeForIndexedDB` by switching from `structuredClone` to `JSON.parse(JSON.stringify())`, which correctly handles Alpine.js Proxy objects.
     - Standardized backup filename matching in tests to support ISO-formatted timestamps.
 - **Improved UI Reactivity & Robustness:**
+    - Enhanced **Backup & Restore** system:
+        - Added selective category support (Feeds, Appearance, History, Settings).
+        - Implemented **Restore Preview** workflow to allow users to pick which parts of a backup file to apply.
+        - Supported merging of partial configurations via backend integration.
     - Implemented **Password Reset** (login page) and **Change Password** (settings) using Firebase Auth.
     - Added **Delete Account (GDPR)** functionality to allow users to wipe their data and account permanently.
     - Integrated **Backup/Restore deep-links** in the RSS and Blacklist configuration screens for better UX.

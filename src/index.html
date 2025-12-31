@@ -435,9 +435,40 @@
                 </div>
 
                                     <div id="advanced-settings-block" x-show="modalView === 'advanced'">
-                                        <h2>Advanced Settings</h2>
-                                        <div class="settings-option"><span>Logout from Firebase</span><button id="logout-button" class="configure-button" @click="logout()">Logout</button></div>
+                                        <div class="d-flex justify-between align-items-center">
+                                            <h2>Advanced Settings</h2>
+                                            <button id="logout-button" class="configure-button" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg); font-size: 0.8rem !important;" @click="logout()">Logout</button>
+                                        </div>
                                         
+                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                                            <h3 style="margin-top: 0;">Backup & Restore</h3>
+                                            <p class="setting-description" style="margin-bottom: 1rem;">Select categories to include in your backup or restoration.</p>
+                                            
+                                            <div class="d-flex flex-column gap-2" style="margin-bottom: 1.5rem;">
+                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
+                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
+                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
+                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
+                                            </div>
+
+                                            <div class="d-flex gap-2">
+                                                <button id="backup-config-button" class="configure-button grow" @click="backupConfig()">Download Backup</button>
+                                                <button id="restore-config-button" class="configure-button grow" style="background-color: transparent; border: 1px solid var(--primary); color: var(--fg);" @click="$refs.restoreFileInput.click()">Restore File</button>
+                                                <input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" />
+                                            </div>
+
+                                            <template x-if="showRestorePreview">
+                                                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                                                    <p style="font-weight: bold; margin-bottom: 0.5rem; color: var(--primary);">Restore detected:</p>
+                                                    <p class="setting-description" style="margin-bottom: 1rem;">Pick which categories to apply from the file.</p>
+                                                    <div class="d-flex gap-2">
+                                                        <button class="configure-button grow" @click="confirmRestore()">Confirm Restore</button>
+                                                        <button class="configure-button grow" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="showRestorePreview = false; restoreData = null">Cancel</button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+
                                         <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
                                             <h3 style="margin-top: 0;">Account Management</h3>
                                             <div class="settings-option">

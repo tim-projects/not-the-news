@@ -177,6 +177,16 @@ export function rssApp(): AppState {
         _isSyncing: false,
         _isPregenerating: false,
         
+        // --- Backup & Restore ---
+        backupSelections: {
+            feeds: true,
+            appearance: true,
+            history: true,
+            settings: true
+        },
+        showRestorePreview: false,
+        restoreData: null,
+        
         // --- Core Methods ---
         initApp: async function(this: AppState): Promise<void> {
             try {
@@ -1133,7 +1143,6 @@ export function rssApp(): AppState {
             this.showUndo = false;
             try {
                 this.progressMessage = 'Fetching configuration for backup...';
-                console.log('Fetching config for backup from:', '/api/admin/config-backup');
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
                 const response = await fetch('/api/admin/config-backup', {
@@ -1149,7 +1158,34 @@ export function rssApp(): AppState {
                 }
 
                 const configData = await response.json();
-                const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+                
+                // Define Categories
+                const CATEGORIES = {
+                    feeds: ['rssFeeds', 'keywordBlacklist'],
+                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
+                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled']
+                };
+
+                // Filter based on selections
+                const filteredConfig: Record<string, any> = {};
+                for (const [category, enabled] of Object.entries(this.backupSelections)) {
+                    if (enabled) {
+                        const keys = CATEGORIES[category as keyof typeof CATEGORIES];
+                        keys.forEach(key => {
+                            if (configData[key] !== undefined) {
+                                filteredConfig[key] = configData[key];
+                            }
+                        });
+                    }
+                }
+
+                if (Object.keys(filteredConfig).length === 0) {
+                    createStatusBarMessage(this, 'No data selected for backup.');
+                    return;
+                }
+
+                const blob = new Blob([JSON.stringify(filteredConfig, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1167,13 +1203,44 @@ export function rssApp(): AppState {
             }
         },
         restoreConfig: async function(this: AppState, event: Event): Promise<void> {
-            if (!confirm('Are you sure you want to restore configuration? This will overwrite your current settings and reload the application.')) {
-                return;
-            }
+            const file = (event.target as HTMLInputElement).files?.[0];
+            if (!file) return;
 
-            const file = (event.target as HTMLInputElement).files?.[0]; // Cast to HTMLInputElement
-            if (!file) {
-                createStatusBarMessage(this, 'No file selected for restoration.');
+            try {
+                const fileContent: string = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target?.result as string);
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsText(file);
+                });
+
+                this.restoreData = JSON.parse(fileContent);
+                this.showRestorePreview = true;
+                
+                // Initialize selection based on what's actually in the file
+                const CATEGORIES = {
+                    feeds: ['rssFeeds', 'keywordBlacklist'],
+                    appearance: ['theme', 'themeStyle', 'fontSize', 'customCss'],
+                    history: ['read', 'starred'],
+                    settings: ['syncEnabled', 'itemButtonMode']
+                };
+
+                for (const [cat, keys] of Object.entries(CATEGORIES)) {
+                    (this.backupSelections as any)[cat] = keys.some(k => this.restoreData[k] !== undefined);
+                }
+
+            } catch (error: any) {
+                console.error("Error parsing restoration file:", error);
+                createStatusBarMessage(this, `Invalid backup file: ${error.message}`);
+            } finally {
+                (event.target as HTMLInputElement).value = '';
+            }
+        },
+
+        confirmRestore: async function(this: AppState): Promise<void> {
+            if (!this.restoreData) return;
+
+            if (!confirm('This will overwrite selected settings and reload the application. Proceed?')) {
                 return;
             }
 
@@ -1181,14 +1248,30 @@ export function rssApp(): AppState {
             this.progressMessage = 'Restoring configuration...';
 
             try {
-                const fileContent: string = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target?.result as string); // Cast to string
-                    reader.onerror = (e) => reject(e);
-                    reader.readAsText(file);
-                });
+                const CATEGORIES = {
+                    feeds: ['rssFeeds', 'keywordBlacklist'],
+                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
+                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled']
+                };
 
-                const configToRestore = JSON.parse(fileContent);
+                const dataToRestore: Record<string, any> = {};
+                for (const [category, enabled] of Object.entries(this.backupSelections)) {
+                    if (enabled) {
+                        const keys = CATEGORIES[category as keyof typeof CATEGORIES];
+                        keys.forEach(key => {
+                            if (this.restoreData[key] !== undefined) {
+                                dataToRestore[key] = this.restoreData[key];
+                            }
+                        });
+                    }
+                }
+
+                if (Object.keys(dataToRestore).length === 0) {
+                    createStatusBarMessage(this, 'No data selected for restoration.');
+                    this.loading = false;
+                    return;
+                }
 
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
@@ -1198,28 +1281,21 @@ export function rssApp(): AppState {
                         'Content-Type': 'application/json',
                         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                     },
-                    body: JSON.stringify(configToRestore)
+                    body: JSON.stringify(dataToRestore)
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to restore backend data.');
                 }
-                console.log('Backend configuration restored successfully.');
-                createStatusBarMessage(this, 'Configuration restored successfully! Reloading...');
 
-                // Reload the page to apply new settings and re-initialize
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                createStatusBarMessage(this, 'Restoration complete! Reloading...');
+                setTimeout(() => window.location.reload(), 1000);
 
             } catch (error: any) {
-                console.error("Error during config restoration:", error);
-                createStatusBarMessage(this, `Failed to restore configuration: ${error.message}`);
+                console.error("Error during restoration:", error);
+                createStatusBarMessage(this, `Restoration failed: ${error.message}`);
                 this.loading = false;
-            } finally {
-                // Clear the file input value so the same file can be selected again
-                (event.target as HTMLInputElement).value = ''; // Cast to HTMLInputElement
             }
         },
         // --- Private Helper Methods ---
