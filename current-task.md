@@ -43,14 +43,12 @@
     - *Finding:* Firebase Hosting (Spark plan) has a 360MB/day transfer limit, which might be tight.
     - *Decision:* Selected **Cloudflare Pages** for frontend hosting due to unlimited free bandwidth and native integration with the existing Cloudflare Worker backend.
 - **RSS Item Descriptions:** RSS feed items were missing description text. 
-    - *Mitigation:* Refactored `mapRawItem` to stop aggressive removal of content-bearing links/images. Improved worker-side field selection (adding `content:encoded` and `contentSnippet` support) and added debug logging. Implementation complete, ready for verification.
+    - *Mitigation:* Refactored `mapRawItem` to stop aggressive removal of content-bearing links/images. Improved worker-side field selection.
+    - *Verification:* Verified with `tests/rss_content.spec.js`. Descriptions (including those with links/images like The Verge) are now rendering correctly.
 - **Alpine Proxies vs. StructuredClone:** `structuredClone` is incompatible with Alpine.js Proxies used in the app state. **Mitigation:** Employed JSON-based sanitization for reliable IndexedDB storage.
 - **Test Environment Isolation:** Tests were failing due to unseeded data or lingering unauthenticated states. **Mitigation:** Implemented `ensureFeedsSeeded` helper and forced explicit login bypass in `beforeEach` hooks.
-- **UI Navigation Latency:** Tests were frequently timing out while waiting for nested settings sub-menus. **Mitigation:** Added explicit waits for sub-menu visibility and manual `change` event dispatching for reactive elements.
 
 **Next Steps:**
 - **Deployment:** Configure Cloudflare Pages for frontend hosting.
-- **Verification:** Verify RSS description fixes in the live dev environment.
 - **Phase 9: Security Rules.** Implement and deploy Firestore Security Rules to protect user data.
-- **Cleanup:** Remove any remaining legacy local file storage logic from the worker.
 - **Comprehensive Run:** Execute the entire `npx playwright test` suite one last time to confirm total project stability.
