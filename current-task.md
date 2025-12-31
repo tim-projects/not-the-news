@@ -51,7 +51,7 @@
 **Next Steps (Comprehensive Testing & Stabilization Plan):**
 To ensure total project stability after the Firebase migration, tests will be run one by one, with findings recorded and fixed iteratively:
 1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - **PASSED**. Fixed CSS specificity for read-item highlights.
-2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - Login, Logout, and Token management.
+2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**. Verified Login, Logout, and Protected routes.
 3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - E2E verification of backup/restore through Firestore.
 4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - RSS parsing and deck generation.
 5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - Theme persistence and mobile/desktop layout stability.
@@ -66,9 +66,12 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Phase 10.1 Feature Verification:**
     - Verified Reset, Backup, and Read item highlight features.
     - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.
+- **Phase 10.2 Authentication Flow:**
+    - Verified Login/Logout cycles and automatic redirection to `login.html` for unauthenticated sessions.
+    - Confirmed persistence of authentication state across reloads.
 - **Phase 9 Security:** (Completed previously) Deployed Firestore rules to both Prod and Dev.
 - **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
 
 **Current Focus:**
-- Phase 10.2: Authentication Flow (`tests/auth.spec.js`).
+- Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`).
 
