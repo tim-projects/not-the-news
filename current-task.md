@@ -50,11 +50,14 @@
 
 **Next Steps (Comprehensive Testing & Stabilization Plan):**
 To ensure total project stability after the Firebase migration, tests will be run one by one, with findings recorded and fixed iteratively:
-1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - **PASSED**. Fixed CSS specificity for read-item highlights.
-2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**. Verified Login, Logout, and Protected routes.
-3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - **PASSED**. Confirmed config export/import cycle via Firestore.
-4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - **PASSED**. Verified RSS description rendering and automatic deck replenishment.
-5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - **PASSED**. Verified theme persistence, basic UI toggles, and offline support.
+1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - **PASSED**.
+2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**.
+3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - **PASSED**.
+4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - **PASSED**.
+5.  **Phase 10.5: UI & UX (All UI, theme, unread, tts, shuffle, etc.)** - **PASSED**.
+
+**COMPREHENSIVE TEST RUN COMPLETE - TOTAL PROJECT STABILITY CONFIRMED.**
+
 
 ---
 
@@ -66,6 +69,10 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Phase 10.1 Feature Verification:**
     - Verified Reset, Backup, and Read item highlight features.
     - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.
+- **Comprehensive Stability Verification:**
+    - Executed and passed the entire E2E test suite (20+ files).
+    - Fixed syntax error in `tts.spec.js`.
+    - Improved robustness of `unread.spec.js` to handle empty states.
 - **Phase 10.5 UI & UX:**
     - Confirmed consistency of header elements, modal navigation, and setting toggles (sync, images, new tab).
     - Verified that theme selections (light/dark/custom styles) persist correctly across reloads.
@@ -83,5 +90,5 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
 
 **Current Focus:**
-- Finalization and Deployment Prep.
+- Deployment to Cloudflare Pages.
 

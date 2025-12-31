@@ -34,7 +34,7 @@ test.describe('Text to Speech (TTS)', () => {
     // Check if the UI reflects speaking state
     await expect(playButton).toHaveClass(/speaking/);
 
-    const textCalled = await page.evaluate(() => (window as any)._speechCalls[0]);
+    const textCalled = await page.evaluate(() => window._speechCalls[0]);
     expect(textCalled).toBeTruthy();
     expect(textCalled.length).toBeGreaterThan(10);
     
