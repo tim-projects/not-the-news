@@ -34,6 +34,7 @@
     - Fixed a critical `DataCloneError` in `sanitizeForIndexedDB` by switching from `structuredClone` to `JSON.parse(JSON.stringify())`, which correctly handles Alpine.js Proxy objects.
     - Standardized backup filename matching in tests to support ISO-formatted timestamps.
 - **Improved UI Reactivity & Robustness:**
+    - Centered login elements on `login.html` using modern Flexbox layout for better cross-device consistency.
     - Enhanced theme selection logic in `index.html` using `closest('optgroup')` for better reliability.
     - Restored missing `[DEBUG]` console logs to support automated verification of configuration settings.
 - **Stabilized Application State:** Restored missing state properties in `src/main.ts` that were causing widespread Alpine.js "undefined" errors.
