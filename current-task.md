@@ -57,7 +57,8 @@ To ensure total project stability after the Firebase migration, tests will be ru
 5.  **Phase 10.5: UI & UX (All UI, theme, unread, tts, shuffle, etc.)** - **PASSED**.
 
 6.  **Phase 10.6: Firestore Integration Proof (`tests/firestore_proof.spec.js`)** - **PASSED**.
-7.  **Phase 10.7: Theme Persistence (`tests/theme_persistence.spec.js`)** - **PASSED**. Verified that custom themes correctly sync to Firestore and survive cross-device reloads.
+7.  **Phase 10.7: Theme Persistence (`tests/theme_persistence.spec.js`)** - **PASSED**.
+8.  **Phase 10.8: Modal Keyboard Interactions (`tests/modal_keyboard.spec.js`)** - **PASSED**. Verified focus trapping and escape-to-close behavior in settings modals.
 
 **COMPREHENSIVE TEST RUN COMPLETE - TOTAL PROJECT STABILITY CONFIRMED.**
 All tests were executed using the `./run_single_test.sh` utility to ensure clean, focused output.
