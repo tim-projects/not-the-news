@@ -90,6 +90,7 @@ test.describe('Feature Verification Tests', () => {
         const themeSelector = page.locator('#theme-style-selector');
         await themeSelector.selectOption('originalDark');
         await themeSelector.dispatchEvent('change');
+        await page.waitForTimeout(2000); // Wait for theme to apply
         
         await page.locator('.modal-content .close').click();
 

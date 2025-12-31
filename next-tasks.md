@@ -1,16 +1,25 @@
-Text-to-Speech Enhancements
-Control speed/voice with utterance.rate and utterance.voice, pausing via speechSynthesis.pause(). Add event listeners for article load to auto-read or use a shortcut like 'v'.​
+# Future Features & Enhancements
 
-----
+## User Account Management (GDPR & Security)
+- **Delete Account:** Implement a feature to allow users to permanently delete their account and all associated data from Firebase/Firestore (GDPR compliance).
+- **Password Management:** Add options for "Change Password" and "Password Reset" (utilizing Firebase Auth's built-in functionality).
 
-Reader View / Extractor Integration
-o key opens the website article in the right side pane (using the extractor)
-Shift+o opens the website in a new tab
+## UI/UX Improvements
+- **Configuration Shortcuts:** Add "Backup/Restore" buttons to the RSS configuration and Keyword Blacklist screens. These buttons should navigate the user to the Advanced Settings screen for easier access to data management.
 
-In order to do this we will need a folder containing website specific extractor modules, or a generic extraction module
-ideally we could expose the per website settings to the user so that they could fix the extraction themselves and then submit upstream to the main app
+## Text-to-Speech Enhancements
+- Control speed/voice with utterance.rate and utterance.voice, pausing via speechSynthesis.pause(). Add event listeners for article load to auto-read or use a shortcut like 'v'.
 
 ---
 
-Play Icon Visibility Scroll
-If using the right arrows on an item to select the read, starred and play icon. Sometimes the item description is long and goes off the screen. In that case selecting the play icon happens off the screen and the user can't see it, so we will need to scroll the window to the play icon. But we should only perform the scroll if the bottom of the item window is off the screen.
+## Reader View / Extractor Integration
+- `o` key opens the website article in the right side pane (using the extractor).
+- `Shift+o` opens the website in a new tab.
+- Folders for website-specific extractor modules or a generic extraction module.
+- Expose per-website settings to users for custom extraction rules (with upstream submission support).
+
+---
+
+## Play Icon Visibility Scroll
+- If using keyboard navigation and an item description is long, ensure the "Play" icon is scrolled into view when selected.
+- Logic: Only scroll if the bottom of the item (or the icon itself) is currently off-screen.

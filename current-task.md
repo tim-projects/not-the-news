@@ -48,8 +48,27 @@
 - **Alpine Proxies vs. StructuredClone:** `structuredClone` is incompatible with Alpine.js Proxies used in the app state. **Mitigation:** Employed JSON-based sanitization for reliable IndexedDB storage.
 - **Test Environment Isolation:** Tests were failing due to unseeded data or lingering unauthenticated states. **Mitigation:** Implemented `ensureFeedsSeeded` helper and forced explicit login bypass in `beforeEach` hooks.
 
-**Next Steps:**
-- **Deployment:** Configure Cloudflare Pages for frontend hosting.
-- **Phase 9: Security Rules.** Created `firestore.rules`. **Completed:** Deployed successfully to `not-the-news` (prod) and `not-the-news-dev` (dev).
-    - *Note:* `.env.development` has correct Service Account Key. `VITE_FIREBASE_API_KEY` and App IDs are placeholders (cloned from prod) and may need updating for full Dev functionality.
-- **Comprehensive Run:** Execute the entire `npx playwright test` suite one last time to confirm total project stability.
+**Next Steps (Comprehensive Testing & Stabilization Plan):**
+To ensure total project stability after the Firebase migration, tests will be run one by one, with findings recorded and fixed iteratively:
+1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - Reset, Backup, and Read item styling.
+2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - Login, Logout, and Token management.
+3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - E2E verification of backup/restore through Firestore.
+4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - RSS parsing and deck generation.
+5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - Theme persistence and mobile/desktop layout stability.
+
+---
+
+### Progress Update - Wednesday, 31 December 2025
+
+**Accomplishments:**
+- **Roadmap Planning:** Defined a granular testing strategy to handle context limits.
+- **Task Backlog:** Updated `next-tasks.md` with new features:
+    - GDPR Account Deletion.
+    - Password Change/Reset (Firebase).
+    - Deep-links for Backup/Restore in RSS/Blacklist settings.
+- **Phase 9 Security:** (Completed previously) Deployed Firestore rules to both Prod and Dev.
+- **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
+
+**Current Focus:**
+- Executing Phase 10.1 (Feature Tests). Resolving CSS check failure in `feature.spec.js`.
+
