@@ -50,7 +50,7 @@
 
 **Next Steps (Comprehensive Testing & Stabilization Plan):**
 To ensure total project stability after the Firebase migration, tests will be run one by one, with findings recorded and fixed iteratively:
-1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - Reset, Backup, and Read item styling.
+1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - **PASSED**. Fixed CSS specificity for read-item highlights.
 2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - Login, Logout, and Token management.
 3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - E2E verification of backup/restore through Firestore.
 4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - RSS parsing and deck generation.
@@ -62,13 +62,13 @@ To ensure total project stability after the Firebase migration, tests will be ru
 
 **Accomplishments:**
 - **Roadmap Planning:** Defined a granular testing strategy to handle context limits.
-- **Task Backlog:** Updated `next-tasks.md` with new features:
-    - GDPR Account Deletion.
-    - Password Change/Reset (Firebase).
-    - Deep-links for Backup/Restore in RSS/Blacklist settings.
+- **Task Backlog:** Updated `next-tasks.md` with new features (GDPR Account Deletion, Password Reset, Deep-links).
+- **Phase 10.1 Feature Verification:**
+    - Verified Reset, Backup, and Read item highlight features.
+    - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.
 - **Phase 9 Security:** (Completed previously) Deployed Firestore rules to both Prod and Dev.
 - **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
 
 **Current Focus:**
-- Executing Phase 10.1 (Feature Tests). Resolving CSS check failure in `feature.spec.js`.
+- Phase 10.2: Authentication Flow (`tests/auth.spec.js`).
 

@@ -184,13 +184,15 @@ button.read-button.animating {
   transition: none !important;
 }
 
-button.star.starred {
+button.star.starred,
+.item button.star.starred {
   color: var(--gold-color);
   opacity: 1;
   background: transparent;
 }
 
-button.read-button.read {
+button.read-button.read,
+.item button.read-button.read {
   color: var(--gold-color); /* Gold text color */
   opacity: 1;
   background-color: rgba(var(--gold-rgb), 0.1); /* Subtle gold background */

@@ -102,18 +102,20 @@ test.describe('Feature Verification Tests', () => {
         // Move mouse away to avoid hover styles
         await page.mouse.move(0, 0);
         
-        // Wait for animation/state update
-        await page.waitForTimeout(1000);
+        // Wait for class and color to apply
         await expect(readButton).toHaveClass(/read/);
+        await expect(readButton).toHaveCSS('color', 'rgb(255, 215, 0)', { timeout: 15000 });
 
         const computedStyles = await readButton.evaluate(el => {
             const style = window.getComputedStyle(el);
+            const htmlClass = document.documentElement.className;
             return {
-                color: style.color
+                color: style.color,
+                htmlClass: htmlClass,
+                goldVar: style.getPropertyValue('--gold-color').trim()
             };
         });
 
-        // var(--gold-color) is expected: rgb(255, 215, 0)
-        expect(computedStyles.color).toBe('rgb(255, 215, 0)'); 
+        console.log('Read Button Style Info:', computedStyles);
     });
 });
