@@ -50,5 +50,5 @@
 
 **Next Steps:**
 - **Deployment:** Configure Cloudflare Pages for frontend hosting.
-- **Phase 9: Security Rules.** Implement and deploy Firestore Security Rules to protect user data.
+- **Phase 9: Security Rules.** Created `firestore.rules`. **Pending Deployment:** Service Account lacks permissions to deploy rules via CLI. User must run `firebase deploy --only firestore:rules` manually.
 - **Comprehensive Run:** Execute the entire `npx playwright test` suite one last time to confirm total project stability.
