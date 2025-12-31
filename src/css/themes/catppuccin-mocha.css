@@ -3,6 +3,8 @@ html.dark.theme-catppuccin-mocha {
   --fg: #cdd6f4;
   --primary: #cba6f7;
   --secondary: #89b4fa;
+  --primary-fg: #1e1e2e;
+  --secondary-fg: #1e1e2e;
   --card-bg: #313244;
   --card-border: #45475a;
   --card-shadow-color: rgba(0, 0, 0, 0.4);

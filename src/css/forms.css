@@ -13,7 +13,7 @@
 
 .filter-select:hover {
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
 }
 
 .filter-select:focus {
@@ -61,6 +61,7 @@ select#theme-style-selector option {
 select#filter-selector option:hover,
 select#theme-style-selector option:hover {
   background: var(--primary);
+  color: var(--primary-fg);
 }
 
 .switch {
@@ -137,7 +138,7 @@ button.font-size-btn {
   align-items: center;
   justify-content: center;
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
   border-radius: 100px;
   font-size: 1rem;
   font-weight: bold;

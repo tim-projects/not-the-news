@@ -3,6 +3,8 @@ html.dark.theme-midnight {
   --fg: #ffffff;
   --primary: #bb86fc;
   --secondary: #03dac6;
+  --primary-fg: #000000;
+  --secondary-fg: #000000;
   --card-bg: #121212;
   --card-border: #333333;
   --card-shadow-color: rgba(0, 0, 0, 0.6);

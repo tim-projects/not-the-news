@@ -3,6 +3,8 @@ html.light.theme-github-light {
   --fg: #24292f;
   --primary: #0969da;
   --secondary: #57606a;
+  --primary-fg: #ffffff;
+  --secondary-fg: #ffffff;
   --card-bg: #f6f8fa;
   --card-border: #d0d7de;
   --card-shadow-color: rgba(0, 0, 0, 0.1);

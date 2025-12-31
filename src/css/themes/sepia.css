@@ -3,6 +3,8 @@ html.light.theme-sepia {
   --fg: #5b4636;
   --primary: #8b4513;
   --secondary: #d2b48c;
+  --primary-fg: #f4ecd8;
+  --secondary-fg: #5b4636;
   --card-bg: #fdf5e6;
   --card-border: #e3d5b8;
   --card-shadow-color: rgba(0, 0, 0, 0.15);

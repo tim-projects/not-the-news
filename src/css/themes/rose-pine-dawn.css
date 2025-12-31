@@ -3,6 +3,8 @@ html.light.theme-rose-pine-dawn {
   --fg: #575279;
   --primary: #286983;
   --secondary: #d7827e;
+  --primary-fg: #faf4ed;
+  --secondary-fg: #faf4ed;
   --card-bg: #fffaf3;
   --card-border: #dfdad9;
   --card-shadow-color: rgba(0, 0, 0, 0.1);

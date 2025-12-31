@@ -355,7 +355,7 @@ body.no-curves .read-button-outline {
 
 .tts-highlight {
     background-color: var(--primary);
-    color: white;
+    color: var(--primary-fg);
     padding: 0 2px;
     border-radius: 2px;
     font-weight: bold;

@@ -3,6 +3,8 @@ html.dark.theme-synthwave {
   --fg: #fffbf5;
   --primary: #ff7edb;
   --secondary: #36f9f6;
+  --primary-fg: #2b213a;
+  --secondary-fg: #2b213a;
   --card-bg: #241b2f;
   --card-border: #ff7edb;
   --card-shadow-color: rgba(0, 0, 0, 0.4);

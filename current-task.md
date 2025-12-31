@@ -82,6 +82,10 @@ All tests were executed using the `./run_single_test.sh` utility to ensure clean
 ### Progress Update - Wednesday, 31 December 2025
 
 **Accomplishments:**
+- **Theme Contrast & Accessibility Fixes:**
+    - Standardized interactive element contrast by introducing `--primary-fg` and `--secondary-fg` variables across all 18 themes.
+    - Updated `buttons.css`, `forms.css`, `layout.css`, `status.css`, and `content.css` to use these variables, ensuring readable text on primary/secondary backgrounds regardless of theme brightness (e.g., dark text on bright neon themes like Synthwave).
+    - Removed legacy `!important` color overrides from theme files.
 - **Roadmap Planning:** Defined a granular testing strategy to handle context limits.
 - **Task Backlog:** Updated `next-tasks.md` with new features:
     - Theme Contrast & Accessibility Fixes (audit and fix low-contrast interactive elements).

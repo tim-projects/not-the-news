@@ -3,6 +3,8 @@ html.light.theme-solarized {
   --fg: #657b83;
   --primary: #268bd2;
   --secondary: #93a1a1;
+  --primary-fg: #fdf6e3;
+  --secondary-fg: #fdf6e3;
   --card-bg: #eee8d5;
   --card-border: #d5ccba;
   --card-shadow-color: rgba(0, 0, 0, 0.15);

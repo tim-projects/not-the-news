@@ -24,6 +24,8 @@ html {
   --fg: gainsboro;
   --primary: cornflowerblue;
   --secondary: aliceblue;
+  --primary-fg: #ffffff; /* Contrast text for primary color */
+  --secondary-fg: #1A1A1B; /* Contrast text for secondary color */
   --card-bg: #1E1E1E;
   --card-border: #343536;
   --card-shadow-color: #00000052;
@@ -45,6 +47,8 @@ html {
   --light-fg: darkslategrey;
   --light-primary: cornflowerblue;
   --light-secondary: slategrey;
+  --light-primary-fg: #ffffff;
+  --light-secondary-fg: #ffffff;
   --light-card-bg: #ffffff;
   --light-card-border: #EEE;
   --light-card-shadow-color: lightgrey;
@@ -95,6 +99,8 @@ html.light {
   --fg: var(--light-fg);
   --primary: var(--light-primary);
   --secondary: var(--light-secondary);
+  --primary-fg: var(--light-primary-fg);
+  --secondary-fg: var(--light-secondary-fg);
   --primary-rgb: var(--light-primary-rgb);
   --secondary-rgb: var(--light-secondary-rgb);
   --card-bg: var(--light-card-bg);

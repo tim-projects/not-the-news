@@ -3,6 +3,8 @@ html.light.theme-paper {
   --fg: #000000;
   --primary: #000000;
   --secondary: #444444;
+  --primary-fg: #ffffff;
+  --secondary-fg: #ffffff;
   --card-bg: #ffffff;
   --card-border: #000000;
   --card-shadow-color: rgba(0, 0, 0, 0.15);

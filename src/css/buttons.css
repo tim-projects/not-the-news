@@ -47,7 +47,7 @@ button.close {
 }
 
 button.close:hover {
-  color: var(--secondary);
+  color: var(--primary-fg);
   background: var(--primary);
 }
 
@@ -87,7 +87,7 @@ button.star {
 }
 
 button.star:hover {
-  color: var(--secondary);
+  color: var(--primary-fg);
   background: var(--primary);
 }
 
@@ -127,7 +127,7 @@ button.play-button {
 }
 
 button.play-button:hover {
-  color: var(--secondary);
+  color: var(--primary-fg);
   background: var(--primary);
   opacity: 1;
 }
@@ -165,7 +165,7 @@ button.read-button {
 }
 
 button.read-button:hover {
-  color: var(--secondary);
+  color: var(--primary-fg);
   background: var(--primary);
 }
 
@@ -238,7 +238,7 @@ button.star.starred:active {
 
 #scroll-to-top:hover {
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
 }
 
 #scroll-to-top:focus {
@@ -267,7 +267,7 @@ button.star.starred:active {
 
 .cog-wheel-button:hover {
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
 }
 
 .cog-wheel-button:focus {
@@ -308,7 +308,7 @@ button.star.starred:active {
 .settings-btn.active,
 .help-btn.active {
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
   opacity: 1;
 }
 
@@ -361,7 +361,7 @@ button.star.starred:active {
 
 .configure-button {
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
   border-radius: var(--border-radius);
   cursor: pointer;
   margin-left: auto;
@@ -374,7 +374,7 @@ button.star.starred:active {
 
 .configure-button:hover {
   background-color: var(--secondary);
-  color: var(--fg);
+  color: var(--secondary-fg);
 }
 
 .configure-button:focus {
@@ -392,7 +392,7 @@ button.star.starred:active {
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-fg);
   border: none;
   cursor: pointer;
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
@@ -402,7 +402,7 @@ button.star.starred:active {
 
 .settings-group button:hover {
   background-color: var(--secondary);
-  color: var(--fg);
+  color: var(--secondary-fg);
 }
 
 .settings-group button:focus {

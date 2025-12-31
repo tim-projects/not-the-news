@@ -3,6 +3,8 @@ html.dark.theme-gruvbox-dark {
   --fg: #ebdbb2;
   --primary: #d79921;
   --secondary: #a89984;
+  --primary-fg: #282828;
+  --secondary-fg: #282828;
   --card-bg: #3c3836;
   --card-border: #504945;
   --card-shadow-color: rgba(0, 0, 0, 0.5);

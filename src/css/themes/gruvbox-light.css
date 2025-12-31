@@ -3,6 +3,8 @@ html.light.theme-gruvbox-light {
   --fg: #3c3836;
   --primary: #b57614;
   --secondary: #928374;
+  --primary-fg: #fbf1c7; /* Light text on gold primary */
+  --secondary-fg: #fbf1c7; /* Light text on grey secondary */
   --card-bg: #f2e5bc;
   --card-border: #d5c4a1;
   --card-shadow-color: rgba(0, 0, 0, 0.15);

@@ -3,6 +3,8 @@ html.dark.theme-material-dark {
   --fg: #eceff1;
   --primary: #80cbc4;
   --secondary: #546e7a;
+  --primary-fg: #263238;
+  --secondary-fg: #eceff1;
   --card-bg: #37474f;
   --card-border: #455a64;
   --card-shadow-color: rgba(0, 0, 0, 0.4);

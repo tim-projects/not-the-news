@@ -3,6 +3,8 @@ html.light.theme-atom-one-light {
   --fg: #383a42;
   --primary: #4078f2;
   --secondary: #a0a1a7;
+  --primary-fg: #ffffff;
+  --secondary-fg: #ffffff;
   --card-bg: #ffffff;
   --card-border: #e5e5e6;
   --card-shadow-color: rgba(0, 0, 0, 0.1);

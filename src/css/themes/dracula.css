@@ -3,6 +3,8 @@ html.dark.theme-dracula {
   --fg: #f8f8f2;
   --primary: #bd93f9;
   --secondary: #6272a4;
+  --primary-fg: #282a36;
+  --secondary-fg: #f8f8f2;
   --card-bg: #44475a;
   --card-border: #6272a4;
   --card-shadow-color: rgba(0, 0, 0, 0.4);

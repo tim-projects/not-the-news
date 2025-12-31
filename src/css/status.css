@@ -81,13 +81,13 @@
 .undo-button:focus,
 .undo-button:active {
     background-color: var(--primary);
-    color: white;
+    color: var(--primary-fg);
 }
 
 .undo-button:hover .undo-timer-outline,
 .undo-button:focus .undo-timer-outline,
 .undo-button:active .undo-timer-outline {
-    stroke: white;
+    stroke: var(--primary-fg);
 }
 
 .undo-timer-svg {

@@ -3,6 +3,8 @@ html.dark.theme-tokyo-night {
   --fg: #c0caf5;
   --primary: #7aa2f7;
   --secondary: #bb9af7;
+  --primary-fg: #1a1b26;
+  --secondary-fg: #1a1b26;
   --card-bg: #24283b;
   --card-border: #414868;
   --card-shadow-color: rgba(0, 0, 0, 0.4);

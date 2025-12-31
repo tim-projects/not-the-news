@@ -3,6 +3,8 @@ html.light.theme-morning {
   --fg: #334e68;
   --primary: #102a43;
   --secondary: #627d98;
+  --primary-fg: #ffffff;
+  --secondary-fg: #ffffff;
   --card-bg: #f0f7ff;
   --card-border: #bcccdc;
   --card-shadow-color: rgba(0, 0, 0, 0.15);

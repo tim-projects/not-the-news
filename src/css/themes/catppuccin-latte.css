@@ -3,6 +3,8 @@ html.light.theme-catppuccin-latte {
   --fg: #4c4f69;
   --primary: #1e66f5;
   --secondary: #8839ef;
+  --primary-fg: #eff1f5;
+  --secondary-fg: #eff1f5;
   --card-bg: #e6e9ef;
   --card-border: #ccd0da;
   --card-shadow-color: rgba(0, 0, 0, 0.1);
