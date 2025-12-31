@@ -65,7 +65,11 @@ To ensure total project stability after the Firebase migration, tests will be ru
 
 **Accomplishments:**
 - **Roadmap Planning:** Defined a granular testing strategy to handle context limits.
-- **Task Backlog:** Updated `next-tasks.md` with new features (GDPR Account Deletion, Password Reset, Deep-links).
+- **Task Backlog:** Updated `next-tasks.md` with new features:
+    - Theme Contrast & Accessibility Fixes (audit and fix low-contrast interactive elements).
+    - GDPR Account Deletion.
+    - Password Change/Reset (Firebase).
+    - Deep-links for Backup/Restore in RSS/Blacklist settings.
 - **Phase 10.1 Feature Verification:**
     - Verified Reset, Backup, and Read item highlight features.
     - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.

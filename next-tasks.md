@@ -1,5 +1,9 @@
 # Future Features & Enhancements
 
+## Theme Contrast & Accessibility Fixes
+- **Audit All Themes:** Review all built-in themes to identify interactive elements (buttons, dropdowns, inputs) where text and background colors have insufficient contrast.
+- **Fix Contrast Issues:** Standardize the use of CSS variables (like `--fg`, `--bg`, `--primary`) across all themes to ensure that text remains readable on all interactive components regardless of the active theme.
+
 ## User Account Management (GDPR & Security)
 - **Delete Account:** Implement a feature to allow users to permanently delete their account and all associated data from Firebase/Firestore (GDPR compliance).
 - **Password Management:** Add options for "Change Password" and "Password Reset" (utilizing Firebase Auth's built-in functionality).
