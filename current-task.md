@@ -53,7 +53,7 @@ To ensure total project stability after the Firebase migration, tests will be ru
 1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - **PASSED**. Fixed CSS specificity for read-item highlights.
 2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**. Verified Login, Logout, and Protected routes.
 3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - **PASSED**. Confirmed config export/import cycle via Firestore.
-4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - RSS parsing and deck generation.
+4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - **PASSED**. Verified RSS description rendering and automatic deck replenishment.
 5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - Theme persistence and mobile/desktop layout stability.
 
 ---
@@ -66,6 +66,9 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Phase 10.1 Feature Verification:**
     - Verified Reset, Backup, and Read item highlight features.
     - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.
+- **Phase 10.4 Content & Sync:**
+    - Confirmed RSS item descriptions are correctly extracted and rendered without aggressive sanitization loss.
+    - Verified that marking items as read triggers automatic deck generation and replenishment when unread items run low.
 - **Phase 10.3 Data Persistence:**
     - Verified that configuration backups can be generated and downloaded.
     - Confirmed that restoring from a JSON backup correctly updates both local IndexedDB and remote Firestore state.
@@ -76,5 +79,5 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
 
 **Current Focus:**
-- Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`).
+- Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`).
 
