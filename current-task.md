@@ -54,7 +54,7 @@ To ensure total project stability after the Firebase migration, tests will be ru
 2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**. Verified Login, Logout, and Protected routes.
 3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - **PASSED**. Confirmed config export/import cycle via Firestore.
 4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - **PASSED**. Verified RSS description rendering and automatic deck replenishment.
-5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - Theme persistence and mobile/desktop layout stability.
+5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - **IN PROGRESS**. `theme.spec.js` PASSED. `ui.spec.js` (Batch 1: Basic UI) PASSED.
 
 ---
 
