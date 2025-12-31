@@ -49,19 +49,32 @@
 - **Test Environment Isolation:** Tests were failing due to unseeded data or lingering unauthenticated states. **Mitigation:** Implemented `ensureFeedsSeeded` helper and forced explicit login bypass in `beforeEach` hooks.
 
 **Next Steps (Comprehensive Testing & Stabilization Plan):**
-To ensure total project stability after the Firebase migration, tests will be run one by one, with findings recorded and fixed iteratively:
-1.  **Phase 10.1: Core Feature Verification (`tests/feature.spec.js`)** - **PASSED**.
-2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**.
-3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - **PASSED**.
-4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - **PASSED**.
-5.  **Phase 10.5: UI & UX (All UI, theme, unread, tts, shuffle, etc.)** - **PASSED**.
 
-6.  **Phase 10.6: Firestore Integration Proof (`tests/firestore_proof.spec.js`)** - **PASSED**.
-7.  **Phase 10.7: Theme Persistence (`tests/theme_persistence.spec.js`)** - **PASSED**.
-8.  **Phase 10.8: Modal Keyboard Interactions (`tests/modal_keyboard.spec.js`)** - **PASSED**. Verified focus trapping and escape-to-close behavior in settings modals.
+To ensure total project stability after the Firebase migration, the following test suites were executed and PASSED:
+
+1.  **Phase 10.1: Core Features (`tests/feature.spec.js`)**
+
+2.  **Phase 10.2: Authentication (`tests/auth.spec.js`)**
+
+3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)**
+
+4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)**
+
+5.  **Phase 10.5: UI & UX (All UI, theme, unread, tts, shuffle, etc.)**
+
+6.  **Phase 10.6: Firestore Proof (`tests/firestore_proof.spec.js`)**
+
+7.  **Phase 10.7: Theme Persistence (`tests/theme_persistence.spec.js`)**
+
+8.  **Phase 10.8: Accessibility (`tests/modal_keyboard.spec.js`)**
+
+
 
 **COMPREHENSIVE TEST RUN COMPLETE - TOTAL PROJECT STABILITY CONFIRMED.**
+
 All tests were executed using the `./run_single_test.sh` utility to ensure clean, focused output.
+
+
 
 
 ---
