@@ -22,7 +22,7 @@ This document guides the agent's interaction with the project.
 ### Testing Workflow
 - **Running Playwright Tests (from Host):**
   1.  Ensure the `ntn-dev` Podman container is built and running using `bash build-dev.sh`.
-  2.  All Playwright tests MUST be run using the `run_single_test.sh` script to minimize output and focus on individual test results.
+  2.  All Playwright tests MUST be run using the `run_single_test.sh` script to minimize output and focus on individual test results. This is the project's verified standard for E2E verification.
       - **Usage:** `./run_single_test.sh <test_file_path> <test_name_regex>`
       - **Example:** `./run_single_test.sh tests/ui.spec.js "should load the main page"`
   - **Important:** Running Playwright tests directly via `npx playwright test` is NOT allowed due to potentially large output. Always use `run_single_test.sh`.
