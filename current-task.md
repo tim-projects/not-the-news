@@ -51,5 +51,5 @@
 **Next Steps:**
 - **Deployment:** Configure Cloudflare Pages for frontend hosting.
 - **Phase 9: Security Rules.** Created `firestore.rules`. **Completed:** Deployed successfully to `not-the-news` (prod) and `not-the-news-dev` (dev).
-    - *Note:* `.env.development` requires updated `VITE_FIREBASE_API_KEY` and `FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY` for the Dev project.
+    - *Note:* `.env.development` has correct Service Account Key. `VITE_FIREBASE_API_KEY` and App IDs are placeholders (cloned from prod) and may need updating for full Dev functionality.
 - **Comprehensive Run:** Execute the entire `npx playwright test` suite one last time to confirm total project stability.
