@@ -375,7 +375,10 @@
                 </div>
 
                 <div id="rss-settings-block" x-show="modalView === 'rss'">
-                    <h2>Configure RSS Feeds</h2>
+                    <div class="d-flex justify-between align-items-center">
+                        <h2>Configure RSS Feeds</h2>
+                        <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem;" @click="modalView = 'advanced'">Backup/Restore</button>
+                    </div>
                     <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(var(--primary-rgb), 0.05);">
                         <label for="discovery-input" style="font-weight: bold; margin-bottom: 0.5rem;">Auto-Discover Feed</label>
                         <div class="d-flex gap-2">
@@ -408,7 +411,10 @@
                 </div>
 
                 <div id="keywords-settings-block" x-show="modalView === 'keywords'">
-                    <h2>Configure Keyword Blacklist</h2>
+                    <div class="d-flex justify-between align-items-center">
+                        <h2>Configure Keyword Blacklist</h2>
+                        <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem;" @click="modalView = 'advanced'">Backup/Restore</button>
+                    </div>
                     <div class="settings-group grow">
                         <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
                         <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
@@ -431,6 +437,25 @@
                                     <div id="advanced-settings-block" x-show="modalView === 'advanced'">
                                         <h2>Advanced Settings</h2>
                                         <div class="settings-option"><span>Logout from Firebase</span><button id="logout-button" class="configure-button" @click="logout()">Logout</button></div>
+                                        
+                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                                            <h3 style="margin-top: 0;">Account Management</h3>
+                                            <div class="settings-option">
+                                                <div class="setting-label-group">
+                                                    <span>Change Password</span>
+                                                    <p class="setting-description">Update your account password.</p>
+                                                </div>
+                                                <button class="configure-button" @click="changePassword()">Change</button>
+                                            </div>
+                                            <div class="settings-option" style="margin-top: 0.5rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+                                                <div class="setting-label-group">
+                                                    <span style="color: #ff4444;">Delete Account</span>
+                                                    <p class="setting-description">Permanently remove your account and data (GDPR).</p>
+                                                </div>
+                                                <button class="configure-button" style="background-color: #ff4444;" @click="deleteAccount()">Delete</button>
+                                            </div>
+                                        </div>
+
                                         <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
                                         <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
                                         <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>

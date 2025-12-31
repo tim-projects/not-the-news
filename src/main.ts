@@ -79,7 +79,7 @@ import { MappedFeedItem, DeckItem, AppState, StarredItem, ShuffledOutItem } from
 import { filterEntriesByQuery, toggleSearch } from './js/helpers/searchManager.ts';
 import { discoverFeed } from './js/helpers/discoveryManager.ts';
 import { auth } from './js/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, updatePassword, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
 // Enforce authentication before initializing the app
 let authInitialized = false;
@@ -364,6 +364,58 @@ export function rssApp(): AppState {
             } catch (error: any) {
                 console.error("Logout error:", error);
                 createStatusBarMessage(this, `Logout failed: ${error.message}`);
+            }
+        },
+
+        changePassword: async function(this: AppState): Promise<void> {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const newPassword = prompt("Enter your new password:");
+            if (!newPassword || newPassword.length < 6) {
+                if (newPassword) alert("Password must be at least 6 characters long.");
+                return;
+            }
+
+            try {
+                await updatePassword(user, newPassword);
+                createStatusBarMessage(this, "Password updated successfully!");
+            } catch (error: any) {
+                console.error("Password update error:", error);
+                if (error.code === 'auth/requires-recent-login') {
+                    alert("This operation requires recent authentication. Please log out and log back in, then try again.");
+                } else {
+                    createStatusBarMessage(this, `Failed to update password: ${error.message}`);
+                }
+            }
+        },
+
+        deleteAccount: async function(this: AppState): Promise<void> {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const confirmation = confirm("CRITICAL: This will permanently delete your account and all your saved data from the server. This action CANNOT be undone.\n\nAre you absolutely sure?");
+            if (!confirmation) return;
+
+            const secondConfirmation = confirm("FINAL WARNING: Are you really, really sure you want to delete your account?");
+            if (!secondConfirmation) return;
+
+            try {
+                // 1. Call backend to clear server-side data (optional but good practice)
+                await this.resetApplicationData(); // This also clears local DB
+
+                // 2. Delete user from Firebase Auth
+                await deleteUser(user);
+                
+                alert("Your account has been successfully deleted.");
+                window.location.href = '/login.html';
+            } catch (error: any) {
+                console.error("Account deletion error:", error);
+                if (error.code === 'auth/requires-recent-login') {
+                    alert("This operation requires recent authentication. Please log out and log back in, then try again.");
+                } else {
+                    createStatusBarMessage(this, `Failed to delete account: ${error.message}`);
+                }
             }
         },
         

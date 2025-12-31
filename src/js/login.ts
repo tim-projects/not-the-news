@@ -4,7 +4,8 @@ import {
     onAuthStateChanged,
     GoogleAuthProvider,
     signInWithPopup,
-    signInAnonymously
+    signInAnonymously,
+    sendPasswordResetEmail
 } from "firebase/auth";
 import { auth } from "./firebase";
 
@@ -14,13 +15,15 @@ const pwInput = document.getElementById("pw") as HTMLInputElement;
 const loginBtn = document.getElementById("login-btn") as HTMLButtonElement;
 const signupBtn = document.getElementById("signup-btn") as HTMLButtonElement;
 const googleBtn = document.getElementById("google-btn") as HTMLButtonElement;
+const forgotPwLink = document.getElementById("forgot-pw-link") as HTMLAnchorElement;
 const authMessage = document.getElementById("auth-message") as HTMLDivElement;
 
 console.log("[Auth] Login script loaded. Form found:", !!loginForm);
 
-const showMessage = (msg: string) => {
+const showMessage = (msg: string, isError: boolean = true) => {
     if (authMessage) {
         authMessage.textContent = msg;
+        authMessage.style.color = isError ? '#ff4444' : '#44ff44';
         authMessage.style.display = 'block';
     } else {
         alert(msg);
@@ -41,6 +44,26 @@ onAuthStateChanged(auth, (user) => {
         window.location.href = "/";
     }
 });
+
+if (forgotPwLink) {
+    forgotPwLink.addEventListener('click', async (e) => {
+        e.preventDefault();
+        clearMessage();
+        const email = emailInput?.value.trim();
+        if (!email) {
+            showMessage("Please enter your email address first.");
+            return;
+        }
+
+        try {
+            await sendPasswordResetEmail(auth, email);
+            showMessage(`Password reset email sent to ${email}`, false);
+        } catch (error: any) {
+            console.error("Password reset error:", error);
+            showMessage(error.message || "Failed to send password reset email");
+        }
+    });
+}
 
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {

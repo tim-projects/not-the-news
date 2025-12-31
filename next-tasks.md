@@ -1,12 +1,5 @@
 # Future Features & Enhancements
 
-## User Account Management (GDPR & Security)
-- **Delete Account:** Implement a feature to allow users to permanently delete their account and all associated data from Firebase/Firestore (GDPR compliance).
-- **Password Management:** Add options for "Change Password" and "Password Reset" (utilizing Firebase Auth's built-in functionality).
-
-## UI/UX Improvements
-- **Configuration Shortcuts:** Add "Backup/Restore" buttons to the RSS configuration and Keyword Blacklist screens. These buttons should navigate the user to the Advanced Settings screen for easier access to data management.
-
 ## Text-to-Speech Enhancements
 - Control speed/voice with utterance.rate and utterance.voice, pausing via speechSynthesis.pause(). Add event listeners for article load to auto-read or use a shortcut like 'v'.
 
