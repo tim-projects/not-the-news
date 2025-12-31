@@ -54,7 +54,7 @@ To ensure total project stability after the Firebase migration, tests will be ru
 2.  **Phase 10.2: Authentication Flow (`tests/auth.spec.js`)** - **PASSED**. Verified Login, Logout, and Protected routes.
 3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)** - **PASSED**. Confirmed config export/import cycle via Firestore.
 4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)** - **PASSED**. Verified RSS description rendering and automatic deck replenishment.
-5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - **IN PROGRESS**. `theme.spec.js` PASSED. `ui.spec.js` (Batch 1 & 2: Basic UI, Config) PASSED.
+5.  **Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`)** - **PASSED**. Verified theme persistence, basic UI toggles, and offline support.
 
 ---
 
@@ -66,6 +66,10 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Phase 10.1 Feature Verification:**
     - Verified Reset, Backup, and Read item highlight features.
     - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.
+- **Phase 10.5 UI & UX:**
+    - Confirmed consistency of header elements, modal navigation, and setting toggles (sync, images, new tab).
+    - Verified that theme selections (light/dark/custom styles) persist correctly across reloads.
+    - Validated core interaction logic (Star, Read, Scroll-to-top) and verified offline functionality using Playwright request interception.
 - **Phase 10.4 Content & Sync:**
     - Confirmed RSS item descriptions are correctly extracted and rendered without aggressive sanitization loss.
     - Verified that marking items as read triggers automatic deck generation and replenishment when unread items run low.
@@ -79,5 +83,5 @@ To ensure total project stability after the Firebase migration, tests will be ru
 - **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
 
 **Current Focus:**
-- Phase 10.5: UI & UX (`tests/ui.spec.js`, `tests/theme.spec.js`).
+- Finalization and Deployment Prep.
 
