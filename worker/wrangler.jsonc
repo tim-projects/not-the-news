@@ -5,6 +5,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "ntn-backend",
+	"account_id": "6e27abd41b72146090b06b58a6d19fd3",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-01-01",
 	"compatibility_flags": [
@@ -12,17 +13,18 @@
 		"nodejs_compat"
 	],
 	"assets": {
-		// The path to the directory containing the `index.html` file to be served at `/`
-		"directory": "./public"
+		"directory": "../www"
 	},
+	"routes": [
+		{
+			"pattern": "news.loveopenly.net",
+			"custom_domain": true
+		}
+	],
 	"observability": {
 		"enabled": true
 	},
 	"vars": {
-		"APP_PASSWORD": "",
-		"FIREBASE_PROJECT_ID": "",
-		"FIREBASE_SERVICE_ACCOUNT_EMAIL": "",
-		"FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY": "",
-		"API_BASE_URL": ""
+		"API_BASE_URL": "https://news.loveopenly.net"
 	}
 }

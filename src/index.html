@@ -3,6 +3,11 @@
 
 <head>
     <script>
+        // Force HTTPS
+        if (location.protocol === 'http:' && location.hostname !== 'localhost' && !location.hostname.endsWith('.test')) {
+            location.replace(location.href.replace('http:', 'https:'));
+        }
+
         // Immediate auth check for static hosting
         if (!localStorage.getItem('isAuthenticated')) {
             window.location.replace('/login.html');

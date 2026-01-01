@@ -13,12 +13,15 @@
 7. [x] Cloudflare Worker: Associate data with UIDs (Storage isolation)
 8. [x] Migration: Local/Redis state to Firestore (REST API Implementation)
 9. [x] Security: Implement Firestore Security Rules
-10. [x] **Prepare for Static Hosting (Cloudflare Pages)**
-    - [x] Replace server-side Caddy redirects with client-side JS (`localStorage` check in `index.html`).
-    - [x] Update `login.ts` and `main.ts` to manage `isAuthenticated` flag.
-    - [x] Remove `redir` directives from production `Caddyfile`.
-    - [x] Verify redirection logic with `tests/redirect.spec.js`.
-    - [x] UI Improvements:
+    - [x] **Prepare for Static Hosting (Cloudflare Pages)**
+        - [x] Replace server-side Caddy redirects with client-side JS (`localStorage` check in `index.html`).
+        - [x] Update `login.ts` and `main.ts` to manage `isAuthenticated` flag.
+        - [x] Remove `redir` directives from production `Caddyfile`.
+        - [x] Verify redirection logic with `tests/redirect.spec.js`.
+        - [x] Configured `wrangler.jsonc` for production assets (`../www`) and custom domain (`news.loveopenly.net`).
+        - [x] Automated production secret management (Firebase & App Password).
+        - [x] Implemented client-side HTTPS redirect in `index.html` and `login.html` to resolve "Not Secure" warnings.
+        - [x] UI Improvements:
         - [x] Layout fixes for Backup/Restore buttons.
         - [x] Implemented Modal-based Password Change UI.
         - [x] Reverted "Advanced Settings" to standard case and added User Email display.
@@ -27,6 +30,8 @@
         - [x] Renamed all API endpoints to neutral names (`/api/profile`, `/api/list`, `/api/refresh`, etc.) to bypass ad-blockers.
         - [x] Hardened RSS fetching with AbortController, 2MB limits, and realistic User-Agent (fixes Reddit 403s).
         - [x] Implemented exponential backoff rate limiting and SSRF protection.
+    - [x] **Deployment Automation:**
+        - [x] Created `run-deploy-production.sh` with Git branch safety check (main/master only).
     - [x] **Containerless Local Development:**
         - [x] Created `run-local.sh` to run Vite and Wrangler without root/Docker.
         - [x] Implemented `systemd --user` service management.
@@ -57,6 +62,7 @@
 - **Improved Identity UI:** The "Advanced Settings" view now clearly displays the email of the person signed in, and labels have been refined for better visual balance.
 - **API Hardening:** The Worker now enforces strict payload size limits (128KB), per-user rate limiting with exponential penalties, and SSRF protection for feed discovery.
 - **Type Safety:** Resolved several TypeScript errors in `AppState` and fixed async return types, ensuring a cleaner production build.
+- **Production Readiness:** Successfully deployed the unified Worker + Assets package to `news.loveopenly.net` with full HTTPS support and automated deployment scripts.
 
 **Final Verification:**
-The full E2E test suite (Auth, Redirect, RSS Content, UI, and Backup/Restore) has been executed and passes in the new containerless environment. The application is fully prepared for Cloudflare Pages/Workers deployment.
+The application is live and functional in the production environment. The full E2E test suite (Auth, Redirect, RSS Content, UI, and Backup/Restore) has been executed and passes in the local containerless environment, mirroring the production logic.
