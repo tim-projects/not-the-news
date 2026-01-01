@@ -5,7 +5,6 @@
   border-radius: 4px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  opacity: 0.8;
   box-shadow: 1px 1px 5px var(--card-shadow-color);
   cursor: pointer;
   transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
@@ -46,20 +45,18 @@
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
 }
 
-select#filter-selector,
-select#theme-style-selector {
-  background: var(--card-bg);
+select.filter-select {
+  background-color: var(--card-bg) !important;
+  color: var(--fg) !important;
+  appearance: auto; /* Ensure standard browser arrow/behavior */
+}
+
+.filter-select option {
+  background-color: var(--card-bg);
   color: var(--fg);
 }
 
-select#filter-selector option,
-select#theme-style-selector option {
-  background: var(--card-bg);
-  color: var(--fg);
-}
-
-select#filter-selector option:hover,
-select#theme-style-selector option:hover {
+.filter-select option:hover {
   background: var(--primary);
   color: var(--primary-fg);
 }
@@ -195,7 +192,3 @@ html.light .switch .slider {
   background-color: var(--toggle-track);
 }
 
-html.light select#filter-selector {
-  background: var(--card-bg);
-  color: var(--fg);
-}
