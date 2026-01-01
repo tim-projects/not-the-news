@@ -121,7 +121,7 @@ All tests were executed using the `./run_single_test.sh` utility to ensure clean
     - Verified Login/Logout cycles and automatic redirection to `login.html` for unauthenticated sessions.
     - Confirmed persistence of authentication state across reloads.
 - **Phase 9 Security:** (Completed previously) Deployed Firestore rules to both Prod and Dev.
-- **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys.
+- **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys and Firebase Web credentials.
 
 **Current Focus:**
 - Deployment to Cloudflare Pages.
