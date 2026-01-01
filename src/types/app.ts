@@ -90,6 +90,7 @@ export interface AppState {
     pregeneratedOfflineDeck: DeckItem[] | null;
     settingsButtonClicks?: number;
     errorMessage: string;
+    userEmail: string;
     isOnline: boolean;
     deckManaged: boolean;
     syncStatusMessage: string;

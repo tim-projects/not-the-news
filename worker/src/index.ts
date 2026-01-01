@@ -381,6 +381,12 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
 async function discoverFeeds(targetUrl: string): Promise<Response> {
     try {
         let normalizedUrl = targetUrl.trim();
+        // Skip normalization for comments or empty strings (though this shouldn't happen from UI)
+        if (!normalizedUrl || normalizedUrl.startsWith('#')) {
+            return jsonResponse({ error: 'Invalid URL' }, 400);
+        }
+
+        // Auto-prepend https:// if missing protocol but has a domain structure
         if (!normalizedUrl.includes('://') && normalizedUrl.includes('.')) {
             normalizedUrl = `https://${normalizedUrl}`;
         }

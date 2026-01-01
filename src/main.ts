@@ -391,7 +391,7 @@ export function rssApp(): AppState {
             this.modalView = 'change-password';
         },
 
-        submitPasswordChange: async function(this: AppState): void {
+        submitPasswordChange: async function(this: AppState): Promise<void> {
             const user = auth.currentUser;
             if (!user) return;
             
