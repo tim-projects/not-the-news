@@ -438,14 +438,7 @@
                         <h2>Advanced Settings</h2>
                         <hr>
 
-                        <div class="settings-option">
-                            <div class="setting-label-group">
-                                <span>Logout</span>
-                                <p class="setting-description">Sign out of your current account.</p>
-                            </div>
-                            <button id="logout-button" class="configure-button" @click="logout()">Logout</button>
-                        </div>
-
+                        <h3 style="margin-top: 1.5rem; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">Backup & Restore</h3>
                         <div class="settings-option">
                             <div class="setting-label-group">
                                 <span>Backup Configuration</span>
@@ -463,6 +456,9 @@
                             <input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" />
                         </div>
 
+                        <hr style="opacity: 0.3; margin: 1.5rem 0;">
+
+                        <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">Account & Data Security</h3>
                         <div class="settings-option">
                             <div class="setting-label-group">
                                 <span>Change Password</span>
@@ -473,10 +469,10 @@
 
                         <div class="settings-option">
                             <div class="setting-label-group">
-                                <span style="color: #ff4444;">Delete Account</span>
-                                <p class="setting-description">Permanently remove your account and data (GDPR).</p>
+                                <span>Logout</span>
+                                <p class="setting-description">Sign out of your current account.</p>
                             </div>
-                            <button class="configure-button" style="background-color: #ff4444;" @click="deleteAccount()">Delete</button>
+                            <button id="logout-button" class="configure-button" @click="logout()">Logout</button>
                         </div>
 
                         <div class="settings-option">
@@ -485,6 +481,14 @@
                                 <p class="setting-description">Wipe all local data and re-initialize.</p>
                             </div>
                             <button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button>
+                        </div>
+
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span style="color: #ff4444;">Delete Account</span>
+                                <p class="setting-description">Permanently remove your account and data (GDPR).</p>
+                            </div>
+                            <button class="configure-button" style="background-color: #ff4444;" @click="deleteAccount()">Delete</button>
                         </div>
                     </div>
 
