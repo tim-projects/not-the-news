@@ -194,7 +194,7 @@
              x-transition:leave-end="opacity-0">
             <div class="modal-content">
                 <div class="modal-header">
-                    <button id="back-button" @click="modalView = 'main'" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
+                    <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
                     <button class="close" @click="openSettings = false">✕</button>
                 </div>
                 <div class="modal-body">
