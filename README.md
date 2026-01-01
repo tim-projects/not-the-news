@@ -1,91 +1,89 @@
-# not-the-news
+# Not The News
 
-![image](screenshot.jpg)
+![image](screenshot.png)
 
-Not The News is a 'Deck based rss feed system.' which is designed to prevent doom scrolling.
+Not The News is a 'Deck-based RSS feed system' designed to prevent doom-scrolling and reclaim your time.
 
-The premise of Not The News is simple: Stop wasting time.
+## The Premise
 
-Wasting time on casual browsing, wasting time on algorithms and video reels that you can't control. Wasting time on ads.
+Stop wasting time on algorithms you can't control, video reels, and intrusive ads. Not The News is a minimal, focused RSS reader that scratches the itch for a personal, ad-free information stream.
 
-The fact is that social media is not good for your health, your productivity, or your overall life.
+### How it Works:
+- **Focused Reading:** You only see 10 items at a time. To see more, you must consume the current deck.
+- **Persistent State:** When you read and close an item, it's hidden forever (unless starred or viewed in 'Read' mode).
+- **Limited Shuffles:** You get 2 shuffles per day to refresh your deck with new random content. Clearing your deck earns you a free shuffle!
+- **Zero Friction:** No folders, no complex management. Just read and go.
 
-Not The News aims to be a solution to this. It's the itch for myself I had to scratch. (Maybe you need it too).
+## Modern Tech Stack
 
-At it's core a browser based single page scroll rss reader with keyword filtering. Multiple rss feeds are regularly aggregated into a single scrollable feed, rss items that flag up with filtered keywords are removed.
+The project has been modernized to run entirely on serverless infrastructure for maximum performance and minimum maintenance:
 
-But the idea is to keep things minimal, and to _focus_ you. So that you can get on with life, preferably away from the internet.
+- **Frontend:** Vite + Alpine.js (Hosted on **Cloudflare Pages**)
+- **Backend:** Cloudflare Workers (RSS processing & API)
+- **Database:** Firebase Firestore (Multi-user state persistence)
+- **Auth:** Firebase Authentication (Google & Email/Password)
+- **PWA:** Full offline support and "Install as App" capability.
 
-So, you can only see 10 items at a time.
-Want to see more than 10 items?
+## Features
 
-No problem - but you have to consume the 10 items you have first!
+- **Multi-User:** Secure accounts with private feed configurations.
+- **Keyword Filtering:** Automatically filter out noise using a personalized blacklist.
+- **Smart Deck Generation:** Algorithms prioritize fresh content while ensuring variety.
+- **Offline First:** Read your synced content even without an internet connection.
+- **Cross-Device Sync:** Seamlessly transition between desktop and mobile.
+- **TTS Support:** Built-in "Read Out Loud" feature for hands-free consumption.
+- **Theming:** 18+ beautiful themes including Nord, Dracula, and Catppuccin.
 
-When you read an item and then close it. It stays closed and hidden. And you never see it again (unless you look for it under the hidden drop down, or star it to save it permanently).
+## Local Development (Containerless)
 
-When you close all 10 items in the list, 10 more show up.
+You no longer need Docker or root access to run Not The News locally.
 
-To make this a little less rigid - You have the option to shuffle the deck.
-The shuffle button in the top right of the app will give you a new random set of rss feed items. But be warned - you only get 2 shuffles per day.
+### 1. Prerequisites
+- [Node.js 20+](https://nodejs.org/)
+- [Firebase Account](https://firebase.google.com/) (Free tier)
+- [Cloudflare Wrangler](https://developers.cloudflare.com/workers/wrangler/install-cli/) (`npm install -g wrangler`)
 
-It's not all bad though, since every time you clear the current deck you earn a free shuffle! In this way, the app helps you to find a balance between mindless scrolling and useful reading.
+### 2. Setup
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/tim-projects/not-the-news.git
+   cd not-the-news
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   cd worker && npm install && cd ..
+   ```
+3. Configure Environment:
+   - Create `.env.development` in the root with your Firebase credentials.
+   - Create `worker/.dev.vars` with your backend secrets (Wrangler will use this for local dev).
 
-The app has no folders, and manages everything automagically without your input.
+### 3. Run
+Start both the frontend and backend with a single command:
+```bash
+./run-local.sh
+```
+- **Frontend:** `http://localhost:5173`
+- **Backend:** `http://localhost:8787`
 
-You just read and go. No distractions. No confusion. No ulterior motives.
+*Note: This script uses `systemd --user` to manage processes. Use `systemctl --user stop ntn-frontend ntn-backend` to shut down.*
 
-You add the rss feeds that you want, and then use the app.
+## Deployment
 
-If the feed is overwhelming with items you don't want to read, then add more filtering keywords, or tweak the feeds you use.
+### Frontend (Cloudflare Pages)
+1. Connect your GitHub repo to Cloudflare Pages.
+2. Build command: `npm run build`
+3. Output directory: `www`
+4. Add your `VITE_FIREBASE_*` variables to the project settings.
 
-It's about balance. And simplicity. While still feeling personal.
+### Backend (Cloudflare Workers)
+1. Navigate to the `worker/` directory.
+2. Deploy using Wrangler:
+   ```bash
+   npx wrangler deploy
+   ```
+3. Set your production secrets in the Cloudflare Dashboard (or via `wrangler secret put`).
 
-Your own personal algorithm. For you.
+## Backup & Restore
 
-If you want the latest news updates using this app, you can. But I encourage you to think differently about how you consume information. Not The News is the tool to help with that.
-
-Current Features:
-
-- Keyword filtering - only see the information you want to see.
-- Night/Day mode
-- Auto reload in the background when new rss items are available
-- Works offline when no connection
-- Automatic cross browser/device syncing with low data usage
-- Feed filter modes (Unread/Starred/Hidden/All)
-- Starred items are saved items
-- Shuffle mode
-
-## Requirements
-
-Not The News currently requires:
-
-- A vps/server that can run docker
-- A web domain (yourdomain.com) that points to the server that runs docker
-
-## Configuration
-
-Clone the repo:
-```git clone https://github.com/tim-projects/not-the-news.git```
-
-For the first run. Edit and rename the config examples in
-www/config/
-
-- feeds.txt
-- filter_keywords.txt
-
-Once the app is running you can use the settings cog icon in the top right, to configure everything.
-
-## Running it
-
-### Build and run the container
-
-Build it with a domain name, your email (for letsencrypt), and the password so that you can login
-```./build.sh -d <yourdomain.com> -e <admin@youremail.com> -n -p <yourpassword>```
-
-Then when you open the site the password is the one set as above.
-
-## Optional - set up a cron to backup the data every 12 hours
-
-By default all the data is stored inside a docker container volume. This cron command will backup every 12 hours to a local folder, so that you can save your app usage (in case your server fails).
-
-```sudo echo "0 */12 * * * cd <FOLDER WHERE NOT-THE-NEWS IS LOCATED> && sh backup.sh" >> /var/spool/cron/crontabs/root```
+Backup is now a core feature of the application UI. You can export your entire configuration (feeds, history, themes) as a JSON file directly from the **ADVANCED SETTINGS** menu. This file can be restored to any account, providing a simple way to migrate or safeguard your data.
