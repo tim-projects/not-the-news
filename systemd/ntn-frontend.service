@@ -1,0 +1,13 @@
+[Unit]
+Description=Not The News - Local Frontend (Vite)
+After=network.target ntn-backend.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ntn/git/not-the-news
+ExecStart=/usr/bin/npx vite --mode development
+Restart=always
+Environment=PATH=/usr/bin:/usr/local/bin
+
+[Install]
+WantedBy=default.target

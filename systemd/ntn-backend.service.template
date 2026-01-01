@@ -1,0 +1,13 @@
+[Unit]
+Description=Not The News - Local Backend (Wrangler)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{REPO_DIR}}/worker
+ExecStart=/usr/bin/npx wrangler dev
+Restart=always
+Environment=PATH=/usr/bin:/usr/local/bin
+
+[Install]
+WantedBy=default.target

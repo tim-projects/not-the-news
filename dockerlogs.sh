@@ -1,1 +1,0 @@
-podman logs --tail 50 ntn-dev
