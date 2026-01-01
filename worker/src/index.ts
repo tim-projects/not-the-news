@@ -262,6 +262,9 @@ function jsonResponse(data: any, status: number = 200, headers: Record<string, s
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization, if-none-match',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Referrer-Policy': 'strict-origin-when-cross-origin',
             ...headers
         }
     });
@@ -337,6 +340,54 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
         return jsonResponse({ status: 'ok', count: items.length });
     } catch (error: any) {
         return jsonResponse({ error: error.message }, 500);
+    }
+}
+
+async function discoverFeeds(targetUrl: string): Promise<Response> {
+    try {
+        const url = new URL(targetUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+            return jsonResponse({ error: 'Invalid protocol' }, 400);
+        }
+
+        // Basic SSRF Protection: Block local/internal IPs
+        const hostname = url.hostname.toLowerCase();
+        if (['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname) || hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
+            return jsonResponse({ error: 'Restricted address' }, 403);
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000); // 3s for discovery
+
+        const response = await fetch(url.href, { 
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NTN-Discovery/1.0)' }
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) return jsonResponse({ error: 'Site unreachable' }, 404);
+
+        // Limit discovery page size to 1MB
+        const text = await response.text();
+        if (text.length > 1024 * 1024) return jsonResponse({ error: 'Page too large' }, 413);
+
+        const feeds: string[] = [];
+        // Simple regex-based discovery for <link> tags
+        const linkMatches = text.matchAll(/<link[^>]+(?:type=["']application\/(?:rss|atom)\+xml["']|rel=["']alternate["'])[^>]*>/gi);
+        
+        for (const match of linkMatches) {
+            const hrefMatch = match[0].match(/href=["']([^"']+)["']/i);
+            if (hrefMatch) {
+                try {
+                    const absoluteUrl = new URL(hrefMatch[1], url.href).href;
+                    if (!feeds.includes(absoluteUrl)) feeds.push(absoluteUrl);
+                } catch {}
+            }
+        }
+
+        return jsonResponse({ feeds });
+    } catch (e: any) {
+        return jsonResponse({ error: 'Invalid URL or connection error' }, 400);
     }
 }
 
@@ -422,6 +473,12 @@ export default {
             
             syncCooldowns.set(uid, now);
             return syncFeeds(uid, env);
+        }
+
+        if (pathName === '/api/discover-feed') {
+            const targetUrl = url.searchParams.get('url');
+            if (!targetUrl) return jsonResponse({ error: 'URL required' }, 400);
+            return discoverFeeds(targetUrl);
         }
 
         if (pathName === '/api/feed-guids') {
