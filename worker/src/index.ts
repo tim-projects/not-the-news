@@ -214,6 +214,8 @@ let lastSyncTime: string | null = null;
 
 // Security: Simple in-memory rate limiting for sync endpoint
 const syncCooldowns = new Map<string, number>();
+const violationCounts = new Map<string, number>();
+const BASE_COOLDOWN_MS = 30000; // 30 seconds
 const MAX_FEEDS_PER_USER = 25;
 const MAX_PAYLOAD_SIZE = 128 * 1024; // 128KB
 
@@ -392,14 +394,33 @@ export default {
         }
 
         if (pathName === '/api/feed-sync' && request.method === 'POST') {
-            // Security: Rate Limit / Cooldown (once per 30 seconds per user)
+            // Security: Exponential Backoff Rate Limiting
             const now = Date.now();
             const lastSync = syncCooldowns.get(uid) || 0;
-            if (now - lastSync < 30000) {
-                return jsonResponse({ error: 'Sync too frequent', retryAfter: 30 }, 429);
+            const violations = violationCounts.get(uid) || 0;
+            
+            // Calculate current required cooldown: BASE * (2 ^ violations)
+            // Clamp violations to 10 to prevent infinite or extreme numbers (max ~8.5 hours)
+            const requiredCooldown = BASE_COOLDOWN_MS * Math.pow(2, Math.min(violations, 10));
+            
+            if (now - lastSync < requiredCooldown) {
+                // Violation: increase penalty count and reject
+                violationCounts.set(uid, violations + 1);
+                const retrySeconds = Math.ceil((requiredCooldown - (now - lastSync)) / 1000);
+                return jsonResponse({ 
+                    error: 'Sync too frequent', 
+                    retryAfter: retrySeconds,
+                    penaltyLevel: violations + 1
+                }, 429);
             }
-            syncCooldowns.set(uid, now);
 
+            // Success or patient attempt: reset violation count if they waited long enough
+            // (e.g. if they waited 2x the required cooldown, they are 'clean')
+            if (now - lastSync > (requiredCooldown * 2)) {
+                violationCounts.delete(uid);
+            }
+            
+            syncCooldowns.set(uid, now);
             return syncFeeds(uid, env);
         }
 
