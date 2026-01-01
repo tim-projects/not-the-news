@@ -148,6 +148,7 @@ export function rssApp(): AppState {
         pregeneratedOnlineDeck: null,
         pregeneratedOfflineDeck: null,
         errorMessage: '',
+        userEmail: '',
         isOnline: isOnline(),
         deckManaged: false,
         syncStatusMessage: '',
@@ -212,6 +213,7 @@ export function rssApp(): AppState {
                     }
                 } else {
                     initialAuthChecked = true; // Mark that we found a user during init
+                    this.userEmail = auth.currentUser.email || (auth.currentUser.isAnonymous ? 'Guest' : 'Authenticated User');
                     console.log("[Auth] User verified, proceeding with data initialization.");
                 }
 
@@ -838,7 +840,7 @@ export function rssApp(): AppState {
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
                 if (token) {
-                    await fetch(`${API_BASE_URL}/api/feed-sync`, { 
+                    await fetch(`${API_BASE_URL}/api/refresh`, { 
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
                     }).catch(e => console.error('[Worker Sync] Immediate sync failed:', e));
@@ -1120,10 +1122,10 @@ export function rssApp(): AppState {
                 console.log('localStorage is preserved.');
 
                 // 4. Call backend to reset server-side data
-                console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
+                console.log('DEBUG: About to make fetch call to /api/admin/wipe');
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
-                const response = await fetch(`${API_BASE_URL}/api/admin/reset-app`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/wipe`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1161,7 +1163,7 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Fetching configuration for backup...';
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
-                const response = await fetch(`${API_BASE_URL}/api/admin/config-backup`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/archive-export`, {
                     method: 'GET',
                     headers: {
                         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -1304,7 +1306,7 @@ export function rssApp(): AppState {
 
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
-                const response = await fetch(`${API_BASE_URL}/api/admin/config-restore`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/archive-import`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1828,13 +1830,13 @@ export function rssApp(): AppState {
                     const token = await getAuthToken();
                     if (!token) return;
 
-                    fetch(`${API_BASE_URL}/api/feed-sync`, { 
+                    fetch(`${API_BASE_URL}/api/refresh`, { 
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
                     })
                         .then(r => r.json())
-                        .then(d => console.log('[Worker Sync] Startup sync triggered:', d))
-                        .catch(e => console.error('[Worker Sync] Startup sync failed:', e));
+                        .then(d => console.log('[Worker Sync] Background sync complete:', d))
+                        .catch(e => console.error('[Worker Sync] Background sync failed:', e));
                 } catch (err) {
                     console.error('[Worker Sync] Setup failed:', err);
                 }
@@ -1849,7 +1851,7 @@ export function rssApp(): AppState {
                     const token = await getAuthToken();
                     if (!token) return;
 
-                    fetch(`${API_BASE_URL}/api/feed-sync`, { 
+                    fetch(`${API_BASE_URL}/api/refresh`, { 
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
                     })

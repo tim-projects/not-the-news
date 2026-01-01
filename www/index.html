@@ -3,6 +3,11 @@
 
 <head>
     <script>
+        // Immediate auth check for static hosting
+        if (!localStorage.getItem('isAuthenticated')) {
+            window.location.replace('/login.html');
+        }
+
         // Use localStorage for instant theme application.
         const storedTheme = localStorage.getItem('theme');
         const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -30,10 +35,10 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-1CPNP43D.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-BIW-gYWT.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-DtFtjQ0g.css">
-  <link rel="stylesheet" crossorigin href="/assets/main-aFq8_29W.css">
+  <script type="module" crossorigin src="/assets/main-B2NLAkIf.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-D4b_x8Xg.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-ByUD8l9H.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-DDPYElNu.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -53,13 +58,13 @@
                                             <h2>Not The News</h2>
                                             <div id="header-options">
                                                 <button id="search-button" @click="toggleSearch()" class="search-btn" :class="{ 'active': showSearchBar }" title="Search Feed">
-                                                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" cy="21" x2="16.65" y2="16.65"></line></svg>
                                                 </button>
                                                 <button id="help-button" @click="openShortcuts = !openShortcuts; if (openShortcuts) { openSettings = false; showSearchBar = false; }" class="help-btn" :class="{ 'active': openShortcuts }" title="Keyboard Shortcuts">
                                                     <span style="font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem;">?</span>
                                                 </button>
                                                 <button id="shuffle-button" @click="processShuffle()" class="shuffle-btn" title="Shuffle">
-                                                    <svg class="shuffle-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 4 20 4 20 8" /><line x1="4" y1="20" x2="20" y2="4" /><polyline points="20 16 20 20 16 20" /><line x1="14" y1="14" x2="20" y2="20" /><line x1="4" y1="4" x2="9" y2="9" /></svg>
+                                                    <svg class="shuffle-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 4 20 4 20 8" /><line x1="4" cy="20" x2="20" y2="4" /><polyline points="20 16 20 20 16 20" /><line x1="14" y1="14" x2="20" y2="20" /><line x1="4" y1="4" x2="9" y2="9" /></svg>
                                                     <span x-text="shuffleCount" class="shuffle-count"></span>
                                                 </button>
                                                 <button id="settings-button" @click="openSettings = !openSettings; if (openSettings) { openShortcuts = false; showSearchBar = false; }" class="settings-btn" :class="{ 'active': openSettings }" aria-label="Settings">
@@ -86,11 +91,20 @@
                         <template x-if="filteredEntries.length === 0">
                             <div class="empty-state">
                                 <div class="d-flex flex-column align-items-center">
-                                    <p x-text="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid))) ? 'You ran out of content. Add another feed..' : 'There\'s nothing here.'"></p>
+                                    <template x-if="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid)))">
+                                        <div class="text-center">
+                                            <p>You ran out of content.</p>
+                                            <p style="font-size: 1.5rem; margin-top: 0.5rem;">Add another feed..</p>
+                                        </div>
+                                    </template>
+                                    <template x-if="!(allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid))))">
+                                        <p>There's nothing here.</p>
+                                    </template>
+
                                     <button x-show="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid)))" 
                                             class="configure-button" 
-                                            style="margin-top: 1.5rem;"
-                                            @click="openSettings = true; loadRssFeeds(); modalView = 'rss'">
+                                            style="margin-top: 2rem; margin-left: 0;"
+                                            @click="openSettings = true; $nextTick(() => { modalView = 'rss'; loadRssFeeds(); })">
                                         Add feed
                                     </button>
                                 </div>
@@ -124,9 +138,9 @@
                                                                                     </svg>
                                                                                     <button class="read-button" @click.stop="toggleRead(entry.guid)" 
                                                                                             :class="{ 
-                                                                                                'read': entry.isRead && readingGuid !== entry.guid,
-                                                                                                'animating': readingGuid === entry.guid,
-                                                                                                'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'read'
+                                                                                                                              'read': entry.isRead && readingGuid !== entry.guid,
+                                                                                                                              'animating': readingGuid === entry.guid,
+                                                                                                                              'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'read'
                                                                                             }" :disabled="readingGuid === entry.guid" aria-label="Mark as Read">
                                                                                         <svg class="star-button-animation-overlay" x-show="readingGuid === entry.guid">
                                                                                             <path class="read-button-outline" d="M 2,2 L 44,2 A 10,10 0 0 1 54,12 L 54,54 L 22,54 A 20,20 0 0 1 2,34 Z" pathLength="1" />
@@ -198,251 +212,363 @@
              x-transition:leave-end="opacity-0">
             <div class="modal-content">
                 <div class="modal-header">
-                    <button id="back-button" @click="modalView = 'main'" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
+                    <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore' || modalView === 'change-password') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
                     <button class="close" @click="openSettings = false">✕</button>
                 </div>
                 <div class="modal-body">
                     <div id="main-settings" x-show="modalView === 'main'">
-                    <h2>APP</h2>
-                    <hr>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="filter-selector">Filter View:</label>
-                            <p class="setting-description">Choose which items to display in the feed.</p>
+                        <h2>APP</h2>
+                        <hr>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="filter-selector">Filter View:</label>
+                                <p class="setting-description">Choose which items to display in the feed.</p>
+                            </div>
+                            <select id="filter-selector" x-model="filterMode" class="filter-select">
+                                <option value="unread" x-text="`Unread (${unreadCount})`"></option>
+                                <option value="starred" x-text="`Starred (${starredCount})`"></option>
+                                <option value="read" x-text="`Read (${readCount})`"></option>
+                                <option value="all" x-text="`All (${allCount})`"></option>
+                            </select>
                         </div>
-                        <select id="filter-selector" x-model="filterMode" class="filter-select">
-                            <option value="unread" x-text="`Unread (${unreadCount})`"></option>
-                            <option value="starred" x-text="`Starred (${starredCount})`"></option>
-                            <option value="read" x-text="`Read (${readCount})`"></option>
-                            <option value="all" x-text="`All (${allCount})`"></option>
-                        </select>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="sync-toggle">Auto-Sync Feed</label>
-                            <p class="setting-description">Automatically fetch new items in the background.</p>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="sync-toggle">Auto-Sync Feed</label>
+                                <p class="setting-description">Automatically fetch new items in the background.</p>
+                            </div>
+                            <div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div>
                         </div>
-                        <div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="item-button-mode-selector">Item Button</label>
-                            <p class="setting-description">Choose the function of the button on each item.</p>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="item-button-mode-selector">Item Button</label>
+                                <p class="setting-description">Choose the function of the button on each item.</p>
+                            </div>
+                            <select id="item-button-mode-selector" x-model="itemButtonMode" class="filter-select">
+                                <option value="play">Play (TTS)</option>
+                                <option value="hide">Hide</option>
+                            </select>
                         </div>
-                        <select id="item-button-mode-selector" x-model="itemButtonMode" class="filter-select">
-                            <option value="play">Play (TTS)</option>
-                            <option value="hide">Hide</option>
-                        </select>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label>
-                            <p class="setting-description">Always open article links in a new browser tab.</p>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label>
+                                <p class="setting-description">Always open article links in a new browser tab.</p>
+                            </div>
+                            <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
                         </div>
-                        <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>Appearance</span>
-                            <p class="setting-description">Customize themes, fonts, and layout.</p>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Appearance</span>
+                                <p class="setting-description">Customize themes, fonts, and layout.</p>
+                            </div>
+                            <button id="configure-appearance-btn" class="configure-button" @click="modalView = 'appearance'">Configure</button>
                         </div>
-                        <button id="configure-appearance-btn" class="configure-button" @click="modalView = 'appearance'">Configure</button>
-                    </div>
-                    
-                    <h2>RSS FEEDS</h2>
-                    <hr>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>RSS Feeds</span>
-                            <p class="setting-description">Manage your news sources.</p>
-                        </div>
-                        <button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button>
-                    </div>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>Keyword Blacklist</span>
-                            <p class="setting-description">Filter out items containing specific words.</p>
-                        </div>
-                        <button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button>
-                    </div>
-                    <hr>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <label for="install-button">Install as App</label>
-                            <p class="setting-description">Add Not The News to your home screen.</p>
-                        </div>
-                        <button id="install-button" class="configure-button">Install</button>
-                    </div>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>Advanced Settings</span>
-                            <p class="setting-description">Reset data or backup your configuration.</p>
-                        </div>
-                        <button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button>
-                    </div>
-                </div>
-
-                <div id="appearance-settings-block" x-show="modalView === 'appearance'">
-                    <h2>APPEARANCE</h2>
-                    <hr>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="theme-style-selector">Theme:</label>
-                            <p class="setting-description">Personalize the application's appearance.</p>
-                        </div>
-                        <select id="theme-style-selector" :value="themeStyle" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].parentElement.dataset.theme)" class="filter-select">
-                            <optgroup label="Light Themes" data-theme="light">
-                                <option value="originalLight">Original Light</option>
-                                <option value="sepia">Sepia</option>
-                                <option value="solarized">Solarized Light</option>
-                                <option value="github-light">GitHub Light</option>
-                                <option value="atom-one-light">Atom One Light</option>
-                                <option value="gruvbox-light">Gruvbox Light</option>
-                                <option value="catppuccin-latte">Catppuccin Latte</option>
-                                <option value="rose-pine-dawn">Rosé Pine Dawn</option>
-                                <option value="paper">Paper</option>
-                                <option value="morning">Morning</option>
-                            </optgroup>
-                            <optgroup label="Dark Themes" data-theme="dark">
-                                <option value="originalDark">Original Dark</option>
-                                <option value="midnight">Midnight</option>
-                                <option value="nord">Nord</option>
-                                <option value="dracula">Dracula</option>
-                                <option value="monokai">Monokai</option>
-                                <option value="gruvbox-dark">Gruvbox Dark</option>
-                                <option value="catppuccin-mocha">Catppuccin Mocha</option>
-                                <option value="tokyo-night">Tokyo Night</option>
-                                <option value="synthwave">Synthwave '84</option>
-                                <option value="material-dark">Material Dark</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="font-size-slider">Font Size</label>
-                            <p class="setting-description">Adjust the text size for readability.</p>
-                        </div>
-                        <div class="d-flex align-items-center grow font-size-control">
-                            <span class="font-size-value" x-text="`${fontSize}%`"></span >
-                            <button class="font-size-btn" @click="fontSize = Math.max(50, fontSize - 5); applyFontSize(); saveFontSize();" aria-label="Decrease font size">-</button>
-                            <input type="range" id="font-size-slider" min="50" max="200" step="5" x-model.number="fontSize" @input="applyFontSize()" @change="saveFontSize()" class="font-size-range">
-                            <button class="font-size-btn" @click="fontSize = Math.min(200, fontSize + 5); applyFontSize(); saveFontSize();" aria-label="Increase font size">+</button>
-                        </div>
-                    </div>
-                    <div class="settings-group d-none d-md-flex">
-                        <div class="setting-label-group">
-                            <label for="feed-width-slider">Feed Width</label>
-                            <p class="setting-description">Change the width of the main content area.</p>
-                        </div>
-                        <div class="d-flex align-items-center grow font-size-control">
-                            <span class="font-size-value" x-text="`${feedWidth}%`"></span >
-                            <button class="font-size-btn" @click="feedWidth = Math.max(25, feedWidth - 5); applyFeedWidth(); saveFeedWidth();" aria-label="Decrease feed width">-</button>
-                            <input type="range" id="feed-width-slider" min="25" max="95" step="5" x-model.number="feedWidth" @input="applyFeedWidth()" @change="saveFeedWidth()" class="font-size-range">
-                            <button class="font-size-btn" @click="feedWidth = Math.min(95, feedWidth + 5); applyFeedWidth(); saveFeedWidth();" aria-label="Increase feed width">+</button>
-                        </div>
-                    </div>
-                    <div class="settings-option">
-                        <div class="setting-label-group">
-                            <span>Custom CSS</span>
-                            <p class="setting-description">Add your own styles to the application.</p>
-                        </div>
-                        <button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="images-toggle">Show Images</label>
-                            <p class="setting-description">Toggle visibility of images in the feed.</p>
-                        </div>
-                        <div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="shadows-toggle">Item Shadows</label>
-                            <p class="setting-description">Add a subtle shadow effect to each news item.</p>
-                        </div>
-                        <div class="d-flex align-items-center"><span id="shadows-text" x-text="shadowsEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="shadows-toggle" x-model="shadowsEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="curves-toggle">Curves</label>
-                            <p class="setting-description">Toggle rounded corners on items and buttons.</p>
-                        </div>
-                        <div class="d-flex align-items-center"><span id="curves-text" x-text="curvesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="curves-toggle" x-model="curvesEnabled"><span class="slider"></span></label></div>
-                    </div>
-                    <div class="settings-group">
-                        <div class="setting-label-group">
-                            <label for="flick-to-select-toggle">Flick to Select</label>
-                            <p class="setting-description">Fast scroll/swipe moves between items.</p>
-                        </div>
-                        <div class="d-flex align-items-center"><span id="flick-to-select-text" x-text="flickToSelectEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="flick-to-select-toggle" x-model="flickToSelectEnabled"><span class="slider"></span></label></div>
-                    </div>
-                </div>
-
-                <div id="rss-settings-block" x-show="modalView === 'rss'">
-                    <h2>Configure RSS Feeds</h2>
-                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(var(--primary-rgb), 0.05);">
-                        <label for="discovery-input" style="font-weight: bold; margin-bottom: 0.5rem;">Auto-Discover Feed</label>
-                        <div class="d-flex gap-2">
-                            <input type="text" id="discovery-input" x-model="discoveryUrl" @keydown.enter="discoverFeed()" placeholder="Enter website URL (e.g. example.com)" class="settings-input grow" style="flex-grow: 1;">
-                            <button id="discover-btn" class="settings-button" @click="discoverFeed()" :disabled="isDiscovering" style="margin: 0; min-width: auto; height: auto; padding: 0.5rem 1rem;">
-                                <span x-show="!isDiscovering">Find Feed</span>
-                                <span x-show="isDiscovering">Scanning…</span>
-                            </button>
-                        </div>
-                        <p class="setting-description" style="margin-top: 0.5rem;">Enter a website URL to automatically find its RSS feed.</p>
                         
-                        <div id="discovery-results" x-show="discoveryResults.length > 0" class="discovery-results-list" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
-                            <p style="font-weight: bold; margin-bottom: 0.5rem;">Feeds found! Add to your list?</p>
-                            <template x-for="foundUrl in discoveryResults" :key="foundUrl">
-                                <div class="d-flex flex-column" style="margin-bottom: 0.75rem; background: var(--card-bg); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border);">
-                                    <code x-text="foundUrl" style="word-break: break-all; font-size: 0.85rem; margin-bottom: 0.75rem; display: block; background: rgba(0,0,0,0.1); padding: 0.4rem; border-radius: 4px;"></code>
-                                    <div class="d-flex gap-2 justify-end">
-                                        <button class="settings-button" @click="discoveryResults = discoveryResults.filter(u => u !== foundUrl)" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg); min-width: auto;">Cancel</button>
-                                        <button class="configure-button" @click="rssFeedsInput += '\n' + foundUrl; rssFeedsInput = rssFeedsInput.trim(); discoveryResults = discoveryResults.filter(u => u !== foundUrl); createStatusBarMessage($data, 'Feed added!')" style="font-size: 0.8rem !important; padding: 0.25rem 1rem; margin: 0; min-width: auto;">Add Feed</button>
-                                    </div>
-                                </div>
-                            </template>
+                        <h2>RSS FEEDS</h2>
+                        <hr>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>RSS Feeds</span>
+                                <p class="setting-description">Manage your news sources.</p>
+                            </div>
+                            <button id="configure-rss-feeds-btn" class="configure-button" @click="loadRssFeeds(); modalView = 'rss'">Configure</button>
                         </div>
-                        <div x-show="discoveryError" x-text="discoveryError" style="color: #ff4444; font-size: 0.8rem; margin-top: 0.5rem;"></div>
-                    </div>
-                    <div class="settings-group grow">
-                        <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
-                        <button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save Feeds</button>
-                    </div>
-                </div>
-
-                <div id="keywords-settings-block" x-show="modalView === 'keywords'">
-                    <h2>Configure Keyword Blacklist</h2>
-                    <div class="settings-group grow">
-                        <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
-                        <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
-                    </div>
-                </div>
-
-                <div id="css-settings-block" x-show="modalView === 'css'">
-                    <h2>Configure Custom CSS</h2>
-                    <p style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.5rem;">Tip: Use the reset button to load a template with common variables.</p>
-                    <div class="settings-group grow">
-                        <textarea class="settings-textarea" x-model="customCss" placeholder="/* Enter custom CSS here */
-/* Example: .itemtitle { font-weight: bold; } */"></textarea>
-                        <div class="d-flex justify-between" style="margin-top: 1rem;">
-                            <button id="reset-css-btn" class="settings-button" @click="resetCustomCss()">Reset to Default</button>
-                            <button id="save-css-btn" class="settings-button" @click="saveCustomCss()">Save CSS</button>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Keyword Blacklist</span>
+                                <p class="setting-description">Filter out items containing specific words.</p>
+                            </div>
+                            <button id="configure-keyword-blacklist-btn" class="configure-button" @click="loadKeywordBlacklist(); modalView = 'keywords'">Configure</button>
+                        </div>
+                        <hr>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <label for="install-button">Install as App</label>
+                                <p class="setting-description">Add Not The News to your home screen.</p>
+                            </div>
+                            <button id="install-button" class="configure-button">Install</button>
+                        </div>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Advanced Settings</span>
+                                <p class="setting-description">Reset data or backup your configuration.</p>
+                            </div>
+                            <button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button>
                         </div>
                     </div>
-                </div>
 
-                                    <div id="advanced-settings-block" x-show="modalView === 'advanced'">
-                                        <h2>Advanced Settings</h2>
-                                        <div class="settings-option"><span>Logout from Firebase</span><button id="logout-button" class="configure-button" @click="logout()">Logout</button></div>
-                                        <div class="settings-option"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
-                                        <div class="settings-option"><span>Backup Configuration</span><button id="backup-config-button" class="configure-button" @click="backupConfig()">Backup</button></div>
-                                        <div class="settings-option"><span>Restore Configuration</span><button id="restore-config-button" class="configure-button" @click="$refs.restoreFileInput.click()">Restore</button><input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" /></div>
-                                    </div>
-                                </div>
+                    <div id="appearance-settings-block" x-show="modalView === 'appearance'">
+                        <h2>APPEARANCE</h2>
+                        <hr>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="theme-style-selector">Theme:</label>
+                                <p class="setting-description">Personalize the application's appearance.</p>
+                            </div>
+                            <select id="theme-style-selector" :value="themeStyle" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].closest('optgroup').dataset.theme)" class="filter-select">
+                                <optgroup label="Light Themes" data-theme="light">
+                                    <option value="originalLight">Original Light</option>
+                                    <option value="sepia">Sepia</option>
+                                    <option value="solarized">Solarized Light</option>
+                                    <option value="github-light">GitHub Light</option>
+                                    <option value="atom-one-light">Atom One Light</option>
+                                    <option value="gruvbox-light">Gruvbox Light</option>
+                                    <option value="catppuccin-latte">Catppuccin Latte</option>
+                                    <option value="rose-pine-dawn">Rosé Pine Dawn</option>
+                                    <option value="paper">Paper</option>
+                                    <option value="morning">Morning</option>
+                                </optgroup>
+                                <optgroup label="Dark Themes" data-theme="dark">
+                                    <option value="originalDark">Original Dark</option>
+                                    <option value="midnight">Midnight</option>
+                                    <option value="nord">Nord</option>
+                                    <option value="dracula">Dracula</option>
+                                    <option value="monokai">Monokai</option>
+                                    <option value="gruvbox-dark">Gruvbox Dark</option>
+                                    <option value="catppuccin-mocha">Catppuccin Mocha</option>
+                                    <option value="tokyo-night">Tokyo Night</option>
+                                    <option value="synthwave">Synthwave '84</option>
+                                    <option value="material-dark">Material Dark</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="font-size-slider">Font Size</label>
+                                <p class="setting-description">Adjust the text size for readability.</p>
+                            </div>
+                            <div class="d-flex align-items-center grow font-size-control">
+                                <span class="font-size-value" x-text="`${fontSize}%`"></span>
+                                <button class="font-size-btn" @click="fontSize = Math.max(50, fontSize - 5); applyFontSize(); saveFontSize();" aria-label="Decrease font size">-</button>
+                                <input type="range" id="font-size-slider" min="50" max="200" step="5" x-model.number="fontSize" @input="applyFontSize()" @change="saveFontSize()" class="font-size-range">
+                                <button class="font-size-btn" @click="fontSize = Math.min(200, fontSize + 5); applyFontSize(); saveFontSize();" aria-label="Increase font size">+</button>
                             </div>
                         </div>
-                        <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
+                        <div class="settings-group d-none d-md-flex">
+                            <div class="setting-label-group">
+                                <label for="feed-width-slider">Feed Width</label>
+                                <p class="setting-description">Change the width of the main content area.</p>
+                            </div>
+                            <div class="d-flex align-items-center grow font-size-control">
+                                <span class="font-size-value" x-text="`${feedWidth}%`"></span>
+                                <button class="font-size-btn" @click="feedWidth = Math.max(25, feedWidth - 5); applyFeedWidth(); saveFeedWidth();" aria-label="Decrease feed width">-</button>
+                                <input type="range" id="feed-width-slider" min="25" max="95" step="5" x-model.number="feedWidth" @input="applyFeedWidth()" @change="saveFeedWidth()" class="font-size-range">
+                                <button class="font-size-btn" @click="feedWidth = Math.min(95, feedWidth + 5); applyFeedWidth(); saveFeedWidth();" aria-label="Increase feed width">+</button>
+                            </div>
+                        </div>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Custom CSS</span>
+                                <p class="setting-description">Add your own styles to the application.</p>
+                            </div>
+                            <button id="configure-custom-css-btn" class="configure-button" @click="modalView = 'css'">Configure</button>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="images-toggle">Show Images</label>
+                                <p class="setting-description">Toggle visibility of images in the feed.</p>
+                            </div>
+                            <div class="d-flex align-items-center"><span id="images-text" x-text="imagesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="images-toggle" x-model="imagesEnabled"><span class="slider"></span></label></div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="shadows-toggle">Item Shadows</label>
+                                <p class="setting-description">Add a subtle shadow effect to each news item.</p>
+                            </div>
+                            <div class="d-flex align-items-center"><span id="shadows-text" x-text="shadowsEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="shadows-toggle" x-model="shadowsEnabled"><span class="slider"></span></label></div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="curves-toggle">Curves</label>
+                                <p class="setting-description">Toggle rounded corners on items and buttons.</p>
+                            </div>
+                            <div class="d-flex align-items-center"><span id="curves-text" x-text="curvesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="curves-toggle" x-model="curvesEnabled"><span class="slider"></span></label></div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="flick-to-select-toggle">Flick to Select</label>
+                                <p class="setting-description">Fast scroll/swipe moves between items.</p>
+                            </div>
+                            <div class="d-flex align-items-center"><span id="flick-to-select-text" x-text="flickToSelectEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="flick-to-select-toggle" x-model="flickToSelectEnabled"><span class="slider"></span></label></div>
+                        </div>
+                    </div>
+
+                    <div id="rss-settings-block" x-show="modalView === 'rss'">
+                        <div class="d-flex justify-between align-items-center">
+                            <h2>Configure RSS Feeds</h2>
+                        </div>
+                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(var(--primary-rgb), 0.05);">
+                            <label for="discovery-input" style="font-weight: bold; margin-bottom: 0.5rem;">Auto-Discover Feed</label>
+                            <div class="d-flex gap-2">
+                                <input type="text" id="discovery-input" x-model="discoveryUrl" @keydown.enter="discoverFeed()" placeholder="Enter website URL (e.g. example.com)" class="settings-input grow" style="flex-grow: 1;">
+                                <button id="discover-btn" class="settings-button" @click="discoverFeed()" :disabled="isDiscovering" style="margin: 0; min-width: auto; height: auto; padding: 0.5rem 1rem;">
+                                    <span x-show="!isDiscovering">Find Feed</span>
+                                    <span x-show="isDiscovering">Scanning…</span>
+                                </button>
+                            </div>
+                            <p class="setting-description" style="margin-top: 0.5rem;">Enter a website URL to automatically find its RSS feed.</p>
+                            
+                            <div id="discovery-results" x-show="discoveryResults.length > 0" class="discovery-results-list" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                                <p style="font-weight: bold; margin-bottom: 0.5rem;">Feeds found! Add to your list?</p>
+                                <template x-for="foundUrl in discoveryResults" :key="foundUrl">
+                                    <div class="d-flex flex-column" style="margin-bottom: 0.75rem; background: var(--card-bg); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border);">
+                                        <code x-text="foundUrl" style="word-break: break-all; font-size: 0.85rem; margin-bottom: 0.75rem; display: block; background: rgba(0,0,0,0.1); padding: 0.4rem; border-radius: 4px;"></code>
+                                        <div class="d-flex gap-2 justify-end">
+                                            <button class="settings-button" @click="discoveryResults = discoveryResults.filter(u => u !== foundUrl)" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg); min-width: auto;">Cancel</button>
+                                            <button class="configure-button" @click="rssFeedsInput += '\n' + foundUrl; rssFeedsInput = rssFeedsInput.trim(); discoveryResults = discoveryResults.filter(u => u !== foundUrl); createStatusBarMessage($data, 'Feed added!')" style="font-size: 0.8rem !important; padding: 0.25rem 1rem; margin: 0; min-width: auto;">Add Feed</button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                            <div x-show="discoveryError" x-text="discoveryError" style="color: #ff4444; font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                        </div>
+                        <div class="settings-group grow">
+                            <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
+                            <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
+                                <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.5rem 1rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'">Backup/Restore</button>
+                                <button id="save-rss-btn" class="settings-button" style="margin: 0;" @click="saveRssFeeds()">Save Feeds</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="keywords-settings-block" x-show="modalView === 'keywords'">
+                        <div class="d-flex justify-between align-items-center">
+                            <h2>Configure Keyword Blacklist</h2>
+                            <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem;" @click="modalView = 'advanced'">Backup/Restore</button>
+                        </div>
+                        <div class="settings-group grow">
+                            <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
+                            <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
+                        </div>
+                    </div>
+
+                    <div id="css-settings-block" x-show="modalView === 'css'">
+                        <h2>Configure Custom CSS</h2>
+                        <p style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.5rem;">Tip: Use the reset button to load a template with common variables.</p>
+                        <div class="settings-group grow">
+                            <textarea class="settings-textarea" x-model="customCss" placeholder="/* Enter custom CSS here */
+    /* Example: .itemtitle { font-weight: bold; } */"></textarea>
+                            <div class="d-flex justify-between" style="margin-top: 1rem;">
+                                <button id="reset-css-btn" class="settings-button" @click="resetCustomCss()">Reset to Default</button>
+                                <button id="save-css-btn" class="settings-button" @click="saveCustomCss()">Save CSS</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="advanced-settings-block" x-show="modalView === 'advanced'">
+                        <h2>Advanced Settings</h2>
+                        <hr>
+
+                        <div class="settings-option" style="margin-bottom: 1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem;">
+                            <div class="setting-label-group">
+                                <span style="font-weight: bold; opacity: 0.6; font-size: 0.8rem; letter-spacing: 0.05em;">SIGNED IN AS</span>
+                                <p class="setting-description" style="font-size: 1.1rem; opacity: 1; margin-top: 0.25rem;" x-text="userEmail"></p>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 1.5rem; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">BACKUP & RESTORE</h3>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Backup Configuration</span>
+                                <p class="setting-description">Export your settings and feeds to a JSON file.</p>
+                            </div>
+                            <button id="show-backup-menu-btn" class="configure-button" @click="modalView = 'backup'">Backup</button>
+                        </div>
+
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Restore Configuration</span>
+                                <p class="setting-description">Import settings from a previously saved file.</p>
+                            </div>
+                            <button id="trigger-restore-picker-btn" class="configure-button" style="background-color: transparent; border: 1px solid var(--primary); color: var(--fg);" @click="$refs.restoreFileInput.click()">Restore</button>
+                            <input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" />
+                        </div>
+
+                        <hr style="opacity: 0.3; margin: 1.5rem 0;">
+
+                        <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">ACCOUNT & DATA SECURITY</h3>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Change Password</span>
+                                <p class="setting-description">Update your account security.</p>
+                            </div>
+                            <button class="configure-button" @click="changePassword()">Change</button>
+                        </div>
+
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Logout</span>
+                                <p class="setting-description">Sign out of your current account.</p>
+                            </div>
+                            <button id="logout-button" class="configure-button" @click="logout()">Logout</button>
+                        </div>
+
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Reset Application</span>
+                                <p class="setting-description">Wipe all local data and re-initialize.</p>
+                            </div>
+                            <button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button>
+                        </div>
+
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span style="color: #ff4444;">Delete Account</span>
+                                <p class="setting-description">Permanently remove your account and data (GDPR).</p>
+                            </div>
+                            <button class="configure-button" style="background-color: #ff4444;" @click="deleteAccount()">Delete</button>
+                        </div>
+                    </div>
+
+                    <div id="backup-settings-block" x-show="modalView === 'backup'">
+                        <h2>Backup Configuration</h2>
+                        <hr>
+                        <p class="setting-description" style="margin-bottom: 1.5rem;">Select which data categories you would like to include in your backup file.</p>
+                        
+                        <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem; padding-left: 0.5rem;">
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
+                        </div>
+
+                        <button id="backup-config-button" class="configure-button" @click="backupConfig()">Download Backup (.json)</button>
+                    </div>
+
+                    <div id="restore-settings-block" x-show="modalView === 'restore'">
+                        <h2>Restore Configuration</h2>
+                        <hr>
+                        <p class="setting-description" style="margin-bottom: 1.5rem;">Choose which data from the file you want to apply to your current account. Existing data in these categories will be overwritten.</p>
+                        
+                        <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem; padding-left: 0.5rem;">
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="configure-button grow" @click="confirmRestore()">Confirm Restore</button>
+                            <button class="configure-button grow" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'; restoreData = null">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div id="change-password-block" x-show="modalView === 'change-password'">
+                        <h2>Change Password</h2>
+                        <hr>
+                        <p class="setting-description" style="margin-bottom: 1.5rem;">Enter your new password below. It must be at least 6 characters long.</p>
+                        
+                        <div class="settings-group grow" style="flex-direction: column; align-items: stretch;">
+                            <input type="password" id="new-password-input" placeholder="New Password" class="settings-input" style="margin-bottom: 1rem; padding: 0.75rem;">
+                            <div class="d-flex gap-2">
+                                <button class="configure-button grow" @click="submitPasswordChange()">Update Password</button>
+                                <button class="configure-button grow" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button id="scroll-to-top" @click="scrollToTop()" aria-label="Scroll to top">
              <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4c-.39 0-.77.15-1.06.44l-6.3 6.3a1 1 0 101.41 1.41L11 7.83V19a1 1 0 102 0V7.83l4.95 4.32a1 1 0 101.41-1.41l-6.3-6.3A1.5 1.5 0 0012 4z" stroke-width="1.5" /></svg>
         </button>
 

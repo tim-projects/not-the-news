@@ -285,7 +285,7 @@
                         </div>
                         <div class="settings-option">
                             <div class="setting-label-group">
-                                <span>ADVANCED SETTINGS</span>
+                                <span>Advanced Settings</span>
                                 <p class="setting-description">Reset data or backup your configuration.</p>
                             </div>
                             <button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button>
@@ -451,8 +451,15 @@
                     </div>
 
                     <div id="advanced-settings-block" x-show="modalView === 'advanced'">
-                        <h2>ADVANCED SETTINGS</h2>
+                        <h2>Advanced Settings</h2>
                         <hr>
+
+                        <div class="settings-option" style="margin-bottom: 1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem;">
+                            <div class="setting-label-group">
+                                <span style="font-weight: bold; opacity: 0.6; font-size: 0.8rem; letter-spacing: 0.05em;">SIGNED IN AS</span>
+                                <p class="setting-description" style="font-size: 1.1rem; opacity: 1; margin-top: 0.25rem;" x-text="userEmail"></p>
+                            </div>
+                        </div>
 
                         <h3 style="margin-top: 1.5rem; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">BACKUP & RESTORE</h3>
                         <div class="settings-option">

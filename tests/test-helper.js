@@ -6,16 +6,16 @@ export async function login(page, appUrl) {
     console.log('Navigating to login page...');
     await page.goto(`${appUrl}/login.html`, { timeout: 60000 });
     
-    // Wait for login script to be ready
-    await page.waitForSelector('#login-form[data-auth-ready="true"]', { timeout: 30000 });
+    // Wait for script to attach listeners
+    await page.waitForSelector('#login-form[data-auth-ready="true"]', { timeout: 15000 });
 
     // Attempt login via UI bypass
     await page.fill('#email', 'test@example.com');
     await page.fill('#pw', APP_PASSWORD);
     await page.click('#login-btn');
-
-    // Wait for redirect to main app URL
-    await page.waitForURL(appUrl, { timeout: 60000 });
+    
+    // Wait for redirect to home
+    await page.waitForURL(`${appUrl}/`, { timeout: 15000 });
     
     // Ensure Alpine is ready
     await page.waitForFunction(() => window.Alpine !== undefined, { timeout: 30000 });

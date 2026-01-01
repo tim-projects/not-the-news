@@ -6,78 +6,96 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Not The News</title>
   <style>
-    body {
+    html, body {
+      height: 100%;
       margin: 0;
-      min-height: 100vh;
+      padding: 0;
+    }
+
+    body {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--bg); /* Use CSS variable */
-      color: var(--fg);     /* Use CSS variable */
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, sans-serif;
     }
 
     .login-container {
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       width: 100%;
+      max-width: 480px;
       padding: 20px;
+      box-sizing: border-box;
     }
 
-    .ntn-title {
+    @media (min-width: 768px) {
+      .login-container {
+        max-width: 520px;
+      }
+    }
+
+    #ntn-title {
       margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    #ntn-title h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.5rem;
+      margin: 0;
     }
 
     #login-form {
       background: var(--card-bg);
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      max-width: 400px;
-      margin: 0 auto;
+      padding: 2.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px var(--card-shadow-color);
+      border: 1px solid var(--card-border);
+      width: 100%;
+      box-sizing: border-box;
     }
 
     #login-form input {
-      width: -webkit-fill-available;
+      width: 100%;
       padding: 12px;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: var(--card-bg);
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: var(--bg);
       color: var(--fg);
-      font-size: large;
+      font-size: 1rem;
+      box-sizing: border-box;
     }
 
     #login-form button {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       background-color: var(--primary);
-      color: white;
+      color: var(--primary-fg);
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
-      font-size: large;
-      /* Add transitions for smooth effects across all states */
-      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      font-size: 1.1rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
     }
 
     #login-form button:hover {
-      background-color: var(--secondary);
-      color: var(--fg);
+      opacity: 0.9;
+      transform: translateY(-1px);
     }
 
     #login-form button:focus {
-      /* Provide a clear focus indicator for keyboard users */
-      outline: none; /* Remove default browser outline */
-      box-shadow: 0 0 0 3px var(--secondary), /* A custom outline based on --secondary */
-                  0 2px 10px rgba(0, 0, 0, 0.1); /* Keep original shadow */
-      background-color: var(--secondary); /* Optional: Make focus background like hover */
-      color: var(--fg); /* Optional: Make focus text like hover */
+      outline: none;
+      box-shadow: 0 0 0 3px var(--primary-rgb);
     }
 
     #login-form button:active {
-      /* Give visual feedback when the button is being pressed */
-      background-color: var(--primary-darker, hsl(var(--primary-hue, 200), var(--primary-saturation, 100%), calc(var(--primary-lightness, 50%) - 10%))); /* A slightly darker primary */
-      box-shadow: inset 0 1px 5px rgba(0,0,0,0.2); /* Inset shadow for "pressed" look */
-      transform: translateY(1px); /* Slight push down */
+      transform: translateY(0);
     }
   </style>
   <script>
@@ -93,9 +111,9 @@
       document.documentElement.classList.add('dark');
     }
   </script>
-  <script type="module" crossorigin src="/assets/login-BXSLikui.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-BIW-gYWT.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-DtFtjQ0g.css">
+  <script type="module" crossorigin src="/assets/login-DOr9-383.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-D4b_x8Xg.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-ByUD8l9H.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -103,15 +121,18 @@
           <div id="ntn-title">
         <h2>Not The News</h2>
       </div>
-    <form id="login-form">
+    <form id="login-form" novalidate>
       <div id="auth-message" style="margin-bottom: 1rem; color: #ff4444; display: none;"></div>
       <input type="email" id="email" placeholder="Email" required autofocus>
       <input type="password" id="pw" placeholder="Password" required>
-      <div class="auth-buttons">
+      <div style="text-align: right; margin-bottom: 1.5rem; margin-top: -0.5rem;">
+        <a href="#" id="forgot-pw-link" style="font-size: 0.85rem; color: var(--primary); text-decoration: none;">Forgot Password?</a>
+      </div>
+      <div class="auth-buttons" style="display: flex; flex-direction: column; gap: 0.75rem;">
         <button type="submit" id="login-btn">Login</button>
-        <button type="button" id="signup-btn" style="margin-top: 0.5rem; background-color: transparent; border: 1px solid var(--primary); color: var(--fg);">Sign Up</button>
-        <div style="margin: 1rem 0; opacity: 0.5;">— OR —</div>
-        <button type="button" id="google-btn" style="background-color: white; color: #757575; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <button type="button" id="signup-btn" style="background-color: transparent; border: 2px solid var(--primary); color: var(--fg);">Sign Up</button>
+        <div style="margin: 0.5rem 0; opacity: 0.5; text-align: center;">— OR —</div>
+        <button type="button" id="google-btn" style="background-color: #ffffff; color: #3c4043; border: 1px solid #dadce0; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 500;">
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 18px; height: 18px; margin: 0;">
           Continue with Google
         </button>

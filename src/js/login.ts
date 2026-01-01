@@ -82,8 +82,8 @@ if (loginForm) {
         }
 
         // TEST ACCOUNT BYPASS
-        // Allow test@example.com with the dev password to log in
-        if (email === 'test@example.com' && password === 'devtestpwd') {
+        // Allow test@example.com with the dev password to log in (Development only)
+        if (import.meta.env.DEV && email === 'test@example.com' && password === 'devtestpwd') {
             console.log("[Auth] Using test account bypass...");
             if (loginBtn) {
                 loginBtn.disabled = true;

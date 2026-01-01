@@ -144,7 +144,7 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
                 return;
             }
 
-            const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
+            const response: Response = await fetch(`${API_BASE_URL}/api/profile`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -221,7 +221,7 @@ export async function processPendingOperations(): Promise<void> {
             return;
         }
 
-        const response: Response = await fetch(`${API_BASE_URL}/api/user-state`, {
+        const response: Response = await fetch(`${API_BASE_URL}/api/profile`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -321,7 +321,7 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
     if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
     try {
-        const response: Response = await fetch(`${API_BASE_URL}/api/user-state/${key}`, { method: 'GET', headers });
+        const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}`, { method: 'GET', headers });
 
         if (response.status === 304 && !force) {
             return { key, status: 304, timestamp: localTimestamp };
@@ -450,7 +450,7 @@ async function _fetchItemsInBatches(guids: string[], app: AppState | null, total
             return null;
         }
 
-        const response = await fetch(`${API_BASE_URL}/api/feed-items`, {
+        const response = await fetch(`${API_BASE_URL}/api/list`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -496,7 +496,7 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
             return false;
         }
 
-        const response: Response = await fetch(`${API_BASE_URL}/api/feed-items`, {
+        const response: Response = await fetch(`${API_BASE_URL}/api/list`, {
             method: 'GET',
             headers: { 
                 'Content-Type': 'application/json',
@@ -504,7 +504,7 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
             }
         });
 
-        if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/feed-items`);
+        if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/list`);
 
         const items: FeedItem[] = await response.json();
         console.log(`[DB] Received ${items.length} items from worker.`);

@@ -43,7 +43,7 @@ test.describe('Reset Application Data', () => {
     // Assertions to check console output
     const resetCalled = consoleLogs.some(log => log.text.includes('resetApplicationData called.'));
     const userConfirmed = consoleLogs.some(log => log.text.includes('User confirmed reset: true'));
-    const backendReset = networkResponses.some(url => url.includes('/api/admin/reset-app'));
+    const backendReset = networkResponses.some(url => url.includes('/api/admin/wipe'));
 
     expect(resetCalled).toBe(true);
     expect(userConfirmed).toBe(true);

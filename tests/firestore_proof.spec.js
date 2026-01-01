@@ -35,7 +35,7 @@ test('Firestore Connection Proof', async ({ page }) => {
     
     // Listen for the network response from the worker
     const savePromise = page.waitForResponse(response => 
-        response.url().includes('/api/user-state') && 
+        response.url().includes('/api/profile') && 
         response.request().method() === 'POST' &&
         response.status() === 200
     );

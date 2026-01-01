@@ -14,7 +14,7 @@ test.describe('Restore and Sync', () => {
         
         // 2. Restore config via API
         console.log("Restoring configuration...");
-        const restoreResponse = await request.post(`${APP_URL}/api/admin/config-restore`, {
+        const restoreResponse = await request.post(`${APP_URL}/api/admin/archive-import`, {
             data: backupData,
             headers: { 
                 'Content-Type': 'application/json',
@@ -26,7 +26,7 @@ test.describe('Restore and Sync', () => {
 
         // 3. Trigger manual sync to generate feed.xml on server
         console.log("Triggering manual feed sync...");
-        const syncResponse = await request.post(`${APP_URL}/api/feed-sync`, {
+        const syncResponse = await request.post(`${APP_URL}/api/refresh`, {
             headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': APP_PASSWORD

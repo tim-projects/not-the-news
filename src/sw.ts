@@ -45,14 +45,14 @@ registerRoute(
   })
 );
 
-// Explicitly bypass service worker for most API calls, EXCEPT search
+// 2. Generic API calls (cache-first or network-only with offline fallback)
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search') && !url.pathname.includes('/discover-feed'),
-  async (params) => {
+  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search') && !url.pathname.includes('/lookup'),
+  async ({ event }) => {
     try {
-      return await new NetworkOnly().handle(params);
+      return await new NetworkOnly().handle({ event, request: event.request });
     } catch (error) {
-      console.warn('[SW] API call failed (likely offline):', params.url.pathname);
+      console.warn('[SW] API call failed (likely offline):', event.request.url);
       return new Response(JSON.stringify({ error: 'Network error', offline: true }), {
         status: 503,
         headers: { 'Content-Type': 'application/json' }
@@ -61,12 +61,12 @@ registerRoute(
   }
 );
 
-// Discovery API - Always Network with error handling
+// 3. Source Discovery (Network only)
 registerRoute(
-  ({ url }) => url.pathname.includes('/api/discover-feed'),
-  async (params) => {
+  ({ url }) => url.pathname.includes('/api/lookup'),
+  async ({ event }) => {
     try {
-      return await new NetworkOnly().handle(params);
+      return await new NetworkOnly().handle({ event, request: event.request });
     } catch (error) {
       return new Response(JSON.stringify({ error: 'Discovery unavailable offline' }), {
         status: 503,

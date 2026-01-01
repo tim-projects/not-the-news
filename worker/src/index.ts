@@ -439,7 +439,7 @@ export default {
             }
         } else if (cookie?.includes('auth=seeding')) {
             uid = 'seeding-user'; // Special UID for initial seeding
-        } else if (pathName.startsWith('/api/') && pathName !== '/api/time' && pathName !== '/api/login') {
+        } else if (pathName.startsWith('/api/') && pathName !== '/api/time' && pathName !== '/api/refresh') {
             if (pathName !== '/api/login') {
                  return new Response('Unauthorized: No Token Provided', { status: 401 });
             }
@@ -455,7 +455,7 @@ export default {
             return jsonResponse({ time: now.toISOString(), timestamp: now.getTime() });
         }
 
-        if (pathName === '/api/feed-sync' && request.method === 'POST') {
+        if (pathName === '/api/refresh' && request.method === 'POST') {
             // Security: Exponential Backoff Rate Limiting
             const now = Date.now();
             const lastSync = syncCooldowns.get(uid) || 0;
@@ -486,20 +486,20 @@ export default {
             return syncFeeds(uid, env);
         }
 
-        if (pathName === '/api/discover-feed') {
+        if (pathName === '/api/lookup') {
             const targetUrl = url.searchParams.get('url');
             if (!targetUrl) return jsonResponse({ error: 'URL required' }, 400);
             return discoverFeeds(targetUrl);
         }
 
-        if (pathName === '/api/feed-guids') {
+        if (pathName === '/api/keys') {
             return jsonResponse({
                 guids: cachedFeedItems.map(i => i.guid),
                 serverTime: lastSyncTime || new Date().toISOString()
             });
         }
 
-        if (pathName === '/api/feed-items') {
+        if (pathName === '/api/list') {
             let wantedGuids: string[] = [];
             if (request.method === 'POST') {
                 const data: any = await request.json();
@@ -521,7 +521,7 @@ export default {
             return jsonResponse(results);
         }
 
-        if (pathName.startsWith('/api/user-state/')) {
+        if (pathName.startsWith('/api/profile/')) {
             const key = pathName.split('/').pop();
             if (key) {
                 const state = await Storage.loadState(uid, key, env);
@@ -532,7 +532,7 @@ export default {
             }
         }
 
-        if (pathName === '/api/user-state' && request.method === 'POST') {
+        if (pathName === '/api/profile' && request.method === 'POST') {
             const operations: any[] = await request.json();
             
             // Security: Limit batch size of operations
@@ -561,7 +561,7 @@ export default {
         }
 
         // Admin endpoints (internal use during seed or by admins)
-        if (pathName === '/api/admin/config-backup') {
+        if (pathName === '/api/admin/archive-export') {
             const config: Record<string, any> = {};
             for (const key in USER_STATE_SERVER_DEFAULTS) {
                 const state = await Storage.loadState(uid, key, env);
@@ -570,7 +570,7 @@ export default {
             return jsonResponse(config);
         }
 
-        if (pathName === '/api/admin/config-restore' && request.method === 'POST') {
+        if (pathName === '/api/admin/archive-import' && request.method === 'POST') {
             try {
                 const config = await request.json() as any;
                 const targetUid = uid === 'anonymous' ? 'admin-seed' : uid;
@@ -586,7 +586,7 @@ export default {
             }
         }
 
-        if (pathName === '/api/admin/reset-app' && request.method === 'POST') {
+        if (pathName === '/api/admin/wipe' && request.method === 'POST') {
             await Storage.resetUser(uid, env);
             return jsonResponse({ status: 'ok' });
         }

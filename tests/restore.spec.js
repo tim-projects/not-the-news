@@ -22,7 +22,7 @@ test.describe('Restore Configuration Button', () => {
 
     page.on('response', async response => {
       networkResponses.push(`[Response] ${response.status()} ${response.url()}`);
-      if (response.url().includes('/api/admin/config-restore')) {
+      if (response.url().includes('/api/admin/archive-import')) {
         try {
           const body = await response.json();
           networkResponses.push(`  [Response Body] ${JSON.stringify(body)}`);
@@ -75,7 +75,7 @@ test.describe('Restore Configuration Button', () => {
     console.log('--- End Network Responses ---\n');
     
     // Check for successful network response
-    expect(networkResponses.some(res => res.includes('/api/admin/config-restore') && res.includes('200'))).toBeTruthy();
+    expect(networkResponses.some(res => res.includes('/api/admin/archive-import') && res.includes('200'))).toBeTruthy();
     
     // Check for success message in console
     expect(consoleMessages.some(msg => msg.includes('Configuration restored successfully!'))).toBeTruthy();

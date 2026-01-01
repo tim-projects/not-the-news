@@ -6,8 +6,14 @@ const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 test.describe('RSS Content Verification', () => {
 
     test.beforeEach(async ({ page }) => {
+        page.on('console', message => {
+            console.log(`[Browser Console] ${message.type().toUpperCase()}: ${message.text()}`);
+        });
         await login(page, APP_URL);
         
+        // Wait for Alpine explicitly before calling evaluate
+        await page.waitForFunction(() => window.Alpine !== undefined, { timeout: 30000 });
+
         // Ensure we have a feed with known rich content (The Verge)
         await page.evaluate(async () => {
              const app = window.Alpine.$data(document.getElementById('app'));
