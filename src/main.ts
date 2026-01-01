@@ -1216,6 +1216,7 @@ export function rssApp(): AppState {
 
                 this.restoreData = JSON.parse(fileContent);
                 this.showRestorePreview = true;
+                this.modalView = 'restore';
                 
                 // Initialize selection based on what's actually in the file
                 const CATEGORIES = {
@@ -1494,7 +1495,22 @@ export function rssApp(): AppState {
             this.$watch('openSettings', async (open: boolean) => {
                 const isMobile = window.innerWidth < 1024;
                 if (open) {
+                    // Push state to history to enable browser back button support
+                    if (window.location.hash !== '#settings') {
+                        window.history.pushState({ modal: 'settings' }, '', '#settings');
+                    }
+
                     this.showUndo = false;
+                    // Default backup selections to all
+                    this.backupSelections = {
+                        feeds: true,
+                        appearance: true,
+                        history: true,
+                        settings: true
+                    };
+                    this.showRestorePreview = false;
+                    this.restoreData = null;
+
                     if (!isMobile) document.body.classList.add('no-scroll');
                     this.modalView = 'main';
                     await manageSettingsPanelVisibility(this);
@@ -1520,9 +1536,40 @@ export function rssApp(): AppState {
                     }
                     await saveCurrentScrollPosition();
                 } else {
+                    // Remove hash if it exists when closing via UI
+                    if (window.location.hash === '#settings') {
+                        window.history.back();
+                    }
                     document.body.classList.remove('no-scroll');
                     document.body.style.overflow = '';
                     await saveCurrentScrollPosition();
+                }
+            });
+
+            // Handle browser back button via popstate
+            window.addEventListener('popstate', (event) => {
+                if (this.openSettings && window.location.hash !== '#settings') {
+                    this.openSettings = false;
+                }
+                if (this.openShortcuts && window.location.hash !== '#shortcuts') {
+                    this.openShortcuts = false;
+                }
+            });
+
+            this.$watch("openShortcuts", async (isOpen: boolean) => {
+                const isMobile = window.innerWidth < 1024;
+                if (isOpen) {
+                    if (window.location.hash !== '#shortcuts') {
+                        window.history.pushState({ modal: 'shortcuts' }, '', '#shortcuts');
+                    }
+                    if (!isMobile) document.body.classList.add('no-scroll');
+                    await saveCurrentScrollPosition();
+                } else {
+                    if (window.location.hash === '#shortcuts') {
+                        window.history.back();
+                    }
+                    document.body.classList.remove('no-scroll');
+                    document.body.style.overflow = '';
                 }
             });
             this.$watch('openUrlsInNewTabEnabled', () => {

@@ -35,6 +35,7 @@
     - Standardized backup filename matching in tests to support ISO-formatted timestamps.
 - **Improved UI Reactivity & Robustness:**
     - Enhanced **Backup & Restore** system:
+        - Implemented **Sub-menu navigation**: Dedicated views for Backup and Restore categories to keep Advanced Settings clean.
         - Added selective category support (Feeds, Appearance, History, Settings).
         - Implemented **Restore Preview** workflow to allow users to pick which parts of a backup file to apply.
         - Supported merging of partial configurations via backend integration.

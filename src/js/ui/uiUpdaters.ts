@@ -158,8 +158,10 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     const keywordsSettings = document.getElementById('keywords-settings-block');
     const cssSettings = document.getElementById('css-settings-block');
     const advancedSettings = document.getElementById('advanced-settings-block');
+    const backupSettings = document.getElementById('backup-settings-block');
+    const restoreSettings = document.getElementById('restore-settings-block');
 
-    if (!mainSettings || !appearanceSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings) {
+    if (!mainSettings || !appearanceSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings || !backupSettings || !restoreSettings) {
         console.warn('One or more settings panels not found.');
         return Promise.resolve();
     }
@@ -171,6 +173,8 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     keywordsSettings.style.display = 'none';
     cssSettings.style.display = 'none';
     advancedSettings.style.display = 'none';
+    backupSettings.style.display = 'none';
+    restoreSettings.style.display = 'none';
 
     // Show the appropriate panel based on modalView
     switch (app.modalView) {
@@ -191,6 +195,12 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
             break;
         case 'advanced':
             advancedSettings.style.display = 'block';
+            break;
+        case 'backup':
+            backupSettings.style.display = 'block';
+            break;
+        case 'restore':
+            restoreSettings.style.display = 'block';
             break;
         default:
             console.warn('Unknown modalView:', app.modalView);
