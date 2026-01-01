@@ -829,6 +829,27 @@ export function rssApp(): AppState {
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
             const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim());
+            
+            // Validate URLs
+            const invalidUrls: string[] = [];
+            rssFeedsArray.forEach(line => {
+                if (line.length > 0 && !line.startsWith('#')) {
+                    try {
+                        const url = new URL(line);
+                        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                            invalidUrls.push(line);
+                        }
+                    } catch {
+                        invalidUrls.push(line);
+                    }
+                }
+            });
+
+            if (invalidUrls.length > 0) {
+                const proceed = confirm(`The following URLs appear to be invalid:\n\n${invalidUrls.slice(0, 5).join('\n')}${invalidUrls.length > 5 ? '\n...and more' : ''}\n\nInvalid URLs will be saved but ignored by the sync process. Proceed anyway?`);
+                if (!proceed) return;
+            }
+
             try {
                 await saveSimpleState('rssFeeds', rssFeedsArray);
                 this.rssFeedsInput = rssFeedsArray.join('\n');

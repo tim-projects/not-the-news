@@ -312,19 +312,34 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
     
     // Extract URLs from nested or flat config
     let feedUrls: string[] = [];
+
+    const isValidUrl = (str: string) => {
+        try {
+            const url = new URL(str);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    };
+
     if (Array.isArray(feedsConfig)) {
         feedUrls = feedsConfig
             .filter(f => typeof f === 'string')
             .map(f => f.trim())
-            .filter(f => f.length > 0 && !f.startsWith('#'));
+            .filter(f => f.length > 0 && !f.startsWith('#') && isValidUrl(f));
     } else if (feedsConfig && typeof feedsConfig === 'object') {
         // Deep extract URLs from categories
         const extract = (obj: any) => {
             for (const k in obj) {
                 if (Array.isArray(obj[k])) {
                     obj[k].forEach((item: any) => {
-                        if (typeof item === 'string') feedUrls.push(item);
-                        else if (item.url) feedUrls.push(item.url);
+                        let candidate = '';
+                        if (typeof item === 'string') candidate = item.trim();
+                        else if (item && item.url) candidate = item.url.trim();
+                        
+                        if (candidate && !candidate.startsWith('#') && isValidUrl(candidate)) {
+                            feedUrls.push(candidate);
+                        }
                     });
                 } else if (typeof obj[k] === 'object') {
                     extract(obj[k]);
