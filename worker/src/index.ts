@@ -212,6 +212,11 @@ async function verifyFirebaseToken(token: string, projectId: string) {
 let cachedFeedItems: FeedItem[] = [];
 let lastSyncTime: string | null = null;
 
+// Security: Simple in-memory rate limiting for sync endpoint
+const syncCooldowns = new Map<string, number>();
+const MAX_FEEDS_PER_USER = 25;
+const MAX_PAYLOAD_SIZE = 128 * 1024; // 128KB
+
 const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'currentDeckGuids': { 'type': 'array', 'default': [] },
     'lastShuffleResetDate': { 'type': 'simple', 'default': null },
@@ -314,8 +319,11 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
         return jsonResponse({ status: 'skipped', reason: 'No feed URLs configured' });
     }
 
+    // Security: Limit total feeds processed per sync
+    const throttledUrls = feedUrls.slice(0, MAX_FEEDS_PER_USER);
+
     try {
-        const items = await processFeeds(feedUrls, blacklist || []);
+        const items = await processFeeds(throttledUrls, blacklist || []);
         
         // Merge with existing global cache to avoid losing items other users might need
         const existingGuids = new Set(cachedFeedItems.map(i => i.guid));
@@ -334,6 +342,14 @@ export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url);
         const pathName = url.pathname;
+
+        // Security: Limit payload size for all POST requests
+        if (request.method === 'POST') {
+            const contentLength = request.headers.get('Content-Length');
+            if (contentLength && parseInt(contentLength) > MAX_PAYLOAD_SIZE) {
+                return jsonResponse({ error: 'Payload too large' }, 413);
+            }
+        }
 
         // AUTHENTICATION LOGIC
         if (request.method === 'OPTIONS') {
@@ -376,6 +392,14 @@ export default {
         }
 
         if (pathName === '/api/feed-sync' && request.method === 'POST') {
+            // Security: Rate Limit / Cooldown (once per 30 seconds per user)
+            const now = Date.now();
+            const lastSync = syncCooldowns.get(uid) || 0;
+            if (now - lastSync < 30000) {
+                return jsonResponse({ error: 'Sync too frequent', retryAfter: 30 }, 429);
+            }
+            syncCooldowns.set(uid, now);
+
             return syncFeeds(uid, env);
         }
 
