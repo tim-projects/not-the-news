@@ -380,7 +380,12 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
 
 async function discoverFeeds(targetUrl: string): Promise<Response> {
     try {
-        const url = new URL(targetUrl);
+        let normalizedUrl = targetUrl.trim();
+        if (!normalizedUrl.includes('://') && normalizedUrl.includes('.')) {
+            normalizedUrl = `https://${normalizedUrl}`;
+        }
+
+        const url = new URL(normalizedUrl);
         if (!['http:', 'https:'].includes(url.protocol)) {
             return jsonResponse({ error: 'Invalid protocol' }, 400);
         }
