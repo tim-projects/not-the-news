@@ -21,19 +21,21 @@ const authMessage = document.getElementById("auth-message") as HTMLDivElement;
 console.log("[Auth] Login script loaded. Form found:", !!loginForm);
 
 const showMessage = (msg: string, isError: boolean = true) => {
-    if (authMessage) {
-        authMessage.textContent = msg;
-        authMessage.style.color = isError ? '#ff4444' : '#44ff44';
-        authMessage.style.display = 'block';
+    const msgEl = document.getElementById("auth-message") as HTMLDivElement;
+    if (msgEl) {
+        msgEl.textContent = msg;
+        msgEl.style.color = isError ? '#ff4444' : '#44ff44';
+        msgEl.style.display = 'block';
     } else {
         alert(msg);
     }
 };
 
 const clearMessage = () => {
-    if (authMessage) {
-        authMessage.textContent = '';
-        authMessage.style.display = 'none';
+    const msgEl = document.getElementById("auth-message") as HTMLDivElement;
+    if (msgEl) {
+        msgEl.textContent = '';
+        msgEl.style.display = 'none';
     }
 };
 

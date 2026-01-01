@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 test('Firestore Connection Proof', async ({ page }) => {
     page.on('console', msg => console.log('Browser:', msg.text()));

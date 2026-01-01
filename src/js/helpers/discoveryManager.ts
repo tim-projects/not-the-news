@@ -7,8 +7,10 @@ import { createStatusBarMessage } from '../ui/uiUpdaters.ts';
  * @param {string} url The website URL to scan.
  * @returns {Promise<{url: string, feeds: string[]}>} The discovery results.
  */
-export async function discoverFeedFromUrl(url: string): Promise<{url: string, feeds: string[]}> {
-    const response = await fetch(`/api/discover-feed?url=${encodeURIComponent(url)}`);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+
+async function fetchDiscoveryResults(url: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/discover-feed?url=${encodeURIComponent(url)}`);
     if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Discovery failed with status ${response.status}`);

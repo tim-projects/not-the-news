@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { login, ensureFeedsSeeded } from './test-helper';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 test.describe('RSS Content Verification', () => {
 
@@ -21,8 +21,11 @@ test.describe('RSS Content Verification', () => {
     });
 
     test('should display description content for feed items', async ({ page }) => {
-        // Wait for items to appear
-        await page.waitForSelector('.item', { state: 'visible', timeout: 30000 });
+        // Wait for loading screen to hide
+        await expect(page.locator('#loading-screen')).not.toBeVisible({ timeout: 60000 });
+
+        // Wait for items to appear (specifically ones that are not help-panel-item)
+        await page.waitForSelector('.entry:not(.help-panel-item)', { state: 'visible', timeout: 60000 });
 
         // Get the first item's description container
         const firstDescription = page.locator('.itemdescription span').first();

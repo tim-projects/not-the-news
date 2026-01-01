@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { login, ensureFeedsSeeded } from './test-helper';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 test.describe('Theme Functionality', () => {
     test.beforeEach(async ({ page }) => {

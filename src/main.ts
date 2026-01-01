@@ -81,6 +81,8 @@ import { discoverFeed } from './js/helpers/discoveryManager.ts';
 import { auth } from './js/firebase';
 import { onAuthStateChanged, signOut, updatePassword, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+
 // Enforce authentication before initializing the app
 let authInitialized = false;
 let initialAuthChecked = false;
@@ -836,7 +838,7 @@ export function rssApp(): AppState {
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
                 if (token) {
-                    await fetch(`${window.location.origin}/api/feed-sync`, { 
+                    await fetch(`${API_BASE_URL}/api/feed-sync`, { 
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
                     }).catch(e => console.error('[Worker Sync] Immediate sync failed:', e));
@@ -1121,7 +1123,7 @@ export function rssApp(): AppState {
                 console.log('DEBUG: About to make fetch call to /api/admin/reset-app');
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
-                const response = await fetch('/api/admin/reset-app', {
+                const response = await fetch(`${API_BASE_URL}/api/admin/reset-app`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1159,7 +1161,7 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Fetching configuration for backup...';
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
-                const response = await fetch('/api/admin/config-backup', {
+                const response = await fetch(`${API_BASE_URL}/api/admin/config-backup`, {
                     method: 'GET',
                     headers: {
                         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -1302,7 +1304,7 @@ export function rssApp(): AppState {
 
                 const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
-                const response = await fetch('/api/admin/config-restore', {
+                const response = await fetch(`${API_BASE_URL}/api/admin/config-restore`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1826,7 +1828,7 @@ export function rssApp(): AppState {
                     const token = await getAuthToken();
                     if (!token) return;
 
-                    fetch(`${window.location.origin}/api/feed-sync`, { 
+                    fetch(`${API_BASE_URL}/api/feed-sync`, { 
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
                     })
@@ -1847,7 +1849,7 @@ export function rssApp(): AppState {
                     const token = await getAuthToken();
                     if (!token) return;
 
-                    fetch(`${window.location.origin}/api/feed-sync`, { 
+                    fetch(`${API_BASE_URL}/api/feed-sync`, { 
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}` }
                     })

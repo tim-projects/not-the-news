@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 const APP_PASSWORD = "devtestpwd";
 const BACKUP_FILE = 'backup/not-the-news-config-backup-2025-12-22T10-00-55.json';
 

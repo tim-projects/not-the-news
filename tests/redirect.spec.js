@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 test('should redirect unauthenticated users to login page', async ({ page }) => {
     // Clear localStorage to ensure we are unauthenticated

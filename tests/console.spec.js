@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { login, ensureFeedsSeeded } from './test-helper';
 
 test.describe('Console Logs Capture', () => {
-  const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+  const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
   test('should capture console logs after clicking settings cog after login', async ({ page }) => {
     let consoleMessages = [];

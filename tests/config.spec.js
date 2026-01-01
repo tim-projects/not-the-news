@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { login, ensureFeedsSeeded } from './test-helper';
 
 test.describe('Configuration Buttons', () => {
-  const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+  const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
   test.beforeEach(async ({ page }) => {
     await login(page, APP_URL);

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:8085';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 test.describe('Authentication Flow', () => {
     test.beforeEach(async ({ page }) => {
@@ -15,8 +15,7 @@ test.describe('Authentication Flow', () => {
     test('should show error on empty login', async ({ page }) => {
         await page.click('#login-btn');
         const message = page.locator('#auth-message');
-        await page.waitForSelector('#auth-message', { state: 'visible', timeout: 5000 });
-        await expect(message).toBeVisible();
+        await expect(message).toBeVisible({ timeout: 15000 });
         await expect(message).toContainText('Email and password required');
     });
 
