@@ -17,7 +17,13 @@ export default defineConfig({
   publicDir: '../public',
 
   server: {
-    allowedHosts: ['vscode.tail06b521.ts.net', 'localhost']
+    allowedHosts: ['vscode.tail06b521.ts.net', 'localhost'],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      }
+    }
   },
 
   build: {
