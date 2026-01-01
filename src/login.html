@@ -12,9 +12,13 @@
   <link rel="stylesheet" href="css/content.css">
   <link rel="stylesheet" href="css/modal.css">
   <style>
-    body {
+    html, body {
+      height: 100%;
       margin: 0;
-      min-height: 100vh;
+      padding: 0;
+    }
+
+    body {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -29,6 +33,7 @@
       align-items: center;
       justify-content: center;
       width: 100%;
+      max-width: 400px;
       padding: 20px;
       box-sizing: border-box;
     }
@@ -51,7 +56,6 @@
       box-shadow: 0 4px 20px var(--card-shadow-color);
       border: 1px solid var(--card-border);
       width: 100%;
-      max-width: 400px;
       box-sizing: border-box;
     }
 
