@@ -102,7 +102,7 @@ select.filter-select {
 }
 
 .switch input:checked+.slider {
-  background: var(--primary);
+  background-color: var(--primary);
 }
 
 .switch input:checked+.slider::before {
@@ -154,10 +154,6 @@ button.font-size-btn {
   color: var(--fg);
 }
 
-html.dark .switch input:checked+.slider {
-  background-color: var(--primary);
-}
-
 #theme-text,
 #sync-text,
 #images-text {
@@ -193,7 +189,4 @@ html.light .settings-btn {
   box-shadow: 1px 1px 5px var(--card-shadow-color);
 }
 
-html.light .switch .slider {
-  background-color: var(--toggle-track);
-}
 

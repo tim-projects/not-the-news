@@ -91,7 +91,7 @@ All tests were executed using the `./run_single_test.sh` utility to ensure clean
 **Accomplishments:**
 - **Theme Contrast & Accessibility Fixes:**
     - Standardized interactive element contrast by introducing `--primary-fg` and `--secondary-fg` variables across all 18 themes.
-    - **Fixed Dropdown & Input Styling:** Forced `background-color` and `color` on all `.filter-select` elements and applied `accent-color: var(--primary)` to standard radio/checkbox inputs for consistent theme integration.
+    - **Fixed Dropdown & Toggle Styling:** Forced `background-color` and `color` on all `.filter-select` elements and ensured **Toggle Switches** consistently use `var(--primary)` when enabled across all light and dark themes.
     - **UX Polish:** Defaulted **Flick to Select** to `false` for new accounts to prevent accidental navigation for new users.
     - Removed legacy `!important` color overrides from theme files.
 - **Roadmap Planning:** Defined a granular testing strategy to handle context limits.
