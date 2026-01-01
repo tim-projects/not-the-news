@@ -32,54 +32,55 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
-    // Output everything to the 'www' directory, which is outside the 'src' folder
-    outDir: '../www',
-    emptyOutDir: true,
-    minify: true,
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/index.html'),
-        login: resolve(__dirname, 'src/login.html'),
-      },
-      output: {
-        entryFileNames: `assets/[name]-[hash].js`,
-        chunkFileNames: `assets/[name]-[hash].js`,
-        assetFileNames: `assets/[name]-[hash].[ext]`,
+      // Output everything to the 'www' directory, which is outside the 'src' folder
+      outDir: '../www',
+      emptyOutDir: true,
+      minify: true,
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'src/index.html'),
+          login: resolve(__dirname, 'src/login.html'),
+        },
+        output: {
+          entryFileNames: `assets/[name]-[hash].js`,
+          chunkFileNames: `assets/[name]-[hash].js`,
+          assetFileNames: `assets/[name]-[hash].[ext]`,
+        },
       },
     },
-  },
 
-  plugins: [
-    VitePWA({
-      strategies: 'injectManifest',
-      srcDir: '.',
-      filename: 'sw.js',
-      manifestFilename: 'manifest.json',
-      injectManifest: {
-        globPatterns: [
-          '**/*.{js,css,html,ico,png,svg,json,ttf,woff,woff2}',
-        ],
-      },
-      manifest: {
-        name: 'Not The News',
-        short_name: 'NTN',
-        start_url: '/',
-        display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#000000',
-        icons: [
-          {
-            src: 'images/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: 'images/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-        ],
-      },
-    }),
-  ],
+    plugins: [
+      VitePWA({
+        strategies: 'injectManifest',
+        srcDir: '.',
+        filename: 'sw.js',
+        manifestFilename: 'manifest.json',
+        injectManifest: {
+          globPatterns: [
+            '**/*.{js,css,html,ico,png,svg,json,ttf,woff,woff2}',
+          ],
+        },
+        manifest: {
+          name: 'Not The News',
+          short_name: 'NTN',
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#ffffff',
+          theme_color: '#000000',
+          icons: [
+            {
+              src: 'images/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+            },
+            {
+              src: 'images/icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+            },
+          ],
+        },
+      }),
+    ],
+  };
 });
