@@ -212,6 +212,8 @@ body.no-scroll {
   width: 100%;
   flex-grow: 1;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .empty-state {
@@ -221,6 +223,7 @@ body.no-scroll {
   align-items: center;
   width: 100%;
   text-align: center;
+  min-height: 60vh; /* Ensure some vertical presence if parent height is flaky */
 }
 
 .empty-state p {
@@ -228,6 +231,7 @@ body.no-scroll {
   font-size: 2rem;
   opacity: 0.5;
   margin: 0;
+  line-height: 1.2;
 }
 
 .itembox {

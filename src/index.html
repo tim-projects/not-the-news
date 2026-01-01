@@ -82,11 +82,20 @@
                         <template x-if="filteredEntries.length === 0">
                             <div class="empty-state">
                                 <div class="d-flex flex-column align-items-center">
-                                    <p x-text="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid))) ? 'You ran out of content. Add another feed..' : 'There\'s nothing here.'"></p>
+                                    <template x-if="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid)))">
+                                        <div class="text-center">
+                                            <p>You ran out of content.</p>
+                                            <p style="font-size: 1.5rem; margin-top: 0.5rem;">Add another feed..</p>
+                                        </div>
+                                    </template>
+                                    <template x-if="!(allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid))))">
+                                        <p>There's nothing here.</p>
+                                    </template>
+
                                     <button x-show="allCount === 0 || (filterMode === 'unread' && entries.every(e => isRead(e.guid)))" 
                                             class="configure-button" 
-                                            style="margin-top: 1.5rem;"
-                                            @click="openSettings = true; loadRssFeeds(); modalView = 'rss'">
+                                            style="margin-top: 2rem; margin-left: 0;"
+                                            @click="openSettings = true; $nextTick(() => { modalView = 'rss'; loadRssFeeds(); })">
                                         Add feed
                                     </button>
                                 </div>
