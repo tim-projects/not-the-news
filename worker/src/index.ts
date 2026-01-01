@@ -313,33 +313,39 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
     // Extract URLs from nested or flat config
     let feedUrls: string[] = [];
 
-    const isValidUrl = (str: string) => {
+    const normalizeAndValidateUrl = (str: string): string | null => {
+        let candidate = str.trim();
+        if (!candidate || candidate.startsWith('#')) return null;
+
+        // Auto-prepend https:// if missing protocol but has a domain structure
+        if (!candidate.includes('://') && candidate.includes('.')) {
+            candidate = `https://${candidate}`;
+        }
+
         try {
-            const url = new URL(str);
-            return url.protocol === 'http:' || url.protocol === 'https:';
+            const url = new URL(candidate);
+            return (url.protocol === 'http:' || url.protocol === 'https:') ? candidate : null;
         } catch {
-            return false;
+            return null;
         }
     };
 
     if (Array.isArray(feedsConfig)) {
         feedUrls = feedsConfig
-            .filter(f => typeof f === 'string')
-            .map(f => f.trim())
-            .filter(f => f.length > 0 && !f.startsWith('#') && isValidUrl(f));
+            .map(f => typeof f === 'string' ? normalizeAndValidateUrl(f) : null)
+            .filter((f): f is string => f !== null);
     } else if (feedsConfig && typeof feedsConfig === 'object') {
         // Deep extract URLs from categories
         const extract = (obj: any) => {
             for (const k in obj) {
                 if (Array.isArray(obj[k])) {
                     obj[k].forEach((item: any) => {
-                        let candidate = '';
-                        if (typeof item === 'string') candidate = item.trim();
-                        else if (item && item.url) candidate = item.url.trim();
+                        let raw = '';
+                        if (typeof item === 'string') raw = item;
+                        else if (item && item.url) raw = item.url;
                         
-                        if (candidate && !candidate.startsWith('#') && isValidUrl(candidate)) {
-                            feedUrls.push(candidate);
-                        }
+                        const normalized = normalizeAndValidateUrl(raw);
+                        if (normalized) feedUrls.push(normalized);
                     });
                 } else if (typeof obj[k] === 'object') {
                     extract(obj[k]);

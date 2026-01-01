@@ -828,14 +828,27 @@ export function rssApp(): AppState {
             this.applyCustomCss();
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
-            const rssFeedsArray = this.rssFeedsInput.split(/\r?\n/).map(url => url.trim());
+            const lines = this.rssFeedsInput.split(/\r?\n/);
+            const normalizedLines = lines.map(line => {
+                const trimmed = line.trim();
+                if (trimmed.length === 0 || trimmed.startsWith('#')) return line;
+                
+                // If it looks like a URL but has no protocol, add https://
+                if (!trimmed.includes('://') && trimmed.includes('.')) {
+                    return `https://${trimmed}`;
+                }
+                return line;
+            });
+
+            const rssFeedsArray = normalizedLines.map(url => url.trim());
             
             // Validate URLs
             const invalidUrls: string[] = [];
             rssFeedsArray.forEach(line => {
-                if (line.length > 0 && !line.startsWith('#')) {
+                const trimmed = line.trim();
+                if (trimmed.length > 0 && !trimmed.startsWith('#')) {
                     try {
-                        const url = new URL(line);
+                        const url = new URL(trimmed);
                         if (url.protocol !== 'http:' && url.protocol !== 'https:') {
                             invalidUrls.push(line);
                         }
@@ -852,7 +865,7 @@ export function rssApp(): AppState {
 
             try {
                 await saveSimpleState('rssFeeds', rssFeedsArray);
-                this.rssFeedsInput = rssFeedsArray.join('\n');
+                this.rssFeedsInput = normalizedLines.join('\n');
                 createStatusBarMessage(this, 'RSS Feeds saved!');
                 this.loading = true;
                 this.progressMessage = 'Saving feeds and performing full sync...';
