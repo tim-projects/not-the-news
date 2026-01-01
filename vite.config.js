@@ -1,32 +1,37 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
-  // Set the root to the 'src' directory
-  root: 'src',
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
+  const env = loadEnv(mode, process.cwd(), '');
 
-  // Look for .env files in the project root
-  envDir: '../',
+  return {
+    // Set the root to the 'src' directory
+    root: 'src',
 
-  resolve: {
-    dedupe: ['firebase/app', 'firebase/auth', 'firebase/firestore']
-  },
+    // Look for .env files in the project root
+    envDir: '../',
 
-  // Configure the public directory to be the one at the same level as src/
-  publicDir: '../public',
+    resolve: {
+      dedupe: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+    },
 
-  server: {
-    allowedHosts: ['vscode.tail06b521.ts.net', 'localhost'],
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8787',
-        changeOrigin: true,
+    // Configure the public directory to be the one at the same level as src/
+    publicDir: '../public',
+
+    server: {
+      allowedHosts: env.VITE_ALLOWED_HOSTS ? env.VITE_ALLOWED_HOSTS.split(',') : ['localhost'],
+      proxy: {
+        '/api': {
+          target: env.VITE_API_PROXY_TARGET || 'http://localhost:8787',
+          changeOrigin: true,
+        }
       }
-    }
-  },
+    },
 
-  build: {
+    build: {
     // Output everything to the 'www' directory, which is outside the 'src' folder
     outDir: '../www',
     emptyOutDir: true,
