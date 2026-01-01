@@ -240,8 +240,19 @@ const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'themeStyleDark': { 'type': 'simple', 'default': 'originalDark' },
     'lastFeedSync': { 'type': 'simple', 'default': null },
     'shuffledOutGuids': { 'type': 'array', 'default': [] },
-    'rssFeeds': { 'type': 'nested_object', 'default': {} },
-    'keywordBlacklist': { 'type': 'array', 'default': [] },
+    'rssFeeds': { 
+        'type': 'nested_object', 
+        'default': {
+            "Miscellaneous": {
+                "Default": [
+                    { "url": "https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en" },
+                    { "url": "https://www.hotukdeals.com/rss/all" },
+                    { "url": "https://hnrss.org/best" }
+                ]
+            }
+        }
+    },
+    'keywordBlacklist': { 'type': 'array', 'default': ["Trump", "politics", "football", "/r/pictures"] },
     'customCss': { 'type': 'simple', 'default': '' },
     'shadowsEnabled': { 'type': 'simple', 'default': true },
     'curvesEnabled': { 'type': 'simple', 'default': true },
