@@ -244,6 +244,22 @@ const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'searchQuery': { 'type': 'simple', 'default': '' },
 };
 
+function jsonResponse(data: any, status: number = 200, headers: Record<string, string> = {}): Response {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            ...headers
+        }
+    });
+}
+
 async function handleLogin(request: Request, env: Env): Promise<Response> {
     try {
         const data: any = await request.json();
@@ -252,23 +268,20 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
         if (!appPassword) {
             console.error('[Worker] APP_PASSWORD not found');
-            return new Response(JSON.stringify({ error: 'Server misconfigured' }), { status: 500 });
+            return jsonResponse({ error: 'Server misconfigured' }, 500);
         }
 
         if (submittedPw !== appPassword) {
-            return new Response(JSON.stringify({ error: 'Invalid password' }), { status: 401 });
+            return jsonResponse({ error: 'Invalid password' }, 401);
         }
 
         const authToken = crypto.randomUUID();
-        const response = new Response(JSON.stringify({ status: 'ok' }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const response = jsonResponse({ status: 'ok' }, 200);
         
         response.headers.append('Set-Cookie', `auth=${authToken}; Max-Age=${90*24*60*60}; HttpOnly; Secure; SameSite=Strict; Path=/`);
         return response;
     } catch (e: any) {
-        return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+        return jsonResponse({ error: 'Internal server error' }, 500);
     }
 }
 
@@ -298,7 +311,7 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
     }
 
     if (feedUrls.length === 0) {
-        return new Response(JSON.stringify({ status: 'skipped', reason: 'No feed URLs configured' }));
+        return jsonResponse({ status: 'skipped', reason: 'No feed URLs configured' });
     }
 
     try {
@@ -311,11 +324,9 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
         
         lastSyncTime = new Date().toISOString();
         
-        return new Response(JSON.stringify({ status: 'ok', count: items.length }), {
-            headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonResponse({ status: 'ok', count: items.length });
     } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        return jsonResponse({ error: error.message }, 500);
     }
 }
 
@@ -351,15 +362,13 @@ export default {
         }
 
         if (pathName === '/api/login' && request.method === 'POST') {
-            return new Response(JSON.stringify({ error: 'Use Firebase Auth' }), { status: 410 });
+            return jsonResponse({ error: 'Use Firebase Auth' }, 410);
         }
 
         // Time endpoint
         if (pathName === '/api/time') {
             const now = new Date();
-            return new Response(JSON.stringify({ time: now.toISOString(), timestamp: now.getTime() }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            return jsonResponse({ time: now.toISOString(), timestamp: now.getTime() });
         }
 
         if (pathName === '/api/feed-sync' && request.method === 'POST') {
@@ -367,11 +376,9 @@ export default {
         }
 
         if (pathName === '/api/feed-guids') {
-            return new Response(JSON.stringify({
+            return jsonResponse({
                 guids: cachedFeedItems.map(i => i.guid),
                 serverTime: lastSyncTime || new Date().toISOString()
-            }), {
-                headers: { 'Content-Type': 'application/json' }
             });
         }
 
@@ -389,9 +396,7 @@ export default {
                 ? cachedFeedItems.filter(i => wantedGuids.includes(i.guid))
                 : cachedFeedItems;
 
-            return new Response(JSON.stringify(results), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            return jsonResponse(results);
         }
 
         if (pathName.startsWith('/api/user-state/')) {
@@ -401,9 +406,7 @@ export default {
                 if (state.value === null && !USER_STATE_SERVER_DEFAULTS[key]) {
                     return new Response('Not Found', { status: 404 });
                 }
-                return new Response(JSON.stringify(state), {
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse(state);
             }
         }
 
@@ -426,9 +429,7 @@ export default {
                     results.push({ id: op.id, status: 'success', lastModified });
                 }
             }
-            return new Response(JSON.stringify({ status: 'ok', results, serverTime: new Date().toISOString() }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            return jsonResponse({ status: 'ok', results, serverTime: new Date().toISOString() });
         }
 
         // Admin endpoints (internal use during seed or by admins)
@@ -438,9 +439,7 @@ export default {
                 const state = await Storage.loadState(uid, key, env);
                 if (state.value !== null) config[key] = state.value;
             }
-            return new Response(JSON.stringify(config), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            return jsonResponse(config);
         }
 
         if (pathName === '/api/admin/config-restore' && request.method === 'POST') {
@@ -453,22 +452,15 @@ export default {
                         await Storage.saveState(targetUid, key, config[key], env);
                     }
                 }
-                return new Response(JSON.stringify({ status: 'ok' }), {
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse({ status: 'ok' });
             } catch (e: any) {
-                return new Response(JSON.stringify({ error: e.message }), {
-                    status: 500,
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse({ error: e.message }, 500);
             }
         }
 
         if (pathName === '/api/admin/reset-app' && request.method === 'POST') {
             await Storage.resetUser(uid, env);
-            return new Response(JSON.stringify({ status: 'ok' }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            return jsonResponse({ status: 'ok' });
         }
 
         return new Response('Not Found', { status: 404 });

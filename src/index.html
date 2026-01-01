@@ -3,6 +3,11 @@
 
 <head>
     <script>
+        // Immediate auth check for static hosting
+        if (!localStorage.getItem('isAuthenticated')) {
+            window.location.replace('/login.html');
+        }
+
         // Use localStorage for instant theme application.
         const storedTheme = localStorage.getItem('theme');
         const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -55,7 +60,7 @@
                                                     <span style="font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem;">?</span>
                                                 </button>
                                                 <button id="shuffle-button" @click="processShuffle()" class="shuffle-btn" title="Shuffle">
-                                                    <svg class="shuffle-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 4 20 4 20 8" /><line x1="4" y1="20" x2="20" y2="4" /><polyline points="20 16 20 20 16 20" /><line x1="14" y1="14" x2="20" y2="20" /><line x1="4" y1="4" x2="9" y2="9" /></svg>
+                                                    <svg class="shuffle-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 4 20 4 20 8" /><line x1="4" cy="20" x2="20" y2="4" /><polyline points="20 16 20 20 16 20" /><line x1="14" y1="14" x2="20" y2="20" /><line x1="4" y1="4" x2="9" y2="9" /></svg>
                                                     <span x-text="shuffleCount" class="shuffle-count"></span>
                                                 </button>
                                                 <button id="settings-button" @click="openSettings = !openSettings; if (openSettings) { openShortcuts = false; showSearchBar = false; }" class="settings-btn" :class="{ 'active': openSettings }" aria-label="Settings">
@@ -203,7 +208,7 @@
              x-transition:leave-end="opacity-0">
             <div class="modal-content">
                 <div class="modal-header">
-                    <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
+                    <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore' || modalView === 'change-password') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
                     <button class="close" @click="openSettings = false">✕</button>
                 </div>
                 <div class="modal-body">
@@ -280,7 +285,7 @@
                         </div>
                         <div class="settings-option">
                             <div class="setting-label-group">
-                                <span>Advanced Settings</span>
+                                <span>ADVANCED SETTINGS</span>
                                 <p class="setting-description">Reset data or backup your configuration.</p>
                             </div>
                             <button id="configure-advanced-settings-btn" class="configure-button" @click="modalView = 'advanced'">Configure</button>
@@ -328,7 +333,7 @@
                                 <p class="setting-description">Adjust the text size for readability.</p>
                             </div>
                             <div class="d-flex align-items-center grow font-size-control">
-                                <span class="font-size-value" x-text="`${fontSize}%`"></span >
+                                <span class="font-size-value" x-text="`${fontSize}%`"></span>
                                 <button class="font-size-btn" @click="fontSize = Math.max(50, fontSize - 5); applyFontSize(); saveFontSize();" aria-label="Decrease font size">-</button>
                                 <input type="range" id="font-size-slider" min="50" max="200" step="5" x-model.number="fontSize" @input="applyFontSize()" @change="saveFontSize()" class="font-size-range">
                                 <button class="font-size-btn" @click="fontSize = Math.min(200, fontSize + 5); applyFontSize(); saveFontSize();" aria-label="Increase font size">+</button>
@@ -340,7 +345,7 @@
                                 <p class="setting-description">Change the width of the main content area.</p>
                             </div>
                             <div class="d-flex align-items-center grow font-size-control">
-                                <span class="font-size-value" x-text="`${feedWidth}%`"></span >
+                                <span class="font-size-value" x-text="`${feedWidth}%`"></span>
                                 <button class="font-size-btn" @click="feedWidth = Math.max(25, feedWidth - 5); applyFeedWidth(); saveFeedWidth();" aria-label="Decrease feed width">-</button>
                                 <input type="range" id="feed-width-slider" min="25" max="95" step="5" x-model.number="feedWidth" @input="applyFeedWidth()" @change="saveFeedWidth()" class="font-size-range">
                                 <button class="font-size-btn" @click="feedWidth = Math.min(95, feedWidth + 5); applyFeedWidth(); saveFeedWidth();" aria-label="Increase feed width">+</button>
@@ -386,7 +391,6 @@
                     <div id="rss-settings-block" x-show="modalView === 'rss'">
                         <div class="d-flex justify-between align-items-center">
                             <h2>Configure RSS Feeds</h2>
-                            <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem;" @click="modalView = 'advanced'">Backup/Restore</button>
                         </div>
                         <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(var(--primary-rgb), 0.05);">
                             <label for="discovery-input" style="font-weight: bold; margin-bottom: 0.5rem;">Auto-Discover Feed</label>
@@ -415,7 +419,10 @@
                         </div>
                         <div class="settings-group grow">
                             <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
-                            <button id="save-rss-btn" class="settings-button" @click="saveRssFeeds()">Save Feeds</button>
+                            <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
+                                <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.5rem 1rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'">Backup/Restore</button>
+                                <button id="save-rss-btn" class="settings-button" style="margin: 0;" @click="saveRssFeeds()">Save Feeds</button>
+                            </div>
                         </div>
                     </div>
 
@@ -444,10 +451,10 @@
                     </div>
 
                     <div id="advanced-settings-block" x-show="modalView === 'advanced'">
-                        <h2>Advanced Settings</h2>
+                        <h2>ADVANCED SETTINGS</h2>
                         <hr>
 
-                        <h3 style="margin-top: 1.5rem; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">Backup & Restore</h3>
+                        <h3 style="margin-top: 1.5rem; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">BACKUP & RESTORE</h3>
                         <div class="settings-option">
                             <div class="setting-label-group">
                                 <span>Backup Configuration</span>
@@ -467,7 +474,7 @@
 
                         <hr style="opacity: 0.3; margin: 1.5rem 0;">
 
-                        <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">Account & Data Security</h3>
+                        <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--fg); opacity: 0.9;">ACCOUNT & DATA SECURITY</h3>
                         <div class="settings-option">
                             <div class="setting-label-group">
                                 <span>Change Password</span>
@@ -513,7 +520,7 @@
                             <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
                         </div>
 
-                        <button id="backup-config-button" class="configure-button" style="width: 100%;" @click="backupConfig()">Download Backup (.json)</button>
+                        <button id="backup-config-button" class="configure-button" @click="backupConfig()">Download Backup (.json)</button>
                     </div>
 
                     <div id="restore-settings-block" x-show="modalView === 'restore'">
@@ -531,6 +538,20 @@
                         <div class="d-flex gap-2">
                             <button class="configure-button grow" @click="confirmRestore()">Confirm Restore</button>
                             <button class="configure-button grow" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'; restoreData = null">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div id="change-password-block" x-show="modalView === 'change-password'">
+                        <h2>Change Password</h2>
+                        <hr>
+                        <p class="setting-description" style="margin-bottom: 1.5rem;">Enter your new password below. It must be at least 6 characters long.</p>
+                        
+                        <div class="settings-group grow" style="flex-direction: column; align-items: stretch;">
+                            <input type="password" id="new-password-input" placeholder="New Password" class="settings-input" style="margin-bottom: 1rem; padding: 0.75rem;">
+                            <div class="d-flex gap-2">
+                                <button class="configure-button grow" @click="submitPasswordChange()">Update Password</button>
+                                <button class="configure-button grow" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'">Cancel</button>
+                            </div>
                         </div>
                     </div>
                 </div>

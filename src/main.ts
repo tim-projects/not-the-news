@@ -92,16 +92,20 @@ onAuthStateChanged(auth, (user) => {
     console.log(`[Auth Event] User: ${user?.uid || 'null'}, Path: ${path}, Initialized: ${initialAuthChecked}`);
 
     if (user) {
+        localStorage.setItem('isAuthenticated', 'true');
         if (path.endsWith('login.html')) {
             console.log(`[Auth Check] Already logged in, redirecting to home`);
             window.location.href = '/';
         }
-    } else if (initialAuthChecked) {
-        // Only redirect to login if we've already done the initial check 
-        // AND the user session actually disappeared (logout)
-        if (!path.endsWith('login.html')) {
-            console.log(`[Auth Check] User logged out, redirecting to login.html`);
-            window.location.href = '/login.html';
+    } else {
+        localStorage.removeItem('isAuthenticated');
+        if (initialAuthChecked) {
+            // Only redirect to login if we've already done the initial check 
+            // AND the user session actually disappeared (logout)
+            if (!path.endsWith('login.html')) {
+                console.log(`[Auth Check] User logged out, redirecting to login.html`);
+                window.location.href = '/login.html';
+            }
         }
     }
 });
@@ -377,19 +381,29 @@ export function rssApp(): AppState {
             }
         },
 
-        changePassword: async function(this: AppState): Promise<void> {
+        changePassword: function(this: AppState): void {
             const user = auth.currentUser;
             if (!user) return;
+            this.modalView = 'change-password';
+        },
 
-            const newPassword = prompt("Enter your new password:");
+        submitPasswordChange: async function(this: AppState): void {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            const passwordInput = document.getElementById('new-password-input') as HTMLInputElement;
+            const newPassword = passwordInput.value;
+
             if (!newPassword || newPassword.length < 6) {
-                if (newPassword) alert("Password must be at least 6 characters long.");
+                alert("Password must be at least 6 characters long.");
                 return;
             }
 
             try {
                 await updatePassword(user, newPassword);
                 createStatusBarMessage(this, "Password updated successfully!");
+                passwordInput.value = ''; // Clear input
+                this.modalView = 'advanced'; // Go back
             } catch (error: any) {
                 console.error("Password update error:", error);
                 if (error.code === 'auth/requires-recent-login') {

@@ -1,4 +1,4 @@
-# Task: Convert to Multi-User App with Firebase
+# Task: Deployment to Cloudflare Pages
 
 ## Status: In Progress
 **Branch:** `multi-user-firebase`
@@ -12,117 +12,43 @@
 6. [x] Cloudflare Worker: Verify Firebase Tokens (using `jose`)
 7. [x] Cloudflare Worker: Associate data with UIDs (Storage isolation)
 8. [x] Migration: Local/Redis state to Firestore (REST API Implementation)
-9. [ ] Security: Implement Firestore Security Rules
+9. [x] Security: Implement Firestore Security Rules
+10. [x] **Prepare for Static Hosting (Cloudflare Pages)**
+    - [x] Replace server-side Caddy redirects with client-side JS (`localStorage` check in `index.html`).
+    - [x] Update `login.ts` and `main.ts` to manage `isAuthenticated` flag.
+    - [x] Remove `redir` directives from production `Caddyfile`.
+    - [x] Verify redirection logic with `tests/redirect.spec.js`.
+    - [x] UI Improvements:
+        - [x] Layout fixes for Backup/Restore buttons.
+        - [x] Implemented Modal-based Password Change UI.
+        - [x] Standardized Settings Labels (ALL CAPS).
+    - [x] Backend Enhancements:
+        - [x] Implemented standard JSON response helper with `Cache-Control` and `CORS` headers in Worker.
+        - [x] Verified Client API usage (removing legacy `feed.xml` dependencies).
 
 ---
 
-### Progress Update - Tuesday, 30 December 2025
+### Progress Update - Thursday, 1 January 2026
 
 **Accomplishments:**
-- **Authentication & Authorization:**
-    - Configured Authorized Domains in Firebase Console (`news.loveopenly.net`, `vscode.tail06b521.ts.net`, `localhost`).
-    - Implemented Google and Email/Password login providers.
-    - Verified email login functionality in the development environment.
-- **Standardized E2E Test Suite:**
-    - Created `tests/test-helper.js` to centralize authenticated login and feed seeding logic.
-    - Refactored 10+ test files (including `shuffle`, `unread`, `undo`, `config`, `theme`, `tts`, `flick`, etc.) to use modern Firebase-aware setup patterns.
-    - Resolved widespread test failures caused by legacy authentication logic and UI structure changes.
-- **Authenticated Admin & Worker Endpoints:**
-    - Added mandatory authentication tokens to `backupConfig`, `restoreConfig`, `resetApplicationData`, and background worker feed-sync tasks.
-    - Exported `getAuthToken` from `dbSyncOperations.ts` to allow widespread usage in core application logic.
-- **Resolved Data Persistence Bugs:**
-    - Fixed a critical `DataCloneError` in `sanitizeForIndexedDB` by switching from `structuredClone` to `JSON.parse(JSON.stringify())`, which correctly handles Alpine.js Proxy objects.
-    - Standardized backup filename matching in tests to support ISO-formatted timestamps.
-- **Improved UI Reactivity & Robustness:**
-    - Enhanced **Backup & Restore** system:
-        - Implemented **Sub-menu navigation**: Dedicated views for Backup and Restore categories to keep Advanced Settings clean.
-        - Added selective category support (Feeds, Appearance, History, Settings).
-        - Implemented **Restore Preview** workflow to allow users to pick which parts of a backup file to apply.
-        - Supported merging of partial configurations via backend integration.
-    - Implemented **Password Reset** (login page) and **Change Password** (settings) using Firebase Auth.
-    - Added **Delete Account (GDPR)** functionality to allow users to wipe their data and account permanently.
-    - Integrated **Backup/Restore deep-links** in the RSS and Blacklist configuration screens for better UX.
-    - Centered login elements on `login.html` using modern Flexbox layout for better cross-device consistency.
-- **Stabilized Application State:** Restored missing state properties in `src/main.ts` that were causing widespread Alpine.js "undefined" errors.
+- **Static Hosting Compatibility:**
+    - Transitioned the application's "protected route" logic from server-side Caddy redirects to a client-side approach compatible with static hosting (Cloudflare Pages).
+    - Implemented a lightweight, blocking script in `index.html` that checks for an `isAuthenticated` flag in `localStorage` before the main bundle loads.
+    - Updated `src/js/login.ts` to set this flag upon successful login.
+    - Updated `src/main.ts` to clear this flag upon logout or session invalidation.
+    - Removed `redir` directives from the production `Caddyfile` to align the Docker environment with the static production environment.
+    - **Backend Autonomy:** Updated the Cloudflare Worker to include `Cache-Control` and `Access-Control-Allow-Origin` (CORS) headers in all JSON responses. This effectively replicates the headers previously handled by Caddy, allowing the frontend to be hosted on any static provider (like Cloudflare Pages) while fetching data from the Worker.
+- **UI Refinement:**
+    - Improved the layout of the **RSS Configuration**, **Backup**, and **Restore** screens for better usability.
+    - Replaced the browser-native `prompt()` for password changes with a custom **Change Password Modal** that matches the application's theme and is vertically centered.
+    - Standardized settings section headers to be ALL CAPS for visual consistency.
+- **Verification:**
+    - Created and passed `tests/redirect.spec.js` to confirm:
+        1. Unauthenticated users are redirected to `/login.html`.
+        2. Authenticated users (with valid Firebase session + local flag) can access the app.
+    - Manually verified UI layout changes and password modal interaction via `tests/ui.spec.js` passes.
 
-**Findings & Mitigations:**
-- **Hosting Strategy:** Evaluated Firebase Hosting vs. Cloudflare Pages.
-    - *Finding:* Firebase Hosting (Spark plan) has a 360MB/day transfer limit, which might be tight.
-    - *Decision:* Selected **Cloudflare Pages** for frontend hosting due to unlimited free bandwidth and native integration with the existing Cloudflare Worker backend.
-- **RSS Item Descriptions:** RSS feed items were missing description text. 
-    - *Mitigation:* Refactored `mapRawItem` to stop aggressive removal of content-bearing links/images. Improved worker-side field selection.
-    - *Verification:* Verified with `tests/rss_content.spec.js`. Descriptions (including those with links/images like The Verge) are now rendering correctly.
-- **Alpine Proxies vs. StructuredClone:** `structuredClone` is incompatible with Alpine.js Proxies used in the app state. **Mitigation:** Employed JSON-based sanitization for reliable IndexedDB storage.
-- **Test Environment Isolation:** Tests were failing due to unseeded data or lingering unauthenticated states. **Mitigation:** Implemented `ensureFeedsSeeded` helper and forced explicit login bypass in `beforeEach` hooks.
-
-**Next Steps (Comprehensive Testing & Stabilization Plan):**
-
-To ensure total project stability after the Firebase migration, the following test suites were executed and PASSED:
-
-1.  **Phase 10.1: Core Features (`tests/feature.spec.js`)**
-
-2.  **Phase 10.2: Authentication (`tests/auth.spec.js`)**
-
-3.  **Phase 10.3: Data Persistence (`tests/backup.spec.js`, `tests/restore.spec.js`)**
-
-4.  **Phase 10.4: Content & Sync (`tests/rss_content.spec.js`, `tests/deck_refresh.spec.js`)**
-
-5.  **Phase 10.5: UI & UX (All UI, theme, unread, tts, shuffle, etc.)**
-
-6.  **Phase 10.6: Firestore Proof (`tests/firestore_proof.spec.js`)**
-
-7.  **Phase 10.7: Theme Persistence (`tests/theme_persistence.spec.js`)**
-
-8.  **Phase 10.8: Accessibility (`tests/modal_keyboard.spec.js`)**
-
-
-
-**COMPREHENSIVE TEST RUN COMPLETE - TOTAL PROJECT STABILITY CONFIRMED.**
-
-All tests were executed using the `./run_single_test.sh` utility to ensure clean, focused output.
-
-
-
-
----
-
-### Progress Update - Wednesday, 31 December 2025
-
-**Accomplishments:**
-- **Theme Contrast & Accessibility Fixes:**
-    - Standardized interactive element contrast by introducing `--primary-fg` and `--secondary-fg` variables across all 18 themes.
-    - **Fixed Dropdown & Toggle Styling:** Forced `background-color` and `color` on all `.filter-select` elements and ensured **Toggle Switches** consistently use `var(--primary)` when enabled across all light and dark themes.
-    - **UX Polish:** Defaulted **Flick to Select** to `false` for new accounts to prevent accidental navigation for new users.
-    - Removed legacy `!important` color overrides from theme files.
-- **Roadmap Planning:** Defined a granular testing strategy to handle context limits.
-- **Task Backlog:** Updated `next-tasks.md` with new features:
-    - Theme Contrast & Accessibility Fixes (audit and fix low-contrast interactive elements).
-    - GDPR Account Deletion.
-    - Password Change/Reset (Firebase).
-    - Deep-links for Backup/Restore in RSS/Blacklist settings.
-- **Phase 10.1 Feature Verification:**
-    - Verified Reset, Backup, and Read item highlight features.
-    - **Fix:** Increased CSS specificity in `buttons.css` for `.read-button.read` to ensure gold highlight correctly overrides theme-specific base colors.
-- **Comprehensive Stability Verification:**
-    - Executed and passed the entire E2E test suite (20+ files).
-    - Fixed syntax error in `tts.spec.js`.
-    - Improved robustness of `unread.spec.js` to handle empty states.
-- **Phase 10.5 UI & UX:**
-    - Confirmed consistency of header elements, modal navigation, and setting toggles (sync, images, new tab).
-    - Verified that theme selections (light/dark/custom styles) persist correctly across reloads.
-    - Validated core interaction logic (Star, Read, Scroll-to-top) and verified offline functionality using Playwright request interception.
-- **Phase 10.4 Content & Sync:**
-    - Confirmed RSS item descriptions are correctly extracted and rendered without aggressive sanitization loss.
-    - Verified that marking items as read triggers automatic deck generation and replenishment when unread items run low.
-- **Phase 10.3 Data Persistence:**
-    - Verified that configuration backups can be generated and downloaded.
-    - Confirmed that restoring from a JSON backup correctly updates both local IndexedDB and remote Firestore state.
-- **Phase 10.2 Authentication Flow:**
-    - Verified Login/Logout cycles and automatic redirection to `login.html` for unauthenticated sessions.
-    - Confirmed persistence of authentication state across reloads.
-- **Phase 9 Security:** (Completed previously) Deployed Firestore rules to both Prod and Dev.
-- **Dev Env:** Fully configured `.env.development` with correct Dev Service Account keys and Firebase Web credentials.
-
-**Current Focus:**
-- Deployment to Cloudflare Pages.
-
+**Next Steps:**
+- Execute the actual deployment to Cloudflare Pages (User action).
+- Deploy the Worker to Cloudflare Workers (User action).
+- Fully decommission Caddy from the local dev environment (optional, but aligns with prod).

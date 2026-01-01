@@ -41,6 +41,7 @@ const clearMessage = () => {
 onAuthStateChanged(auth, (user) => {
     if (user) {
         console.log("[Auth] User detected:", user.uid, user.isAnonymous ? "(Anonymous)" : "(Authenticated)");
+        localStorage.setItem('isAuthenticated', 'true');
         window.location.href = "/";
     }
 });
