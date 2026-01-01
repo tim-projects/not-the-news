@@ -311,9 +311,12 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
     const { value: blacklist } = await Storage.loadState(uid, 'keywordBlacklist', env);
     
     // Extract URLs from nested or flat config
-    const feedUrls: string[] = [];
+    let feedUrls: string[] = [];
     if (Array.isArray(feedsConfig)) {
-        feedUrls.push(...feedsConfig.filter(f => typeof f === 'string'));
+        feedUrls = feedsConfig
+            .filter(f => typeof f === 'string')
+            .map(f => f.trim())
+            .filter(f => f.length > 0 && !f.startsWith('#'));
     } else if (feedsConfig && typeof feedsConfig === 'object') {
         // Deep extract URLs from categories
         const extract = (obj: any) => {

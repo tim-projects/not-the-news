@@ -97,7 +97,13 @@ export async function processFeeds(feedUrls: string[], blacklist: string[]): Pro
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-            const response = await fetch(url, { signal: controller.signal });
+            const response = await fetch(url, { 
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*'
+                }
+            });
             clearTimeout(timeout);
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);

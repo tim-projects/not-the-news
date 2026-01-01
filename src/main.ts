@@ -1292,7 +1292,15 @@ export function rssApp(): AppState {
                         const keys = CATEGORIES[category as keyof typeof CATEGORIES];
                         keys.forEach(key => {
                             if (this.restoreData[key] !== undefined) {
-                                dataToRestore[key] = this.restoreData[key];
+                                let val = this.restoreData[key];
+                                // Normalize legacy theme values
+                                if (key === 'themeStyle' && val === 'original') {
+                                    val = this.restoreData.theme === 'light' ? 'originalLight' : 'originalDark';
+                                }
+                                if (key === 'themeStyleLight' && val === 'original') val = 'originalLight';
+                                if (key === 'themeStyleDark' && val === 'original') val = 'originalDark';
+                                
+                                dataToRestore[key] = val;
                             }
                         });
                     }
@@ -1363,7 +1371,15 @@ export function rssApp(): AppState {
 
                 this.themeStyleLight = typeof themeStyleLightRes.value === 'string' ? themeStyleLightRes.value : 'originalLight';
                 this.themeStyleDark = typeof themeStyleDarkRes.value === 'string' ? themeStyleDarkRes.value : 'originalDark';
+                
+                // Normalize legacy "original" value from old backups
+                if (this.themeStyleLight === 'original') this.themeStyleLight = 'originalLight';
+                if (this.themeStyleDark === 'original') this.themeStyleDark = 'originalDark';
+
                 this.themeStyle = this.theme === 'light' ? this.themeStyleLight : this.themeStyleDark;
+                if (this.themeStyle === 'original') {
+                    this.themeStyle = this.theme === 'light' ? 'originalLight' : 'originalDark';
+                }
 
                 this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');
                 this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
