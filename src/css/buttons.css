@@ -64,7 +64,7 @@ button.star {
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 0 0;
-  opacity: 0.66;
+  opacity: 0.85;
   box-shadow: -2px -2px 0 1px var(--card-shadow-color);
   float: right;
   position: absolute;
@@ -104,7 +104,7 @@ button.play-button {
   background: var(--bg);
   color: var(--fg);
   border-radius: 20px 0 10px 0; /* Curve in top-left (20px) and bottom-right (10px) */
-  opacity: 0.66;
+  opacity: 0.85;
   box-shadow: -2px -2px 0 1px var(--card-shadow-color);
   position: absolute;
   bottom: 0;
@@ -143,7 +143,7 @@ button.read-button {
   background: var(--bg);
   color: var(--fg);
   border-radius: 0 10px 0 20px;
-  opacity: 0.66;
+  opacity: 0.85;
   box-shadow: -1px 1px 0 1px var(--card-shadow-color);
   position: absolute;
   top: 1px;

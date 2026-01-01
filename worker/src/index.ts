@@ -238,7 +238,7 @@ const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'customCss': { 'type': 'simple', 'default': '' },
     'shadowsEnabled': { 'type': 'simple', 'default': true },
     'curvesEnabled': { 'type': 'simple', 'default': true },
-    'flickToSelectEnabled': { 'type': 'simple', 'default': true },
+    'flickToSelectEnabled': { 'type': 'simple', 'default': false },
     'itemButtonMode': { 'type': 'simple', 'default': 'play' },
     'showSearchBar': { 'type': 'simple', 'default': false },
     'searchQuery': { 'type': 'simple', 'default': '' },

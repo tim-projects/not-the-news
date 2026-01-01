@@ -434,70 +434,79 @@
                     </div>
                 </div>
 
-                                    <div id="advanced-settings-block" x-show="modalView === 'advanced'">
-                                        <div class="d-flex justify-between align-items-center">
-                                            <h2>Advanced Settings</h2>
-                                            <button id="logout-button" class="configure-button" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg); font-size: 0.8rem !important;" @click="logout()">Logout</button>
-                                        </div>
-                                        
-                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                                            <h3 style="margin-top: 0;">Backup & Restore</h3>
-                                            <p class="setting-description" style="margin-bottom: 1rem;">Manage your data by exporting to a file or restoring from a previous backup.</p>
-                                            
-                                            <div class="d-flex gap-2">
-                                                <button id="show-backup-menu-btn" class="configure-button grow" @click="modalView = 'backup'">Backup to File</button>
-                                                <button id="trigger-restore-picker-btn" class="configure-button grow" style="background-color: transparent; border: 1px solid var(--primary); color: var(--fg);" @click="$refs.restoreFileInput.click()">Restore from File</button>
-                                                <input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" />
-                                            </div>
-                                        </div>
+                <div id="advanced-settings-block" x-show="modalView === 'advanced'">
+                    <div class="d-flex justify-between align-items-center">
+                        <h2>Advanced Settings</h2>
+                        <button id="logout-button" class="configure-button" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg); font-size: 0.8rem !important;" @click="logout()">Logout</button>
+                    </div>
+                    
+                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                        <h3 style="margin-top: 0;">Backup & Restore</h3>
+                        <p class="setting-description" style="margin-bottom: 1rem;">Manage your data by exporting to a file or restoring from a previous backup.</p>
+                        
+                        <div class="d-flex gap-2">
+                            <button id="show-backup-menu-btn" class="configure-button grow" @click="modalView = 'backup'">Backup to File</button>
+                            <button id="trigger-restore-picker-btn" class="configure-button grow" style="background-color: transparent; border: 1px solid var(--primary); color: var(--fg);" @click="$refs.restoreFileInput.click()">Restore from File</button>
+                            <input type="file" x-ref="restoreFileInput" @change="restoreConfig($event)" accept="application/json" style="display: none;" />
+                        </div>
+                    </div>
 
-                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                                            <h3 style="margin-top: 0;">Account Management</h3>
-                                            <div class="settings-option">
-                                                <div class="setting-label-group">
-                                                    <span>Change Password</span>
-                                                    <p class="setting-description">Update your account password.</p>
-                                                </div>
-                                                <button class="configure-button" @click="changePassword()">Change</button>
-                                            </div>
-                                            <div class="settings-option" style="margin-top: 0.5rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
-                                                <div class="setting-label-group">
-                                                    <span style="color: #ff4444;">Delete Account</span>
-                                                    <p class="setting-description">Permanently remove your account and data (GDPR).</p>
-                                                </div>
-                                                <button class="configure-button" style="background-color: #ff4444;" @click="deleteAccount()">Delete</button>
-                                            </div>
-                                        </div>
+                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                        <h3 style="margin-top: 0;">Account Management</h3>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Change Password</span>
+                                <p class="setting-description">Update your account password.</p>
+                            </div>
+                            <button class="configure-button" @click="changePassword()">Change</button>
+                        </div>
+                        <div class="settings-option" style="margin-top: 0.5rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+                            <div class="setting-label-group">
+                                <span style="color: #ff4444;">Delete Account</span>
+                                <p class="setting-description">Permanently remove your account and data (GDPR).</p>
+                            </div>
+                            <button class="configure-button" style="background-color: #ff4444;" @click="deleteAccount()">Delete</button>
+                        </div>
+                    </div>
 
-                                        <div class="settings-option" style="margin-top: 1rem;"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
-                                    </div>
+                    <div class="settings-option" style="margin-top: 1rem;"><span>Reset Application</span><button id="reset-app-button" class="configure-button" @click="resetApplicationData()">Reset</button></div>
+                </div>
 
-                                    <div id="backup-settings-block" x-show="modalView === 'backup'">
-                                        <h2>Backup Configuration</h2>
-                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
-                                            <p class="setting-description" style="margin-bottom: 1.5rem;">Select which data categories you would like to include in your backup file.</p>
-                                            
-                                            <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem;">
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
-                                            </div>
+                <div id="backup-settings-block" x-show="modalView === 'backup'">
+                    <h2>Backup Configuration</h2>
+                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+                        <p class="setting-description" style="margin-bottom: 1.5rem;">Select which data categories you would like to include in your backup file.</p>
+                        
+                        <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem;">
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
+                        </div>
 
-                                            <button id="backup-config-button" class="configure-button" style="width: 100%;" @click="backupConfig()">Download Backup (.json)</button>
-                                        </div>
-                                    </div>
+                        <button id="backup-config-button" class="configure-button" style="width: 100%;" @click="backupConfig()">Download Backup (.json)</button>
+                    </div>
+                </div>
 
-                                    <div id="restore-settings-block" x-show="modalView === 'restore'">
-                                        <h2>Restore Configuration</h2>
-                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
-                                            <p style="font-weight: bold; margin-bottom: 0.5rem; color: var(--primary);">Backup file detected!</p>
-                                            <p class="setting-description" style="margin-bottom: 1.5rem;">Choose which data from the file you want to apply to your current account. Existing data in these categories will be overwritten.</p>
-                                            
-                                            <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem;">
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
-                                                <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
+                <div id="restore-settings-block" x-show="modalView === 'restore'">
+                    <h2>Restore Configuration</h2>
+                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+                        <p style="font-weight: bold; margin-bottom: 0.5rem; color: var(--primary);">Backup file detected!</p>
+                        <p class="setting-description" style="margin-bottom: 1.5rem;">Choose which data from the file you want to apply to your current account. Existing data in these categories will be overwritten.</p>
+                        
+                        <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem;">
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.history"> <span>Read & Starred History</span></label>
+                            <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="configure-button grow" @click="confirmRestore()">Confirm Restore</button>
+                            <button class="configure-button grow" style="background-color: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'; restoreData = null">Cancel</button>
+                        </div>
+                    </div>
+                </div>
                                                 <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.settings"> <span>Application Settings</span></label>
                                             </div>
 

@@ -116,6 +116,11 @@ select.filter-select {
   accent-color: var(--primary);
 }
 
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
 .font-size-control {
   gap: 0.25rem;
 }

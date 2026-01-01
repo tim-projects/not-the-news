@@ -133,7 +133,7 @@ export function rssApp(): AppState {
         discoveryError: '',
         shadowsEnabled: true,
         curvesEnabled: true,
-        flickToSelectEnabled: true,
+        flickToSelectEnabled: false,
         entries: [],
         read: [],
         starred: [],
@@ -1318,7 +1318,7 @@ export function rssApp(): AppState {
                 this.itemButtonMode = itemButtonMode.value ?? 'play';
                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
                 this.curvesEnabled = curvesState.value ?? true;
-                this.flickToSelectEnabled = flickState.value ?? true;
+                this.flickToSelectEnabled = flickState.value ?? false;
                 this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                 localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
