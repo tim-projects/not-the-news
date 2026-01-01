@@ -92,7 +92,38 @@ export async function processFeeds(feedUrls: string[], blacklist: string[]): Pro
     for (const url of feedUrls) {
         try {
             console.log(`[RSS] Fetching: ${url}`);
-            const feed = await parser.parseURL(url);
+            
+            // Security: Set timeout and max size for fetching
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeout);
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            // Security: Limit response size to 2MB
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No body');
+
+            let chunks = [];
+            let totalSize = 0;
+            const MAX_RSS_SIZE = 2 * 1024 * 1024; // 2MB
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                totalSize += value.length;
+                if (totalSize > MAX_RSS_SIZE) {
+                    controller.abort();
+                    throw new Error('RSS feed exceeds 2MB limit');
+                }
+                chunks.push(value);
+            }
+
+            const blob = new Blob(chunks);
+            const xml = await blob.text();
+            const feed = await parser.parseString(xml);
             
             for (const entry of feed.items) {
                 const guid = entry.guid || entry.link || '';

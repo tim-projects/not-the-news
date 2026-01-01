@@ -441,6 +441,11 @@ export default {
                 wantedGuids = guidsParam ? guidsParam.split(',') : [];
             }
 
+            // Security: Limit number of GUIDs requested in one hit
+            if (wantedGuids.length > 50) {
+                return jsonResponse({ error: 'Too many GUIDs requested' }, 400);
+            }
+
             const results = wantedGuids.length > 0 
                 ? cachedFeedItems.filter(i => wantedGuids.includes(i.guid))
                 : cachedFeedItems;
@@ -461,6 +466,12 @@ export default {
 
         if (pathName === '/api/user-state' && request.method === 'POST') {
             const operations: any[] = await request.json();
+            
+            // Security: Limit batch size of operations
+            if (operations.length > 25) {
+                return jsonResponse({ error: 'Too many operations in batch' }, 400);
+            }
+
             const results = [];
             for (const op of operations) {
                 if (op.type === 'simpleUpdate') {
