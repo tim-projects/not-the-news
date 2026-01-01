@@ -16,6 +16,10 @@ export default defineConfig({
   // Configure the public directory to be the one at the same level as src/
   publicDir: '../public',
 
+  server: {
+    allowedHosts: ['vscode.tail06b521.ts.net', 'localhost']
+  },
+
   build: {
     // Output everything to the 'www' directory, which is outside the 'src' folder
     outDir: '../www',
