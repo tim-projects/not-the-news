@@ -1215,6 +1215,18 @@ export function rssApp(): AppState {
                 });
 
                 this.restoreData = JSON.parse(fileContent);
+                
+                // Validate if it's a valid backup file by checking for common keys
+                const validKeys = ['rssFeeds', 'theme', 'read', 'starred', 'keywordBlacklist', 'fontSize'];
+                const hasValidData = Object.keys(this.restoreData).some(key => validKeys.includes(key));
+
+                if (!hasValidData) {
+                    createStatusBarMessage(this, "The selected file does not appear to be a valid Not The News backup.");
+                    this.restoreData = null;
+                    this.modalView = 'advanced';
+                    return;
+                }
+
                 this.showRestorePreview = true;
                 this.modalView = 'restore';
                 

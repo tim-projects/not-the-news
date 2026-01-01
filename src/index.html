@@ -488,12 +488,10 @@
                     </div>
                 </div>
 
-                <div id="restore-settings-block" x-show="modalView === 'restore'">
-                    <h2>Restore Configuration</h2>
-                    <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
-                        <p style="font-weight: bold; margin-bottom: 0.5rem; color: var(--primary);">Backup file detected!</p>
-                        <p class="setting-description" style="margin-bottom: 1.5rem;">Choose which data from the file you want to apply to your current account. Existing data in these categories will be overwritten.</p>
-                        
+                                                    <div id="restore-settings-block" x-show="modalView === 'restore'">
+                                                        <h2>Restore Configuration</h2>
+                                                        <div class="settings-group" style="flex-direction: column; align-items: stretch; border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+                                                            <p class="setting-description" style="margin-bottom: 1.5rem;">Choose which data from the file you want to apply to your current account. Existing data in these categories will be overwritten.</p>                        
                         <div class="d-flex flex-column gap-2" style="margin-bottom: 2rem;">
                             <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.feeds"> <span>RSS Feeds & Blacklist</span></label>
                             <label class="d-flex align-items-center gap-2"><input type="checkbox" x-model="backupSelections.appearance"> <span>Appearance & Themes</span></label>
