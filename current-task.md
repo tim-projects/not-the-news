@@ -25,6 +25,10 @@
     - [x] Backend Enhancements:
         - [x] Implemented standard JSON response helper with `Cache-Control` and `CORS` headers in Worker.
         - [x] Verified Client API usage (removing legacy `feed.xml` dependencies).
+    - [x] **Containerless Local Development:**
+        - [x] Created `run-local.sh` to run Vite and Wrangler without root/Docker.
+        - [x] Configured `worker/.dev.vars` for local secrets.
+        - [x] Updated env vars for `news.loveopenly.net` production target.
 
 ---
 
@@ -38,6 +42,10 @@
     - Updated `src/main.ts` to clear this flag upon logout or session invalidation.
     - Removed `redir` directives from the production `Caddyfile` to align the Docker environment with the static production environment.
     - **Backend Autonomy:** Updated the Cloudflare Worker to include `Cache-Control` and `Access-Control-Allow-Origin` (CORS) headers in all JSON responses. This effectively replicates the headers previously handled by Caddy, allowing the frontend to be hosted on any static provider (like Cloudflare Pages) while fetching data from the Worker.
+- **Containerless Workflow:**
+    - Established a purely local, root-free development environment using Vite and Cloudflare Wrangler.
+    - Created a unified `run-local.sh` runner script.
+    - Configured production environment variables for the final deployment target: `news.loveopenly.net`.
 - **UI Refinement:**
     - Improved the layout of the **RSS Configuration**, **Backup**, and **Restore** screens for better usability.
     - Replaced the browser-native `prompt()` for password changes with a custom **Change Password Modal** that matches the application's theme and is vertically centered.
@@ -51,4 +59,4 @@
 **Next Steps:**
 - Execute the actual deployment to Cloudflare Pages (User action).
 - Deploy the Worker to Cloudflare Workers (User action).
-- Fully decommission Caddy from the local dev environment (optional, but aligns with prod).
+- Archive/Remove Docker-related files once Cloudflare deployment is stable.
