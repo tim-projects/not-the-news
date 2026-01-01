@@ -9,6 +9,7 @@ This document guides the agent's interaction with the project.
 - Use the `@refactor-directive` to refactor JavaScript code to be concise, modern, and functional while maintaining the same output.
 - everything can run without root. Use standard web development tools like Vite and Cloudflare Wrangler.
 - do not rename variables without asking.
+- **Service Verification:** Each time you restart a service, you MUST check the logs immediately to verify it is running correctly. Do not assume a successful command means a successful startup.
 
 ### Project Commands
 - **Run Application (Local Dev):** Use `./run-local.sh`. This script uses `systemd --user` to manage background processes for the Vite frontend and Cloudflare Worker backend.
