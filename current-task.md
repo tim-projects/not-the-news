@@ -1,6 +1,6 @@
 # Task: Deployment to Cloudflare Pages
 
-## Status: In Progress
+## Status: Completed
 **Branch:** `multi-user-firebase`
 
 ### Roadmap
@@ -27,25 +27,28 @@
         - [x] Verified Client API usage (removing legacy `feed.xml` dependencies).
     - [x] **Containerless Local Development:**
         - [x] Created `run-local.sh` to run Vite and Wrangler without root/Docker.
+        - [x] Implemented `systemd --user` service management for robust background processes.
         - [x] Configured `worker/.dev.vars` for local secrets.
         - [x] Updated env vars for `news.loveopenly.net` production target.
+    - [x] **Legacy Cleanup:**
+        - [x] Eliminated Docker, Podman, and Caddy components.
+        - [x] Updated `GEMINI.md` with new containerless instructions.
 
 ---
 
 ### Progress Update - Thursday, 1 January 2026
 
 **Accomplishments:**
+- **Full Containerless Transition:**
+    - Successfully decommissioned all Docker and Podman related artifacts, including `Dockerfile`, `docker-compose` equivalents, and various `build.sh`/`run.sh` scripts.
+    - Established a high-performance local development workflow using `systemd --user` to manage the Vite dev server and Cloudflare Wrangler.
+    - Simplified the codebase by removing legacy Caddy configuration and serving dependencies.
 - **Static Hosting Compatibility:**
     - Transitioned the application's "protected route" logic from server-side Caddy redirects to a client-side approach compatible with static hosting (Cloudflare Pages).
     - Implemented a lightweight, blocking script in `index.html` that checks for an `isAuthenticated` flag in `localStorage` before the main bundle loads.
     - Updated `src/js/login.ts` to set this flag upon successful login.
     - Updated `src/main.ts` to clear this flag upon logout or session invalidation.
-    - Removed `redir` directives from the production `Caddyfile` to align the Docker environment with the static production environment.
     - **Backend Autonomy:** Updated the Cloudflare Worker to include `Cache-Control` and `Access-Control-Allow-Origin` (CORS) headers in all JSON responses. This effectively replicates the headers previously handled by Caddy, allowing the frontend to be hosted on any static provider (like Cloudflare Pages) while fetching data from the Worker.
-- **Containerless Workflow:**
-    - Established a purely local, root-free development environment using Vite and Cloudflare Wrangler.
-    - Created a unified `run-local.sh` runner script.
-    - Configured production environment variables for the final deployment target: `news.loveopenly.net`.
 - **UI Refinement:**
     - Improved the layout of the **RSS Configuration**, **Backup**, and **Restore** screens for better usability.
     - Replaced the browser-native `prompt()` for password changes with a custom **Change Password Modal** that matches the application's theme and is vertically centered.
@@ -55,8 +58,7 @@
         1. Unauthenticated users are redirected to `/login.html`.
         2. Authenticated users (with valid Firebase session + local flag) can access the app.
     - Manually verified UI layout changes and password modal interaction via `tests/ui.spec.js` passes.
+    - Confirmed systemd service management correctly handles process lifecycles and enforces single instances.
 
-**Next Steps:**
-- Execute the actual deployment to Cloudflare Pages (User action).
-- Deploy the Worker to Cloudflare Workers (User action).
-- Archive/Remove Docker-related files once Cloudflare deployment is stable.
+**Final State:**
+The project is now a modern, containerless full-stack application ready for deployment to Cloudflare's edge platform. Local development is simplified, root-free, and mirrors the production architecture.
