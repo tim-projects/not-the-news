@@ -1,6 +1,6 @@
 # Task: Deployment to Cloudflare Pages
 
-## Status: Completed
+## Status: Substantially Complete
 **Branch:** `multi-user-firebase`
 
 ### Roadmap
@@ -21,44 +21,42 @@
     - [x] UI Improvements:
         - [x] Layout fixes for Backup/Restore buttons.
         - [x] Implemented Modal-based Password Change UI.
-        - [x] Standardized Settings Labels (ALL CAPS).
+        - [x] Reverted "Advanced Settings" to standard case and added User Email display.
     - [x] Backend Enhancements:
         - [x] Implemented standard JSON response helper with `Cache-Control` and `CORS` headers in Worker.
-        - [x] Verified Client API usage (removing legacy `feed.xml` dependencies).
+        - [x] Renamed all API endpoints to neutral names (`/api/profile`, `/api/list`, `/api/refresh`, etc.) to bypass ad-blockers.
+        - [x] Hardened RSS fetching with AbortController, 2MB limits, and realistic User-Agent (fixes Reddit 403s).
+        - [x] Implemented exponential backoff rate limiting and SSRF protection.
     - [x] **Containerless Local Development:**
         - [x] Created `run-local.sh` to run Vite and Wrangler without root/Docker.
-        - [x] Implemented `systemd --user` service management for robust background processes.
+        - [x] Implemented `systemd --user` service management.
         - [x] Configured `worker/.dev.vars` for local secrets.
-        - [x] Updated env vars for `news.loveopenly.net` production target.
+    - [x] **Data Integrity & Robustness:**
+        - [x] Fixed "original" theme normalization for legacy backups.
+        - [x] Implemented auto-prepending of `https://` for protocol-less RSS URLs.
+        - [x] Added worker-side filtering for comments (`#`) and empty lines in feed lists.
     - [x] **Legacy Cleanup:**
         - [x] Eliminated Docker, Podman, and Caddy components.
-        - [x] Updated `GEMINI.md` with new containerless instructions.
 
 ---
 
 ### Progress Update - Thursday, 1 January 2026
 
-**Accomplishments:**
-- **Full Containerless Transition:**
-    - Successfully decommissioned all Docker and Podman related artifacts, including `Dockerfile`, `docker-compose` equivalents, and various `build.sh`/`run.sh` scripts.
-    - Established a high-performance local development workflow using `systemd --user` to manage the Vite dev server and Cloudflare Wrangler.
-    - Simplified the codebase by removing legacy Caddy configuration and serving dependencies.
-- **Static Hosting Compatibility:**
-    - Transitioned the application's "protected route" logic from server-side Caddy redirects to a client-side approach compatible with static hosting (Cloudflare Pages).
-    - Implemented a lightweight, blocking script in `index.html` that checks for an `isAuthenticated` flag in `localStorage` before the main bundle loads.
-    - Updated `src/js/login.ts` to set this flag upon successful login.
-    - Updated `src/main.ts` to clear this flag upon logout or session invalidation.
-    - **Backend Autonomy:** Updated the Cloudflare Worker to include `Cache-Control` and `Access-Control-Allow-Origin` (CORS) headers in all JSON responses. This effectively replicates the headers previously handled by Caddy, allowing the frontend to be hosted on any static provider (like Cloudflare Pages) while fetching data from the Worker.
-- **UI Refinement:**
-    - Improved the layout of the **RSS Configuration**, **Backup**, and **Restore** screens for better usability.
-    - Replaced the browser-native `prompt()` for password changes with a custom **Change Password Modal** that matches the application's theme and is vertically centered.
-    - Standardized settings section headers to be ALL CAPS for visual consistency.
-- **Verification:**
-    - Created and passed `tests/redirect.spec.js` to confirm:
-        1. Unauthenticated users are redirected to `/login.html`.
-        2. Authenticated users (with valid Firebase session + local flag) can access the app.
-    - Manually verified UI layout changes and password modal interaction via `tests/ui.spec.js` passes.
-    - Confirmed systemd service management correctly handles process lifecycles and enforces single instances.
+**Findings & Mitigations:**
+- **Ad-Blocker Interference:** Browser extensions were blocking URLs containing "feed", "sync", or "user-state". 
+    - *Mitigation:* Renamed all API endpoints to generic terms: `/api/profile` (state), `/api/refresh` (sync), `/api/list` (items), and `/api/lookup` (discovery).
+- **RSS Fetching Reliability:** Reddit and other major sites were returning `403 Forbidden` to the Worker's default fetch requests.
+    - *Mitigation:* Added a modern browser `User-Agent` and refined the fetch logic to include a 5s timeout and 2MB response size limit.
+- **Production Security:** The `test@example.com` bypass posed a risk if leaked to production.
+    - *Mitigation:* Wrapped the bypass in `import.meta.env.DEV` to ensure it only functions in local development environments.
+- **Data Migration Path:** Restoring old backups (pre-2026) resulted in a broken UI due to the "original" theme name change.
+    - *Mitigation:* Added normalization logic in `_loadInitialState` and `confirmRestore` to map legacy `"original"` values to `"originalLight"` or `"originalDark"`.
 
-**Final State:**
-The project is now a modern, containerless full-stack application ready for deployment to Cloudflare's edge platform. Local development is simplified, root-free, and mirrors the production architecture.
+**Accomplishments:**
+- **Robust URL Handling:** Implemented smart URL normalization that automatically adds `https://` to inputs like `theverge.com/rss` and strictly ignores comments/empty lines while preserving them in the user's configuration text.
+- **Improved Identity UI:** The "Advanced Settings" view now clearly displays the email of the person signed in, and labels have been refined for better visual balance.
+- **API Hardening:** The Worker now enforces strict payload size limits (128KB), per-user rate limiting with exponential penalties, and SSRF protection for feed discovery.
+- **Type Safety:** Resolved several TypeScript errors in `AppState` and fixed async return types, ensuring a cleaner production build.
+
+**Final Verification:**
+The full E2E test suite (Auth, Redirect, RSS Content, UI, and Backup/Restore) has been executed and passes in the new containerless environment. The application is fully prepared for Cloudflare Pages/Workers deployment.
