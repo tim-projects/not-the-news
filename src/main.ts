@@ -1361,7 +1361,7 @@ export function rssApp(): AppState {
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to restore backend data.');
+                    throw new Error(errorData.error || errorData.message || 'Failed to restore backend data.');
                 }
 
                 createStatusBarMessage(this, 'Restoration complete! Reloading...');

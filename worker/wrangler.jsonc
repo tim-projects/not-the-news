@@ -17,7 +17,7 @@
 	},
 	"routes": [
 		{
-			"pattern": "news.loveopenly.net",
+			"pattern": "VITE_PRODUCTION_DOMAIN_PLACEHOLDER",
 			"custom_domain": true
 		}
 	],
@@ -25,6 +25,7 @@
 		"enabled": true
 	},
 	"vars": {
-		"API_BASE_URL": "https://news.loveopenly.net"
+		"API_BASE_URL": "https://VITE_PRODUCTION_DOMAIN_PLACEHOLDER",
+		"FIREBASE_PROJECT_ID": "not-the-news"
 	}
 }

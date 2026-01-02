@@ -18,7 +18,7 @@
         - [x] Update `login.ts` and `main.ts` to manage `isAuthenticated` flag.
         - [x] Remove `redir` directives from production `Caddyfile`.
         - [x] Verify redirection logic with `tests/redirect.spec.js`.
-        - [x] Configured `wrangler.jsonc` for production assets (`../www`) and custom domain (`news.loveopenly.net`).
+        - [x] Configured `wrangler.jsonc` for production assets (`../www`) and custom domain.
         - [x] Automated production secret management (Firebase & App Password).
         - [x] Implemented client-side HTTPS redirect in `index.html` and `login.html` to resolve "Not Secure" warnings.
         - [x] UI Improvements:
@@ -62,7 +62,7 @@
 - **Improved Identity UI:** The "Advanced Settings" view now clearly displays the email of the person signed in, and labels have been refined for better visual balance.
 - **API Hardening:** The Worker now enforces strict payload size limits (128KB), per-user rate limiting with exponential penalties, and SSRF protection for feed discovery.
 - **Type Safety:** Resolved several TypeScript errors in `AppState` and fixed async return types, ensuring a cleaner production build.
-- **Production Readiness:** Successfully deployed the unified Worker + Assets package to `news.loveopenly.net` with full HTTPS support and automated deployment scripts.
+- **Production Readiness:** Successfully deployed the unified Worker + Assets package with full HTTPS support and automated deployment scripts.
 
 **Final Verification:**
 The application is live and functional in the production environment. The full E2E test suite (Auth, Redirect, RSS Content, UI, and Backup/Restore) has been executed and passes in the local containerless environment, mirroring the production logic.
