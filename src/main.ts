@@ -1211,12 +1211,11 @@ export function rssApp(): AppState {
 
                 const configData = await response.json();
                 
-                // Define Categories
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
-                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'lastShuffleResetDate', 'shuffleCount'],
-                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled']
+                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
                 // Filter based on selections
@@ -1285,9 +1284,9 @@ export function rssApp(): AppState {
                 // Initialize selection based on what's actually in the file
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
-                    appearance: ['theme', 'themeStyle', 'fontSize', 'customCss'],
-                    history: ['read', 'starred'],
-                    settings: ['syncEnabled', 'itemButtonMode']
+                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
+                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
                 for (const [cat, keys] of Object.entries(CATEGORIES)) {
@@ -1316,8 +1315,8 @@ export function rssApp(): AppState {
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
-                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'lastShuffleResetDate', 'shuffleCount'],
-                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled']
+                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
                 const dataToRestore: Record<string, any> = {};
@@ -1339,6 +1338,9 @@ export function rssApp(): AppState {
                         });
                     }
                 }
+
+                // Always enable sync after restore
+                dataToRestore['syncEnabled'] = true;
 
                 if (Object.keys(dataToRestore).length === 0) {
                     createStatusBarMessage(this, 'No data selected for restoration.');

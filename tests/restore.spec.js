@@ -17,7 +17,13 @@ test.describe('Restore Configuration Button', () => {
     });
 
     page.on('request', request => {
-      networkRequests.push(`[Request] ${request.method()} ${request.url()}`);
+      const url = request.url();
+      const method = request.method();
+      networkRequests.push(`[Request] ${method} ${url}`);
+      if (url.includes('/api/admin/archive-import') && method === 'POST') {
+        const postData = request.postData();
+        networkRequests.push(`  [Request Body] ${postData}`);
+      }
     });
 
     page.on('response', async response => {
@@ -37,6 +43,7 @@ test.describe('Restore Configuration Button', () => {
 
     // --- Login ---
     await page.goto(`${APP_URL}/login.html`, { waitUntil: 'networkidle' });
+    await page.fill('#email', 'test@example.com');
     await page.fill('#pw', APP_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL(`${APP_URL}/`, { waitUntil: 'networkidle' });
@@ -59,6 +66,12 @@ test.describe('Restore Configuration Button', () => {
     // Set the file to the hidden file input
     await page.setInputFiles('input[type="file"]', sampleConfigFile);
     
+    // Wait for the restore preview to show up
+    await page.waitForSelector('#restore-settings-block', { state: 'visible', timeout: 5000 });
+    
+    // Click Confirm Restore
+    await page.click('button:has-text("Confirm Restore")');
+
     // Wait briefly for potential asynchronous operations
     await page.waitForTimeout(2000);
 
@@ -77,7 +90,11 @@ test.describe('Restore Configuration Button', () => {
     // Check for successful network response
     expect(networkResponses.some(res => res.includes('/api/admin/archive-import') && res.includes('200'))).toBeTruthy();
     
+    // Verify syncEnabled is true in the request
+    const importRequestBody = networkRequests.find(req => req.includes('[Request Body]') && req.includes('"syncEnabled":true'));
+    expect(importRequestBody).toBeDefined();
+
     // Check for success message in console
-    expect(consoleMessages.some(msg => msg.includes('Configuration restored successfully!'))).toBeTruthy();
+    expect(consoleMessages.some(msg => msg.includes('Restoration complete! Reloading...'))).toBeTruthy();
   });
 });

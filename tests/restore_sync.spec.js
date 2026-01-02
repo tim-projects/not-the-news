@@ -46,6 +46,7 @@ test.describe('Restore and Sync', () => {
 
         // 4. Load the app and login
         await page.goto(`${APP_URL}/login.html`);
+        await page.fill('#email', 'test@example.com');
         await page.fill('input[type="password"]', APP_PASSWORD);
         await page.click('button[type="submit"]');
         
