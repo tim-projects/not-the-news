@@ -3,6 +3,11 @@
 
 <head>
     <script>
+        // Force HTTPS
+        if (location.protocol === 'http:' && location.hostname !== 'localhost' && !location.hostname.endsWith('.test')) {
+            location.replace(location.href.replace('http:', 'https:'));
+        }
+
         // Immediate auth check for static hosting
         if (!localStorage.getItem('isAuthenticated')) {
             window.location.replace('/login.html');
@@ -35,7 +40,7 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-DFPROOUi.js"></script>
+  <script type="module" crossorigin src="/assets/main-BZ72fd6u.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/firebase-D4b_x8Xg.js">
   <link rel="stylesheet" crossorigin href="/assets/firebase-ByUD8l9H.css">
   <link rel="stylesheet" crossorigin href="/assets/main-DDPYElNu.css">
