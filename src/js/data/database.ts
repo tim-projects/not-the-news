@@ -4,6 +4,7 @@
 // database-related functions, simplifying imports for the rest of the application.
 
 export { initDb, withDb, closeDb } from './dbCore.ts';
+export * from './dbStateDefs.ts';
 export * from './dbUserState.ts';
 export * from './dbSyncOperations.ts';
 

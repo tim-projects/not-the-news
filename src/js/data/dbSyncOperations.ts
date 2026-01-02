@@ -1,19 +1,14 @@
 //
 
 import { withDb } from './dbCore.ts';
-import { isOnline } from '../utils/connectivity.js'; // Will be converted later
+import { isOnline } from '../utils/connectivity.ts';
 import {
     loadSimpleState,
     loadArrayState,
-    // NOTE: We no longer import writers like `saveSimpleState` or `updateArrayState`
-    // to prevent accidental sync loops. This file manages its own local writes.
-    USER_STATE_DEFS
-} from './dbUserState.ts';
-
-// Locally declare types that are not exported from their modules
-type IDBPDatabase = any;
-type SimpleStateValue = any;
-type UserStateDef = any;
+    USER_STATE_DEFS,
+    UserStateDef,
+    SimpleStateValue
+} from './dbStateDefs.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
@@ -321,7 +316,15 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
     if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
     try {
-        const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}`, { method: 'GET', headers });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per key
+
+        const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}`, { 
+            method: 'GET', 
+            headers,
+            signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
 
         if (response.status === 304 && !force) {
             return { key, status: 304, timestamp: localTimestamp };
@@ -401,8 +404,12 @@ export async function pullUserState(force: boolean = false, skipKeys: string[] =
         const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS)
             .filter(([key, def]) => !def.localOnly && key !== 'syncEnabled' && !skipKeys.includes(key)) as [string, UserStateDef][];
         
-        const results: { key: string, status: string | number, timestamp?: string }[] = await Promise.all(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
+        const resultsSettled = await Promise.allSettled(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
         
+        const results = resultsSettled
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+            .map(r => r.value);
+
         const newestOverallTimestamp: string = results.reduce((newest: string, result: { key: string, status: string | number, timestamp?: string }) => {
             return (result?.timestamp && result.timestamp > newest) ? result.timestamp : newest;
         }, '');

@@ -1,16 +1,18 @@
 // @filepath: src/js/userStateUtils.js
 
-import { AppState, PendingOperation, ReadItem, StarredItem, DeckItem } from '@/types/app.ts';
+import { AppState, PendingOperation, ReadItem, StarredItem, DeckItem, ShuffledOutItem } from '@/types/app.ts';
 
 import {
-    loadSimpleState,
     saveSimpleState,
-    loadArrayState,
     saveArrayState,
-    queueAndAttemptSyncOperation,
     updateArrayState,
     overwriteArrayAndSyncChanges
 } from '../data/dbUserState.ts';
+import {
+    loadSimpleState,
+    loadArrayState
+} from '../data/dbStateDefs.ts';
+import { queueAndAttemptSyncOperation } from '../data/dbSyncOperations.ts';
 
 /**
  * A helper function to deeply clone an object, sanitizing it for IndexedDB storage.

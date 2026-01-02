@@ -329,6 +329,7 @@ export function rssApp(): AppState {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
                 this.progressMessage = `Error: ${error.message}`;
+                this.loading = false;
                 createStatusBarMessage(this, `Could not load feed: ${error.message}`);
             }
         },

@@ -66,3 +66,22 @@
 
 **Final Verification:**
 The application is live and functional in the production environment. The full E2E test suite (Auth, Redirect, RSS Content, UI, and Backup/Restore) has been executed and passes in the local containerless environment, mirroring the production logic.
+
+---
+
+### Progress Update - Friday, 2 January 2026
+
+**Findings & Mitigations:**
+- **Circular Dependency Hang:** A circular dependency between `dbUserState.ts` and `dbSyncOperations.ts` caused module evaluation to fail in production builds, leading to a hang on the loading screen.
+    - *Mitigation:* Extracted shared definitions and basic loaders into `src/js/data/dbStateDefs.ts` to break the cycle.
+- **Vite Build Script Injection:** The script tag in `src/index.html` was incorrectly pointing to `/main.js` instead of `/main.ts`, which could cause issues with Vite's script injection.
+    - *Mitigation:* Updated the source template to use the correct `.ts` extension.
+- **Restoration Incompleteness:** Several state keys (like `filterMode`, `currentDeckGuids`, `lastViewedItemId`) were missing from the restoration logic, leading to inconsistent app states after a restore.
+    - *Mitigation:* Updated category definitions across the backup/restore pipeline to include all essential state.
+
+**Accomplishments:**
+- **Hardened Restoration:** Backups now correctly restore the full application state, including feed filters and deck positions.
+- **Forced Sync on Restore:** The application now automatically re-enables synchronization after a restore to ensure the user immediately starts receiving fresh content.
+- **Environment-Based Configuration:** Removed all hardcoded production URLs from the repository. Deployment now uses `VITE_PRODUCTION_DOMAIN` and temporary configuration files to maintain environment flexibility.
+- **Startup Robustness:** Added 10s timeouts to individual state pull requests and implemented `Promise.allSettled` to ensure the app can finish loading even if some network requests are slow or fail.
+- **Updated Test Suite:** Fixed the restoration and sync tests to work with the latest multi-user login flow and UI confirm dialogs.
