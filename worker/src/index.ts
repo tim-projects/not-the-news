@@ -22,35 +22,40 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
         throw new Error("Missing Firestore Service Account credentials in environment.");
     }
 
-    const cleanedKey = privateKey.replace(/\\n/g, '\n');
-    const algorithm = 'RS256';
-    const pkcs8 = await jose.importPKCS8(cleanedKey, algorithm);
+    try {
+        const cleanedKey = privateKey.replace(/\\n/g, '\n');
+        const algorithm = 'RS256';
+        const pkcs8 = await jose.importPKCS8(cleanedKey, algorithm);
 
-    const jwt = await new jose.SignJWT({
-        scope: 'https://www.googleapis.com/auth/datastore',
-    })
-        .setProtectedHeader({ alg: algorithm })
-        .setIssuer(email)
-        .setSubject(email)
-        .setAudience('https://oauth2.googleapis.com/token')
-        .setExpirationTime('1h')
-        .setIssuedAt()
-        .sign(pkcs8);
+        const jwt = await new jose.SignJWT({
+            scope: 'https://www.googleapis.com/auth/datastore',
+        })
+            .setProtectedHeader({ alg: algorithm })
+            .setIssuer(email)
+            .setSubject(email)
+            .setAudience('https://oauth2.googleapis.com/token')
+            .setExpirationTime('1h')
+            .setIssuedAt()
+            .sign(pkcs8);
 
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            assertion: jwt,
-        }),
-    });
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                assertion: jwt,
+            }),
+        });
 
-    const data: any = await response.json();
-    if (!data.access_token) {
-        throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
+        const data: any = await response.json();
+        if (!data.access_token) {
+            throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
+        }
+        return data.access_token;
+    } catch (e: any) {
+        console.error('[Auth] getGoogleAccessToken Fatal Error:', e);
+        throw e;
     }
-    return data.access_token;
 }
 
 class Storage {
@@ -212,15 +217,15 @@ async function verifyFirebaseToken(token: string, projectId: string) {
     return payload;
 }
 
-// Global cache for feeds
-let cachedFeedItems: FeedItem[] = [];
-let lastSyncTime: string | null = null;
+// Global cache for feeds, keyed by User ID to prevent leaks
+const userCaches = new Map<string, { items: FeedItem[], lastSync: string }>();
 
 const syncCooldowns = new Map<string, number>();
 const violationCounts = new Map<string, number>();
 const BASE_COOLDOWN_MS = 30000;
 const MAX_FEEDS_PER_USER = 25;
 const MAX_PAYLOAD_SIZE = 128 * 1024;
+const MAX_CACHE_USERS = 100; // Prevent OOM by limiting cached users
 
 const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'currentDeckGuids': { 'type': 'array', 'default': [] },
@@ -326,10 +331,28 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
 
     try {
         const items = await processFeeds(throttledUrls, blacklist || []);
-        const existingGuids = new Set(cachedFeedItems.map(i => i.guid));
+        
+        // Initialize or get user cache
+        let userCache = userCaches.get(uid);
+        if (!userCache) {
+             // Simple LRU-ish cleanup: if too many users, delete the oldest (first key)
+             if (userCaches.size >= MAX_CACHE_USERS) {
+                 const firstKey = userCaches.keys().next().value;
+                 if (firstKey) userCaches.delete(firstKey);
+             }
+             userCache = { items: [], lastSync: new Date().toISOString() };
+        }
+
+        const currentItems = userCache.items;
+        const existingGuids = new Set(currentItems.map(i => i.guid));
         const newItems = items.filter(i => !existingGuids.has(i.guid));
-        cachedFeedItems.push(...newItems);
-        lastSyncTime = new Date().toISOString();
+        
+        // Append new items and update timestamp
+        currentItems.push(...newItems);
+        userCache.lastSync = new Date().toISOString();
+        
+        userCaches.set(uid, userCache);
+
         return jsonResponse({ status: 'ok', count: items.length });
     } catch (error: any) {
         return jsonResponse({ error: error.message }, 500);
@@ -389,6 +412,11 @@ export default {
             // If it's not an API request, let the assets handler take it.
             if (!pathName.startsWith('/api/')) {
                 if (env.ASSETS) {
+                    // Special case for root favicon.ico
+                    if (pathName === '/favicon.ico') {
+                        const favRequest = new Request(new URL('/images/favicon.svg', url.origin), request);
+                        return env.ASSETS.fetch(favRequest);
+                    }
                     return env.ASSETS.fetch(request);
                 } else {
                     console.error('[Worker] ASSETS binding is missing.');
@@ -459,9 +487,10 @@ export default {
             }
 
             if (pathName === '/api/keys') {
+                const userCache = userCaches.get(uid);
                 return jsonResponse({
-                    guids: cachedFeedItems.map(i => i.guid),
-                    serverTime: lastSyncTime || new Date().toISOString()
+                    guids: userCache ? userCache.items.map(i => i.guid) : [],
+                    serverTime: userCache ? userCache.lastSync : new Date().toISOString()
                 });
             }
 
@@ -475,7 +504,11 @@ export default {
                     wantedGuids = guidsParam ? guidsParam.split(',') : [];
                 }
                 if (wantedGuids.length > 50) return jsonResponse({ error: 'Too many GUIDs requested' }, 400);
-                const results = wantedGuids.length > 0 ? cachedFeedItems.filter(i => wantedGuids.includes(i.guid)) : cachedFeedItems;
+                
+                const userCache = userCaches.get(uid);
+                const currentItems = userCache ? userCache.items : [];
+                
+                const results = wantedGuids.length > 0 ? currentItems.filter(i => wantedGuids.includes(i.guid)) : currentItems;
                 return jsonResponse(results);
             }
 
@@ -512,6 +545,44 @@ export default {
             if (pathName === '/api/admin/wipe' && request.method === 'POST') {
                 await Storage.resetUser(uid, env);
                 return jsonResponse({ status: 'ok' });
+            }
+
+            // Admin endpoints (internal use during seed or by admins)
+            if (pathName.includes('/api/admin/archive-export')) {
+                if (uid === 'anonymous') return new Response('Unauthorized', { status: 401 });
+                console.log(`[Archive] Exporting state for user: ${uid}`);
+                const config: Record<string, any> = {};
+                for (const key in USER_STATE_SERVER_DEFAULTS) {
+                    try {
+                        const state = await Storage.loadState(uid, key, env);
+                        if (state.value !== null) config[key] = state.value;
+                    } catch (e: any) {
+                        console.error(`[Archive] Error loading ${key} for export:`, e.message);
+                    }
+                }
+                return jsonResponse(config);
+            }
+
+            if (pathName.includes('/api/admin/archive-import') && request.method === 'POST') {
+                if (uid === 'anonymous') return new Response('Unauthorized', { status: 401 });
+                console.log(`[Archive] Importing state for user: ${uid}`);
+                try {
+                    const config = await request.json() as any;
+                    let count = 0;
+                    for (const key in config) {
+                        if (USER_STATE_SERVER_DEFAULTS[key]) {
+                            await Storage.saveState(uid, key, config[key], env);
+                            count++;
+                        } else {
+                            console.warn(`[Archive] Skipping unknown key in import: ${key}`);
+                        }
+                    }
+                    console.log(`[Archive] Successfully imported ${count} keys.`);
+                    return jsonResponse({ status: 'ok', imported: count });
+                } catch (e: any) {
+                    console.error('[Archive] Import Fatal Error:', e);
+                    return jsonResponse({ error: e.message, stack: e.stack }, 500);
+                }
             }
 
             return new Response('Not Found', { status: 404 });
