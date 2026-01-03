@@ -51,7 +51,6 @@ export default defineConfig(({ mode }) => {
 
     plugins: [
       VitePWA({
-        registerType: 'autoUpdate',
         strategies: 'injectManifest',
         srcDir: '.',
         filename: 'sw.js',
