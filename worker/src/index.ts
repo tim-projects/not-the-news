@@ -568,6 +568,13 @@ export default {
                 console.log(`[Archive] Importing state for user: ${uid}`);
                 try {
                     const config = await request.json() as any;
+                    
+                    // Security: Explicitly strip UID from import to prevent identity spoofing
+                    if ('uid' in config) {
+                        console.warn('[Archive] Stripping forbidden "uid" field from import payload.');
+                        delete config.uid;
+                    }
+
                     let count = 0;
                     for (const key in config) {
                         if (USER_STATE_SERVER_DEFAULTS[key]) {

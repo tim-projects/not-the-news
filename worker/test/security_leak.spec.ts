@@ -181,4 +181,39 @@ describe('Security Leak & Isolation Check', () => {
         expect(dataB.value).not.toBe('user_a_theme');
         expect(dataB.value).toBe('dark'); // Default
     });
+
+    it('ENDPOINT: /api/admin/archive-import - should ignore/strip "uid" from payload', async () => {
+        // User A tries to import a config that claims to be for "user_b"
+        // This simulates a malicious backup file
+        const reqImport = new Request('http://localhost/api/admin/archive-import', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer token_user_a' },
+            body: JSON.stringify({
+                uid: 'user_b', // Malicious field
+                theme: 'hacked_theme'
+            })
+        });
+
+        await worker.fetch(reqImport, env, ctx);
+
+        // CHECK 1: User A's theme should be updated
+        // Because the 'uid' field in body is ignored, it uses the token's uid (user_a)
+        const reqARead = new Request('http://localhost/api/profile/theme', {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer token_user_a' }
+        });
+        const resA = await worker.fetch(reqARead, env, ctx);
+        const dataA: any = await resA.json();
+        expect(dataA.value).toBe('hacked_theme');
+
+        // CHECK 2: User B's theme should be UNTOUCHED
+        const reqBRead = new Request('http://localhost/api/profile/theme', {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer token_user_b' }
+        });
+        const resB = await worker.fetch(reqBRead, env, ctx);
+        const dataB: any = await resB.json();
+        // Should be default or empty, NOT 'hacked_theme'
+        expect(dataB.value).not.toBe('hacked_theme');
+    });
 });
