@@ -14,6 +14,9 @@ precacheAndRoute(self.__WB_MANIFEST);
 // Clean up old caches on activation.
 cleanupOutdatedCaches();
 
+// Force the waiting service worker to become the active service worker.
+self.addEventListener('install', () => self.skipWaiting());
+
 // Take control of the page immediately.
 clientsClaim();
 

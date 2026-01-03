@@ -99,6 +99,7 @@ The application is live and functional in the production environment. The full E
 - **Archive Security:** Explicitly ensured that any `uid` field in restoration/backup files is stripped and ignored during import to prevent identity spoofing.
 - **Import Robustness:** Modified the archive import process to be fault-tolerant, allowing partial success if individual keys fail to save, ensuring compatibility with older or malformed backup files.
 - **Stale Asset Detection:** Investigated a user-reported `auth/popup-blocked` error and confirmed it was caused by a stale Service Worker serving an outdated build (`login-DOr9-383.js`) instead of the current version (`login-C34FhPJ2.js`) which correctly uses `signInWithRedirect`.
+- **Automatic PWA Updates:** Configured `vite-plugin-pwa` with `registerType: 'autoUpdate'` and added `self.skipWaiting()` to `src/sw.ts`. This ensures that all users are forced to load the latest deployed version immediately upon visiting the site, preventing stale asset issues.
 
 **Accomplishments:**
 - **Production Google Login:** Fully functional redirect-based authentication flow.
