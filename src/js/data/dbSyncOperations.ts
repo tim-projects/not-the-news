@@ -9,6 +9,7 @@ import {
     UserStateDef,
     SimpleStateValue
 } from './dbStateDefs.ts';
+import { getAuthToken } from './dbAuth.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
@@ -87,30 +88,6 @@ async function _addPendingOperationToBuffer(operation: Operation): Promise<numbe
 }
 
 import { auth } from '../firebase';
-
-/**
- * Retrieves the Firebase ID token for the currently logged-in user.
- * Includes a small retry loop to handle the race condition during app initialization.
- * @returns {Promise<string | null>} The ID token or null if not logged in.
- */
-export const getAuthToken = async (maxRetries = 10): Promise<string | null> => {
-    let retries = 0;
-    while (retries < maxRetries) {
-        const user = auth.currentUser;
-        if (user) {
-            try {
-                return await user.getIdToken();
-            } catch (e) {
-                console.error("[Auth] Failed to get ID token:", e);
-            }
-        }
-        // Small delay before retry
-        await new Promise(resolve => setTimeout(resolve, 200));
-        retries++;
-    }
-    console.warn(`[Auth] Could not obtain token after ${maxRetries} attempts.`);
-    return null;
-};
 
 /**
  * --- MODIFIED: Queues any user operation and attempts an immediate sync if online. ---

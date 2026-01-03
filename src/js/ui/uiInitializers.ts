@@ -4,10 +4,14 @@
 
 import { AppState } from '../../types/app.ts';
 import {
-    loadSimpleState,
-    saveSimpleState,
+    loadSimpleState
+} from '../data/dbStateDefs.ts';
+import {
+    saveSimpleState
+} from '../data/dbUserState.ts';
+import {
     performFullSync
-} from '../data/database.ts';
+} from '../data/dbSyncOperations.ts';
 import {
     getSyncToggle,
     getImagesToggle,

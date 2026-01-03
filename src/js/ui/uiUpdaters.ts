@@ -5,7 +5,7 @@ import {
     // @ts-ignore
     getNtnTitleH2
 } from './uiElements.js'; // Will be converted later
-import { saveSimpleState } from '../data/database.ts'; // Changed to .ts
+import { saveSimpleState } from '../data/dbUserState.ts';
 
 // Minimal AppState interface for compilation, will be refined as app.ts is converted
 

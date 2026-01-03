@@ -261,7 +261,7 @@
                                 <span>Appearance</span>
                                 <p class="setting-description">Customize themes, fonts, and layout.</p>
                             </div>
-                            <button id="configure-appearance-btn" class="configure-button" @click="modalView = 'appearance'">Configure</button>
+                            <button id="configure-appearance-btn" class="configure-button" @click="modalView = 'appearance'; preloadThemes();">Configure</button>
                         </div>
                         
                         <h2>RSS FEEDS</h2>
@@ -305,7 +305,7 @@
                                 <label for="theme-style-selector">Theme:</label>
                                 <p class="setting-description">Personalize the application's appearance.</p>
                             </div>
-                            <select id="theme-style-selector" :value="themeStyle" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].closest('optgroup').dataset.theme)" class="filter-select">
+                            <select id="theme-style-selector" :value="themeStyle" @click="preloadThemes()" @change="updateThemeAndStyle($event.target.value, $event.target.selectedOptions[0].closest('optgroup').dataset.theme)" class="filter-select">
                                 <optgroup label="Light Themes" data-theme="light">
                                     <option value="originalLight">Original Light</option>
                                     <option value="sepia">Sepia</option>

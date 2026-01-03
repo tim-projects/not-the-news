@@ -81,6 +81,23 @@ The application is live and functional in the production environment. The full E
 - **Circular Dependency Hang:** A circular dependency between `dbUserState.ts` and `dbSyncOperations.ts` caused module evaluation to fail in production builds.
     - *Mitigation:* Extracted shared definitions and basic loaders into `src/js/data/dbStateDefs.ts` to break the cycle.
 
+---
+
+### Progress Update - Saturday, 3 January 2026
+
+**Findings & Mitigations:**
+- **Cross-User Data Leak:** Discovered that the global feed cache in the Worker was shared across all authenticated sessions, allowing any logged-in user to see items synced by others via `/api/keys` and `/api/list`.
+    - *Mitigation:* Replaced shared global arrays with a user-keyed `Map` (`userCaches`) to ensure strict isolation of feed data per UID.
+- **Worker Memory Management:** Storing per-user caches in-memory without limits posed an OOM (Out-Of-Memory) risk.
+    - *Mitigation:* Implemented a basic LRU (Least Recently Used) eviction policy for the `userCaches` Map, limiting the cache to 100 concurrent users.
+- **RSS Content Security (XSS):** Audited the sanitization logic and confirmed that `sanitize-html` is correctly configured with a strict whitelist to strip malicious tags (`<script>`, `<iframe>`) and event handlers (`onerror`).
+
+**Accomplishments:**
+- **Isolated Per-User Caching:** Fully implemented and deployed secure, isolated caching in the Cloudflare Worker.
+- **Security Regression Suite:** Added `worker/test/security_leak.spec.ts` which automatically verifies that users cannot access each other's feeds or profile data.
+- **Hardened API Logic:** Updated all data-fetching endpoints (`/api/refresh`, `/api/keys`, `/api/list`) to strictly enforce UID-based lookups.
+- **Archive Security:** Explicitly ensured that any `uid` field in restoration/backup files is stripped and ignored during import to prevent identity spoofing.
+
 **Accomplishments:**
 - **Production Google Login:** Fully functional redirect-based authentication flow.
 - **Stable Asset Delivery:** Reliable serving of all static files through the Worker's asset binding.

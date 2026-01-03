@@ -36,14 +36,21 @@ import {
     performFullSync,
     pullUserState,
     processPendingOperations,
+    getAllFeedItems
+} from './js/data/dbSyncOperations.ts';
+import { getAuthToken } from './js/data/dbAuth.ts';
+import {
     loadSimpleState,
     loadArrayState,
-    initDb,
-    closeDb,
-    saveSimpleState,
-    getAllFeedItems,
     USER_STATE_DEFS
-} from './js/data/database.ts';
+} from './js/data/dbStateDefs.ts';
+import {
+    initDb,
+    closeDb
+} from './js/data/dbCore.ts';
+import {
+    saveSimpleState
+} from './js/data/dbUserState.ts';
 import { formatDate, mapRawItem, mapRawItems, parseRssFeedsConfig } from './js/helpers/dataUtils.ts';
 import {
     loadCurrentDeck,
@@ -98,17 +105,15 @@ onAuthStateChanged(auth, (user) => {
         localStorage.setItem('isAuthenticated', 'true');
         if (path.endsWith('login.html')) {
             console.log(`[Auth Check] Already logged in, redirecting to home`);
-            window.location.href = '/';
+            window.location.replace('/');
         }
     } else {
         localStorage.removeItem('isAuthenticated');
-        if (initialAuthChecked) {
-            // Only redirect to login if we've already done the initial check 
-            // AND the user session actually disappeared (logout)
-            if (!path.endsWith('login.html')) {
-                console.log(`[Auth Check] User logged out, redirecting to login.html`);
-                window.location.href = '/login.html';
-            }
+        // Only redirect if we explicitly KNOW we are logged out
+        // AND we've already done the first pass of initialization
+        if (initialAuthChecked && !path.endsWith('login.html')) {
+            console.log(`[Auth Check] User session ended, redirecting to login.html`);
+            window.location.replace('/login.html');
         }
     }
 });
@@ -209,7 +214,7 @@ export function rssApp(): AppState {
                 if (!auth.currentUser) {
                     if (!window.location.pathname.endsWith('login.html')) {
                         console.log("[Auth] Not logged in after wait, redirecting...");
-                        window.location.href = '/login.html';
+                        window.location.replace('/login.html');
                         return;
                     }
                 } else {
@@ -1167,8 +1172,15 @@ export function rssApp(): AppState {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to reset backend data.');
+                    let errorMsg = 'Failed to reset backend data.';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.message || errorData.error || errorMsg;
+                    } catch (e) {
+                        const text = await response.text();
+                        errorMsg = `Server error (${response.status}): ${text.substring(0, 100)}`;
+                    }
+                    throw new Error(errorMsg);
                 }
                 console.log('Backend application data reset successfully.');
                 createStatusBarMessage(this, 'Application reset complete! Reloading...');
@@ -1204,8 +1216,15 @@ export function rssApp(): AppState {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch config for backup.');
+                    let errorMsg = 'Failed to fetch config for backup.';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.message || errorData.error || errorMsg;
+                    } catch (e) {
+                        const text = await response.text();
+                        errorMsg = `Server error (${response.status}): ${text.substring(0, 100)}`;
+                    }
+                    throw new Error(errorMsg);
                 }
 
                 const configData = await response.json();
@@ -1359,8 +1378,16 @@ export function rssApp(): AppState {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || errorData.message || 'Failed to restore backend data.');
+                    let errorMsg = 'Failed to restore backend data.';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.error || errorData.message || errorMsg;
+                    } catch (e) {
+                        // Fallback if not JSON
+                        const text = await response.text();
+                        errorMsg = `Server error (${response.status}): ${text.substring(0, 100)}`;
+                    }
+                    throw new Error(errorMsg);
                 }
 
                 createStatusBarMessage(this, 'Restoration complete! Reloading...');
@@ -1957,6 +1984,40 @@ export function rssApp(): AppState {
 
         discoverFeed: async function(this: AppState): Promise<void> {
             await discoverFeed(this);
+        },
+
+        preloadThemes: function(this: AppState): void {
+            console.log('[Theme] Preloading all theme styles into browser cache...');
+            const themes = [
+                'sepia', 'solarized-light', 'github-light', 'atom-one-light', 'gruvbox-light', 
+                'catppuccin-latte', 'rose-pine-dawn', 'paper', 'morning', 'midnight', 
+                'nord', 'dracula', 'monokai', 'gruvbox-dark', 'catppuccin-mocha', 
+                'tokyo-night', 'synthwave', 'material-dark'
+            ];
+            
+            // To truly pre-cache in a Vite environment where CSS is bundled, 
+            // we can't easily fetch individual files because they don't exist as such.
+            // However, we can "warm up" the styles by temporarily applying them 
+            // to a hidden element, which forces the browser to parse and ready them.
+            
+            const staging = document.createElement('div');
+            staging.style.display = 'none';
+            staging.id = 'theme-preloader';
+            document.body.appendChild(staging);
+
+            themes.forEach(t => {
+                const probe = document.createElement('div');
+                probe.className = `theme-${t}`;
+                staging.appendChild(probe);
+                // Trigger a layout/style calculation
+                window.getComputedStyle(probe).getPropertyValue('--bg');
+            });
+
+            // Clean up after a delay
+            setTimeout(() => {
+                document.body.removeChild(staging);
+                console.log('[Theme] Preloading completed.');
+            }, 2000);
         },
 
         // --- Background Generation ---

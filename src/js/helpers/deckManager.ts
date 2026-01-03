@@ -1,7 +1,7 @@
 import {
     saveSimpleState,
     saveArrayState
-} from '../data/database.js';
+} from '../data/dbUserState.ts';
 import {
     saveCurrentDeck,
     saveShuffleState

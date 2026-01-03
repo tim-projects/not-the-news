@@ -198,6 +198,7 @@ export interface AppState {
     loadCustomCss(): Promise<void>;
     toggleSearch(): void;
     discoverFeed(): Promise<void>;
+    preloadThemes(): void;
 
     // Alpine.js specific properties (need to be declared if used in 'this' context)
     $nextTick: (callback: (this: AppState) => void) => Promise<void>;

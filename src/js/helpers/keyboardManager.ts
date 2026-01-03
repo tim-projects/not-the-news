@@ -261,7 +261,7 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
             app.imagesEnabled = !app.imagesEnabled;
             createStatusBarMessage(app, `Images ${app.imagesEnabled ? 'Enabled' : 'Disabled'}.`);
             // Persist the change
-            import('../data/database.ts').then(m => {
+            import('../data/dbUserState.ts').then(m => {
                 m.saveSimpleState('imagesEnabled', app.imagesEnabled);
             });
             break;
