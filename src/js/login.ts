@@ -3,7 +3,6 @@ import {
     createUserWithEmailAndPassword,
     onAuthStateChanged,
     GoogleAuthProvider,
-    signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
     signInAnonymously,
