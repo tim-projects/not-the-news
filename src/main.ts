@@ -41,7 +41,8 @@ import {
     initDb,
     closeDb,
     saveSimpleState,
-    getAllFeedItems
+    getAllFeedItems,
+    USER_STATE_DEFS
 } from './js/data/database.ts';
 import { formatDate, mapRawItem, mapRawItems, parseRssFeedsConfig } from './js/helpers/dataUtils.ts';
 import {
@@ -218,10 +219,20 @@ export function rssApp(): AppState {
                 }
 
                 this.progressMessage = 'Connecting to database...';
-                this.db = await initDb();
+                try {
+                    this.db = await initDb();
+                } catch (dbError: any) {
+                    console.error("Database initialization failed:", dbError);
+                    throw new Error(`Local database failed: ${dbError.message}`);
+                }
                 
                 this.progressMessage = 'Loading settings...';
-                await this._loadInitialState();
+                try {
+                    await this._loadInitialState();
+                } catch (stateError: any) {
+                    console.error("Initial state load failed:", stateError);
+                    // Continue with defaults if state fails
+                }
                 
                 this._initImageObserver();
 
@@ -238,32 +249,28 @@ export function rssApp(): AppState {
                 this.isOnline = isOnline();
 
                 if (this.isOnline && initialAuthChecked) {
-                    this.progressMessage = 'Syncing latest content...'; // Set specific sync message
+                    this.progressMessage = 'Syncing latest content...'; 
                     
-                    // STABILITY: Double-check connectivity before each network call
-                    if (isOnline()) await processPendingOperations();
-                    if (isOnline()) await pullUserState(); // This fetches user preferences like rssFeeds from backend
-                    
-                    let syncSuccess = true;
                     try {
-                        if (isOnline()) {
-                            syncSuccess = await performFeedSync(this);
-                        }
-                    } catch (syncError) {
-                        console.error("Priority sync failed:", syncError);
-                        syncSuccess = false;
+                        const syncPromise = (async () => {
+                            if (isOnline()) await processPendingOperations();
+                            if (isOnline()) await pullUserState();
+                            if (isOnline()) await performFeedSync(this);
+                        })();
+
+                        // Cap initial sync wait at 15 seconds to prevent permanent hang
+                        const timeoutPromise = new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error("Sync timeout")), 15000)
+                        );
+
+                        await Promise.race([syncPromise, timeoutPromise]).catch(e => {
+                            console.warn("Initial sync slow or failed, proceeding to load data:", e.message);
+                        });
+                    } catch (e) {
+                        console.error("Critical sync logic failure:", e);
                     }
                     
-                    // Now that syncs are attempted (or skipped if offline), load data.
                     await this._loadAndManageAllData();
-                    
-                    if (syncSuccess && this.isOnline) {
-                        createStatusBarMessage(this, "Initial sync complete!");
-                    } else if (!this.isOnline) {
-                        createStatusBarMessage(this, "Sync skipped (Offline).");
-                    } else {
-                        createStatusBarMessage(this, "Sync finished with some issues. Check console for details.");
-                    }
                 } else {
                     this.progressMessage = 'Offline mode. Loading local data...';
                     await this._loadAndManageAllData();
@@ -817,13 +824,11 @@ export function rssApp(): AppState {
                 console.error('Error loading RSS feeds:', error);
             }
         },        loadKeywordBlacklist: async function(this: AppState): Promise<void> {
-            const { loadSimpleState } = await import('./js/data/dbUserState.ts');
             const { value } = await loadSimpleState('keywordBlacklist');
             this.keywordBlacklistInput = Array.isArray(value) ? value.join('\n') : '';
             console.log(`[DEBUG] Content for keywordBlacklist input: ${this.keywordBlacklistInput}`);
         },
         loadCustomCss: async function(this: AppState): Promise<void> {
-            const { loadSimpleState } = await import('./js/data/dbUserState.ts');
             const { value } = await loadSimpleState('customCss');
             this.customCss = (typeof value === 'string' && value.trim() !== '') ? value : this.generateCustomCssTemplate();
             this.applyCustomCss();
@@ -872,7 +877,6 @@ export function rssApp(): AppState {
                 this.progressMessage = 'Saving feeds and performing full sync...';
                 
                 // Trigger worker to start fetching these new feeds immediately
-                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
                 const token = await getAuthToken();
                 if (token) {
                     await fetch(`${API_BASE_URL}/api/refresh`, { 
@@ -966,7 +970,7 @@ export function rssApp(): AppState {
                     styleEl.textContent = this.customCss;
                 },
                 loadThemeStyle: async function(this: AppState): Promise<void> {
-                    const { loadSimpleState } = await import('./js/data/dbUserState.ts');
+                     
                     const [, lightRes, darkRes] = await Promise.all([
                         loadSimpleState('themeStyle'),
                         loadSimpleState('themeStyleLight'),
@@ -998,7 +1002,7 @@ export function rssApp(): AppState {
                     localStorage.setItem('theme', newTheme);
                     
                     // Persist to DB
-                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                     
                     await saveSimpleState('theme', newTheme);
                     
                     if (newTheme === 'light') {
@@ -1016,8 +1020,6 @@ export function rssApp(): AppState {
                 saveThemeStyle: async function(this: AppState): Promise<void> {
                     // This method is now mostly handled by updateThemeAndStyle
                     // But we keep it for backward compatibility or if called directly
-                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
-                    
                     if (this.theme === 'light') {
                         this.themeStyleLight = this.themeStyle;
                         await saveSimpleState('themeStyleLight', this.themeStyleLight);
@@ -1044,13 +1046,11 @@ export function rssApp(): AppState {
                     }
                 },
                 loadFontSize: async function(this: AppState): Promise<void> {
-                    const { loadSimpleState } = await import('./js/data/dbUserState.ts');
                     const { value } = await loadSimpleState('fontSize');
                     this.fontSize = (typeof value === 'number') ? value : 100;
                     this.applyFontSize();
                 },
                 saveFontSize: async function(this: AppState): Promise<void> {
-                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
                     await saveSimpleState('fontSize', this.fontSize);
                     this.applyFontSize();
                 },
@@ -1058,13 +1058,11 @@ export function rssApp(): AppState {
                     document.documentElement.style.setProperty('--font-scale', (this.fontSize / 100).toString());
                 },
                 loadFeedWidth: async function(this: AppState): Promise<void> {
-                    const { loadSimpleState } = await import('./js/data/dbUserState.ts');
                     const { value } = await loadSimpleState('feedWidth');
                     this.feedWidth = (typeof value === 'number') ? value : 50;
                     this.applyFeedWidth();
                 },
                 saveFeedWidth: async function(this: AppState): Promise<void> {
-                    const { saveSimpleState } = await import('./js/data/dbUserState.ts');
                     await saveSimpleState('feedWidth', this.feedWidth);
                     this.applyFeedWidth();
                 },
@@ -1158,7 +1156,7 @@ export function rssApp(): AppState {
 
                 // 4. Call backend to reset server-side data
                 console.log('DEBUG: About to make fetch call to /api/admin/wipe');
-                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                 
                 const token = await getAuthToken();
                 const response = await fetch(`${API_BASE_URL}/api/admin/wipe`, {
                     method: 'POST',
@@ -1196,7 +1194,7 @@ export function rssApp(): AppState {
             this.showUndo = false;
             try {
                 this.progressMessage = 'Fetching configuration for backup...';
-                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                 
                 const token = await getAuthToken();
                 const response = await fetch(`${API_BASE_URL}/api/admin/archive-export`, {
                     method: 'GET',
@@ -1349,7 +1347,7 @@ export function rssApp(): AppState {
                     return;
                 }
 
-                const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                 
                 const token = await getAuthToken();
                 const response = await fetch(`${API_BASE_URL}/api/admin/archive-import`, {
                     method: 'POST',
@@ -1517,7 +1515,7 @@ export function rssApp(): AppState {
                 } else {
                     this.pregeneratedOfflineDeck = null;
                 }
-                const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+                 
                 await saveSimpleState(pregenKey, null);
                 
                 // Trigger background generation for the NEXT deck
@@ -1879,7 +1877,7 @@ export function rssApp(): AppState {
             setTimeout(async () => {
                 if (!this.isOnline || !this.syncEnabled) return;
                 try {
-                    const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                     
                     const token = await getAuthToken();
                     if (!token) return;
 
@@ -1900,7 +1898,7 @@ export function rssApp(): AppState {
                 if (!this.isOnline || !this.syncEnabled) return;
                 console.log('[Worker Sync] Triggering background feed processing...');
                 try {
-                    const { getAuthToken } = await import('./js/data/dbSyncOperations.ts');
+                     
                     const token = await getAuthToken();
                     if (!token) return;
 
@@ -1984,7 +1982,7 @@ export function rssApp(): AppState {
 
         _generateAndSavePregeneratedDeck: async function(this: AppState, online: boolean): Promise<void> {
             const { generateNewDeck } = await import('./js/helpers/dataUtils.ts');
-            const { saveSimpleState } = await import('./js/data/dbUserState.ts');
+             
             
             // We use current state but mimic the target connectivity
             const deckItems = await generateNewDeck(

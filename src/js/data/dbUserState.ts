@@ -14,15 +14,6 @@ import { queueAndAttemptSyncOperation } from './dbSyncOperations.ts';
 // Locally declare types that are not exported from their modules
 type IDBPDatabase = any;
 
-interface QueueOperation {
-    type: string;
-    guid?: string;
-    action?: 'add' | 'remove';
-    timestamp: string;
-    key?: string;
-    value?: any;
-}
-
 /**
  * Saves a simple key-value state locally AND queues it for synchronization.
  */

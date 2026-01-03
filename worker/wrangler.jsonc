@@ -13,7 +13,8 @@
 		"nodejs_compat"
 	],
 	"assets": {
-		"directory": "../www"
+		"directory": "../www",
+		"binding": "ASSETS"
 	},
 	"routes": [
 		{

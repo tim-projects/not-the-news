@@ -72,16 +72,18 @@ The application is live and functional in the production environment. The full E
 ### Progress Update - Friday, 2 January 2026
 
 **Findings & Mitigations:**
-- **Circular Dependency Hang:** A circular dependency between `dbUserState.ts` and `dbSyncOperations.ts` caused module evaluation to fail in production builds, leading to a hang on the loading screen.
+- **COOP Policy Blockage:** Google Login popups were being blocked in production due to `Cross-Origin-Opener-Policy` restrictions.
+    - *Mitigation:* Switched authentication flow from `signInWithPopup` to `signInWithRedirect`.
+- **Missing Asset Binding:** Static assets were failing with 500 errors because the `ASSETS` binding was missing in `wrangler.jsonc`.
+    - *Mitigation:* Added `binding: "ASSETS"` to the configuration and simplified the Worker's fetch handler.
+- **Module Evaluation Errors:** Redundant re-exports and dynamic imports caused `TypeError` during production initialization.
+    - *Mitigation:* Consolidated database imports into a central facade and eliminated dynamic imports in `main.ts`.
+- **Circular Dependency Hang:** A circular dependency between `dbUserState.ts` and `dbSyncOperations.ts` caused module evaluation to fail in production builds.
     - *Mitigation:* Extracted shared definitions and basic loaders into `src/js/data/dbStateDefs.ts` to break the cycle.
-- **Vite Build Script Injection:** The script tag in `src/index.html` was incorrectly pointing to `/main.js` instead of `/main.ts`, which could cause issues with Vite's script injection.
-    - *Mitigation:* Updated the source template to use the correct `.ts` extension.
-- **Restoration Incompleteness:** Several state keys (like `filterMode`, `currentDeckGuids`, `lastViewedItemId`) were missing from the restoration logic, leading to inconsistent app states after a restore.
-    - *Mitigation:* Updated category definitions across the backup/restore pipeline to include all essential state.
 
 **Accomplishments:**
+- **Production Google Login:** Fully functional redirect-based authentication flow.
+- **Stable Asset Delivery:** Reliable serving of all static files through the Worker's asset binding.
+- **Initialization Robustness:** Hardened application startup with timeouts and cleaner module structure.
 - **Hardened Restoration:** Backups now correctly restore the full application state, including feed filters and deck positions.
-- **Forced Sync on Restore:** The application now automatically re-enables synchronization after a restore to ensure the user immediately starts receiving fresh content.
-- **Environment-Based Configuration:** Removed all hardcoded production URLs from the repository. Deployment now uses `VITE_PRODUCTION_DOMAIN` and temporary configuration files to maintain environment flexibility.
-- **Startup Robustness:** Added 10s timeouts to individual state pull requests and implemented `Promise.allSettled` to ensure the app can finish loading even if some network requests are slow or fail.
-- **Updated Test Suite:** Fixed the restoration and sync tests to work with the latest multi-user login flow and UI confirm dialogs.
+- **Environment-Based Configuration:** Removed all hardcoded production URLs from the repository. Deployment now uses `VITE_PRODUCTION_DOMAIN` and temporary configuration files.
