@@ -576,16 +576,22 @@ export default {
                     }
 
                     let count = 0;
+                    let failed = 0;
                     for (const key in config) {
                         if (USER_STATE_SERVER_DEFAULTS[key]) {
-                            await Storage.saveState(uid, key, config[key], env);
-                            count++;
+                            try {
+                                await Storage.saveState(uid, key, config[key], env);
+                                count++;
+                            } catch (itemError: any) {
+                                console.error(`[Archive] Failed to import key '${key}':`, itemError);
+                                failed++;
+                            }
                         } else {
                             console.warn(`[Archive] Skipping unknown key in import: ${key}`);
                         }
                     }
-                    console.log(`[Archive] Successfully imported ${count} keys.`);
-                    return jsonResponse({ status: 'ok', imported: count });
+                    console.log(`[Archive] Import complete. Success: ${count}, Failed: ${failed}`);
+                    return jsonResponse({ status: 'ok', imported: count, failed });
                 } catch (e: any) {
                     console.error('[Archive] Import Fatal Error:', e);
                     return jsonResponse({ error: e.message, stack: e.stack }, 500);

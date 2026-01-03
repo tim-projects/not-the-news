@@ -97,6 +97,7 @@ The application is live and functional in the production environment. The full E
 - **Security Regression Suite:** Added `worker/test/security_leak.spec.ts` which automatically verifies that users cannot access each other's feeds or profile data.
 - **Hardened API Logic:** Updated all data-fetching endpoints (`/api/refresh`, `/api/keys`, `/api/list`) to strictly enforce UID-based lookups.
 - **Archive Security:** Explicitly ensured that any `uid` field in restoration/backup files is stripped and ignored during import to prevent identity spoofing.
+- **Import Robustness:** Modified the archive import process to be fault-tolerant, allowing partial success if individual keys fail to save, ensuring compatibility with older or malformed backup files.
 
 **Accomplishments:**
 - **Production Google Login:** Fully functional redirect-based authentication flow.
