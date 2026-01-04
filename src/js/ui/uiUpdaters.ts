@@ -91,7 +91,7 @@ export function createStatusBarMessage(app: AppState, message: string): void {
             setTimeout(() => {
                 if (!app.showSyncStatus) app.syncStatusMessage = '';
             }, 300);
-        }, 5000);
+        }, 1000);
     };
 
     if ((app as any).$nextTick) {

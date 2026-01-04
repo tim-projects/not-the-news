@@ -1,4 +1,4 @@
-# TODO
+# TODO - not to be worked on without explicit human permission
 
 -----
 
@@ -46,8 +46,6 @@ I want you to review the entire codebase and create a report - FUNCTIONS-MAP.md.
 │   functions it contains. As part of this process, I want you to record how manage lines of code each function uses. My goal here is to eventually rewrite the         │
 │   codebase to ensure that each file aims to be a maximum 300 lines. But it should make sense with which function is stored where. So I need this                      │
 │   FUNCTIONS-MAP.md so that I can think of a new repo structure
-
-- major db/sync refactor
 
 You still need to fix loading configs to and from the server, and make sure the shuffle is working properly
 

@@ -20,6 +20,9 @@ This document guides the agent's interaction with the project.
 - **Build for Production:** Use `npm run build`. Assets are generated in the `www/` directory for deployment to Cloudflare Pages.
 
 ### Testing Workflow
+- **Authentication:**
+    - **Production (prod) & Development (dev):** Perform human testing using Google Login.
+    - **Local development:** Use the test account bypass (`test@example.com` / `devtestpwd`) for automated or manual local testing.
 - **Running Playwright Tests:**
   1. Ensure the local services are running using `./run-local.sh`.
   2. All Playwright tests MUST be run using the `run_single_test.sh` script to minimize output and focus on individual test results.
@@ -42,3 +45,8 @@ If you get stuck:
 1. Document the problem in `current-task.md`, including what you tried and why it failed.
 2. Propose alternative solutions.
 3. Seek user input, providing all relevant context.
+
+### Codebase Maintenance
+- **FUNCTIONS-MAP.md:**
+  - You MUST keep `FUNCTIONS-MAP.md` up to date when adding, removing, or significantly modifying functions or files.
+  - You MUST source `FUNCTIONS-MAP.md` before making code edits to understand the structure and ensure you are not increasing the size of large files unnecessarily.

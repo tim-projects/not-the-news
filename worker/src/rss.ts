@@ -52,13 +52,30 @@ function wrapTitle(title: string, link: string): string {
 function prettifyItem(item: any): any {
     const domain = extractDomain(item.link || '');
     
-    // Default prettification: wrap title
-    item.title = wrapTitle(item.title || 'No Title', item.link || '#');
-
-    // Domain specific logic
+    // Domain specific logic before wrapping title
     if (domain.includes('reddit.com')) {
         item.source = 'Reddit';
-        // Add Reddit specific logic here (e.g. Redlib proxy)
+        // Extract real link from Reddit description if available
+        // Reddit RSS usually has the content link in the description as <a href="...">[link]</a>
+        const linkMatch = item.description?.match(/<a href="([^"]+)">\[link\]<\/a>/i);
+        if (linkMatch) {
+            const realLink = linkMatch[1];
+            
+            // Check for image or video
+            if (realLink.includes('i.redd.it') || realLink.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                // Prepend image if not already there (often Reddit RSS has it anyway, but let's be sure)
+                if (!item.description.includes(realLink)) {
+                    item.description = `<img src="${realLink}" /><br/>` + item.description;
+                }
+            } else if (realLink.includes('v.redd.it')) {
+                // v.redd.it handling
+                item.description = `<video controls><source src="${realLink}" type="video/mp4"></video><br/>` + item.description;
+            }
+
+            item.link = realLink;
+            // Hide the [link] text from description
+            item.description = item.description.replace(/<a href="[^"]+">\[link\]<\/a>/i, '');
+        }
     } else if (domain.includes('news.ycombinator.com')) {
         item.title = (item.title || '').replace(' | Hacker News', '');
     } else if (domain.includes('x.com')) {
@@ -66,6 +83,9 @@ function prettifyItem(item: any): any {
     } else if (domain.includes('wired.com')) {
         item.link = (item.link || '').replace('www.wired.com', 'removepaywalls.com/https://www.wired.com');
     }
+
+    // Default prettification: wrap title
+    item.title = wrapTitle(item.title || 'No Title', item.link || '#');
 
     // Image logic: find first image in description
     const imgMatch = item.description?.match(/<img[^>]+src=["']([^"']+)["']/i);

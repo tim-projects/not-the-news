@@ -377,14 +377,13 @@ export function rssApp(): AppState {
             const online = isOnline();
 
             if (!online) {
-                this.syncStatusMessage = 'Offline.';
-                this.showSyncStatus = true;
+                createStatusBarMessage(this, 'Offline.');
             } else if (!this.syncEnabled) {
-                this.syncStatusMessage = 'Sync is disabled.';
-                this.showSyncStatus = true;
+                createStatusBarMessage(this, 'Sync is disabled.');
             } else {
-                this.showSyncStatus = false;
-                this.syncStatusMessage = '';
+                // When coming back online, we don't necessarily need a toast 
+                // unless we want to confirm the reconnection.
+                // But the user might prefer it stays clean.
             }
         },
         
@@ -1884,6 +1883,7 @@ export function rssApp(): AppState {
                     return;
                 }
                 console.log('Starting scheduled background sync...');
+                createStatusBarMessage(this, 'Syncing...');
                     try {
                         await processPendingOperations();
                         const syncSuccess = await performFeedSync(this);
@@ -1891,11 +1891,17 @@ export function rssApp(): AppState {
                         await this._loadAndManageAllData();
                         this.deckManaged = true;
                         console.log(`Scheduled sync complete. Success: ${syncSuccess}`);
+                        if (syncSuccess) {
+                            createStatusBarMessage(this, 'Sync complete!');
+                        } else {
+                            createStatusBarMessage(this, 'Sync finished with issues.');
+                        }
                         
                         // After sync, pre-generate decks for next shuffle
                         await this.pregenerateDecks();
                     } catch (error) {
                     console.error('Periodic sync failed:', error);
+                    createStatusBarMessage(this, 'Sync failed!');
                 }
             }, SYNC_INTERVAL_MS);
         },
