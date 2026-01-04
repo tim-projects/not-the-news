@@ -36,6 +36,7 @@ deploy_dev() {
     
     # 1. Prepare wrangler config
     sed "s/VITE_PRODUCTION_DOMAIN_PLACEHOLDER/$DEV_DOMAIN/g" worker/wrangler.jsonc | \
+    sed "s/\"FIREBASE_PROJECT_ID\": \"not-the-news\"/\"FIREBASE_PROJECT_ID\": \"$DEV_PROJECT_ID\"/" | \
     sed 's/"name": "ntn-backend"/"name": "ntn-backend-dev"/' > worker/wrangler.dev.jsonc
 
     # 2. Build for development
