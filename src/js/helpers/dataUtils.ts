@@ -208,25 +208,25 @@ export async function generateNewDeck(
                 break;
             case 'unread':
             default:
-                // First try items that are BOTH unread and unshuffled
+                // 1. Unread AND Unshuffled
                 filteredItems = allFeedItems.filter(item =>
                     !readGuidsSet.has(item.guid) &&
                     !shuffledOutGuidsSet.has(item.guid)
                 );
                 
-                // If that's empty, try items that are just unshuffled (might be read)
+                // 2. Fallback: Any Unread (even if shuffled out previously)
                 if (filteredItems.length === 0) {
-                    console.log('generateNewDeck: No unread/unshuffled items found, trying all unshuffled items.');
-                    filteredItems = allFeedItems.filter(item => !shuffledOutGuidsSet.has(item.guid));
-                }
-
-                // If STILL empty, try items that are unread (even if shuffled out)
-                if (filteredItems.length === 0) {
-                    console.log('generateNewDeck: No unshuffled items found, trying all unread items.');
+                    console.log('generateNewDeck: No unread/unshuffled items found, trying any unread items.');
                     filteredItems = allFeedItems.filter(item => !readGuidsSet.has(item.guid));
                 }
 
-                // If STILL empty, fallback to ALL items
+                // 3. Fallback: Any Unshuffled (even if read)
+                if (filteredItems.length === 0) {
+                    console.log('generateNewDeck: No unread items found, trying all unshuffled items.');
+                    filteredItems = allFeedItems.filter(item => !shuffledOutGuidsSet.has(item.guid));
+                }
+
+                // 4. Ultimate Fallback: Absolutely everything
                 if (filteredItems.length === 0) {
                     console.log('generateNewDeck: Absolutely no filter matches, using all items.');
                     filteredItems = [...allFeedItems];

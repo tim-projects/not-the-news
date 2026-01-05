@@ -148,29 +148,6 @@ body.no-scroll {
   gap: 0.75rem;
 }
 
-.search-btn {
-  width: 3.5em;
-  height: 3.5em;
-  background-color: var(--card-bg);
-  color: var(--fg);
-  border-radius: 100px;
-  opacity: 0.8;
-  box-shadow: 1px 1px 5px var(--card-shadow-color);
-  border: 1px solid var(--card-border);
-  cursor: pointer;
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-btn:hover,
-.search-btn.active {
-  background-color: var(--primary);
-  color: var(--primary-fg);
-  opacity: 1;
-}
-
 .search-icon {
   width: 1.5rem;
   height: 1.5rem;

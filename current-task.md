@@ -1,16 +1,14 @@
-# Task: Test Unified Build Script and Verify Deployments
+# Task: Bug Fixes and UI Polishing
 
 ## Goal
-Verify that the new `build.sh` script correctly handles local development startup, development deployment (Cloudflare + Firebase), and production deployment (Cloudflare).
+Address reported bugs regarding deck clearing, shuffle counts, icon styling, and theme inconsistencies.
 
 ## Status
-- [ ] **Test Local Development:** Run `./build.sh --local` and verify services start.
-- [ ] **Test Development Deployment:** Run `./build.sh --dev` (Target: dev-news.loveopenly.net) and verify Cloudflare + Firebase hosting.
-- [ ] **Test Production Deployment:** Run `./build.sh --prod` (requires being on main/master branch).
-- [ ] **Test Full Suite:** Run `./build.sh --all`.
+- [ ] **Fix Deck Clearing Logic:** Resolve issue where unread > 0 but deck is empty, preventing new deck generation.
+- [ ] **Fix Shuffle Count Increment:** Ensure the shuffle counter updates correctly in the UI and DB.
+- [ ] **Repair Search/Shuffle Icons:** Fix CSS or SVG issues making icons look "messed up".
+- [ ] **Fix Light Themes:** Ensure light themes don't inherit dark theme elements.
+- [ ] **Remove Sync Status Messages:** Remove or silence the transient status bar messages during sync.
 
 ## Progress
-- [x] Created `build.sh`.
-- [x] Consolidated deployment logic.
-- [x] Added Firebase Hosting to dev flow.
-- [x] Corrected DEV_DOMAIN to dev-news.loveopenly.net.
+- [ ] Added tasks to current-task.md.

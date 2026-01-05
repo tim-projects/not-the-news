@@ -192,7 +192,7 @@ h2,
 h3,
 h5,
 h6 {
-  text-shadow: 2px 2px 2px var(--card-shadow-color);
+  text-shadow: 1px 1px 1px var(--card-shadow-color);
 }
 
 title {

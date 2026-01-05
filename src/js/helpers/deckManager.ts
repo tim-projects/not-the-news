@@ -226,11 +226,6 @@ export async function processShuffle(app: AppState): Promise<void> {
     await overwriteArrayAndSyncChanges('shuffledOutGuids', newShuffledOutGuids);
     await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate ?? new Date().toDateString());
 
-    const shuffleDisplay = getShuffleCountDisplay();
-    if (shuffleDisplay) {
-        shuffleDisplay.textContent = app.shuffleCount.toString();
-    }
-
     // Use the optimized manageDailyDeck which supports pre-generated decks
     const isOnline = app.isOnline;
     const pregenKey = isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';

@@ -187,6 +187,7 @@ export async function processPendingOperations(): Promise<void> {
     console.log(`[DB] Processing ${operations.length} pending operations...`);
     
     const MAX_BATCH_SIZE = 10;
+    const allSkipKeys = new Set<string>();
     
     // Process in chunks to respect server limit
     for (let i = 0; i < operations.length; i += MAX_BATCH_SIZE) {
@@ -210,13 +211,12 @@ export async function processPendingOperations(): Promise<void> {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error ${response.status}. Details: ${await response.text()}`);
+                throw new Error(`HTTP error ${response.status} for batch sync. Details: ${await response.text()}`);
             }
 
             const responseData: SyncResponse = await response.json();
             console.log(`[DB] Batch ${i / MAX_BATCH_SIZE + 1} sync successful. Server response:`, responseData);
 
-            const skipKeys: string[] = [];
             if (responseData.results && Array.isArray(responseData.results)) {
                 await withDb(async (db: IDBPDatabase) => {
                     const tx = db.transaction('pendingOperations', 'readwrite');
@@ -227,9 +227,9 @@ export async function processPendingOperations(): Promise<void> {
                             // Identify key to skip to prevent race condition on immediate pull
                             const originalOp = batch.find(op => op.id === result.id);
                             if (originalOp) {
-                                if (originalOp.key) skipKeys.push(originalOp.key);
-                                else if (originalOp.type === 'readDelta') skipKeys.push('read');
-                                else if (originalOp.type === 'starDelta') skipKeys.push('starred');
+                                if (originalOp.key) allSkipKeys.add(originalOp.key);
+                                else if (originalOp.type === 'readDelta') allSkipKeys.add('read');
+                                else if (originalOp.type === 'starDelta') allSkipKeys.add('starred');
                             }
                         } else {
                             console.warn(`[DB] Op ${result.id ?? 'N/A'} (${result.opType}) ${result.status}: ${result.reason || 'N/A'}`);
@@ -243,15 +243,17 @@ export async function processPendingOperations(): Promise<void> {
 
             if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
 
-            // --- SOLUTION ---
-            // After a successful batch sync, pull the latest state, skipping updated keys.
-            pullUserState(false, skipKeys);
-            // --- END SOLUTION ---
-
         } catch (error: any) {
             console.error('[DB] Error during batch synchronization:', error);
             // We continue to the next batch even if one fails
         }
+    }
+
+    // After ALL batches are processed, perform a single pull to sync state,
+    // skipping all keys we just pushed to the server.
+    if (allSkipKeys.size > 0) {
+        console.log(`[DB] Post-batch sync: Triggering single pull for ${allSkipKeys.size} unique keys.`);
+        pullUserState(false, Array.from(allSkipKeys));
     }
 }
 

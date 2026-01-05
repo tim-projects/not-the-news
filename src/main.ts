@@ -346,7 +346,7 @@ export function rssApp(): AppState {
             }
         },
 
-        performBackgroundSync: async function(this: AppState): Promise<void> {
+        performBackgroundSync: async function (this: AppState): Promise<void> {
             if (!this.syncEnabled || !this.isOnline) return;
             console.log('Performing immediate background sync...');
             this.progressMessage = 'Syncing...';
@@ -360,9 +360,7 @@ export function rssApp(): AppState {
                 this.progressMessage = '';
                 this.loading = false;
                 console.log('Immediate background sync complete.');
-                if (syncSuccess) {
-                    createStatusBarMessage(this, 'Sync complete!');
-                } else {
+                if (!syncSuccess) {
                     createStatusBarMessage(this, 'Sync finished with errors.');
                 }
             } catch (error: any) {
@@ -373,7 +371,7 @@ export function rssApp(): AppState {
             }
         },
 
-        updateSyncStatusMessage: async function(this: AppState): Promise<void> {
+        updateSyncStatusMessage: async function (this: AppState): Promise<void> {
             const online = isOnline();
 
             if (!online) {
@@ -1318,13 +1316,14 @@ export function rssApp(): AppState {
             }
         },
 
-        confirmRestore: async function(this: AppState): Promise<void> {
+        confirmRestore: async function (this: AppState): Promise<void> {
             if (!this.restoreData) return;
 
             if (!confirm('This will overwrite selected settings and reload the application. Proceed?')) {
                 return;
             }
 
+            this.openSettings = false; // Close modal so loading screen is visible
             this.loading = true;
             this.progressMessage = 'Restoring configuration...';
 
@@ -1883,7 +1882,6 @@ export function rssApp(): AppState {
                     return;
                 }
                 console.log('Starting scheduled background sync...');
-                createStatusBarMessage(this, 'Syncing...');
                     try {
                         await processPendingOperations();
                         const syncSuccess = await performFeedSync(this);
@@ -1891,9 +1889,7 @@ export function rssApp(): AppState {
                         await this._loadAndManageAllData();
                         this.deckManaged = true;
                         console.log(`Scheduled sync complete. Success: ${syncSuccess}`);
-                        if (syncSuccess) {
-                            createStatusBarMessage(this, 'Sync complete!');
-                        } else {
+                        if (!syncSuccess) {
                             createStatusBarMessage(this, 'Sync finished with issues.');
                         }
                         

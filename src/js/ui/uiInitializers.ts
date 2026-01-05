@@ -64,20 +64,13 @@ type GetToggleElementFunction = () => HTMLElement | null;
         });
     }
     
-    /**
-     * Initializes the synchronization toggle.
-     * @param {object} app The Alpine.js app state object.
-     */
     export async function initSyncToggle(app: AppState): Promise<void> {
         await setupBooleanToggle(app, getSyncToggle, 'syncEnabled', async (enabled: boolean) => {
             app.updateSyncStatusMessage?.(); // Update the status message on toggle
             if (enabled) {
-                createStatusBarMessage(app, 'Kicking off a new sync');
                 console.log("Sync enabled, triggering full sync.");
                 const syncSuccess = await performFullSync(app);
-                if (syncSuccess) {
-                    createStatusBarMessage(app, 'Sync complete!');
-                } else {
+                if (!syncSuccess) {
                     createStatusBarMessage(app, 'Sync finished with some issues.');
                 }
                 
