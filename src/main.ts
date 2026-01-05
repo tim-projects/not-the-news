@@ -1,6 +1,7 @@
 // @filepath: src//main.ts
 
 import Alpine from 'alpinejs';
+import collapse from '@alpinejs/collapse';
 // CSS imports remain the same
 import './css/variables.css';
 import './css/buttons.css';
@@ -1702,6 +1703,16 @@ export function rssApp(): AppState {
                 }
             });
 
+            this.$watch('fullscreenImage', (img: string | null) => {
+                if (img) {
+                    if (window.location.hash !== '#image') {
+                        window.history.pushState({ modal: 'image' }, '', '#image');
+                    }
+                } else if (window.location.hash === '#image') {
+                    window.history.back();
+                }
+            });
+
             // Handle browser back button via popstate
             window.addEventListener('popstate', (event) => {
                 if (this.openSettings && window.location.hash !== '#settings') {
@@ -1709,6 +1720,9 @@ export function rssApp(): AppState {
                 }
                 if (this.openShortcuts && window.location.hash !== '#shortcuts') {
                     this.openShortcuts = false;
+                }
+                if (this.fullscreenImage && window.location.hash !== '#image') {
+                    this.fullscreenImage = null;
                 }
             });
 

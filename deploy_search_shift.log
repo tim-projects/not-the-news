@@ -1,0 +1,52 @@
+>>> Starting PRODUCTION deployment to news.loveopenly.net...
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! WARNING: YOU ARE DEPLOYING TO PRODUCTION (news.loveopenly.net) !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Type 'DEPLOY' to confirm production deployment: Confirmation received. Proceeding...
+Building frontend for PROD...
+
+> not-the-news@1.0.0 build
+> vite build
+
+vite v7.3.0 building client environment for production...
+transforming...
+✓ 13 modules transformed.
+
+PWA v1.0.3
+Building sw.js service worker ("es" format)...
+vite v7.3.0 building client environment for production...
+transforming...
+✓ 84 modules transformed.
+rendering chunks...
+computing gzip size...
+../www/sw.mjs  19.88 kB │ gzip: 6.55 kB
+✓ built in 3.00s
+
+PWA v1.0.3
+mode      injectManifest
+format:   es
+precache  17 entries (855.96 KiB)
+files generated
+  ../www/sw.js
+✗ Build failed in 3.65s
+error during build:
+[vite-plugin-pwa:build] [plugin vite-plugin-pwa:build] There was an error during the build:
+  [vite]: Rollup failed to resolve import "@alpinejs/collapse" from "/home/ntn/git/not-the-news/src/main.ts".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`
+Additionally, handling the error in the 'buildEnd' hook caused the following error:
+  [vite]: Rollup failed to resolve import "@alpinejs/collapse" from "/home/ntn/git/not-the-news/src/main.ts".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`
+    at getRollupError (file:///home/ntn/git/not-the-news/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at file:///home/ntn/git/not-the-news/node_modules/rollup/dist/es/shared/node-entry.js:23290:39
+    at async catchUnfinishedHookActions (file:///home/ntn/git/not-the-news/node_modules/rollup/dist/es/shared/node-entry.js:22749:16)
+    at async rollupInternal (file:///home/ntn/git/not-the-news/node_modules/rollup/dist/es/shared/node-entry.js:23273:5)
+    at async buildEnvironment (file:///home/ntn/git/not-the-news/node_modules/vite/dist/node/chunks/config.js:33540:12)
+    at async Object.build (file:///home/ntn/git/not-the-news/node_modules/vite/dist/node/chunks/config.js:33899:19)
+    at async Object.buildApp (file:///home/ntn/git/not-the-news/node_modules/vite/dist/node/chunks/config.js:33896:153)
+    at async CAC.<anonymous> (file:///home/ntn/git/not-the-news/node_modules/vite/dist/node/cli.js:629:3)

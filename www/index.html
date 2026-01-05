@@ -40,9 +40,9 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-BpDZujf-.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-FD2r2Ui8.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-DYNGyZpu.css">
+  <script type="module" crossorigin src="/assets/main-2ZSdwu5M.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-1vDuLmft.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-eJl3Yr_g.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
@@ -80,12 +80,12 @@
                                     </header>
 
                     <div id="search-overlay" x-show="showSearchBar" x-cloak
-                         x-transition:enter="transition ease-out duration-300"
-                         x-transition:enter-start="opacity-0 transform -translate-y-4"
-                         x-transition:enter-end="opacity-100 transform translate-y-0"
-                         x-transition:leave="transition ease-in duration-200"
-                         x-transition:leave-start="opacity-100 transform translate-y-0"
-                         x-transition:leave-end="opacity-0 transform -translate-y-4">
+                         x-transition:enter="search-expand"
+                         x-transition:enter-start="search-closed"
+                         x-transition:enter-end="search-open"
+                         x-transition:leave="search-collapse"
+                         x-transition:leave-start="search-open"
+                         x-transition:leave-end="search-closed">
                         <div class="search-container">
                             <input type="text" id="search-input" x-model="searchQuery" @keydown.escape="toggleSearch()" placeholder="Search titles and descriptions..." aria-label="Search">
                             <button class="search-close" @click="toggleSearch()">✕</button>

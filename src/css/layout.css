@@ -163,6 +163,29 @@ body.no-scroll {
     padding: 1rem 0;
     pointer-events: none;
     will-change: transform, opacity;
+    overflow: hidden;
+}
+
+/* Search Bar CSS Animations */
+.search-expand,
+.search-collapse {
+    transition: max-height calc(0.3s * var(--animation-duration-factor)) ease-in-out, 
+                opacity calc(0.3s * var(--animation-duration-factor)) ease-in-out,
+                padding calc(0.3s * var(--animation-duration-factor)) ease-in-out;
+}
+
+.search-closed {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.search-open {
+    max-height: 10rem !important; /* Sufficient for the search bar */
+    opacity: 1 !important;
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
 }
 
 .search-container {
