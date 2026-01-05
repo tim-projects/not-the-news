@@ -159,10 +159,10 @@ export function rssApp(): AppState {
         deckManaged: false,
         syncStatusMessage: '',
         showSyncStatus: false,
-        theme: 'dark',
-        themeStyle: 'originalDark',
-        themeStyleLight: 'originalLight',
-        themeStyleDark: 'originalDark',
+        theme: localStorage.getItem('theme') || 'dark',
+        themeStyle: localStorage.getItem('theme') === 'light' ? (localStorage.getItem('themeStyleLight') || 'originalLight') : (localStorage.getItem('themeStyleDark') || 'originalDark'),
+        themeStyleLight: localStorage.getItem('themeStyleLight') || 'originalLight',
+        themeStyleDark: localStorage.getItem('themeStyleDark') || 'originalDark',
         customCss: '',
         fontSize: 100,
         feedWidth: 50,
@@ -297,15 +297,6 @@ export function rssApp(): AppState {
                     initScrollPosition(this);
                 });
                 
-                this.progressMessage = 'Setting up app watchers...';
-                this._setupWatchers();
-                this._setupEventListeners();
-                this._setupFlickToSelectListeners();
-                this._startPeriodicSync();
-                this._startWorkerFeedSync();
-                this._initScrollObserver();
-                this._initObservers();
-
                 // Ensure initial sync messages are shown and loading screen is managed
                 if (this.deck.length === 0) {
                     // If deck is still empty after sync/load, keep loading screen up with a message
@@ -332,13 +323,24 @@ export function rssApp(): AppState {
                     }
                 }
                 
-                // Kick off first background pre-generation
-                this.pregenerateDecks();
-
-                this.loading = false; // Hide main loading screen after all processing and messages are set
+                this.loading = false; // Hide main loading screen as soon as feed is ready
                 this._initComplete = true;
 
-                await this.updateSyncStatusMessage();
+                // Kick off non-critical background initialization
+                (async () => {
+                    console.log("[Init] Starting background initialization tasks...");
+                    this._setupWatchers();
+                    this._setupEventListeners();
+                    this._setupFlickToSelectListeners();
+                    this._startPeriodicSync();
+                    this._startWorkerFeedSync();
+                    this._initScrollObserver();
+                    this._initObservers();
+                    this.pregenerateDecks();
+                    await this.updateSyncStatusMessage();
+                    console.log("[Init] Background initialization complete.");
+                })();
+
             } catch (error: any) {
                 console.error("Initialization failed:", error);
                 this.errorMessage = `Could not load feed: ${error.message}`;
@@ -469,8 +471,8 @@ export function rssApp(): AppState {
             console.log(`[loadAndDisplayDeck] feedItems contains ${Object.keys(this.feedItems).length} items`);
 
             const items: MappedFeedItem[] = [];
-            const readSet = new Set(this.read.map(h => h.guid));
-            const starredSet = new Set(this.starred.map(s => s.guid));
+            const readSet = new Set(this.read.map(h => h.guid.toLowerCase()));
+            const starredSet = new Set(this.starred.map(s => s.guid.toLowerCase()));
             const seenGuidsForDeck = new Set<string>();
 
             let foundCount = 0;
@@ -480,14 +482,15 @@ export function rssApp(): AppState {
                 const guid = deckItem.guid;
                 if (typeof guid !== 'string' || !guid) continue;
                 
-                const item = this.feedItems[guid];
-                if (item && item.guid && !seenGuidsForDeck.has(item.guid)) {
+                const item = this.feedItems[guid.toLowerCase()];
+                if (item && item.guid && !seenGuidsForDeck.has(item.guid.toLowerCase())) {
                     const mappedItem = mapRawItem(item, formatDate);
                     if (mappedItem) { // Ensure mappedItem is not null
-                        mappedItem.isRead = readSet.has(mappedItem.guid);
-                        mappedItem.isStarred = starredSet.has(mappedItem.guid);
+                        const g = mappedItem.guid.toLowerCase();
+                        mappedItem.isRead = readSet.has(g);
+                        mappedItem.isStarred = starredSet.has(g);
                         items.push(mappedItem);
-                        seenGuidsForDeck.add(mappedItem.guid);
+                        seenGuidsForDeck.add(g);
                         foundCount++;
                     }
                 } else {
@@ -515,10 +518,10 @@ export function rssApp(): AppState {
             const seenGuids = new Set<string>();
 
             rawItemsFromDb.forEach(item => {
-                if (item && item.guid && !seenGuids.has(item.guid)) {
-                    this.feedItems[item.guid] = item;
+                if (item && item.guid && !seenGuids.has(item.guid.toLowerCase())) {
+                    this.feedItems[item.guid.toLowerCase()] = item;
                     uniqueEntries.push(item);
-                    seenGuids.add(item.guid);
+                    seenGuids.add(item.guid.toLowerCase());
                 }
             });
 
@@ -537,31 +540,34 @@ export function rssApp(): AppState {
             }
 
             let filtered: MappedFeedItem[] = [];
-            const readMap = new Map(this.read.map(h => [h.guid, h.readAt]));
-            const starredMap = new Map(this.starred.map(s => [s.guid, s.starredAt]));
+            const readMap = new Map(this.read.map(h => [h.guid.toLowerCase(), h.readAt]));
+            const starredMap = new Map(this.starred.map(s => [s.guid.toLowerCase(), s.starredAt]));
 
             switch (this.filterMode) {
                 case "unread":
-                    filtered = this.deck.filter(item => !readMap.has(item.guid));
+                    filtered = this.deck.filter(item => !readMap.has(item.guid.toLowerCase()));
                     break;
                 case "all":
                     filtered = this.entries;
                     break;
                 case "read":
-                    filtered = this.entries.filter(e => readMap.has(e.guid))
-                        .sort((a, b) => (new Date(readMap.get(b.guid) || 0).getTime()) - (new Date(readMap.get(a.guid) || 0).getTime()));
+                    filtered = this.entries.filter(e => readMap.has(e.guid.toLowerCase()))
+                        .sort((a, b) => (new Date(readMap.get(b.guid.toLowerCase()) || 0).getTime()) - (new Date(readMap.get(a.guid.toLowerCase()) || 0).getTime()));
                     break;
                 case "starred":
-                    filtered = this.entries.filter(e => starredMap.has(e.guid))
-                        .sort((a, b) => (new Date(starredMap.get(b.guid) || 0).getTime()) - (new Date(starredMap.get(a.guid) || 0).getTime()));
+                    filtered = this.entries.filter(e => starredMap.has(e.guid.toLowerCase()))
+                        .sort((a, b) => (new Date(starredMap.get(b.guid.toLowerCase()) || 0).getTime()) - (new Date(starredMap.get(a.guid.toLowerCase()) || 0).getTime()));
                     break;
             }
 
-            filtered = filtered.map(e => ({
-                ...e,
-                isRead: readMap.has(e.guid),
-                isStarred: starredMap.has(e.guid)
-            }));
+            filtered = filtered.map(e => {
+                const g = e.guid.toLowerCase();
+                return {
+                    ...e,
+                    isRead: readMap.has(g),
+                    isStarred: starredMap.has(g)
+                };
+            });
 
             // Apply Keyword Blacklist
             const keywordBlacklist = (this.keywordBlacklistInput ?? '')
@@ -598,15 +604,20 @@ export function rssApp(): AppState {
         },
         get unreadCount(): number {
             if (!this.entries.length || !this.currentDeckGuids.length) return 0;
-            const readSet = new Set(this.read.map(r => r.guid));
-            const deckGuidsSet = new Set(this.currentDeckGuids.map(item => item.guid));
-            return this.entries.filter(e => deckGuidsSet.has(e.guid) && !readSet.has(e.guid)).length;
+            const readGuids = new Set(this.read.map(r => r.guid.toLowerCase()));
+            const deckGuids = new Set(this.currentDeckGuids.map(item => item.guid.toLowerCase()));
+            return this.entries.filter(e => {
+                const g = e.guid.toLowerCase();
+                return deckGuids.has(g) && !readGuids.has(g);
+            }).length;
         },
         // --- Action Methods ---
-        isStarred: function(this: AppState, guid: string): boolean {
-            return this.starred.some(e => e.guid === guid);
-        },        isRead: function(this: AppState, guid: string): boolean {
-            return this.read.some(e => e.guid === guid);
+        isStarred: function (this: AppState, guid: string): boolean {
+            const g = guid.toLowerCase();
+            return this.starred.some(e => e.guid.toLowerCase() === g);
+        }, isRead: function (this: AppState, guid: string): boolean {
+            const g = guid.toLowerCase();
+            return this.read.some(e => e.guid.toLowerCase() === g);
         },
         toggleStar: async function (this: AppState, guid: string): Promise<void> {
             const isStarring = !this.starred.some(item => item.guid === guid);
@@ -1251,7 +1262,7 @@ export function rssApp(): AppState {
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
-                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    history: ['read', 'starred', 'hidden'],
                     settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
@@ -1322,7 +1333,7 @@ export function rssApp(): AppState {
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
-                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    history: ['read', 'starred', 'hidden'],
                     settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
@@ -1353,7 +1364,7 @@ export function rssApp(): AppState {
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
-                    history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
+                    history: ['read', 'starred', 'hidden'],
                     settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
@@ -1438,35 +1449,43 @@ export function rssApp(): AppState {
                                 this.imagesEnabled = imagesEnabled.value ?? true;
                                 this.itemButtonMode = itemButtonMode.value ?? 'play';
                                 this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
-                                this.curvesEnabled = curvesState.value ?? true;
-                                this.flickToSelectEnabled = flickState.value ?? false;
-                                this.animationSpeed = animSpeedRes.value ?? 100;
-                                this.filterMode = filterModeResult; // filterModeResult is already the string
-                this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
-                localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
-                this.isOnline = isOnline();
-                
-                const [rssFeeds, keywordBlacklist, themeStyleLightRes, themeStyleDarkRes] = await Promise.all([
-                    loadSimpleState('rssFeeds'),
-                    loadSimpleState('keywordBlacklist'),
-                    loadSimpleState('themeStyleLight'),
-                    loadSimpleState('themeStyleDark')
-                ]);
-
-                this.themeStyleLight = typeof themeStyleLightRes.value === 'string' ? themeStyleLightRes.value : 'originalLight';
-                this.themeStyleDark = typeof themeStyleDarkRes.value === 'string' ? themeStyleDarkRes.value : 'originalDark';
-                
-                // Normalize legacy "original" value from old backups
-                if (this.themeStyleLight === 'original') this.themeStyleLight = 'originalLight';
-                if (this.themeStyleDark === 'original') this.themeStyleDark = 'originalDark';
-
-                this.themeStyle = this.theme === 'light' ? this.themeStyleLight : this.themeStyleDark;
-                if (this.themeStyle === 'original') {
-                    this.themeStyle = this.theme === 'light' ? 'originalLight' : 'originalDark';
-                }
-
-                this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');
-                this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
+                                                this.curvesEnabled = curvesState.value ?? true;
+                                                this.flickToSelectEnabled = flickState.value ?? false;
+                                                this.animationSpeed = animSpeedRes.value ?? 100;
+                                                this.filterMode = filterModeResult; // filterModeResult is already the string
+                                                
+                                                const newTheme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
+                                                if (this.theme !== newTheme) {
+                                                    this.theme = newTheme;
+                                                    localStorage.setItem('theme', this.theme);
+                                                }
+                                                
+                                                this.isOnline = isOnline();
+                                                
+                                                const [rssFeeds, keywordBlacklist, themeStyleLightRes, themeStyleDarkRes] = await Promise.all([
+                                                    loadSimpleState('rssFeeds'),
+                                                    loadSimpleState('keywordBlacklist'),
+                                                    loadSimpleState('themeStyleLight'),
+                                                    loadSimpleState('themeStyleDark')
+                                                ]);
+                                
+                                                const newLightStyle = typeof themeStyleLightRes.value === 'string' ? themeStyleLightRes.value : 'originalLight';
+                                                const newDarkStyle = typeof themeStyleDarkRes.value === 'string' ? themeStyleDarkRes.value : 'originalDark';
+                                                
+                                                // Normalize legacy "original" value from old backups
+                                                this.themeStyleLight = newLightStyle === 'original' ? 'originalLight' : newLightStyle;
+                                                this.themeStyleDark = newDarkStyle === 'original' ? 'originalDark' : newDarkStyle;
+                                                
+                                                localStorage.setItem('themeStyleLight', this.themeStyleLight);
+                                                localStorage.setItem('themeStyleDark', this.themeStyleDark);
+                                
+                                                const newStyle = this.theme === 'light' ? this.themeStyleLight : this.themeStyleDark;
+                                                if (this.themeStyle !== newStyle) {
+                                                    this.themeStyle = newStyle;
+                                                    this.applyThemeStyle();
+                                                }
+                                
+                                                this.rssFeedsInput = parseRssFeedsConfig(rssFeeds.value).join('\n');                this.keywordBlacklistInput = Array.isArray(keywordBlacklist.value) 
                     ? keywordBlacklist.value.join('\n') 
                     : '';
                 

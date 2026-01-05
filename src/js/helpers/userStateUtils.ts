@@ -50,7 +50,8 @@ function sanitizeForIndexedDB(obj: any): any {
 
 
 export async function toggleItemStateAndSync(app: AppState, guid: string, stateKey: 'read' | 'starred'): Promise<void> {
-    const isCurrentlyActive = (app[stateKey] as Array<ReadItem | StarredItem>).some(item => item.guid === guid);
+    const g = guid.toLowerCase();
+    const isCurrentlyActive = (app[stateKey] as Array<ReadItem | StarredItem>).some(item => item.guid.toLowerCase() === g);
     const action = isCurrentlyActive ? 'remove' : 'add';
     const timestamp = new Date().toISOString();
     const itemObject: ReadItem | StarredItem = stateKey === 'read'

@@ -75,24 +75,25 @@ export const manageDailyDeck = async (
     const { loadCurrentDeck } = await import('./userStateUtils.ts');
     const currentDeckItems = await loadCurrentDeck();
     
-    const readGuidsSet = new Set(readItemsArray.map(getGuid));
-    const starredGuidsSet = new Set(starredItemsArray.map(getGuid));
-    const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(getGuid));
+    const readGuidsSet = new Set(readItemsArray.map(item => getGuid(item).toLowerCase()));
+    const starredGuidsSet = new Set(starredItemsArray.map(item => getGuid(item).toLowerCase()));
+    const shuffledOutGuidsSet = new Set(shuffledOutItemsArray.map(item => getGuid(item).toLowerCase()));
     
-    const entriesMap = new Map(entries.map(e => [e.guid, e]));
+    const entriesMap = new Map(entries.map(e => [e.guid.toLowerCase(), e]));
 
     let existingDeck: MappedFeedItem[] = currentDeckItems
-        .map(di => entriesMap.get(getGuid(di)))
+        .map(di => entriesMap.get(getGuid(di).toLowerCase()))
         .filter((item): item is MappedFeedItem => !!item);
 
     const today = new Date().toDateString();
     const isNewDay = lastShuffleResetDate !== today;
     
     const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
-    const isDeckEffectivelyEmpty = isDeckEmpty || existingDeck.every(item => 
-        readGuidsSet.has(item.guid) || shuffledOutGuidsSet.has(item.guid)
-    );
-    const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid));
+    const isDeckEffectivelyEmpty = isDeckEmpty || existingDeck.every(item => {
+        const g = item.guid.toLowerCase();
+        return readGuidsSet.has(g) || shuffledOutGuidsSet.has(g);
+    });
+    const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid.toLowerCase()));
 
     let newDeck: MappedFeedItem[] = existingDeck;
     let newCurrentDeckGuids: DeckItem[] = currentDeckItems;
@@ -208,10 +209,10 @@ export async function processShuffle(app: AppState): Promise<void> {
 
     const visibleGuids = app.deck.map(item => item.guid);
     console.log(`[deckManager] processShuffle: Visible GUIDs to shuffle out: ${visibleGuids.length}`, visibleGuids);
-    const existingShuffledGuids: ShuffledOutItem[] = (app.shuffledOutGuids || []).map(getGuid).map(guid => ({ guid, shuffledAt: new Date().toISOString() }));
+    const existingShuffledGuids: ShuffledOutItem[] = (app.shuffledOutGuids || []).map(item => ({ guid: getGuid(item), shuffledAt: new Date().toISOString() }));
     
-    const existingShuffledGuidsSet = new Set(existingShuffledGuids.map(getGuid));
-    const updatedShuffledGuidsSet = new Set([...existingShuffledGuidsSet, ...visibleGuids]);
+    const existingShuffledGuidsSet = new Set(existingShuffledGuids.map(item => item.guid.toLowerCase()));
+    const updatedShuffledGuidsSet = new Set([...existingShuffledGuidsSet, ...visibleGuids.map(g => g.toLowerCase())]);
     
     const timestamp = new Date().toISOString();
     const newShuffledOutGuids: ShuffledOutItem[] = Array.from(updatedShuffledGuidsSet).map(guid => ({

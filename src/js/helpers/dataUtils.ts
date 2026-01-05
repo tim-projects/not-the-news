@@ -184,8 +184,8 @@ export async function generateNewDeck(
             if (!Array.isArray(arr)) {
                 return new Set();
             }
-            const guids = arr.map(item => (typeof item === 'object' && 'guid' in item && item.guid ? item.guid : item)); // Check for 'guid' property
-            return new Set(guids.filter((guid): guid is string => typeof guid === 'string' && Boolean(guid))); // Filter out any non-string/empty values
+            const guids = arr.map(item => (typeof item === 'object' && 'guid' in item && item.guid ? item.guid.toLowerCase() : (typeof item === 'string' ? item.toLowerCase() : ''))); // Check for 'guid' property
+            return new Set(guids.filter((guid): guid is string => Boolean(guid))); // Filter out any non-string/empty values
         };
 
         const allFeedGuidsSet = new Set(allFeedItems.map(item => item.guid));
