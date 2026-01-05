@@ -1231,9 +1231,10 @@ export function rssApp(): AppState {
                 this.loading = false;
             }
         },
-        backupConfig: async function(this: AppState): Promise<void> {
+        backupConfig: async function (this: AppState): Promise<void> {
             console.log('backupConfig called.');
             this.showUndo = false;
+            createStatusBarMessage(this, 'Generating backup file...');
             try {
                 this.progressMessage = 'Fetching configuration for backup...';
                  
@@ -1292,9 +1293,10 @@ export function rssApp(): AppState {
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                createStatusBarMessage(this, 'Configuration backed up successfully!');
-            } catch (error: any) {
+                URL.revokeObjectURL(o);
+                createStatusBarMessage(this, 'Backup ready for download!');
+                console.log("Configuration backed up successfully!")
+            } catch (e) {
                 console.error("Error during config backup:", error);
                 createStatusBarMessage(this, `Failed to backup configuration: ${error.message}`);
             } finally {

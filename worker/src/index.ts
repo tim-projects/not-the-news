@@ -572,14 +572,22 @@ export default {
                 if (uid === 'anonymous') return new Response('Unauthorized', { status: 401 });
                 console.log(`[Archive] Exporting state for user: ${uid}`);
                 const config: Record<string, any> = {};
-                for (const key in USER_STATE_SERVER_DEFAULTS) {
+                const keys = Object.keys(USER_STATE_SERVER_DEFAULTS);
+                
+                const results = await Promise.all(keys.map(async (key) => {
                     try {
                         const state = await Storage.loadState(uid, key, env);
-                        if (state.value !== null) config[key] = state.value;
+                        return { key, value: state.value };
                     } catch (e: any) {
                         console.error(`[Archive] Error loading ${key} for export:`, e.message);
+                        return { key, value: null };
                     }
+                }));
+
+                for (const res of results) {
+                    if (res.value !== null) config[res.key] = res.value;
                 }
+                
                 return jsonResponse(config);
             }
 
@@ -595,21 +603,21 @@ export default {
                         delete config.uid;
                     }
 
-                    let count = 0;
-                    let failed = 0;
-                    for (const key in config) {
-                        if (USER_STATE_SERVER_DEFAULTS[key]) {
-                            try {
-                                await Storage.saveState(uid, key, config[key], env);
-                                count++;
-                            } catch (itemError: any) {
-                                console.error(`[Archive] Failed to import key '${key}':`, itemError);
-                                failed++;
-                            }
-                        } else {
-                            console.warn(`[Archive] Skipping unknown key in import: ${key}`);
+                    const keysToImport = Object.keys(config).filter(key => USER_STATE_SERVER_DEFAULTS[key]);
+                    
+                    const results = await Promise.all(keysToImport.map(async (key) => {
+                        try {
+                            await Storage.saveState(uid, key, config[key], env);
+                            return { key, success: true };
+                        } catch (itemError: any) {
+                            console.error(`[Archive] Failed to import key '${key}':`, itemError);
+                            return { key, success: false };
                         }
-                    }
+                    }));
+
+                    const count = results.filter(r => r.success).length;
+                    const failed = results.length - count;
+                    
                     console.log(`[Archive] Import complete. Success: ${count}, Failed: ${failed}`);
                     return jsonResponse({ status: 'ok', imported: count, failed });
                 } catch (e: any) {
