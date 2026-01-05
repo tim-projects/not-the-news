@@ -94,19 +94,29 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     const images = doc.querySelectorAll("img");
     let imgSrc = "";
     
-    if (images.length === 1) {
-        const imgEl = images[0] as HTMLImageElement;
-        imgSrc = imgEl.src || "";
-        // Only remove if it's likely a featured image at the start
-        if (imgEl === doc.body.firstElementChild || (doc.body.firstElementChild?.tagName === 'A' && imgEl === doc.body.firstElementChild.firstElementChild)) {
-            imgEl.remove();
+    if (images.length > 0) {
+        const firstImg = images[0];
+        imgSrc = firstImg.src || "";
+        
+        // Find if this image should be removed from the description (prevent duplicate)
+        // Check if it's the first child, or the first child of the first child (if it's a link)
+        let shouldRemove = false;
+        const firstChild = doc.body.firstElementChild;
+        if (firstImg === firstChild) shouldRemove = true;
+        else if (firstChild?.tagName === 'A' && firstImg === firstChild.firstElementChild) shouldRemove = true;
+        else if (firstChild?.tagName === 'P' && firstImg === firstChild.firstElementChild) shouldRemove = true;
+        else if (firstChild?.tagName === 'DIV' && firstImg === firstChild.firstElementChild) shouldRemove = true;
+
+        if (shouldRemove || images.length === 1) {
+            firstImg.remove();
         }
-    } else {
-        images.forEach(img => {
-            img.setAttribute('loading', 'lazy');
-            img.setAttribute('onload', "this.classList.add('loaded')");
-        });
     }
+
+    // Set lazy loading for any remaining images
+    doc.querySelectorAll("img").forEach(img => {
+        img.setAttribute('loading', 'lazy');
+        img.setAttribute('onload', "this.classList.add('loaded')");
+    });
 
     let sourceUrl = "";
     // Only remove if it explicitly has the source-url class
@@ -115,10 +125,16 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
         sourceUrl = sourceEl.textContent?.trim() || "";
         sourceEl.remove();
     } else {
-        sourceUrl = item.source || (item.link ? new URL(item.link).hostname : "");
+        sourceUrl = (item as any).source || (item.link ? new URL(item.link).hostname : "");
     }
 
-    const descContent = doc.body.innerHTML.trim();
+    // Cleanup gaps: remove empty top-level tags and leading breaks
+    let html = doc.body.innerHTML.trim();
+    html = html.replace(/^<br\s*\/?>/i, ''); // Leading break
+    html = html.replace(/<p><\/p>/gi, '');   // Empty paragraphs
+    html = html.replace(/<div><\/div>/gi, ''); // Empty divs
+    
+    const descContent = html.trim();
     const ts = Date.parse(item.pubDate) || 0;
 
     return {

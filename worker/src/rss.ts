@@ -91,6 +91,10 @@ function prettifyItem(item: any): any {
     const imgMatch = item.description?.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (imgMatch) {
         item.image = imgMatch[1];
+        // Remove this image from the description to prevent duplicate display in the client
+        // We look for the whole tag that contains the URL
+        const imgTagRegex = new RegExp(`<img[^>]+src=["']${imgMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'i');
+        item.description = item.description.replace(imgTagRegex, '');
     }
 
     const beforeLen = item.description?.length || 0;
@@ -100,6 +104,12 @@ function prettifyItem(item: any): any {
     if (beforeLen > 0 && afterLen === 0) {
         console.log(`[RSS] WARNING: Sanitization removed entire description for item: ${item.title}`);
     }
+
+    // Post-sanitize cleanup for gaps
+    item.description = (item.description || '').trim();
+    item.description = item.description.replace(/^<br\s*\/?>/i, '');
+    item.description = item.description.replace(/<p><\/p>/gi, '');
+    item.description = item.description.replace(/<div><\/div>/gi, '');
     
     return item;
 }
