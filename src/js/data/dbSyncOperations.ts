@@ -481,34 +481,50 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
         return true;
     }
     
-    console.log('[DB] Fetching feed items from worker.');
+    console.log('[DB] Fetching new feed items from worker (Delta Sync).');
 
     try {
-        // 1. Fetch current feed from worker (which handles the RSS parsing/cleaning)
         const token = await getAuthToken();
         if (!token) {
             console.warn('[DB] No auth token available for feed sync.');
             return false;
         }
 
-        const response: Response = await fetch(`${API_BASE_URL}/api/list`, {
-            method: 'GET',
+        // DELTA SYNC: Find the timestamp of the newest item we have locally
+        let newestTimestamp = 0;
+        await withDb(async (db: IDBPDatabase) => {
+            const items = await db.getAll('feedItems');
+            if (items.length > 0) {
+                newestTimestamp = Math.max(...items.map((i: any) => i.timestamp || 0));
+            }
+        });
+        console.log(`[DB] Local newest item timestamp: ${newestTimestamp} (${new Date(newestTimestamp).toISOString()})`);
+
+        // Trigger worker refresh with delta parameter
+        const response: Response = await fetch(`${API_BASE_URL}/api/refresh`, {
+            method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 "Authorization": `Bearer ${token}`
-            }
+            },
+            body: JSON.stringify({ since: newestTimestamp })
         });
 
-        if (!response.ok) throw new Error(`HTTP error ${response.status} for /api/list`);
+        if (!response.ok) {
+            if (response.status === 429) {
+                console.log('[DB] Sync throttled by server.');
+                return true;
+            }
+            throw new Error(`HTTP error ${response.status} for /api/refresh`);
+        }
 
-        const items: FeedItem[] = await response.json();
-        console.log(`[DB] Received ${items.length} items from worker.`);
+        const data: any = await response.json();
+        const items: FeedItem[] = data.items || [];
+        console.log(`[DB] Received ${items.length} new items from worker (Delta).`);
 
         if (items.length > 0) {
             await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
-                // Use 'put' to merge/update items instead of clearing the store.
-                // This preserves local items if the worker cache is fresh or incomplete.
                 for (const item of items) {
                     if (item.guid) await tx.store.put(item);
                 }

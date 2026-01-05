@@ -304,7 +304,7 @@ function jsonResponse(data: any, status: number = 200, headers: Record<string, s
     });
 }
 
-async function syncFeeds(uid: string, env: Env): Promise<Response> {
+async function syncFeeds(uid: string, env: Env, since: number = 0): Promise<Response> {
     const { value: feedsConfig } = await Storage.loadState(uid, 'rssFeeds', env);
     const { value: blacklist } = await Storage.loadState(uid, 'keywordBlacklist', env);
     
@@ -373,7 +373,15 @@ async function syncFeeds(uid: string, env: Env): Promise<Response> {
         
         userCaches.set(uid, userCache);
 
-        return jsonResponse({ status: 'ok', count: items.length });
+        // DELTA SYNC: Filter returned items by the 'since' timestamp
+        const deltaItems = items.filter(item => item.timestamp > since);
+
+        return jsonResponse({ 
+            status: 'ok', 
+            count: items.length,
+            deltaCount: deltaItems.length,
+            items: deltaItems 
+        });
     } catch (error: any) {
         return jsonResponse({ error: error.message }, 500);
     }
@@ -497,7 +505,17 @@ export default {
                 }
                 if (now - lastSync > (requiredCooldown * 2)) violationCounts.delete(uid);
                 syncCooldowns.set(uid, now);
-                return syncFeeds(uid, env);
+
+                let since = 0;
+                try {
+                    const data: any = await request.clone().json();
+                    since = Number(data.since) || 0;
+                } catch {
+                    const urlParams = new URL(request.url).searchParams;
+                    since = Number(urlParams.get('since')) || 0;
+                }
+
+                return syncFeeds(uid, env, since);
             }
 
             if (pathName === '/api/lookup') {
