@@ -6,10 +6,11 @@ Address reported bugs regarding deck clearing, shuffle counts, icon styling, and
 ## Status
 - [x] **Background Watcher Setup:** Move 'setting up watchers' and similar non-critical init tasks to the background.
 - [x] **Fix Theme Reset on Refresh:** Prevent the theme from resetting to default before loading user preferences.
-- [ ] **Fix Deck Clearing & Unread Bug:** Implement case-insensitive GUID comparison across the app. Ensure 'unreadCount' and 'loadAndDisplayDeck' correctly handle potentially mismatched GUID casing from restores or syncs.
-- [ ] **Refine Backup/Restore:** Exclude 'currentDeckGuids', 'shuffledOutGuids', 'lastShuffleResetDate', and 'shuffleCount' from backups to prevent "ghost" items and ensure clean regeneration on new installs.
-- [ ] **Fix Light Themes:** Audit theme CSS files to ensure dark elements don't bleed into light themes (check gradients, shadows, and hardcoded colors).
-- [ ] **Fix Shuffle Count Increment:** Ensure the shuffle counter updates correctly in the UI and DB (verify interaction with refund logic).
+- [x] **Fix Deck Clearing & Unread Bug:** Implement case-insensitive GUID comparison across the app.
+- [x] **Refine Backup/Restore:** Exclude 'currentDeckGuids', 'shuffledOutGuids', 'lastShuffleResetDate', and 'shuffleCount' from backups.
+- [ ] **Optimize Sync (Delta Sync):** Implement GUID-based delta syncing. The client will send its `lastFeedSync` timestamp, and the worker will only return items newer than that. This minimizes data usage and speeds up sync without needing external storage like Redis.
+- [ ] **Fix Light Themes:** Audit theme CSS files to ensure dark elements (shadows, gradients) don't bleed into light themes.
+- [ ] **Fix Shuffle Count Increment:** Ensure the shuffle counter updates correctly in the UI and DB.
 - [ ] **Repair Search/Shuffle Icons:** Verify if current icons look "messed up" and fix if needed.
 
 ## Progress
@@ -21,3 +22,6 @@ Address reported bugs regarding deck clearing, shuffle counts, icon styling, and
 - [x] Implemented alternating swipe directions.
 - [x] Backgrounded non-critical initialization tasks.
 - [x] Fixed theme flash on refresh.
+- [x] Implemented case-insensitive GUID matching.
+- [x] Refined backup/restore to exclude transient session data.
+- [x] Parallelized feed fetching in the Worker.
