@@ -1786,6 +1786,12 @@ export function rssApp(): AppState {
                     this.selectedSubElement = 'item';
                 }
             });
+
+            this.$watch('isOnline', (online: boolean) => {
+                document.documentElement.style.setProperty('--offline-padding', online ? '0' : '30px');
+            });
+            // Apply initial state
+            document.documentElement.style.setProperty('--offline-padding', this.isOnline ? '0' : '30px');
         },
         _setupEventListeners: function(this: AppState): void {
             const backgroundSync = async (): Promise<void> => {

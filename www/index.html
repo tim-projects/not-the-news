@@ -40,10 +40,10 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-CWeAi8mh.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-BnSMO8gx.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-Db5cC7j1.css">
-  <link rel="stylesheet" crossorigin href="/assets/main-nkIjUKeV.css">
+  <script type="module" crossorigin src="/assets/main-CCXHj2QH.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-C5uMzVru.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-CQSNS_LX.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -591,6 +591,10 @@
         </button>
 
         <div id="sync-status-message" x-cloak x-show="showSyncStatus" :class="{ 'visible': showSyncStatus }" x-text="syncStatusMessage"></div>
+
+        <div id="offline-status-bar" x-cloak x-show="!isOnline" :class="{ 'visible': !isOnline }">
+            Offline Mode
+        </div>
 
         <div id="undo-notification" x-cloak x-show="showUndo && !openSettings && !openShortcuts" :class="{ 'visible': showUndo && !openSettings && !openShortcuts }">
             <button @click="undoMarkRead()" class="undo-button">

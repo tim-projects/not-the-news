@@ -588,6 +588,10 @@
 
         <div id="sync-status-message" x-cloak x-show="showSyncStatus" :class="{ 'visible': showSyncStatus }" x-text="syncStatusMessage"></div>
 
+        <div id="offline-status-bar" x-cloak x-show="!isOnline" :class="{ 'visible': !isOnline }">
+            Offline Mode
+        </div>
+
         <div id="undo-notification" x-cloak x-show="showUndo && !openSettings && !openShortcuts" :class="{ 'visible': showUndo && !openSettings && !openShortcuts }">
             <button @click="undoMarkRead()" class="undo-button">
                 <span class="undo-label-desktop">Undo (u or ctrl+z)</span>

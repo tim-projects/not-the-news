@@ -8,7 +8,7 @@ Address reported bugs regarding deck clearing, shuffle counts, icon styling, and
 - [x] **Fix Theme Reset on Refresh:** Prevent the theme from resetting to default before loading user preferences.
 - [x] **Fix Deck Clearing & Unread Bug:** Implement case-insensitive GUID comparison across the app.
 - [x] **Refine Backup/Restore:** Exclude 'currentDeckGuids', 'shuffledOutGuids', 'lastShuffleResetDate', and 'shuffleCount' from backups.
-- [ ] **Optimize Sync (Delta Sync):** Implement GUID-based delta syncing. The client will send its `lastFeedSync` timestamp, and the worker will only return items newer than that. This minimizes data usage and speeds up sync without needing external storage like Redis.
+- [x] **Optimize Sync (Delta Sync):** Implement GUID-based delta syncing. The client now sends its newest item timestamp, and the worker only returns fresh content. This dramatically reduces data transfer and sync time.
 - [ ] **Fix Light Themes:** Audit theme CSS files to ensure dark elements (shadows, gradients) don't bleed into light themes.
 - [ ] **Fix Shuffle Count Increment:** Ensure the shuffle counter updates correctly in the UI and DB.
 - [ ] **Repair Search/Shuffle Icons:** Verify if current icons look "messed up" and fix if needed.
@@ -25,3 +25,7 @@ Address reported bugs regarding deck clearing, shuffle counts, icon styling, and
 - [x] Implemented case-insensitive GUID matching.
 - [x] Refined backup/restore to exclude transient session data.
 - [x] Parallelized feed fetching in the Worker.
+- [x] Implemented GUID-based Delta Sync.
+- [x] Optimized backup/restore performance via parallel server requests.
+- [x] Fixed read history restoration bug.
+- [x] Added production deployment protection to build.sh.
