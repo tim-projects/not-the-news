@@ -53,7 +53,7 @@ html {
   --light-secondary-fg: #ffffff;
   --light-card-bg: #ffffff;
   --light-card-border: #EEE;
-  --light-card-shadow-color: lightgrey;
+  --light-card-shadow-color: rgba(0, 0, 0, 0.1);
   --light-toggle-track: #ccc;
   --light-link-highlight: rgba(173, 216, 230, 0.5);
   --light-primary-rgb: 100, 149, 237;

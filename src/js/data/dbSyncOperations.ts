@@ -41,6 +41,7 @@ interface AppState { // Minimal AppState interface needed for performFeedSync
     updateCounts?: () => void;
     progressMessage?: string;
     currentDeckGuids?: { guid: string }[];
+    lastFeedSync?: number;
 }
 
 
@@ -536,6 +537,11 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
             if (app && app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
             if (app && app.updateCounts) app.updateCounts();
         }
+        
+        // Update last sync time locally after success (even if 0 items)
+        const now = Date.now();
+        await _saveSyncMetaState('lastFeedSync', now);
+        if (app) app.lastFeedSync = now;
         
         return true;
 

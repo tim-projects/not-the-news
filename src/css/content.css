@@ -189,16 +189,19 @@ p {
 }
 
 .itemdescription {
-  padding: 1em 1.8em 2em;
-  overflow: hidden;
-  max-height: 10000px; /* Large enough for content */
-  transition: max-height calc(0.5s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1), opacity calc(0.3s * var(--animation-duration-factor)) ease, padding calc(0.5s * var(--animation-duration-factor)) ease, margin calc(0.5s * var(--animation-duration-factor)) ease;
+    padding: 1em 1.8em 2em;
+    overflow: hidden;
+    max-height: 10000px;
+    transition: max-height calc(0.33s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1),
+                opacity calc(0.2s * var(--animation-duration-factor)) ease,
+                padding calc(0.33s * var(--animation-duration-factor)) ease,
+                margin calc(0.33s * var(--animation-duration-factor)) ease;
 }
 
 /* Close Animation Sequence */
 .item.entry.is-closing-left .itemdescription,
 .item.entry.is-closing-right .itemdescription {
-    animation: fold-and-vanish calc(0.5s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: fold-and-vanish calc(0.33s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1) forwards;
     pointer-events: none;
     max-height: 0 !important;
     opacity: 0 !important;
@@ -295,14 +298,14 @@ p {
 }
 
 .item.entry.is-closing-left {
-    animation: swipe-and-collapse-left calc(0.4s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1) calc(0.5s * var(--animation-duration-factor)) forwards;
+    animation: swipe-and-collapse-left calc(0.26s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1) calc(0.33s * var(--animation-duration-factor)) forwards;
     pointer-events: none;
     z-index: 100;
     overflow: hidden;
 }
 
 .item.entry.is-closing-right {
-    animation: swipe-and-collapse-right calc(0.4s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1) calc(0.5s * var(--animation-duration-factor)) forwards;
+    animation: swipe-and-collapse-right calc(0.26s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1) calc(0.33s * var(--animation-duration-factor)) forwards;
     pointer-events: none;
     z-index: 100;
     overflow: hidden;
@@ -348,24 +351,9 @@ p {
     }
 }
 
-svg.shuffle-icon {
-  width: 3em;
-  margin-left: -0.15em;
-  margin-top: -0.15em;
-}
-
-span.shuffle-count {
-  margin-top: -1em;
-  font-size: smaller;
-  margin-right: 0em;
-  font-weight: 900;
-  line-height: 2em;
-}
-
-.gear-icon {
-  width: 3em;
-  margin-left: -0.15em;
-  margin-top: -0.15em;
+svg.shuffle-icon, .gear-icon {
+  width: 1.8em;
+  height: 1.8em;
 }
 
 /* Styles for news items */
@@ -451,7 +439,7 @@ button.play-button.sub-focused {
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
     opacity: 0.85;
-    animation: draw-outline calc(0.5s * var(--animation-duration-factor)) ease-in-out forwards;
+    animation: draw-outline calc(0.33s * var(--animation-duration-factor)) ease-in-out forwards;
 }
 
 body.no-curves .star-outline {
@@ -466,10 +454,10 @@ body.no-curves .star-outline {
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
     opacity: 0.85;
-    animation: draw-outline calc(0.5s * var(--animation-duration-factor)) ease-in-out calc(0.5s * var(--animation-duration-factor)) forwards; /* 0.5s delay to follow title animation */
+    animation: draw-outline calc(0.33s * var(--animation-duration-factor)) ease-in-out calc(0.33s * var(--animation-duration-factor)) forwards; /* 0.33s delay to follow title animation */
 }
 
-body.no-curves .star-button-outline,
+body.no-curves .star-button-outline, 
 body.no-curves .read-button-outline {
     d: path("M 0,0 L 56,0 L 56,56 L 0,56 Z") !important;
 }
@@ -481,9 +469,8 @@ body.no-curves .read-button-outline {
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
     opacity: 0.85;
-    animation: draw-outline calc(0.5s * var(--animation-duration-factor)) ease-in-out forwards;
+    animation: draw-outline calc(0.33s * var(--animation-duration-factor)) ease-in-out forwards;
 }
-
 .tts-highlight {
     background-color: var(--primary);
     color: var(--primary-fg);

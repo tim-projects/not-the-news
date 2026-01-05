@@ -107,7 +107,7 @@ export const manageDailyDeck = async (
         if (!isNewDay && currentDeckItems.length > 0 && isDeckEffectivelyEmpty && filterMode === 'unread') {
             if (!allItemsInDeckShuffled) {
                 console.log('[deckManager] Automatically incrementing (refunding) shuffleCount due to deck cleared by reading.');
-                newShuffleCount++;
+                newShuffleCount = Math.min(DAILY_SHUFFLE_LIMIT, newShuffleCount + 1);
                 await saveShuffleState(newShuffleCount, newLastShuffleResetDate);
             }
         }

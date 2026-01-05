@@ -263,3 +263,29 @@ The application is live and functional in the production environment. The full E
 - **Initialization Robustness:** Hardened application startup with timeouts and cleaner module structure.
 - **Hardened Restoration:** Backups now correctly restore the full application state, including feed filters and deck positions.
 - **Environment-Based Configuration:** Removed all hardcoded production URLs from the repository. Deployment now uses `VITE_PRODUCTION_DOMAIN` and temporary configuration files.
+
+---
+**Completed Task: Bug Fixes and UI Polishing**
+
+**Goal:** Address reported bugs regarding deck clearing, shuffle counts, icon styling, and theme inconsistencies.
+
+**Progress:**
+- **Delta Sync & Performance:**
+  - Implemented GUID-based delta syncing. The client now sends its newest item timestamp, and the worker only returns fresh content.
+  - Added a 10-minute threshold check using `lastFeedSync`. If the app was recently synced, it skips the network sync during reload for near-instant startup.
+- **Shuffle & Deck Logic:**
+  - Fixed a bug where `shuffleCount` was not updating in the UI when switching filter modes.
+  - Capped the shuffle count refund logic to ensure it doesn't exceed the `DAILY_SHUFFLE_LIMIT` (2).
+  - Implemented case-insensitive GUID comparison to prevent "empty deck" issues caused by ID mismatch.
+- **UI & Iconography:**
+  - Repaired "messed up" header icons by standardizing their size to `1.8em` and removing conflicting negative margins.
+  - Increased default animation speed for `mark read` and `star item` by 50% for a snappier feel.
+  - Fixed theme "flash" on refresh by synchronizing `localStorage` and HTML base classes earlier in the boot process.
+  - Refined Backup/Restore to exclude transient session data (`currentDeckGuids`, `shuffleCount`).
+- **Theme Polishing:**
+  - Softened light theme shadows by replacing `lightgrey` with `rgba(0, 0, 0, 0.1)`.
+  - Audited theme CSS to ensure dark elements don't bleed into light modes.
+- **Ops & Stability:**
+  - Parallelized feed fetching in the Worker for faster global refreshes.
+  - Moved non-critical initialization tasks (watchers, observers) to the background.
+  - Added production deployment protection to `build.sh`.

@@ -134,6 +134,7 @@ export function rssApp(): AppState {
         searchQuery: '',
         shuffleCount: 0,
         lastShuffleResetDate: null,
+        lastFeedSync: 0,
         syncEnabled: true,
         imagesEnabled: true,
         itemButtonMode: 'play',
@@ -259,25 +260,32 @@ export function rssApp(): AppState {
                 this.isOnline = isOnline();
 
                 if (this.isOnline && initialAuthChecked) {
-                    this.progressMessage = 'Syncing latest content...'; 
-                    
-                    try {
-                        const syncPromise = (async () => {
-                            if (isOnline()) await processPendingOperations();
-                            if (isOnline()) await pullUserState();
-                            if (isOnline()) await performFeedSync(this);
-                        })();
+                    const SYNC_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+                    const isStale = (Date.now() - (this.lastFeedSync || 0)) > SYNC_THRESHOLD_MS;
 
-                        // Cap initial sync wait at 15 seconds to prevent permanent hang
-                        const timeoutPromise = new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error("Sync timeout")), 15000)
-                        );
+                    if (isStale) {
+                        this.progressMessage = 'Syncing latest content...'; 
+                        
+                        try {
+                            const syncPromise = (async () => {
+                                if (isOnline()) await processPendingOperations();
+                                if (isOnline()) await pullUserState();
+                                if (isOnline()) await performFeedSync(this);
+                            })();
 
-                        await Promise.race([syncPromise, timeoutPromise]).catch(e => {
-                            console.warn("Initial sync slow or failed, proceeding to load data:", e.message);
-                        });
-                    } catch (e) {
-                        console.error("Critical sync logic failure:", e);
+                            // Cap initial sync wait at 15 seconds to prevent permanent hang
+                            const timeoutPromise = new Promise((_, reject) => 
+                                setTimeout(() => reject(new Error("Sync timeout")), 15000)
+                            );
+
+                            await Promise.race([syncPromise, timeoutPromise]).catch(e => {
+                                console.warn("Initial sync slow or failed, proceeding to load data:", e.message);
+                            });
+                        } catch (e) {
+                            console.error("Critical sync logic failure:", e);
+                        }
+                    } else {
+                        console.log(`[Init] Skipping initial sync, last sync was recent: ${new Date(this.lastFeedSync).toLocaleTimeString()}`);
                     }
                     
                     await this._loadAndManageAllData();
@@ -628,7 +636,7 @@ export function rssApp(): AppState {
             const isStarring = !this.starred.some(item => item.guid === guid);
             if (isStarring) {
                 this.starredGuid = guid;
-                const animDuration = 1000 * (100 / (this.animationSpeed || 100));
+                const animDuration = 667 * (100 / (this.animationSpeed || 100));
                 setTimeout(() => {
                     if (this.starredGuid === guid) this.starredGuid = null;
                 }, animDuration); // Sync with CSS draw-outline duration + delay
@@ -675,21 +683,21 @@ export function rssApp(): AppState {
             if (!isCurrentlyRead) {
                 this.readingGuid = guid;
                 const animFactor = 100 / (this.animationSpeed || 100);
-                // Phase 1: Fold animation (500ms baseline)
+                // Phase 1: Fold animation (333ms baseline, was 500ms)
                 if (this.filterMode === 'unread') {
                     this.closingGuid = guid;
-                    await new Promise(resolve => setTimeout(resolve, 500 * animFactor));
+                    await new Promise(resolve => setTimeout(resolve, 333 * animFactor));
                     
                     // Select next item AFTER fold but DURING swipe for smoother feel
                     if (nextGuidToSelect) {
                         this.selectItem(nextGuidToSelect);
                     }
 
-                    // Phase 2: Swipe animation (450ms baseline)
-                    await new Promise(resolve => setTimeout(resolve, 450 * animFactor));
+                    // Phase 2: Swipe animation (300ms baseline, was 450ms)
+                    await new Promise(resolve => setTimeout(resolve, 300 * animFactor));
                 } else {
                     // Just the short delay for the button animation if not removing
-                    await new Promise(resolve => setTimeout(resolve, 500 * animFactor));
+                    await new Promise(resolve => setTimeout(resolve, 333 * animFactor));
                 }
                 this.readingGuid = null;
                 this.closingGuid = null;
@@ -1440,28 +1448,30 @@ export function rssApp(): AppState {
         // --- Private Helper Methods ---
                         _loadInitialState: async function (this: AppState): Promise<void> {
                             try {
-                                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState, animSpeedRes] = await Promise.all([
-                                    loadSimpleState('syncEnabled'),
-                                    loadSimpleState('imagesEnabled'),
-                                    loadSimpleState('itemButtonMode'),
-                                    loadSimpleState('openUrlsInNewTabEnabled'),
-                                    loadFilterMode(), // loadFilterMode directly returns string, not object with value
-                                    loadSimpleState('theme'),
-                                    loadSimpleState('curvesEnabled'),
-                                    loadSimpleState('flickToSelectEnabled'),
-                                    loadSimpleState('animationSpeed')
-                                ]);
+                                                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState, animSpeedRes, lastFeedSyncRes] = await Promise.all([
+                                                    loadSimpleState('syncEnabled'),
+                                                    loadSimpleState('imagesEnabled'),
+                                                    loadSimpleState('itemButtonMode'),
+                                                    loadSimpleState('openUrlsInNewTabEnabled'),
+                                                    loadFilterMode(), // loadFilterMode directly returns string, not object with value
+                                                    loadSimpleState('theme'),
+                                                    loadSimpleState('curvesEnabled'),
+                                                    loadSimpleState('flickToSelectEnabled'),
+                                                    loadSimpleState('animationSpeed'),
+                                                    loadSimpleState('lastFeedSync')
+                                                ]);
+                                
+                this.syncEnabled = syncEnabled.value ?? true;
+                this.imagesEnabled = imagesEnabled.value ?? true;
+                this.itemButtonMode = itemButtonMode.value ?? 'play';
+                this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
+                this.curvesEnabled = curvesState.value ?? true;
+                this.flickToSelectEnabled = flickState.value ?? false;
+                this.animationSpeed = animSpeedRes.value ?? 100;
+                this.lastFeedSync = lastFeedSyncRes.value ?? 0;
+                this.filterMode = filterModeResult;
                 
-                                this.syncEnabled = syncEnabled.value ?? true;
-                                this.imagesEnabled = imagesEnabled.value ?? true;
-                                this.itemButtonMode = itemButtonMode.value ?? 'play';
-                                this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
-                                                this.curvesEnabled = curvesState.value ?? true;
-                                                this.flickToSelectEnabled = flickState.value ?? false;
-                                                this.animationSpeed = animSpeedRes.value ?? 100;
-                                                this.filterMode = filterModeResult; // filterModeResult is already the string
-                                                
-                                                const newTheme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
+                const newTheme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                                                 if (this.theme !== newTheme) {
                                                     this.theme = newTheme;
                                                     localStorage.setItem('theme', this.theme);
@@ -1757,10 +1767,14 @@ export function rssApp(): AppState {
             this.$watch('filterMode', async (newMode: string) => {
                 await setFilterMode(this, newMode);
                 if (newMode === 'unread') {
-                    await manageDailyDeck(
+                    const result = await manageDailyDeck(
                         Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids,
                         this.shuffleCount, this.filterMode, this.lastShuffleResetDate
                     );
+                    this.deck = result.deck;
+                    this.currentDeckGuids = result.currentDeckGuids;
+                    this.shuffleCount = result.shuffleCount;
+                    this.lastShuffleResetDate = result.lastShuffleResetDate;
                 }
                 this.scrollToTop();
             });

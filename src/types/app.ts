@@ -68,6 +68,7 @@ export interface AppState {
     searchQuery: string;
     shuffleCount: number;
     lastShuffleResetDate: string | null;
+    lastFeedSync: number;
     syncEnabled: boolean;
     imagesEnabled: boolean;
     itemButtonMode: 'hide' | 'play';

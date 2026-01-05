@@ -22,7 +22,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: false, default: [] },
     shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: false, default: [] },
     lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
-    lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
+    lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     itemButtonMode: { store: 'userSettings', type: 'simple', localOnly: false, default: 'play' },
