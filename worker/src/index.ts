@@ -242,8 +242,8 @@ const userCaches = new Map<string, { items: FeedItem[], lastSync: string }>();
 const syncCooldowns = new Map<string, number>();
 const violationCounts = new Map<string, number>();
 const BASE_COOLDOWN_MS = 30000;
-const MAX_FEEDS_PER_USER = 100;
-const MAX_PAYLOAD_SIZE = 128 * 1024;
+const MAX_FEEDS_PER_USER = 150;
+const MAX_PAYLOAD_SIZE = 512 * 1024;
 const MAX_CACHE_USERS = 100; // Prevent OOM by limiting cached users
 
 const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {

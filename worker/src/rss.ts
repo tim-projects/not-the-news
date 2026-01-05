@@ -109,87 +109,97 @@ export async function processFeeds(feedUrls: string[], blacklist: string[]): Pro
     const seenGuids = new Set<string>();
     const normalizedBlacklist = blacklist.map(kw => String(kw).toLowerCase().trim()).filter(kw => kw.length > 0);
 
-    for (const url of feedUrls) {
-        try {
-            console.log(`[RSS] Fetching: ${url}`);
-            
-            // Security: Set timeout and max size for fetching
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+    // Fetch in parallel batches to avoid timeouts and stay under Cloudflare limits
+    const BATCH_SIZE = 25;
+    for (let i = 0; i < feedUrls.length; i += BATCH_SIZE) {
+        const batch = feedUrls.slice(i, i + BATCH_SIZE);
+        console.log(`[RSS] Processing batch ${i / BATCH_SIZE + 1} (${batch.length} feeds)`);
 
-            const response = await fetch(url, { 
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*'
+        const results = await Promise.all(batch.map(async (url) => {
+            try {
+                // Security: Set timeout and max size for fetching
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+                const response = await fetch(url, { 
+                    signal: controller.signal,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*'
+                    }
+                });
+                clearTimeout(timeout);
+
+                if (!response.ok) return [];
+
+                // Security: Limit response size to 2MB
+                const reader = response.body?.getReader();
+                if (!reader) return [];
+
+                let chunks = [];
+                let totalSize = 0;
+                const MAX_RSS_SIZE = 2 * 1024 * 1024; // 2MB
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    totalSize += value.length;
+                    if (totalSize > MAX_RSS_SIZE) {
+                        controller.abort();
+                        return [];
+                    }
+                    chunks.push(value);
                 }
-            });
-            clearTimeout(timeout);
 
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-            // Security: Limit response size to 2MB
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error('No body');
-
-            let chunks = [];
-            let totalSize = 0;
-            const MAX_RSS_SIZE = 2 * 1024 * 1024; // 2MB
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                totalSize += value.length;
-                if (totalSize > MAX_RSS_SIZE) {
-                    controller.abort();
-                    throw new Error('RSS feed exceeds 2MB limit');
-                }
-                chunks.push(value);
-            }
-
-            const blob = new Blob(chunks);
-            const xml = await blob.text();
-            const feed = await parser.parseString(xml);
-            
-            for (const entry of feed.items) {
-                const guid = entry.guid || entry.link || '';
-                if (!guid || seenGuids.has(guid)) continue;
-
-                // Keyword filtering
-                const title = entry.title || '';
-                const rawDescription = entry['content:encoded'] || entry.content || entry.description || entry.summary || '';
-                const description = typeof rawDescription === 'string' ? rawDescription : (entry.contentSnippet || '');
-                const searchableText = `${title} ${description}`.toLowerCase();
+                const blob = new Blob(chunks);
+                const xml = await blob.text();
+                const feed = await parser.parseString(xml);
                 
-                const isBlacklisted = normalizedBlacklist.some(kw => searchableText.includes(kw));
-                if (isBlacklisted) {
-                    console.log(`[RSS] Filtering blacklisted item: ${title.substring(0, 50)}...`);
-                    continue;
+                const feedItems: FeedItem[] = [];
+                for (const entry of feed.items) {
+                    const guid = entry.guid || entry.link || '';
+                    if (!guid) continue;
+
+                    // Keyword filtering
+                    const title = entry.title || '';
+                    const rawDescription = entry['content:encoded'] || entry.content || entry.description || entry.summary || '';
+                    const description = typeof rawDescription === 'string' ? rawDescription : (entry.contentSnippet || '');
+                    const searchableText = `${title} ${description}`.toLowerCase();
+                    
+                    const isBlacklisted = normalizedBlacklist.some(kw => searchableText.includes(kw));
+                    if (isBlacklisted) continue;
+
+                    const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
+                    
+                    let item: any = {
+                        guid,
+                        title: entry.title,
+                        link: entry.link,
+                        pubDate,
+                        description: description,
+                        source: feed.title || extractDomain(entry.link || ''),
+                        image: '',
+                        timestamp: new Date(pubDate).getTime()
+                    };
+
+                    item = prettifyItem(item);
+                    feedItems.push(item as FeedItem);
                 }
-
-                seenGuids.add(guid);
-                const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
-                
-                if (!description) {
-                    console.log(`[RSS] WARNING: No description found for item: ${title}`);
-                }
-
-                let item: any = {
-                    guid,
-                    title: entry.title,
-                    link: entry.link,
-                    pubDate,
-                    description: description,
-                    source: feed.title || extractDomain(entry.link || ''),
-                    image: '',
-                    timestamp: new Date(pubDate).getTime()
-                };
-
-                item = prettifyItem(item);
-                allItems.push(item as FeedItem);
+                return feedItems;
+            } catch (error) {
+                console.error(`[RSS] Failed to process ${url}:`, error);
+                return [];
             }
-        } catch (error) {
-            console.error(`[RSS] Failed to process ${url}:`, error);
+        }));
+
+        // Flatten results and deduplicate
+        for (const feedItems of results) {
+            for (const item of feedItems) {
+                if (!seenGuids.has(item.guid)) {
+                    seenGuids.add(item.guid);
+                    allItems.push(item);
+                }
+            }
         }
     }
 
