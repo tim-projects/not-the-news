@@ -613,11 +613,17 @@ export function rssApp(): AppState {
         },
         // --- Action Methods ---
         isStarred: function (this: AppState, guid: string): boolean {
+            if (!guid) return false;
             const g = guid.toLowerCase();
-            return this.starred.some(e => e.guid.toLowerCase() === g);
+            const found = this.starred.some(e => e.guid.toLowerCase() === g);
+            // console.debug(`[isStarred] ${guid} -> ${found}`);
+            return found;
         }, isRead: function (this: AppState, guid: string): boolean {
+            if (!guid) return false;
             const g = guid.toLowerCase();
-            return this.read.some(e => e.guid.toLowerCase() === g);
+            const found = this.read.some(e => e.guid.toLowerCase() === g);
+            // if (found) console.debug(`[isRead] ${guid} -> ${found}`);
+            return found;
         },
         toggleStar: async function (this: AppState, guid: string): Promise<void> {
             const isStarring = !this.starred.some(item => item.guid === guid);

@@ -569,10 +569,15 @@ export default {
                         results.push({ id: op.id, status: 'success', lastModified });
                     } else if (op.type === 'readDelta' || op.type === 'starDelta') {
                         const key = op.type === 'readDelta' ? 'read' : 'starred';
+                        const timeField = op.type === 'readDelta' ? 'readAt' : 'starredAt';
                         const { value: current } = await Storage.loadState(uid, key, env);
                         const arr = Array.isArray(current) ? current : [];
-                        const filtered = arr.filter((i: any) => i.guid !== op.guid);
-                        if (op.action === 'add') filtered.push({ guid: op.guid, timestamp: new Date().toISOString() });
+                        const filtered = arr.filter((i: any) => i.guid.toLowerCase() !== op.guid.toLowerCase());
+                        if (op.action === 'add') {
+                            const item: any = { guid: op.guid };
+                            item[timeField] = op.timestamp || new Date().toISOString();
+                            filtered.push(item);
+                        }
                         const lastModified = await Storage.saveState(uid, key, filtered, env);
                         results.push({ id: op.id, status: 'success', lastModified });
                     }

@@ -70,6 +70,20 @@ deploy_prod() {
         exit 1
     fi
 
+    # Mandatory user confirmation to prevent automated agent deployments
+    echo ""
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "!!! WARNING: YOU ARE DEPLOYING TO PRODUCTION ($PROD_DOMAIN) !!!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo ""
+    printf "Type 'DEPLOY' to confirm production deployment: "
+    read CONFIRMATION
+    if [ "$CONFIRMATION" != "DEPLOY" ]; then
+        echo "Deployment aborted."
+        exit 1
+    fi
+    echo "Confirmation received. Proceeding..."
+
     # 1. Prepare wrangler config
     sed "s/VITE_PRODUCTION_DOMAIN_PLACEHOLDER/$PROD_DOMAIN/g" worker/wrangler.jsonc > worker/wrangler.deploy.jsonc
 

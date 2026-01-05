@@ -147,8 +147,9 @@ export async function loadAndPruneReadItems(feedItems: any[]): Promise<ReadItem[
                 needsResave = true;
             } else if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid) {
                 // Modern object data: ensure timestamp exists
+                const timestamp = item.readAt || item.timestamp;
                 if (!item.readAt) {
-                    item.readAt = defaultTimestamp;
+                    item.readAt = timestamp || defaultTimestamp;
                     needsResave = true;
                 }
                 normalizedItems.push(item);
