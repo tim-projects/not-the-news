@@ -40,9 +40,9 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-CezUpG0f.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-C0v-DdPe.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-CMaBS_v2.css">
+  <script type="module" crossorigin src="/assets/main-BpDZujf-.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-FD2r2Ui8.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-DYNGyZpu.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
@@ -171,11 +171,18 @@
                                         <p class="pubdate" x-text="entry.pubDate"></p>
                                     </div>
                                     <template x-if="imagesEnabled && entry.image">
-                                        <img :data-src="entry.image" alt="" class="entry-image title-image" loading="lazy" 
-                                             x-init="observeImage($el)"
-                                             @load="$el.classList.add('loaded')"
-                                             @click.stop="fullscreenImage = entry.image"
-                                             style="cursor: zoom-in;" />
+                                        <div class="image-wrapper" @click.away="if (activeExpandGuid === entry.guid) activeExpandGuid = null">
+                                            <img :data-src="entry.image" alt="" class="entry-image title-image" loading="lazy" 
+                                                 x-init="observeImage($el)"
+                                                 @load="$el.classList.add('loaded')"
+                                                 @click.stop="activeExpandGuid === entry.guid ? (fullscreenImage = entry.image, activeExpandGuid = null) : activeExpandGuid = entry.guid"
+                                                 :style="{ 'cursor': activeExpandGuid === entry.guid ? 'zoom-in' : 'pointer' }" />
+                                            <div class="expand-icon-overlay" x-show="activeExpandGuid === entry.guid" x-cloak @click.stop="fullscreenImage = entry.image; activeExpandGuid = null">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                                </svg>
+                                            </div>
+                                        </div>
                                     </template>
                                     <span x-html="entry.description"></span>
                                 </div>

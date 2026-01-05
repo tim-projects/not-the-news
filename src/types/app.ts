@@ -119,6 +119,7 @@ export interface AppState {
     closingGuid: string | null; // Track item animating out
     nextSwipeDirection: 'left' | 'right';
     fullscreenImage: string | null;
+    activeExpandGuid: string | null;
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;

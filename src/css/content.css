@@ -59,6 +59,45 @@ img.entry-image {
   aspect-ratio: 16/9;
 }
 
+.image-wrapper {
+    position: relative;
+    width: 100%;
+    margin: 0 0 1em 0;
+}
+
+.image-wrapper img.title-image {
+    margin: 0 !important;
+}
+
+.expand-icon-overlay {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+    pointer-events: auto;
+    animation: fade-in calc(0.2s * var(--animation-duration-factor)) ease-out;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.expand-icon-overlay svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
 img.loaded,
 .itemdescription img.loaded {
   opacity: 1;

@@ -183,6 +183,7 @@ export function rssApp(): AppState {
         closingGuid: null,
         nextSwipeDirection: 'left',
         fullscreenImage: null,
+        activeExpandGuid: null,
         db: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
