@@ -507,8 +507,8 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
         if (items.length > 0) {
             await withDb(async (db: IDBPDatabase) => {
                 const tx = db.transaction('feedItems', 'readwrite');
-                // Clear old items and replace with fresh ones from worker
-                await tx.store.clear();
+                // Use 'put' to merge/update items instead of clearing the store.
+                // This preserves local items if the worker cache is fresh or incomplete.
                 for (const item of items) {
                     if (item.guid) await tx.store.put(item);
                 }
