@@ -1905,29 +1905,9 @@ export function rssApp(): AppState {
                 }
             }, SYNC_INTERVAL_MS);
         },
-        _startWorkerFeedSync: function(this: AppState): void {
-            // Trigger an initial sync shortly after startup
-            setTimeout(async () => {
-                if (!this.isOnline || !this.syncEnabled) return;
-                try {
-                     
-                    const token = await getAuthToken();
-                    if (!token) return;
-
-                    fetch(`${API_BASE_URL}/api/refresh`, { 
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                        .then(r => r.json())
-                        .then(d => console.log('[Worker Sync] Background sync complete:', d))
-                        .catch(e => console.error('[Worker Sync] Background sync failed:', e));
-                } catch (err) {
-                    console.error('[Worker Sync] Setup failed:', err);
-                }
-            }, 5000);
-
-            // Periodically trigger worker to fetch and process RSS feeds (every 10 minutes)
-            setInterval(async () => {
+                _startWorkerFeedSync: function (this: AppState): void {
+                    // Periodically trigger worker to fetch and process RSS feeds (every 10 minutes)
+                    setInterval(async () => {
                 if (!this.isOnline || !this.syncEnabled) return;
                 console.log('[Worker Sync] Triggering background feed processing...');
                 try {
