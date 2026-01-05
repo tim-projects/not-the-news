@@ -118,6 +118,7 @@ export interface AppState {
     speakingGuid: string | null; // Track which item is being read out
     closingGuid: string | null; // Track item animating out
     nextSwipeDirection: 'left' | 'right';
+    fullscreenImage: string | null;
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;

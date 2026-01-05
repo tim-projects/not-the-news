@@ -169,7 +169,9 @@
                                     <template x-if="imagesEnabled && entry.image">
                                         <img :data-src="entry.image" alt="" class="entry-image title-image" loading="lazy" 
                                              x-init="observeImage($el)"
-                                             @load="$el.classList.add('loaded')" />
+                                             @load="$el.classList.add('loaded')"
+                                             @click.stop="fullscreenImage = entry.image"
+                                             style="cursor: zoom-in;" />
                                     </template>
                                     <span x-html="entry.description"></span>
                                 </div>
@@ -599,6 +601,14 @@
                             <svg class="undo-timer-svg">
                                 <rect class="undo-timer-outline" pathLength="1" :class="{ 'active': undoTimerActive }" :rx="undoBtnRadius" :ry="undoBtnRadius" />
                             </svg>            </button>
+        </div>
+
+        <div id="image-lightbox" x-cloak x-show="fullscreenImage" 
+             @click="fullscreenImage = null"
+             @keydown.window.escape="fullscreenImage = null"
+             :class="{ 'visible': fullscreenImage }">
+            <button class="lightbox-close" @click="fullscreenImage = null" aria-label="Close full view">✕</button>
+            <img :src="fullscreenImage" x-show="fullscreenImage" @click.stop>
         </div>
     </div>
 

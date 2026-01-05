@@ -40,9 +40,9 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-Cc3S_mUu.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-C5uMzVru.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-CQSNS_LX.css">
+  <script type="module" crossorigin src="/assets/main-Dry4tFfN.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-BXuI_YEW.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-D0-nsgY3.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
@@ -173,7 +173,9 @@
                                     <template x-if="imagesEnabled && entry.image">
                                         <img :data-src="entry.image" alt="" class="entry-image title-image" loading="lazy" 
                                              x-init="observeImage($el)"
-                                             @load="$el.classList.add('loaded')" />
+                                             @load="$el.classList.add('loaded')"
+                                             @click.stop="fullscreenImage = entry.image"
+                                             style="cursor: zoom-in;" />
                                     </template>
                                     <span x-html="entry.description"></span>
                                 </div>
@@ -603,6 +605,14 @@
                             <svg class="undo-timer-svg">
                                 <rect class="undo-timer-outline" pathLength="1" :class="{ 'active': undoTimerActive }" :rx="undoBtnRadius" :ry="undoBtnRadius" />
                             </svg>            </button>
+        </div>
+
+        <div id="image-lightbox" x-cloak x-show="fullscreenImage" 
+             @click="fullscreenImage = null"
+             @keydown.window.escape="fullscreenImage = null"
+             :class="{ 'visible': fullscreenImage }">
+            <button class="lightbox-close" @click="fullscreenImage = null" aria-label="Close full view">✕</button>
+            <img :src="fullscreenImage" x-show="fullscreenImage" @click.stop>
         </div>
     </div>
 
