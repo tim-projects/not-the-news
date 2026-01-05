@@ -3,18 +3,11 @@ import {
     createUserWithEmailAndPassword,
     onAuthStateChanged,
     GoogleAuthProvider,
-    signInWithRedirect,
-    getRedirectResult,
+    signInWithPopup,
     signInAnonymously,
     sendPasswordResetEmail
 } from "firebase/auth";
 import { auth } from "./firebase";
-
-// Handle redirect result errors
-getRedirectResult(auth).catch((error) => {
-    console.error("Google Redirect Error:", error);
-    showMessage(error.message || "Failed to complete Google login");
-});
 
 const loginForm = document.getElementById("login-form") as HTMLFormElement;
 const emailInput = document.getElementById("email") as HTMLInputElement;
@@ -168,9 +161,11 @@ if (googleBtn) {
         const provider = new GoogleAuthProvider();
         googleBtn.disabled = true;
         try {
-            console.log("[Auth] Calling signInWithRedirect...");
-            await signInWithRedirect(auth, provider);
-            // Redirect will happen, onAuthStateChanged will handle the return
+            console.log("[Auth] Calling signInWithPopup...");
+            const result = await signInWithPopup(auth, provider);
+            console.log("[Auth] Google Popup Success:", result.user.uid);
+            showMessage("Login successful! Redirecting...", false);
+            // onAuthStateChanged will handle the redirect
         } catch (error: any) {
             console.error("Google login error:", error);
             showMessage(error.message || "Failed to login with Google");

@@ -75,6 +75,8 @@ deploy_prod() {
 
     # 2. Build for production
     echo "Building frontend for PROD..."
+    export VITE_API_BASE_URL="https://$PROD_DOMAIN"
+    export VITE_PRODUCTION_DOMAIN="$PROD_DOMAIN"
     npm run build
 
     # 3. Deploy to Cloudflare

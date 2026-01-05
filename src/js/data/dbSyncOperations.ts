@@ -184,65 +184,74 @@ export async function processPendingOperations(): Promise<void> {
         return;
     }
 
-    console.log(`[DB] Sending ${operations.length} batched operations to /api/user-state.`);
+    console.log(`[DB] Processing ${operations.length} pending operations...`);
+    
+    const MAX_BATCH_SIZE = 10;
+    
+    // Process in chunks to respect server limit
+    for (let i = 0; i < operations.length; i += MAX_BATCH_SIZE) {
+        const batch = operations.slice(i, i + MAX_BATCH_SIZE);
+        console.log(`[DB] Sending batch ${i / MAX_BATCH_SIZE + 1} (${batch.length} ops) to /api/user-state.`);
 
-    try {
-        const token = await getAuthToken();
-        if (!token) {
-            console.warn('[DB] No auth token available for batch sync.');
-            return;
-        }
+        try {
+            const token = await getAuthToken();
+            if (!token) {
+                console.warn('[DB] No auth token available for batch sync.');
+                return;
+            }
 
-        const response: Response = await fetch(`${API_BASE_URL}/api/profile`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify(operations)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error ${response.status}. Details: ${await response.text()}`);
-        }
-
-        const responseData: SyncResponse = await response.json();
-        console.log('[DB] Batch sync successful. Server response:', responseData);
-
-        const skipKeys: string[] = [];
-        if (responseData.results && Array.isArray(responseData.results)) {
-            await withDb(async (db: IDBPDatabase) => {
-                const tx = db.transaction('pendingOperations', 'readwrite');
-                for (const result of responseData.results as SyncResult[]) {
-                    if (result.status === 'success' && result.id !== undefined) {
-                        await tx.store.delete(result.id);
-                        
-                        // Identify key to skip to prevent race condition on immediate pull
-                        const originalOp = operations?.find(op => op.id === result.id);
-                        if (originalOp) {
-                            if (originalOp.key) skipKeys.push(originalOp.key);
-                            else if (originalOp.type === 'readDelta') skipKeys.push('read');
-                            else if (originalOp.type === 'starDelta') skipKeys.push('starred');
-                        }
-                    } else {
-                        console.warn(`[DB] Op ${result.id ?? 'N/A'} (${result.opType}) ${result.status}: ${result.reason || 'N/A'}`);
-                    }
-                }
-                await tx.done;
+            const response: Response = await fetch(`${API_BASE_URL}/api/profile`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(batch)
             });
-        } else {
-            console.warn('[DB] Server response invalid; cannot clear buffered operations.');
+
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}. Details: ${await response.text()}`);
+            }
+
+            const responseData: SyncResponse = await response.json();
+            console.log(`[DB] Batch ${i / MAX_BATCH_SIZE + 1} sync successful. Server response:`, responseData);
+
+            const skipKeys: string[] = [];
+            if (responseData.results && Array.isArray(responseData.results)) {
+                await withDb(async (db: IDBPDatabase) => {
+                    const tx = db.transaction('pendingOperations', 'readwrite');
+                    for (const result of responseData.results as SyncResult[]) {
+                        if (result.status === 'success' && result.id !== undefined) {
+                            await tx.store.delete(result.id);
+                            
+                            // Identify key to skip to prevent race condition on immediate pull
+                            const originalOp = batch.find(op => op.id === result.id);
+                            if (originalOp) {
+                                if (originalOp.key) skipKeys.push(originalOp.key);
+                                else if (originalOp.type === 'readDelta') skipKeys.push('read');
+                                else if (originalOp.type === 'starDelta') skipKeys.push('starred');
+                            }
+                        } else {
+                            console.warn(`[DB] Op ${result.id ?? 'N/A'} (${result.opType}) ${result.status}: ${result.reason || 'N/A'}`);
+                        }
+                    }
+                    await tx.done;
+                });
+            } else {
+                console.warn('[DB] Server response invalid; cannot clear buffered operations.');
+            }
+
+            if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
+
+            // --- SOLUTION ---
+            // After a successful batch sync, pull the latest state, skipping updated keys.
+            pullUserState(false, skipKeys);
+            // --- END SOLUTION ---
+
+        } catch (error: any) {
+            console.error('[DB] Error during batch synchronization:', error);
+            // We continue to the next batch even if one fails
         }
-
-        if (responseData.serverTime) await _saveSyncMetaState('lastStateSync', responseData.serverTime);
-
-        // --- SOLUTION ---
-        // After a successful batch sync, pull the latest state, skipping updated keys.
-        pullUserState(false, skipKeys);
-        // --- END SOLUTION ---
-
-    } catch (error: any) {
-        console.error('[DB] Error during batch synchronization:', error);
     }
 }
 

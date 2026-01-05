@@ -11,10 +11,19 @@ interface Env {
     ASSETS: { fetch: typeof fetch };
 }
 
+// Global cache for Google Access Token
+let cachedGoogleToken: { token: string, expiresAt: number } | null = null;
+
 /**
  * Helper to get a Google OAuth2 Access Token for Firestore
  */
 async function getGoogleAccessToken(env: Env): Promise<string> {
+    const now = Date.now();
+    // Reuse token if valid (with 5-minute buffer)
+    if (cachedGoogleToken && cachedGoogleToken.expiresAt > now + 300000) {
+        return cachedGoogleToken.token;
+    }
+
     const email = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
     const privateKey = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
@@ -23,7 +32,10 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
     }
 
     try {
-        const cleanedKey = privateKey.replace(/\\n/g, '\n');
+        let cleanedKey = privateKey.replace(/\\n/g, '\n');
+        if (cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) {
+            cleanedKey = cleanedKey.slice(1, -1);
+        }
         const algorithm = 'RS256';
         const pkcs8 = await jose.importPKCS8(cleanedKey, algorithm);
 
@@ -51,6 +63,13 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
         if (!data.access_token) {
             throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
         }
+        
+        // Cache the token
+        cachedGoogleToken = {
+            token: data.access_token,
+            expiresAt: Date.now() + (data.expires_in || 3600) * 1000
+        };
+
         return data.access_token;
     } catch (e: any) {
         console.error('[Auth] getGoogleAccessToken Fatal Error:', e);
