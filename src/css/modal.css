@@ -72,6 +72,10 @@ html.light .modal-content {
   transition-property: opacity, transform;
 }
 
+.duration-300 {
+  transition-duration: calc(0.3s * var(--animation-duration-factor));
+}
+
 .duration-200 {
   transition-duration: calc(0.2s * var(--animation-duration-factor));
 }
