@@ -594,18 +594,18 @@ export function rssApp(): AppState {
         },
         get starredCount(): number {
             if (!this.entries.length) return 0;
-            const starredSet = new Set(this.starred.map(s => s.guid));
-            return this.entries.filter(e => starredSet.has(e.guid)).length;
+            const starredGuids = new Set(this.starred.map(s => (typeof s === 'string' ? s : s.guid).toLowerCase()));
+            return this.entries.filter(e => starredGuids.has(e.guid.toLowerCase())).length;
         },
         get readCount(): number {
             if (!this.entries.length) return 0;
-            const readSet = new Set(this.read.map(r => r.guid));
-            return this.entries.filter(e => readSet.has(e.guid)).length;
+            const readGuids = new Set(this.read.map(r => (typeof r === 'string' ? r : r.guid).toLowerCase()));
+            return this.entries.filter(e => readGuids.has(e.guid.toLowerCase())).length;
         },
         get unreadCount(): number {
             if (!this.entries.length || !this.currentDeckGuids.length) return 0;
-            const readGuids = new Set(this.read.map(r => r.guid.toLowerCase()));
-            const deckGuids = new Set(this.currentDeckGuids.map(item => item.guid.toLowerCase()));
+            const readGuids = new Set(this.read.map(r => (typeof r === 'string' ? r : r.guid).toLowerCase()));
+            const deckGuids = new Set(this.currentDeckGuids.map(item => (typeof item === 'string' ? item : item.guid).toLowerCase()));
             return this.entries.filter(e => {
                 const g = e.guid.toLowerCase();
                 return deckGuids.has(g) && !readGuids.has(g);
@@ -615,15 +615,11 @@ export function rssApp(): AppState {
         isStarred: function (this: AppState, guid: string): boolean {
             if (!guid) return false;
             const g = guid.toLowerCase();
-            const found = this.starred.some(e => e.guid.toLowerCase() === g);
-            // console.debug(`[isStarred] ${guid} -> ${found}`);
-            return found;
+            return this.starred.some(e => (typeof e === 'string' ? e : e.guid).toLowerCase() === g);
         }, isRead: function (this: AppState, guid: string): boolean {
             if (!guid) return false;
             const g = guid.toLowerCase();
-            const found = this.read.some(e => e.guid.toLowerCase() === g);
-            // if (found) console.debug(`[isRead] ${guid} -> ${found}`);
-            return found;
+            return this.read.some(e => (typeof e === 'string' ? e : e.guid).toLowerCase() === g);
         },
         toggleStar: async function (this: AppState, guid: string): Promise<void> {
             const isStarring = !this.starred.some(item => item.guid === guid);
@@ -1836,17 +1832,36 @@ export function rssApp(): AppState {
                 handleKeyboardShortcuts(e, this);
             });
 
-            // Re-trigger selection animation when returning to the app
+            // Re-verify connectivity when returning to the app
             window.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && this.selectedGuid) {
-                    console.log('[Visibility] App returned to foreground. Redrawing selection animation.');
-                    const currentGuid = this.selectedGuid;
-                    this.selectedGuid = null;
-                    this.$nextTick(() => {
-                        this.selectedGuid = currentGuid;
-                    });
+                if (document.visibilityState === 'visible') {
+                    const online = isOnline();
+                    if (this.isOnline !== online) {
+                        console.log(`[Connectivity] Visibility change detected. Updating status: ${online ? 'ONLINE' : 'OFFLINE'}`);
+                        this.isOnline = online;
+                        this.updateSyncStatusMessage();
+                    }
+                    
+                    if (this.selectedGuid) {
+                        console.log('[Visibility] App returned to foreground. Redrawing selection animation.');
+                        const currentGuid = this.selectedGuid;
+                        this.selectedGuid = null;
+                        this.$nextTick(() => {
+                            this.selectedGuid = currentGuid;
+                        });
+                    }
                 }
             });
+
+            // Periodic heartbeat to prevent getting stuck in a stale state
+            setInterval(() => {
+                const online = isOnline();
+                if (this.isOnline !== online) {
+                    console.log(`[Connectivity] Heartbeat status change: ${online ? 'ONLINE' : 'OFFLINE'}`);
+                    this.isOnline = online;
+                    this.updateSyncStatusMessage();
+                }
+            }, 30000);
         },
         _setupFlickToSelectListeners: function(this: AppState): void {
             let lastFlickTime = 0;
