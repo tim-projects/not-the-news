@@ -258,6 +258,7 @@ const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'syncEnabled': { 'type': 'simple', 'default': true },
     'imagesEnabled': { 'type': 'simple', 'default': true },
     'fontSize': { 'type': 'simple', 'default': 100 },
+    'animationSpeed': { 'type': 'simple', 'default': 100 },
     'lastStateSync': { 'type': 'simple', 'default': null },
     'lastViewedItemId': { 'type': 'simple', 'default': null },
     'lastViewedItemOffset': { 'type': 'simple', 'default': 0 },

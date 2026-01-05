@@ -73,11 +73,11 @@ html.light .modal-content {
 }
 
 .duration-200 {
-  transition-duration: 0.2s;
+  transition-duration: calc(0.2s * var(--animation-duration-factor));
 }
 
 .duration-150 {
-  transition-duration: 0.15s;
+  transition-duration: calc(0.15s * var(--animation-duration-factor));
 }
 
 .ease-in {
@@ -130,6 +130,7 @@ html.light .modal-content {
 .setting-label-group {
     display: flex;
     flex-direction: column;
+    flex-basis: 40%;
     flex-grow: 1;
     min-width: 0;
 }

@@ -41,7 +41,7 @@ body.no-scroll #app-viewport {
   display: flex;
   width: calc(200vw + var(--feed-gap));
   gap: var(--feed-gap);
-  transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+  transition: transform calc(0.6s * var(--animation-duration-factor)) cubic-bezier(0.65, 0, 0.35, 1);
   align-items: flex-start; /* Better for performance than stretch on mobile */
 }
 
@@ -84,7 +84,7 @@ body.no-scroll #app-viewport {
   padding-left: 5vw; /* Offset to help centering in the shifted viewport */
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.4s ease-in-out, visibility 0.4s;
+  transition: opacity calc(0.4s * var(--animation-duration-factor)) ease-in-out, visibility calc(0.4s * var(--animation-duration-factor));
 }
 
 #app-viewport.shifted #shortcuts-section {
@@ -198,7 +198,7 @@ body.no-scroll {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: color calc(0.2s * var(--animation-duration-factor));
 }
 
 .search-close:hover {
@@ -248,7 +248,7 @@ body.no-scroll {
   float: none;
   overflow: visible;
   max-height: 10000px;
-  transition: transform .25s ease, max-height .25s ease, padding .25s ease, opacity .25s ease;
+  transition: transform calc(.25s * var(--animation-duration-factor)) ease, max-height calc(.25s * var(--animation-duration-factor)) ease, padding calc(.25s * var(--animation-duration-factor)) ease, opacity calc(.25s * var(--animation-duration-factor)) ease;
 }
 
 .itemtitle {

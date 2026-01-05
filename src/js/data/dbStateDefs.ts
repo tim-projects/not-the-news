@@ -34,6 +34,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     customCss: { store: 'userSettings', type: 'simple', localOnly: false, default: '' },
     fontSize: { store: 'userSettings', type: 'simple', localOnly: true, default: 100 },
     feedWidth: { store: 'userSettings', type: 'simple', localOnly: true, default: 50 },
+    animationSpeed: { store: 'userSettings', type: 'simple', localOnly: false, default: 100 },
     feedLastModified: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
     rssFeeds: { store: 'userSettings', type: 'simple', localOnly: false, default: {} },
     keywordBlacklist: { store: 'userSettings', type: 'simple', localOnly: false, default: [] },

@@ -14,7 +14,7 @@
     opacity: 0;
     visibility: hidden;
     transform: translateY(-100%);
-    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity calc(0.3s * var(--animation-duration-factor)) ease, visibility calc(0.3s * var(--animation-duration-factor)) ease, transform calc(0.3s * var(--animation-duration-factor)) cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
     display: flex;

@@ -2,7 +2,7 @@
 button {
   cursor: pointer;
   border: none;
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+  transition: background-color calc(.2s * var(--animation-duration-factor)) ease, color calc(.2s * var(--animation-duration-factor)) ease, box-shadow calc(.2s * var(--animation-duration-factor)) ease, transform calc(.2s * var(--animation-duration-factor)) ease, opacity calc(.2s * var(--animation-duration-factor)) ease;
   /* FIX: Prevents sticky active state on mobile taps */
   -webkit-tap-highlight-color: transparent;
 }
@@ -291,7 +291,7 @@ button.star.starred:active {
   box-shadow: 1px 1px 5px var(--card-shadow-color);
   border: 1px solid var(--card-border);
   cursor: pointer;
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+  transition: background-color calc(.2s * var(--animation-duration-factor)) ease, color calc(.2s * var(--animation-duration-factor)) ease, box-shadow calc(.2s * var(--animation-duration-factor)) ease, transform calc(.2s * var(--animation-duration-factor)) ease, opacity calc(.2s * var(--animation-duration-factor)) ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -363,7 +363,7 @@ button.star.starred:active {
   border-radius: 10px 0 20px 0;
   opacity: 0.8;
   box-shadow: 1px 1px 0 1px var(--card-shadow-color);
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+  transition: background-color calc(.2s * var(--animation-duration-factor)) ease, color calc(.2s * var(--animation-duration-factor)) ease, box-shadow calc(.2s * var(--animation-duration-factor)) ease, transform calc(.2s * var(--animation-duration-factor)) ease;
 }
 
 #back-button:hover {
@@ -387,7 +387,7 @@ button.star.starred:active {
   margin-left: auto;
   padding: 0.5rem 1rem;
   border: none;
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+  transition: background-color calc(.2s * var(--animation-duration-factor)) ease, color calc(.2s * var(--animation-duration-factor)) ease, box-shadow calc(.2s * var(--animation-duration-factor)) ease, transform calc(.2s * var(--animation-duration-factor)) ease;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -415,7 +415,7 @@ button.star.starred:active {
   color: var(--primary-fg);
   border: none;
   cursor: pointer;
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+  transition: background-color calc(.2s * var(--animation-duration-factor)) ease, color calc(.2s * var(--animation-duration-factor)) ease, box-shadow calc(.2s * var(--animation-duration-factor)) ease, transform calc(.2s * var(--animation-duration-factor)) ease;
   white-space: nowrap;
   flex-shrink: 0;
 }

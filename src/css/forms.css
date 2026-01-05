@@ -7,7 +7,7 @@
   border: 1px solid var(--card-border);
   box-shadow: 1px 1px 5px var(--card-shadow-color);
   cursor: pointer;
-  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+  transition: background-color calc(.2s * var(--animation-duration-factor)) ease, color calc(.2s * var(--animation-duration-factor)) ease, box-shadow calc(.2s * var(--animation-duration-factor)) ease, transform calc(.2s * var(--animation-duration-factor)) ease, opacity calc(.2s * var(--animation-duration-factor)) ease;
 }
 
 .filter-select:hover {
@@ -85,7 +85,7 @@ select.filter-select {
   right: 0;
   bottom: 0;
   background-color: var(--toggle-track);
-  transition: .4s;
+  transition: calc(.4s * var(--animation-duration-factor));
   border-radius: 34px;
 }
 
@@ -97,7 +97,7 @@ select.filter-select {
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .4s;
+  transition: calc(.4s * var(--animation-duration-factor));
   border-radius: 50%;
 }
 

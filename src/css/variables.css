@@ -40,6 +40,7 @@ html {
   --border-radius: 5px;
   --read-item-bg: #282828; /* A slightly darker background for read items */
   --font-scale: 1;
+  --animation-duration-factor: 1;
   --feed-gap: 1em;
 
   /* Define the specific LIGHT theme variables for use by html.light */
@@ -201,7 +202,7 @@ title {
 
 a {
   text-decoration: none;
-  transition: color .3s linear;
+  transition: color calc(.3s * var(--animation-duration-factor)) linear;
 }
 
 a:visited {

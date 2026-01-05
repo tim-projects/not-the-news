@@ -40,10 +40,10 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-DAV5BbhO.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-BOEmE5ZG.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-DjurUqsu.css">
-  <link rel="stylesheet" crossorigin href="/assets/main-CAI1U8em.css">
+  <script type="module" crossorigin src="/assets/main-BKaB2A3R.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-BnSMO8gx.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-Db5cC7j1.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-nkIjUKeV.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body>
@@ -121,7 +121,8 @@
                                                                                                                         'selected-item': entry.guid === selectedGuid,
                                                                                                                         'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'item',
                                                                                                                         'read': entry.isRead,
-                                                                                                                        'is-closing': entry.guid === closingGuid
+                                                                                                                        'is-closing-left': entry.guid === closingGuid && nextSwipeDirection === 'right',
+                                                                                                                        'is-closing-right': entry.guid === closingGuid && nextSwipeDirection === 'left'
                                                                                                                      }" 
                                                                                                                      :data-guid="entry.guid" @click="selectItem(entry.guid)">
                                                                                                                     
@@ -348,18 +349,30 @@
                                 <button class="font-size-btn" @click="fontSize = Math.min(200, fontSize + 5); applyFontSize(); saveFontSize();" aria-label="Increase font size">+</button>
                             </div>
                         </div>
-                        <div class="settings-group d-none d-md-flex">
-                            <div class="setting-label-group">
-                                <label for="feed-width-slider">Feed Width</label>
-                                <p class="setting-description">Change the width of the main content area.</p>
-                            </div>
-                            <div class="d-flex align-items-center grow font-size-control">
-                                <span class="font-size-value" x-text="`${feedWidth}%`"></span>
-                                <button class="font-size-btn" @click="feedWidth = Math.max(25, feedWidth - 5); applyFeedWidth(); saveFeedWidth();" aria-label="Decrease feed width">-</button>
-                                <input type="range" id="feed-width-slider" min="25" max="95" step="5" x-model.number="feedWidth" @input="applyFeedWidth()" @change="saveFeedWidth()" class="font-size-range">
-                                <button class="font-size-btn" @click="feedWidth = Math.min(95, feedWidth + 5); applyFeedWidth(); saveFeedWidth();" aria-label="Increase feed width">+</button>
-                            </div>
-                        </div>
+                                                <div class="settings-group d-none d-md-flex">
+                                                    <div class="setting-label-group">
+                                                        <label for="feed-width-slider">Feed Width</label>
+                                                        <p class="setting-description">Change the width of the main content area.</p>
+                                                    </div>
+                                                    <div class="d-flex align-items-center grow font-size-control">
+                                                        <span class="font-size-value" x-text="`${feedWidth}%`"></span >
+                                                        <button class="font-size-btn" @click="feedWidth = Math.max(25, feedWidth - 5); applyFeedWidth(); saveFeedWidth();" aria-label="Decrease feed width">-</button>
+                                                        <input type="range" id="feed-width-slider" min="25" max="95" step="5" x-model.number="feedWidth" @input="applyFeedWidth()" @change="saveFeedWidth()" class="font-size-range">
+                                                        <button class="font-size-btn" @click="feedWidth = Math.min(95, feedWidth + 5); applyFeedWidth(); saveFeedWidth();" aria-label="Increase feed width">+</button>
+                                                    </div>
+                                                </div>
+                                                <div class="settings-group">
+                                                    <div class="setting-label-group">
+                                                        <label for="animation-speed-slider">Animation Speed</label>
+                                                        <p class="setting-description">Speed of UI transitions (50% to 200%).</p>
+                                                    </div>
+                                                    <div class="d-flex align-items-center grow font-size-control">
+                                                        <span class="font-size-value" x-text="`${animationSpeed}%`"></span >
+                                                        <button class="font-size-btn" @click="animationSpeed = Math.max(50, animationSpeed - 5); applyAnimationSpeed(); saveAnimationSpeed();" aria-label="Decrease animation speed">-</button>
+                                                        <input type="range" id="animation-speed-slider" min="50" max="200" step="5" x-model.number="animationSpeed" @input="applyAnimationSpeed()" @change="saveAnimationSpeed()" class="font-size-range">
+                                                        <button class="font-size-btn" @click="animationSpeed = Math.min(200, animationSpeed + 5); applyAnimationSpeed(); saveAnimationSpeed();" aria-label="Increase animation speed">+</button>
+                                                    </div>
+                                                </div>
                         <div class="settings-option">
                             <div class="setting-label-group">
                                 <span>Custom CSS</span>
@@ -405,7 +418,7 @@
                             <label for="discovery-input" style="font-weight: bold; margin-bottom: 0.5rem;">Auto-Discover Feed</label>
                             <div class="d-flex gap-2">
                                 <input type="text" id="discovery-input" x-model="discoveryUrl" @keydown.enter="discoverFeed()" placeholder="Enter website URL (e.g. example.com)" class="settings-input grow" style="flex-grow: 1;">
-                                <button id="discover-btn" class="settings-button" @click="discoverFeed()" :disabled="isDiscovering" style="margin: 0; min-width: auto; height: auto; padding: 0.5rem 1rem;">
+                                <button id="discover-btn" class="configure-button" @click="discoverFeed()" :disabled="isDiscovering" style="margin: 0;">
                                     <span x-show="!isDiscovering">Find Feed</span>
                                     <span x-show="isDiscovering">Scanning…</span>
                                 </button>
@@ -418,7 +431,7 @@
                                     <div class="d-flex flex-column" style="margin-bottom: 0.75rem; background: var(--card-bg); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--card-border);">
                                         <code x-text="foundUrl" style="word-break: break-all; font-size: 0.85rem; margin-bottom: 0.75rem; display: block; background: rgba(0,0,0,0.1); padding: 0.4rem; border-radius: 4px;"></code>
                                         <div class="d-flex gap-2 justify-end">
-                                            <button class="settings-button" @click="discoveryResults = discoveryResults.filter(u => u !== foundUrl)" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg); min-width: auto;">Cancel</button>
+                                            <button class="configure-button" @click="discoveryResults = discoveryResults.filter(u => u !== foundUrl)" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg); min-width: auto;">Cancel</button>
                                             <button class="configure-button" @click="rssFeedsInput += '\n' + foundUrl; rssFeedsInput = rssFeedsInput.trim(); discoveryResults = discoveryResults.filter(u => u !== foundUrl); createStatusBarMessage($data, 'Feed added!')" style="font-size: 0.8rem !important; padding: 0.25rem 1rem; margin: 0; min-width: auto;">Add Feed</button>
                                         </div>
                                     </div>
@@ -429,20 +442,20 @@
                         <div class="settings-group grow">
                             <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
-                                <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.5rem 1rem; margin: 0; background: transparent; border: 1px solid var(--card-border); color: var(--fg);" @click="modalView = 'advanced'">Backup/Restore</button>
-                                <button id="save-rss-btn" class="settings-button" style="margin: 0;" @click="saveRssFeeds()">Save Feeds</button>
+                                <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
+                                <button id="save-rss-btn" class="configure-button" style="margin: 0;" @click="saveRssFeeds()">Save Feeds</button>
                             </div>
                         </div>
                     </div>
 
                     <div id="keywords-settings-block" x-show="modalView === 'keywords'">
-                        <div class="d-flex justify-between align-items-center">
-                            <h2>Configure Keyword Blacklist</h2>
-                            <button class="configure-button" style="font-size: 0.8rem !important; padding: 0.25rem 0.75rem;" @click="modalView = 'advanced'">Backup/Restore</button>
-                        </div>
+                        <h2>Configure Keyword Blacklist</h2>
                         <div class="settings-group grow">
                             <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
-                            <button id="save-keywords-btn" class="settings-button" @click="saveKeywordBlacklist()">Save Keywords</button>
+                            <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
+                                <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
+                                <button id="save-keywords-btn" class="configure-button" style="margin: 0;" @click="saveKeywordBlacklist()">Save Keywords</button>
+                            </div>
                         </div>
                     </div>
 
@@ -453,8 +466,8 @@
                             <textarea class="settings-textarea" x-model="customCss" placeholder="/* Enter custom CSS here */
     /* Example: .itemtitle { font-weight: bold; } */"></textarea>
                             <div class="d-flex justify-between" style="margin-top: 1rem;">
-                                <button id="reset-css-btn" class="settings-button" @click="resetCustomCss()">Reset to Default</button>
-                                <button id="save-css-btn" class="settings-button" @click="saveCustomCss()">Save CSS</button>
+                                <button id="reset-css-btn" class="configure-button" @click="resetCustomCss()">Reset to Default</button>
+                                <button id="save-css-btn" class="configure-button" @click="saveCustomCss()">Save CSS</button>
                             </div>
                         </div>
                     </div>

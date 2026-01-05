@@ -102,6 +102,7 @@ export interface AppState {
     customCss: string;
     fontSize: number;
     feedWidth: number;
+    animationSpeed: number;
     showUndo: boolean;
     undoTimerActive: boolean;
     undoItemGuid: string | null;
@@ -116,6 +117,7 @@ export interface AppState {
     readingGuid: string | null;
     speakingGuid: string | null; // Track which item is being read out
     closingGuid: string | null; // Track item animating out
+    nextSwipeDirection: 'left' | 'right';
     db: any | null;
     _lastFilterHash: string;
     _cachedFilteredEntries: MappedFeedItem[] | null;
@@ -169,12 +171,14 @@ export interface AppState {
     saveThemeStyle(): Promise<void>;
     saveFontSize(): Promise<void>;
     saveFeedWidth(): Promise<void>;
+    saveAnimationSpeed(): Promise<void>;
     resetCustomCss(): Promise<void>;
     generateCustomCssTemplate(): string;
     applyCustomCss(): void;
     applyThemeStyle(): void;
     applyFontSize(): void;
     applyFeedWidth(): void;
+    applyAnimationSpeed(): void;
     updateThemeAndStyle(newStyle: string, newTheme: 'light' | 'dark'): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;

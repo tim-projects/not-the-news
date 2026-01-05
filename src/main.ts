@@ -166,6 +166,7 @@ export function rssApp(): AppState {
         customCss: '',
         fontSize: 100,
         feedWidth: 50,
+        animationSpeed: 100,
         showUndo: false,
         undoTimerActive: false,
         undoItemGuid: null,
@@ -180,6 +181,7 @@ export function rssApp(): AppState {
         readingGuid: null,
         speakingGuid: null,
         closingGuid: null,
+        nextSwipeDirection: 'left',
         db: null,
         _lastFilterHash: '',
         _cachedFilteredEntries: null,
@@ -606,13 +608,14 @@ export function rssApp(): AppState {
         },        isRead: function(this: AppState, guid: string): boolean {
             return this.read.some(e => e.guid === guid);
         },
-        toggleStar: async function(this: AppState, guid: string): Promise<void> {
+        toggleStar: async function (this: AppState, guid: string): Promise<void> {
             const isStarring = !this.starred.some(item => item.guid === guid);
             if (isStarring) {
                 this.starredGuid = guid;
+                const animDuration = 1000 * (100 / (this.animationSpeed || 100));
                 setTimeout(() => {
                     if (this.starredGuid === guid) this.starredGuid = null;
-                }, 1000); // 0.5s for title + 0.5s for button
+                }, animDuration); // Sync with CSS draw-outline duration + delay
             }
 
             // --- IMMEDIATE STATE UPDATE ---
@@ -655,21 +658,22 @@ export function rssApp(): AppState {
             
             if (!isCurrentlyRead) {
                 this.readingGuid = guid;
-                // Phase 1: Fold animation (500ms)
+                const animFactor = 100 / (this.animationSpeed || 100);
+                // Phase 1: Fold animation (500ms baseline)
                 if (this.filterMode === 'unread') {
                     this.closingGuid = guid;
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 500 * animFactor));
                     
                     // Select next item AFTER fold but DURING swipe for smoother feel
                     if (nextGuidToSelect) {
                         this.selectItem(nextGuidToSelect);
                     }
 
-                    // Phase 2: Swipe animation (450ms)
-                    await new Promise(resolve => setTimeout(resolve, 450));
+                    // Phase 2: Swipe animation (450ms baseline)
+                    await new Promise(resolve => setTimeout(resolve, 450 * animFactor));
                 } else {
                     // Just the short delay for the button animation if not removing
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 500 * animFactor));
                 }
                 this.readingGuid = null;
                 this.closingGuid = null;
@@ -688,6 +692,10 @@ export function rssApp(): AppState {
 
             // Trigger the sync and array updates (now backgrounded in the helper)
             await toggleItemStateAndSync(this, guid, 'read');
+
+            if (!isCurrentlyRead) {
+                this.nextSwipeDirection = this.nextSwipeDirection === 'left' ? 'right' : 'left';
+            }
 
             if (this.filterMode === 'unread' && !isCurrentlyRead) {
                 // If it was unread and now read, remove it from the deck in unread mode
@@ -1068,10 +1076,24 @@ export function rssApp(): AppState {
                     await saveSimpleState('feedWidth', this.feedWidth);
                     this.applyFeedWidth();
                 },
-                applyFeedWidth: function(this: AppState): void {
-                    document.documentElement.style.setProperty('--feed-width', `${this.feedWidth}%`);
-                },
-                updateCounts: function(this: AppState): void {
+                                applyFeedWidth: function (this: AppState): void {
+                                    document.documentElement.style.setProperty('--feed-width', `${this.feedWidth}%`);
+                                },
+                                loadAnimationSpeed: async function (this: AppState): Promise<void> {
+                                    const { value } = await loadSimpleState('animationSpeed');
+                                    this.animationSpeed = (typeof value === 'number') ? value : 100;
+                                    this.applyAnimationSpeed();
+                                },
+                                saveAnimationSpeed: async function (this: AppState): Promise<void> {
+                                    await saveSimpleState('animationSpeed', this.animationSpeed);
+                                    this.applyAnimationSpeed();
+                                },
+                                applyAnimationSpeed: function (this: AppState): void {
+                                    // 200% speed means 0.5x duration, 50% speed means 2x duration
+                                    const factor = 100 / (this.animationSpeed || 100);
+                                    document.documentElement.style.setProperty('--animation-duration-factor', factor.toString());
+                                },
+                                updateCounts: function (this: AppState): void {
             updateCounts(this);
         },        scrollToTop: function(this: AppState): void {
             scrollToTop();
@@ -1228,7 +1250,7 @@ export function rssApp(): AppState {
                 
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
-                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
+                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
                     history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
                     settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
@@ -1299,7 +1321,7 @@ export function rssApp(): AppState {
                 // Initialize selection based on what's actually in the file
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
-                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
+                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
                     history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
                     settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
@@ -1330,7 +1352,7 @@ export function rssApp(): AppState {
             try {
                 const CATEGORIES = {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
-                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
+                    appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
                     history: ['read', 'starred', 'hidden', 'shuffledOutGuids', 'currentDeckGuids', 'lastShuffleResetDate', 'shuffleCount'],
                     settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
@@ -1398,26 +1420,28 @@ export function rssApp(): AppState {
             }
         },
         // --- Private Helper Methods ---
-                _loadInitialState: async function(this: AppState): Promise<void> {
-            try {
-                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState] = await Promise.all([
-                    loadSimpleState('syncEnabled'),
-                    loadSimpleState('imagesEnabled'),
-                    loadSimpleState('itemButtonMode'),
-                    loadSimpleState('openUrlsInNewTabEnabled'),
-                    loadFilterMode(), // loadFilterMode directly returns string, not object with value
-                    loadSimpleState('theme'),
-                    loadSimpleState('curvesEnabled'),
-                    loadSimpleState('flickToSelectEnabled')
-                ]);
-
-                this.syncEnabled = syncEnabled.value ?? true;
-                this.imagesEnabled = imagesEnabled.value ?? true;
-                this.itemButtonMode = itemButtonMode.value ?? 'play';
-                this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
-                this.curvesEnabled = curvesState.value ?? true;
-                this.flickToSelectEnabled = flickState.value ?? false;
-                this.filterMode = filterModeResult; // filterModeResult is already the string
+                        _loadInitialState: async function (this: AppState): Promise<void> {
+                            try {
+                                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState, animSpeedRes] = await Promise.all([
+                                    loadSimpleState('syncEnabled'),
+                                    loadSimpleState('imagesEnabled'),
+                                    loadSimpleState('itemButtonMode'),
+                                    loadSimpleState('openUrlsInNewTabEnabled'),
+                                    loadFilterMode(), // loadFilterMode directly returns string, not object with value
+                                    loadSimpleState('theme'),
+                                    loadSimpleState('curvesEnabled'),
+                                    loadSimpleState('flickToSelectEnabled'),
+                                    loadSimpleState('animationSpeed')
+                                ]);
+                
+                                this.syncEnabled = syncEnabled.value ?? true;
+                                this.imagesEnabled = imagesEnabled.value ?? true;
+                                this.itemButtonMode = itemButtonMode.value ?? 'play';
+                                this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
+                                this.curvesEnabled = curvesState.value ?? true;
+                                this.flickToSelectEnabled = flickState.value ?? false;
+                                this.animationSpeed = animSpeedRes.value ?? 100;
+                                this.filterMode = filterModeResult; // filterModeResult is already the string
                 this.theme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                 localStorage.setItem('theme', this.theme); // Ensure localStorage matches DB
                 this.isOnline = isOnline();
@@ -1449,6 +1473,7 @@ export function rssApp(): AppState {
                 await this.loadCustomCss();
                 await this.loadFontSize();
                 await this.loadFeedWidth();
+                this.applyAnimationSpeed();
                 this.applyThemeStyle();
 
                 // Load pre-generated decks (local only)
