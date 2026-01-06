@@ -111,10 +111,11 @@ export interface AppState {
     undoStack: { guid: string, index: number | null }[];
     undoBtnRadius: number;
     selectedGuid: string | null;
-    selectedSubElement: 'item' | 'read' | 'star' | 'play';
+    selectedSubElement: 'item' | 'read' | 'menu' | 'play';
     selectedTimestamp: number | null;
     lastSelectedGuid: string | null;
     starredGuid: string | null;
+    activeMenuGuid: string | null; // Track which item's popup menu is open
     readingGuid: string | null;
     speakingGuid: string | null; // Track which item is being read out
     closingGuid: string | null; // Track item animating out
@@ -159,6 +160,8 @@ export interface AppState {
     isRead(guid: string): boolean;
     toggleStar(guid: string): Promise<void>;
     toggleRead(guid: string): Promise<void>;
+    toggleItemMenu(guid: string): void; // New method for opening item menu
+    shareItem(guid: string): void; // New method for sharing
     speakItem(guid: string): void; // New method for TTS
     undoMarkRead(): Promise<void>;
     selectItem(guid: string): void;

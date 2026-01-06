@@ -180,6 +180,7 @@ export function rssApp(): AppState {
         selectedTimestamp: null,
         lastSelectedGuid: null,
         starredGuid: null,
+        activeMenuGuid: null,
         readingGuid: null,
         speakingGuid: null,
         closingGuid: null,
@@ -810,7 +811,28 @@ export function rssApp(): AppState {
                     this.progressMessage = '';
                 }
             }
-        },        undoMarkRead: async function(this: AppState): Promise<void> {
+        },
+
+        toggleItemMenu: function(this: AppState, guid: string): void {
+            if (this.activeMenuGuid === guid) {
+                this.activeMenuGuid = null;
+            } else {
+                this.activeMenuGuid = guid;
+            }
+        },
+
+        shareItem: function(this: AppState, guid: string): void {
+            const entry = this.entries.find(e => e.guid === guid);
+            if (!entry) return;
+            
+            console.log(`[Share] Sharing item: ${entry.title}`);
+            createStatusBarMessage(this, 'Sharing feature coming soon!');
+            
+            // Close menu after action
+            this.activeMenuGuid = null;
+        },
+
+        undoMarkRead: async function(this: AppState): Promise<void> {
             if (this.undoStack.length === 0) {
                 this.showUndo = false;
                 return;
@@ -2060,6 +2082,40 @@ export function rssApp(): AppState {
                         link.removeAttribute('target');
                     }
                 }
+                
+                // Add click listener to the link itself to implement the >90% coverage check
+                link.addEventListener('click', (e: MouseEvent) => {
+                    // Find the parent item element
+                    const item = (e.target as HTMLElement).closest('.item') as HTMLElement;
+                    if (!item) return;
+                    
+                    const guid = item.dataset.guid;
+                    if (!guid) return;
+
+                    // If already selected, allow normal link behavior
+                    if (this.selectedGuid === guid) return;
+
+                    // Check screen coverage
+                    const rect = item.getBoundingClientRect();
+                    const viewHeight = window.innerHeight;
+                    const visibleHeight = Math.min(rect.bottom, viewHeight) - Math.max(rect.top, 0);
+                    const coverage = visibleHeight / viewHeight;
+
+                    console.log(`[LinkClick] Item coverage: ${(coverage * 100).toFixed(1)}%`);
+
+                    if (coverage > 0.9) {
+                        // Covered >90%, allow instant follow. 
+                        // We also select it silently for consistency but don't prevent the click.
+                        this.selectedGuid = guid;
+                        console.log(`[LinkClick] High coverage (${(coverage * 100).toFixed(1)}%), skipping double-click.`);
+                    } else {
+                        // Low coverage, require selection first
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log(`[LinkClick] Low coverage (${(coverage * 100).toFixed(1)}%), selecting item first.`);
+                        this.selectItem(guid);
+                    }
+                });
             });
         },
 

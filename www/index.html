@@ -40,9 +40,9 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-DFF3dyn2.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-DITLapOu.js">
-  <link rel="stylesheet" crossorigin href="/assets/firebase-CTjV1NKw.css">
+  <script type="module" crossorigin src="/assets/main-DJgwrynT.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-bKcaoaHX.js">
+  <link rel="stylesheet" crossorigin href="/assets/firebase-CqCDvwzH.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
@@ -124,7 +124,7 @@
                                                                                                                         'is-closing-left': entry.guid === closingGuid && nextSwipeDirection === 'right',
                                                                                                                         'is-closing-right': entry.guid === closingGuid && nextSwipeDirection === 'left'
                                                                                                                      }" 
-                                                                                                                     :data-guid="entry.guid" @click="selectItem(entry.guid)">
+                                                                                                                     :data-guid="entry.guid" @click="if (selectedGuid !== entry.guid) selectItem(entry.guid)">
                                                                                                                     
                                                                                                                     <button class="play-button" x-show="itemButtonMode === 'play'"
                                                                                                                             :class="{
@@ -137,7 +137,20 @@
                                                                                                                         <span x-show="speakingGuid === entry.guid">■</span>
                                                                                                                     </button>
                                                                         
-                                                                                                                    <div class="itemtitle" @click="if (window.innerWidth < 768 && selectedGuid !== entry.guid) { selectItem(entry.guid); $event.stopPropagation(); $event.preventDefault(); }">
+                                                                                                                    <div class="itemtitle" @click="
+                                                                                                                        if (selectedGuid !== entry.guid) {
+                                                                                                                            const rect = $el.closest('.item').getBoundingClientRect();
+                                                                                                                            const viewHeight = window.innerHeight;
+                                                                                                                            const visibleHeight = Math.min(rect.bottom, viewHeight) - Math.max(rect.top, 0);
+                                                                                                                            const coverage = visibleHeight / viewHeight;
+                                                                                                                            if (coverage <= 0.9) {
+                                                                                                                                selectItem(entry.guid); 
+                                                                                                                                $event.stopPropagation(); 
+                                                                                                                                $event.preventDefault(); 
+                                                                                                                            } else {
+                                                                                                                                selectedGuid = entry.guid;
+                                                                                                                            }
+                                                                                                                        }">
                                                                         
                                                                                     <svg class="star-animation-overlay" x-show="starredGuid === entry.guid">
                                                                                         <rect class="star-outline" pathLength="1" />
@@ -154,16 +167,26 @@
                                                                                         ✕
                                                                                     </button>
                                                                                                             <div x-html="entry.title"></div>
-                                                                                                            <button class="star" @click.stop="toggleStar(entry.guid)" 
-                                                                                                                    :class="{
-                                                                                                                        'starred': entry.isStarred,
-                                                                                                                        'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'star'
-                                                                                                                    }" aria-label="Star">
-                                                                                                                <svg class="star-button-animation-overlay" x-show="starredGuid === entry.guid">
-                                                                                                                    <path class="star-button-outline" d="M 20,2 L 54,2 L 54,54 L 2,54 L 2,20 A 18,18 0 0 1 20,2 Z" pathLength="1" />
-                                                                                                                </svg>
-                                                                                                                ★
-                                                                                                            </button>
+                                                                                                            <div class="menu-container">
+                                                                                                                <button class="star menu-trigger" @click.stop="toggleItemMenu(entry.guid)" 
+                                                                                                                        :class="{
+                                                                                                                            'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'star',
+                                                                                                                            'active': activeMenuGuid === entry.guid
+                                                                                                                        }" aria-label="Menu">
+                                                                                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.5em; height: 1.5em;">
+                                                                                                                      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                                                                                                    </svg>
+                                                                                                                </button>
+                                                                                                                
+                                                                                                                <div class="item-popup-menu" x-show="activeMenuGuid === entry.guid" x-cloak @click.away="activeMenuGuid = null">
+                                                                                                                    <button class="menu-item" @click.stop="speakItem(entry.guid)">
+                                                                                                                        <span class="menu-icon">▶</span> Play
+                                                                                                                    </button>
+                                                                                                                    <button class="menu-item" @click.stop="shareItem(entry.guid)">
+                                                                                                                        <span class="menu-icon">🔗</span> Share
+                                                                                                                    </button>
+                                                                                                                </div>
+                                                                                                            </div>
                                                                                                         </div>
                                                                     <div class="itemdescription" x-init="handleEntryLinks($el)">
                                     <div class="itemfrom">
@@ -202,7 +225,7 @@
                             <div class="shortcuts-list">
                                 <div class="shortcut-item"><span>Navigate</span><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> or <kbd>←</kbd> <kbd>↓</kbd> <kbd>↑</kbd> <kbd>→</kbd></div>
                                 <div class="shortcut-item"><span>Mark Read & Next</span><kbd>Space</kbd> or <kbd>n</kbd></div>
-                                <div class="shortcut-item"><span>Star / Save</span><kbd>s</kbd> or <kbd>L</kbd></div>
+                                <div class="shortcut-item"><span>Item Menu</span><kbd>s</kbd> or <kbd>L</kbd></div>
                                 <div class="shortcut-item"><span>Search Feed</span><kbd>/</kbd></div>
                                 <div class="shortcut-item"><span>Toggle Images</span><kbd>i</kbd></div>
                                 <div class="shortcut-item"><span>Read Out Loud</span><kbd>p</kbd></div>

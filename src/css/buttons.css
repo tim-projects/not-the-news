@@ -488,6 +488,57 @@ html.dark .cog-wheel-button:hover {
   color: var(--bg);
 }
 
+/* Item Popup Menu */
+.menu-container {
+  position: absolute;
+  bottom: 2px;
+  right: 0;
+  z-index: 20;
+}
+
+.item-popup-menu {
+  position: absolute;
+  bottom: 60px; /* Above the trigger button */
+  right: 5px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  min-width: 140px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border-radius: 0 !important; /* Overwrite global button radius */
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.menu-item:hover {
+  background-color: var(--primary);
+  color: var(--primary-fg);
+}
+
+.menu-icon {
+  width: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2rem;
+}
+
 @media (max-width: 767px) {
   .modal-content button {
     font-size: 0.9rem !important;

@@ -190,8 +190,8 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
                 if (app.selectedSubElement === 'item') {
                     app.selectedSubElement = 'read';
                 } else if (app.selectedSubElement === 'read') {
-                    app.selectedSubElement = 'star';
-                } else if (app.selectedSubElement === 'star') {
+                    app.selectedSubElement = 'menu';
+                } else if (app.selectedSubElement === 'menu') {
                     app.selectedSubElement = 'play';
                     // Auto-scroll to play button if it's off-screen
                     setTimeout(() => {
@@ -219,8 +219,8 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
             if (app.selectedGuid) {
                 event.preventDefault();
                 if (app.selectedSubElement === 'play') {
-                    app.selectedSubElement = 'star';
-                } else if (app.selectedSubElement === 'star') {
+                    app.selectedSubElement = 'menu';
+                } else if (app.selectedSubElement === 'menu') {
                     app.selectedSubElement = 'read';
                 } else if (app.selectedSubElement === 'read') {
                     app.selectedSubElement = 'item';
@@ -252,7 +252,7 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
         case 'L':
             if (app.selectedGuid) {
                 event.preventDefault();
-                await app.toggleStar(app.selectedGuid);
+                app.toggleItemMenu(app.selectedGuid);
             }
             break;
 
@@ -272,8 +272,8 @@ export async function handleKeyboardShortcuts(event: KeyboardEvent, app: AppStat
                 event.preventDefault();
                 if (app.selectedSubElement === 'read') {
                     await app.toggleRead(app.selectedGuid);
-                } else if (app.selectedSubElement === 'star') {
-                    await app.toggleStar(app.selectedGuid);
+                } else if (app.selectedSubElement === 'menu') {
+                    app.toggleItemMenu(app.selectedGuid);
                 } else if (app.selectedSubElement === 'play') {
                     app.speakItem(app.selectedGuid);
                 } else {
