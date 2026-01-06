@@ -503,7 +503,8 @@ export function rssApp(): AppState {
                 if (typeof guid !== 'string' || !guid) continue;
                 
                 const item = this.feedItems[guid.toLowerCase()];
-                if (item && item.guid && !seenGuidsForDeck.has(item.guid.toLowerCase())) {
+                // Check for item existence AND presence of content (description)
+                if (item && item.guid && item.description && !seenGuidsForDeck.has(item.guid.toLowerCase())) {
                     const mappedItem = mapRawItem(item, formatDate);
                     if (mappedItem) { 
                         const g = mappedItem.guid.toLowerCase();
@@ -946,6 +947,18 @@ export function rssApp(): AppState {
 
             const rssFeedsArray = normalizedLines.map(url => url.trim());
             
+            // Check if anything has actually changed to avoid redundant syncs
+            const { value: currentFeeds } = await loadSimpleState('rssFeeds');
+            const currentArray = parseRssFeedsConfig(currentFeeds);
+            const isSame = currentArray.length === rssFeedsArray.filter(u => u && !u.startsWith('#')).length && 
+                           rssFeedsArray.filter(u => u && !u.startsWith('#')).every(u => currentArray.includes(u));
+            
+            if (isSame) {
+                console.log('[saveRssFeeds] No changes detected, skipping save and sync.');
+                createStatusBarMessage(this, 'No changes to feeds.');
+                return;
+            }
+
             // Validate URLs
             const invalidUrls: string[] = [];
             rssFeedsArray.forEach(line => {
@@ -1016,6 +1029,19 @@ export function rssApp(): AppState {
             }
         },        saveKeywordBlacklist: async function(this: AppState): Promise<void> {
             const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean).sort();
+            
+            // Check if anything changed
+            const { value: currentBlacklist } = await loadSimpleState('keywordBlacklist');
+            const currentArray = Array.isArray(currentBlacklist) ? [...currentBlacklist].sort() : [];
+            const isSame = currentArray.length === keywordsArray.length && 
+                           keywordsArray.every((kw, idx) => kw === currentArray[idx]);
+
+            if (isSame) {
+                console.log('[saveKeywordBlacklist] No changes detected, skipping save.');
+                createStatusBarMessage(this, 'No changes to blacklist.');
+                return;
+            }
+
             try {
                 await saveSimpleState('keywordBlacklist', keywordsArray);
                 this.keywordBlacklistInput = keywordsArray.join('\n');

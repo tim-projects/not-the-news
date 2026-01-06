@@ -373,8 +373,15 @@ async function syncFeeds(uid: string, env: Env, since: number = 0): Promise<Resp
         
         userCaches.set(uid, userCache);
 
-        // DELTA SYNC: Filter returned items by the 'since' timestamp
-        const deltaItems = items.filter(item => item.timestamp > since);
+        // OPTIMIZATION: Return only GUIDs, timestamps and basic flags for the client to generate its deck.
+        // The client will fetch full content for items in the active deck via /api/list.
+        const deltaItems = items.filter(item => item.timestamp > since).map(item => ({
+            guid: item.guid,
+            timestamp: item.timestamp,
+            // Include minimal flags for smart shuffle logic without sending full content
+            hasImage: !!item.image,
+            hasQuestion: item.title?.includes('?') || item.description?.includes('?')
+        }));
 
         return jsonResponse({ 
             status: 'ok', 

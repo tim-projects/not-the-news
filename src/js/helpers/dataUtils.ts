@@ -281,16 +281,19 @@ export async function generateNewDeck(
 
         if (isOnline) {
             const now = Date.now();
-            const hasHyperlink = (item: MappedFeedItem) => /<a\s+href=/i.test(item.description);
+            const hasHyperlink = (item: MappedFeedItem) => /<a\s+href=/i.test(item.description || '');
             const hasQuestionMarkInTitle = (item: MappedFeedItem) => item.title?.includes('?');
-            const hasQuestionMarkInDescriptionFirst150 = (item: MappedFeedItem) => item.description?.length >= 150 && item.description.substring(0, 150).includes('?');
+            const hasQuestionMarkInDescriptionFirst150 = (item: MappedFeedItem) => (item.description || '').length >= 150 && item.description.substring(0, 150).includes('?');
             const hasQuestionMarkInDescriptionLast150 = (item: MappedFeedItem) => {
-                const desc = item.description;
-                return desc?.length >= 150 && desc.substring(desc.length - 150).includes('?');
+                const desc = item.description || '';
+                return desc.length >= 150 && desc.substring(desc.length - 150).includes('?');
             };
-            const hasImage = (item: MappedFeedItem) => item.image !== "";
-            const isLongItem = (item: MappedFeedItem) => item.description?.length >= 750;
-            const isShortItem = (item: MappedFeedItem) => item.description?.length < 750;
+            // Fallback to flags if description is missing (for items synced by GUID only)
+            const hasQuestion = (item: MappedFeedItem) => (item as any).hasQuestion || hasQuestionMarkInTitle(item) || hasQuestionMarkInDescriptionFirst150(item) || hasQuestionMarkInDescriptionLast150(item);
+            const hasImage = (item: MappedFeedItem) => (item as any).hasImage || item.image !== "";
+            
+            const isLongItem = (item: MappedFeedItem) => (item.description || '').length >= 750;
+            const isShortItem = (item: MappedFeedItem) => (item.description || '').length > 0 && (item.description || '').length < 750;
 
             const recentItems = filteredItems.filter(item => now - item.timestamp <= 24 * 60 * 60 * 1000);
             addItemsFromCategory(recentItems, 2);
@@ -300,17 +303,9 @@ export async function generateNewDeck(
             addItemsFromCategory(itemsWithLinks, 1);
             console.log(`[generateNewDeck] After itemsWithLinks: ${nextDeckItems.length}`);
 
-            const itemsWithQuestionTitle = filteredItems.filter(hasQuestionMarkInTitle);
-            addItemsFromCategory(itemsWithQuestionTitle, 1);
-            console.log(`[generateNewDeck] After itemsWithQuestionTitle: ${nextDeckItems.length}`);
-
-            const itemsWithQuestionFirst150 = filteredItems.filter(hasQuestionMarkInDescriptionFirst150);
-            addItemsFromCategory(itemsWithQuestionFirst150, 1);
-            console.log(`[generateNewDeck] After itemsWithQuestionFirst150: ${nextDeckItems.length}`);
-
-            const itemsWithQuestionLast150 = filteredItems.filter(hasQuestionMarkInDescriptionLast150);
-            addItemsFromCategory(itemsWithQuestionLast150, 1);
-            console.log(`[generateNewDeck] After itemsWithQuestionLast150: ${nextDeckItems.length}`);
+            const itemsWithQuestion = filteredItems.filter(hasQuestion);
+            addItemsFromCategory(itemsWithQuestion, 3);
+            console.log(`[generateNewDeck] After itemsWithQuestion: ${nextDeckItems.length}`);
 
             const itemsWithImages = filteredItems.filter(hasImage);
             addItemsFromCategory(itemsWithImages, 1);
