@@ -126,31 +126,31 @@
                                                                                                                      }" 
                                                                                                                      :data-guid="entry.guid" @click="if (selectedGuid !== entry.guid) selectItem(entry.guid)">
                                                                                                                     
-                                                                                                                    <div class="menu-container" x-show="itemButtonMode !== 'hide'">
-                                                                                                                        <!-- Original Play Button (shown if mode is 'play') -->
-                                                                                                                        <button class="play-button" x-show="itemButtonMode === 'play'"
-                                                                                                                                :class="{
-                                                                                                                                    'speaking': speakingGuid === entry.guid,
-                                                                                                                                    'sub-focused': selectedGuid === entry.guid && selectedSubElement === 'play'
-                                                                                                                                }"
-                                                                                                                                @click.stop="speakItem(entry.guid)"
-                                                                                                                                title="Read Out Loud">
-                                                                                                                            <span x-show="speakingGuid !== entry.guid">▶</span>
-                                                                                                                            <span x-show="speakingGuid === entry.guid">■</span>
-                                                                                                                        </button>
+                                                                                                                        <div class="menu-container" x-show="itemButtonMode !== 'hide'">
+                                                                                                                            <!-- Original Play Button (shown if mode is 'play') -->
+                                                                                                                            <button class="play-button menu-trigger" x-show="itemButtonMode === 'play'"
+                                                                                                                                    :class="{
+                                                                                                                                        'speaking': speakingGuid === entry.guid,
+                                                                                                                                        'sub-focused': selectedGuid === entry.guid && selectedSubElement === 'play'
+                                                                                                                                    }"
+                                                                                                                                    @click.stop="speakItem(entry.guid)"
+                                                                                                                                    title="Read Out Loud">
+                                                                                                                                <span x-show="speakingGuid !== entry.guid">▶</span>
+                                                                                                                                <span x-show="speakingGuid === entry.guid">■</span>
+                                                                                                                            </button>
 
-                                                                                                                        <!-- Hamburger Menu Button (shown if mode is 'menu') -->
-                                                                                                                        <button class="play-button menu-trigger" x-show="itemButtonMode === 'menu'"
-                                                                                                                                :class="{
-                                                                                                                                    'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'play',
-                                                                                                                                    'active': activeMenuGuid === entry.guid
-                                                                                                                                }" 
-                                                                                                                                @click.stop="toggleItemMenu(entry.guid)"
-                                                                                                                                title="Menu">
-                                                                                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.5em; height: 1.5em;">
-                                                                                                                              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                                                                                                                            </svg>
-                                                                                                                        </button>
+                                                                                                                            <!-- Hamburger Menu Button (shown if mode is 'menu') -->
+                                                                                                                            <button class="play-button menu-trigger" x-show="itemButtonMode === 'menu'"
+                                                                                                                                    :class="{
+                                                                                                                                        'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'play',
+                                                                                                                                        'active': activeMenuGuid === entry.guid
+                                                                                                                                    }" 
+                                                                                                                                    @click.stop="toggleItemMenu(entry.guid)"
+                                                                                                                                    title="Menu">
+                                                                                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.0em; height: 1.0em;">
+                                                                                                                                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                                                                                                                </svg>
+                                                                                                                            </button>
                                                                                                                         
                                                                                                                         <div class="item-popup-menu" x-show="activeMenuGuid === entry.guid" x-cloak @click.away="activeMenuGuid = null">
                                                                                                                             <button class="menu-item" @click.stop="speakItem(entry.guid)">

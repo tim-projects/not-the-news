@@ -207,6 +207,7 @@ export interface AppState {
     _generateAndSavePregeneratedDeck(online: boolean): Promise<void>;
     loadCustomCss(): Promise<void>;
     toggleSearch(): void;
+    loadSvg(element: HTMLElement, filename: string): Promise<void>;
     discoverFeed(): Promise<void>;
     preloadThemes(): void;
 

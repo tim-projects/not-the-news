@@ -2198,6 +2198,26 @@ export function rssApp(): AppState {
             toggleSearch(this);
         },
 
+        loadSvg: async function(this: AppState, element: HTMLElement, filename: string): Promise<void> {
+            try {
+                const response = await fetch(`/images/icons/${filename}`);
+                if (response.ok) {
+                    const svgText = await response.text();
+                    element.innerHTML = svgText;
+                    
+                    // If it's a direct SVG injection, ensure classes are preserved if needed
+                    const svg = element.querySelector('svg');
+                    if (svg) {
+                        // Inherit dimensions if not specified in file
+                        if (!svg.getAttribute('width')) svg.setAttribute('width', '100%');
+                        if (!svg.getAttribute('height')) svg.setAttribute('height', '100%');
+                    }
+                }
+            } catch (e) {
+                console.error(`Failed to load SVG: ${filename}`, e);
+            }
+        },
+
         discoverFeed: async function(this: AppState): Promise<void> {
             await discoverFeed(this);
         },
