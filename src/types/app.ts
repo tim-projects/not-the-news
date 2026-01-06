@@ -71,7 +71,7 @@ export interface AppState {
     lastFeedSync: number;
     syncEnabled: boolean;
     imagesEnabled: boolean;
-    itemButtonMode: 'hide' | 'play';
+    itemButtonMode: 'hide' | 'play' | 'menu';
     openUrlsInNewTabEnabled: boolean;
     rssFeedsInput: string;
     keywordBlacklistInput: string;
@@ -111,7 +111,7 @@ export interface AppState {
     undoStack: { guid: string, index: number | null }[];
     undoBtnRadius: number;
     selectedGuid: string | null;
-    selectedSubElement: 'item' | 'read' | 'menu' | 'play';
+    selectedSubElement: 'item' | 'read' | 'star' | 'play';
     selectedTimestamp: number | null;
     lastSelectedGuid: string | null;
     starredGuid: string | null;

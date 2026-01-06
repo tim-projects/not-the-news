@@ -26,7 +26,7 @@ export const USER_STATE_DEFS: UserStateDefs = {
     lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     imagesEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
-    itemButtonMode: { store: 'userSettings', type: 'simple', localOnly: false, default: 'play' },
+    itemButtonMode: { store: 'userSettings', type: 'simple', localOnly: false, default: 'menu' },
     syncEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     theme: { store: 'userSettings', type: 'simple', localOnly: false, default: 'dark' },
     themeStyle: { store: 'userSettings', type: 'simple', localOnly: false, default: 'originalDark' },
