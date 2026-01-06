@@ -535,18 +535,34 @@ export default {
             if (pathName === '/api/list') {
                 let wantedGuids: string[] = [];
                 if (request.method === 'POST') {
-                    const data: any = await request.json();
-                    wantedGuids = data.guids || [];
+                    try {
+                        const data: any = await request.json();
+                        wantedGuids = data.guids || [];
+                    } catch (e) {
+                        console.error('[List] Failed to parse request body:', e);
+                    }
                 } else {
                     const guidsParam = url.searchParams.get('guids');
                     wantedGuids = guidsParam ? guidsParam.split(',') : [];
                 }
-                if (wantedGuids.length > 50) return jsonResponse({ error: 'Too many GUIDs requested' }, 400);
                 
-                const userCache = userCaches.get(uid);
+                if (wantedGuids.length > 100) return jsonResponse({ error: 'Too many GUIDs requested' }, 400);
+                
+                let userCache = userCaches.get(uid);
+                
+                // If cache is missing or doesn't have all wanted items, try one sync
+                const hasAllItems = userCache && wantedGuids.every(g => userCache!.items.some(i => i.guid === g));
+                
+                if (!hasAllItems && wantedGuids.length > 0) {
+                    console.log(`[List] Items missing from cache for ${uid}, triggering internal sync...`);
+                    // We perform a sync but don't return its response directly
+                    await syncFeeds(uid, env, 0);
+                    userCache = userCaches.get(uid);
+                }
+
                 const currentItems = userCache ? userCache.items : [];
-                
                 const results = wantedGuids.length > 0 ? currentItems.filter(i => wantedGuids.includes(i.guid)) : currentItems;
+                
                 return jsonResponse(results);
             }
 

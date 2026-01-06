@@ -261,6 +261,16 @@ export function rssApp(): AppState {
                 this.isOnline = isOnline();
 
                 if (this.isOnline && initialAuthChecked) {
+                    // Metadata sync is cheap, always do it
+                    this.progressMessage = 'Syncing user profile...';
+                    try {
+                        if (isOnline()) await processPendingOperations();
+                        if (isOnline()) await pullUserState(false, [], this);
+                    } catch (e) {
+                        console.error("Profile sync failed:", e);
+                    }
+
+                    // Feed content sync is expensive, use threshold
                     const SYNC_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
                     const isStale = (Date.now() - (this.lastFeedSync || 0)) > SYNC_THRESHOLD_MS;
 
@@ -269,8 +279,6 @@ export function rssApp(): AppState {
                         
                         try {
                             const syncPromise = (async () => {
-                                if (isOnline()) await processPendingOperations();
-                                if (isOnline()) await pullUserState();
                                 if (isOnline()) await performFeedSync(this);
                             })();
 
@@ -286,7 +294,7 @@ export function rssApp(): AppState {
                             console.error("Critical sync logic failure:", e);
                         }
                     } else {
-                        console.log(`[Init] Skipping initial sync, last sync was recent: ${new Date(this.lastFeedSync).toLocaleTimeString()}`);
+                        console.log(`[Init] Skipping feed sync, last sync was recent: ${new Date(this.lastFeedSync).toLocaleTimeString()}`);
                     }
                     
                     await this._loadAndManageAllData();
@@ -487,17 +495,17 @@ export function rssApp(): AppState {
             const starredSet = new Set(this.starred.map(s => s.guid.toLowerCase()));
             const seenGuidsForDeck = new Set<string>();
 
+            const missingGuids: string[] = [];
             let foundCount = 0;
-            let missingCount = 0;
 
-            for (const deckItem of guidsToDisplay) { // Changed guid to deckItem for clarity
+            for (const deckItem of guidsToDisplay) { 
                 const guid = deckItem.guid;
                 if (typeof guid !== 'string' || !guid) continue;
                 
                 const item = this.feedItems[guid.toLowerCase()];
                 if (item && item.guid && !seenGuidsForDeck.has(item.guid.toLowerCase())) {
                     const mappedItem = mapRawItem(item, formatDate);
-                    if (mappedItem) { // Ensure mappedItem is not null
+                    if (mappedItem) { 
                         const g = mappedItem.guid.toLowerCase();
                         mappedItem.isRead = readSet.has(g);
                         mappedItem.isStarred = starredSet.has(g);
@@ -506,14 +514,48 @@ export function rssApp(): AppState {
                         foundCount++;
                     }
                 } else {
-                    missingCount++;
-                    if (missingCount <= 3) {
-                        console.log(`[loadAndDisplayDeck] MISSING: GUID ${guid} not found in feedItems`);
-                    }
+                    missingGuids.push(guid);
                 }
             }
 
-            console.log(`[loadAndDisplayDeck] Found ${foundCount} items, Missing ${missingCount} items`);
+            console.log(`[loadAndDisplayDeck] Found ${foundCount} items locally, ${missingGuids.length} items missing.`);
+
+            // --- SOLUTION: Fetch missing items from server ---
+            if (missingGuids.length > 0 && isOnline()) {
+                console.log(`[loadAndDisplayDeck] Attempting to fetch ${missingGuids.length} missing items from server...`);
+                const { _fetchItemsInBatches } = await import('./js/data/dbSyncOperations.ts');
+                const fetchedItems = await _fetchItemsInBatches(missingGuids, this, missingGuids.length, foundCount);
+                
+                if (fetchedItems && fetchedItems.length > 0) {
+                    console.log(`[loadAndDisplayDeck] Successfully fetched ${fetchedItems.length} items from server.`);
+                    // Save to local DB so they are available next time
+                    const { withDb } = await import('./js/data/dbCore.ts');
+                    await withDb(async (db: any) => {
+                        const tx = db.transaction('feedItems', 'readwrite');
+                        for (const item of fetchedItems) {
+                            if (item.guid) {
+                                await tx.store.put(item);
+                                this.feedItems[item.guid.toLowerCase()] = item;
+                            }
+                        }
+                        await tx.done;
+                    });
+
+                    // Re-process the missing items into the display items array
+                    for (const item of fetchedItems) {
+                        const mappedItem = mapRawItem(item, formatDate);
+                        if (mappedItem && !seenGuidsForDeck.has(mappedItem.guid.toLowerCase())) {
+                            const g = mappedItem.guid.toLowerCase();
+                            mappedItem.isRead = readSet.has(g);
+                            mappedItem.isStarred = starredSet.has(g);
+                            items.push(mappedItem);
+                            seenGuidsForDeck.add(g);
+                            foundCount++;
+                        }
+                    }
+                }
+            }
+            // --- END SOLUTION ---
 
             this.deck = Array.isArray(items) ? items : [];
             console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
@@ -1554,31 +1596,38 @@ export function rssApp(): AppState {
             }
         },
         
-        _loadAndManageAllData: async function(this: AppState): Promise<void> {
-            console.log("_loadAndManageAllData: START");
-            this.progressMessage = "Loading saved feed items...";
+        _loadAndManageAllData: async function(this: AppState, initialEntries?: MappedFeedItem[]): Promise<void> {
+            console.log('_loadAndManageAllData: START');
+            this.progressMessage = 'Loading saved feed items...';
             await this.loadFeedItemsFromDB();
             console.log(`_loadAndManageAllData: After loadFeedItemsFromDB. Entries: ${this.entries.length}`);
 
-            this.progressMessage = "Loading user state from storage...";
-            // Load all necessary state in parallel
-            const [starredState, shuffledState, currentDeck, shuffleState] = await Promise.all([
+            this.progressMessage = 'Loading user state from storage...';
+            // Also reload metadata into Alpine state so settings UI is updated after sync
+            const [starredRes, shuffledRes, currentDeckRes, shuffleState, rssFeedsRes, blacklistRes] = await Promise.all([
                 loadArrayState('starred'),
                 loadArrayState('shuffledOutGuids'),
                 loadCurrentDeck(),
-                loadShuffleState()
+                loadShuffleState(),
+                loadSimpleState('rssFeeds'),
+                loadSimpleState('keywordBlacklist')
             ]);
 
-            console.log("_loadAndManageAllData: Loaded starred state:", starredState.value);
-            this.starred = Array.isArray(starredState.value) ? starredState.value as StarredItem[] : [];
-            this.shuffledOutGuids = Array.isArray(shuffledState.value) ? shuffledState.value as ShuffledOutItem[] : [];
-            this.currentDeckGuids = Array.isArray(currentDeck) ? currentDeck : [];
-            console.log("_loadAndManageAllData: Loaded currentDeckGuids:", this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
-            
+            console.log('_loadAndManageAllData: Loaded starred state:', starredRes.value);
+            this.starred = Array.isArray(starredRes.value) ? starredRes.value : [];
+            this.shuffledOutGuids = Array.isArray(shuffledRes.value) ? shuffledRes.value : [];
+            this.currentDeckGuids = Array.isArray(currentDeckRes) ? currentDeckRes : [];
+            console.log('_loadAndManageAllData: Loaded currentDeckGuids:', this.currentDeckGuids.slice(0, 3), typeof this.currentDeckGuids[0]);
+
             this.shuffleCount = shuffleState.shuffleCount;
             this.lastShuffleResetDate = shuffleState.lastShuffleResetDate;
+            
+            // Update UI strings for settings
+            const { parseRssFeedsConfig } = await import('./js/helpers/dataUtils.ts');
+            this.rssFeedsInput = parseRssFeedsConfig(rssFeedsRes.value).join('\n');
+            this.keywordBlacklistInput = Array.isArray(blacklistRes.value) ? blacklistRes.value.join('\n') : '';
 
-            this.progressMessage = "Optimizing local storage...";
+            this.progressMessage = 'Optimizing local storage...';
             // Prune old read items before we use them
             this.read = await loadAndPruneReadItems(Object.values(this.feedItems));
             console.log(`_loadAndManageAllData: After loadAndPruneReadItems. Read count: ${this.read.length}`);

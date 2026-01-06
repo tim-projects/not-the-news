@@ -9,6 +9,7 @@ export interface UserStateDef {
     type: 'array' | 'simple';
     localOnly: boolean;
     default: any;
+    syncMode?: 'merge' | 'replace'; // Optional: default is 'merge' for arrays, 'replace' for simple
 }
 
 export interface UserStateDefs {
@@ -17,10 +18,10 @@ export interface UserStateDefs {
 
 // --- User State Definitions ---
 export const USER_STATE_DEFS: UserStateDefs = {
-    starred: { store: 'starred', type: 'array', localOnly: false, default: [] },
-    read: { store: 'read', type: 'array', localOnly: false, default: [] },
-    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: false, default: [] },
-    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: false, default: [] },
+    starred: { store: 'starred', type: 'array', localOnly: false, default: [], syncMode: 'merge' },
+    read: { store: 'read', type: 'array', localOnly: false, default: [], syncMode: 'merge' },
+    currentDeckGuids: { store: 'currentDeckGuids', type: 'array', localOnly: false, default: [], syncMode: 'replace' },
+    shuffledOutGuids: { store: 'shuffledOutGuids', type: 'array', localOnly: false, default: [], syncMode: 'replace' },
     lastStateSync: { store: 'userSettings', type: 'simple', localOnly: false, default: 0 },
     lastFeedSync: { store: 'userSettings', type: 'simple', localOnly: true, default: 0 },
     openUrlsInNewTabEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },

@@ -151,7 +151,8 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
                     skipKey = 'starred';
                 }
                 
-                pullUserState(false, skipKey ? [skipKey] : []);
+                // @ts-ignore - pullUserState takes app as 3rd param
+                pullUserState(false, skipKey ? [skipKey] : [], (this && this.loadFeedItemsFromDB) ? this : null);
                 // --- END SOLUTION ---
 
             } else {
@@ -327,23 +328,44 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
 
         if (def.type === 'array') {
             const serverObjects: any[] = data.value || [];
-            const localObjects: any[] = localData || [];
-            const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
-            const localGuids = new Set(localObjects.map((item: any) => item.guid));
+            const localDataRaw: any[] = localData || [];
+            const syncMode = def.syncMode || 'merge';
 
-            const objectsToAdd = force ? serverObjects : serverObjects.filter((item: any) => !localGuids.has(item.guid));
-            const objectsToRemove = force ? [] : localObjects.filter((item: any) => !serverGuids.has(item.guid));
-
-            if (objectsToAdd.length > 0 || objectsToRemove.length > 0 || force) {
-                 await withDb(async (db: IDBPDatabase) => {
+            if (syncMode === 'replace' || force) {
+                console.log(`[DB Sync] Replacing local '${key}' with server snapshot.`);
+                await withDb(async (db: IDBPDatabase) => {
                     const tx = db.transaction(def.store, 'readwrite');
-                    if (force) await tx.store.clear(); // Clear local store if forcing
-                    for (const item of objectsToAdd) await tx.store.put(item);
-                    for (const item of objectsToRemove) {
-                        if (!force) await tx.store.delete(item.id);
+                    await tx.store.clear();
+                    for (const item of serverObjects) {
+                        const toStore = { ...item };
+                        delete toStore.id; // Let IndexedDB generate new local IDs
+                        await tx.store.put(toStore);
                     }
                     await tx.done;
                 });
+            } else {
+                // Merge mode (default for arrays)
+                const localGuids = new Set(localDataRaw.map((item: any) => item.guid));
+                const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
+
+                const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
+                const objectsToRemove = localDataRaw.filter((item: any) => !serverGuids.has(item.guid));
+
+                if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
+                    console.log(`[DB Sync] Merging '${key}': ${objectsToAdd.length} added, ${objectsToRemove.length} removed.`);
+                    await withDb(async (db: IDBPDatabase) => {
+                        const tx = db.transaction(def.store, 'readwrite');
+                        for (const item of objectsToAdd) {
+                            const toStore = { ...item };
+                            delete toStore.id;
+                            await tx.store.put(toStore);
+                        }
+                        for (const item of objectsToRemove) {
+                            await tx.store.delete(item.id);
+                        }
+                        await tx.done;
+                    });
+                }
             }
         } else {
             // Use the internal save function to prevent re-queuing this change.
@@ -360,7 +382,7 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
 /**
  * Pulls the user state from the server.
  */
-export async function pullUserState(force: boolean = false, skipKeys: string[] = []): Promise<void> {
+export async function pullUserState(force: boolean = false, skipKeys: string[] = [], app: AppState | null = null): Promise<void> {
     if (!isOnline()) return;
 
     let { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
@@ -404,6 +426,16 @@ export async function pullUserState(force: boolean = false, skipKeys: string[] =
         }, '');
 
         if (newestOverallTimestamp) await _saveSyncMetaState('lastStateSync', newestOverallTimestamp);
+
+        // Notify app to reload from IndexedDB if provided
+        if (app && app.loadFeedItemsFromDB) {
+            console.log('[DB Sync] State pull complete, triggering app data reload.');
+            // We use a small delay to ensure all async IndexedDB operations from results settle
+            setTimeout(() => {
+                // @ts-ignore - _loadAndManageAllData is private in the type but accessible here
+                if (app._loadAndManageAllData) app._loadAndManageAllData();
+            }, 100);
+        }
     } catch (error: any) {
         console.error('[DB] User state pull failed:', error);
     } finally {
@@ -430,7 +462,7 @@ export async function getAllFeedItems(): Promise<FeedItem[]> {
 /**
  * Helper to fetch a list of GUIDs from the server in batches.
  */
-async function _fetchItemsInBatches(guids: string[], app: AppState | null, totalOverall: number, currentOverallOffset: number): Promise<FeedItem[] | null> {
+export async function _fetchItemsInBatches(guids: string[], app: AppState | null, totalOverall: number, currentOverallOffset: number): Promise<FeedItem[] | null> {
     const BATCH_SIZE = 50;
     const items: FeedItem[] = [];
     
@@ -567,7 +599,7 @@ export async function performFullSync(app: AppState): Promise<boolean> {
     try {
         // Run push first, then pulls.
         await processPendingOperations(); // Process any items that were queued while offline.
-        await pullUserState();
+        await pullUserState(false, [], app);
         const syncSuccess = await performFeedSync(app);
         return syncSuccess;
     } catch (error: any) {
