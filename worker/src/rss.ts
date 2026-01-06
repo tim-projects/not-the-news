@@ -49,12 +49,15 @@ function wrapTitle(title: string, link: string): string {
     return html;
 }
 
-function prettifyItem(item: any): any {
+export function prettifyItem(item: any): any {
     const domain = extractDomain(item.link || '');
     
     // Domain specific logic before wrapping title
     if (domain.includes('reddit.com')) {
-        item.source = 'Reddit';
+        const subredditMatch = (item.link || '').match(/\/r\/([^/]+)/i);
+        const subreddit = subredditMatch ? subredditMatch[1] : '';
+        item.source = subreddit ? `Reddit/r/${subreddit}` : 'Reddit';
+
         // Extract real link from Reddit description if available
         // Reddit RSS usually has the content link in the description as <a href="...">[link]</a>
         const linkMatch = item.description?.match(/<a href="([^"]+)">\[link\]<\/a>/i);
@@ -64,7 +67,10 @@ function prettifyItem(item: any): any {
             // Check for image or video
             if (realLink.includes('i.redd.it') || realLink.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
                 // Prepend image if not already there (often Reddit RSS has it anyway, but let's be sure)
-                if (!item.description.includes(realLink)) {
+                const escapedLink = realLink.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const hasImgTag = new RegExp(`<img[^>]+src=["']${escapedLink}["']`, 'i').test(item.description);
+                
+                if (!hasImgTag) {
                     item.description = `<img src="${realLink}" /><br/>` + item.description;
                 }
             } else if (realLink.includes('v.redd.it')) {
@@ -93,7 +99,7 @@ function prettifyItem(item: any): any {
         item.image = imgMatch[1];
         // Remove this image from the description to prevent duplicate display in the client
         // We look for the whole tag that contains the URL
-        const imgTagRegex = new RegExp(`<img[^>]+src=["']${imgMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'i');
+        const imgTagRegex = new RegExp(`<img[^>]+src=["']${imgMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'ig');
         item.description = item.description.replace(imgTagRegex, '');
     }
 
