@@ -48,14 +48,43 @@ registerRoute(
   })
 );
 
+// Cache local images and icons
+registerRoute(
+  ({ url }) => url.origin === self.location.origin && 
+               (url.pathname.startsWith('/images/') || url.pathname.endsWith('.svg')),
+  new StaleWhileRevalidate({
+    cacheName: 'local-assets',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+    ],
+  })
+);
+
 // 2. Generic API calls (cache-first or network-only with offline fallback)
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/search') && !url.pathname.includes('/lookup'),
+  ({ url }) => url.pathname.startsWith('/api/') && 
+               !url.pathname.includes('/search') && 
+               !url.pathname.includes('/lookup') &&
+               !url.pathname.includes('/profile'),
+  new StaleWhileRevalidate({
+    cacheName: 'news-api-cache',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+    ],
+  })
+);
+
+// 3. User Profile / State (Network Only to ensure cross-device consistency)
+registerRoute(
+  ({ url }) => url.pathname.includes('/api/profile'),
   async ({ event }) => {
     try {
       return await new NetworkOnly().handle({ event, request: event.request });
     } catch (error) {
-      console.warn('[SW] API call failed (likely offline):', event.request.url);
       return new Response(JSON.stringify({ error: 'Network error', offline: true }), {
         status: 503,
         headers: { 'Content-Type': 'application/json' }
@@ -64,7 +93,7 @@ registerRoute(
   }
 );
 
-// 3. Source Discovery (Network only)
+// 4. Source Discovery (Network only)
 registerRoute(
   ({ url }) => url.pathname.includes('/api/lookup'),
   async ({ event }) => {
