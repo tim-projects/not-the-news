@@ -412,8 +412,30 @@ export async function pullUserState(force: boolean = false, skipKeys: string[] =
     console.log(`[DB] Pulling user state (force=${force}, skip=${skipKeys.join(',')})...`);
     
     try {
+        // --- SOLUTION: Efficient Theme Check ---
+        let finalSkipKeys = [...skipKeys];
+        const localTheme = localStorage.getItem('theme');
+        
+        // If we are trying to skip keys (during fast init), we must verify theme first
+        if (skipKeys.length > 0 && !force && localTheme) {
+            console.log('[DB Sync] Verifying theme consistency before deferring heavy keys...');
+            const themeDef = USER_STATE_DEFS['theme'];
+            const themeResult = await _pullSingleStateKey('theme', themeDef, false);
+            
+            if (themeResult.status === 200) {
+                const { value: serverTheme } = await loadSimpleState('theme');
+                if (serverTheme !== localTheme) {
+                    console.log(`[DB Sync] Theme mismatch detected (Local: ${localTheme}, Server: ${serverTheme}). Aborting skip and pulling all state.`);
+                    finalSkipKeys = []; // Force full pull due to inconsistency
+                } else {
+                    console.log('[DB Sync] Theme is consistent, proceeding with deferred sync.');
+                }
+            }
+        }
+        // --- END SOLUTION ---
+
         const keysToPull: [string, UserStateDef][] = Object.entries(USER_STATE_DEFS)
-            .filter(([key, def]) => !def.localOnly && key !== 'syncEnabled' && !skipKeys.includes(key)) as [string, UserStateDef][];
+            .filter(([key, def]) => !def.localOnly && key !== 'syncEnabled' && !finalSkipKeys.includes(key)) as [string, UserStateDef][];
         
         const resultsSettled = await Promise.allSettled(keysToPull.map(([key, def]) => _pullSingleStateKey(key, def, force)));
         
@@ -545,29 +567,43 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
 
         if (!response.ok) {
             if (response.status === 429) {
-                console.log('[DB] Sync throttled by server.');
-                return true;
+                console.warn('[DB] Sync throttled by server. Backing off.');
+                // Update last sync time to avoid immediate retry loop on reload
+                const now = Date.now();
+                await _saveSyncMetaState('lastFeedSync', now);
+                if (app) app.lastFeedSync = now;
+                return false;
             }
             throw new Error(`HTTP error ${response.status} for /api/refresh`);
         }
 
         const data: any = await response.json();
-        const items: FeedItem[] = data.items || [];
-        console.log(`[DB] Received ${items.length} new items from worker (Delta).`);
+        const deltaItems: any[] = data.items || [];
+        console.log(`[DB] Received ${deltaItems.length} new items from worker (Delta).`);
 
-        if (items.length > 0) {
-            await withDb(async (db: IDBPDatabase) => {
-                const tx = db.transaction('feedItems', 'readwrite');
-                for (const item of items) {
-                    if (item.guid) await tx.store.put(item);
-                }
-                await tx.done;
-            });
+        if (deltaItems.length > 0) {
+            // The worker returns minimized items (GUID + flags only). We must fetch full content.
+            const guids = deltaItems.map(i => i.guid);
+            console.log(`[DB] Fetching full content for ${guids.length} delta items...`);
+            
+            const fullItems = await _fetchItemsInBatches(guids, app, guids.length, 0);
 
-            // Trigger immediate refresh in UI
-            if (app && app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
-            if (app && app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
-            if (app && app.updateCounts) app.updateCounts();
+            if (fullItems && fullItems.length > 0) {
+                await withDb(async (db: IDBPDatabase) => {
+                    const tx = db.transaction('feedItems', 'readwrite');
+                    for (const item of fullItems) {
+                        if (item.guid) await tx.store.put(item);
+                    }
+                    await tx.done;
+                });
+
+                // Trigger immediate refresh in UI
+                if (app && app.loadFeedItemsFromDB) await app.loadFeedItemsFromDB();
+                if (app && app.loadAndDisplayDeck) await app.loadAndDisplayDeck();
+                if (app && app.updateCounts) app.updateCounts();
+            } else {
+                console.warn('[DB] Failed to fetch full content for delta items.');
+            }
         }
         
         // Update last sync time locally after success (even if 0 items)

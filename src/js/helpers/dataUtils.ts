@@ -190,6 +190,19 @@ export async function generateNewDeck(
     try {
         const MAX_DECK_SIZE = 10;
 
+        // Fetch blacklist from DB
+        const { loadSimpleState } = await import('../data/dbStateDefs.ts');
+        const blacklistRes = await loadSimpleState('keywordBlacklist');
+        const keywordBlacklist = (Array.isArray(blacklistRes.value) ? blacklistRes.value : [])
+            .map((kw: string) => kw.trim().toLowerCase())
+            .filter((kw: string) => kw.length > 0);
+
+        const isBlacklisted = (item: MappedFeedItem): boolean => {
+            if (keywordBlacklist.length === 0) return false;
+            const searchable = `${item.title} ${item.description} ${item.guid}`.toLowerCase();
+            return keywordBlacklist.some((kw: string) => searchable.includes(kw));
+        };
+
         /**
          * Safely extracts GUIDs from an array that might contain full objects or raw strings,
          * supporting the data migration period.
@@ -224,28 +237,29 @@ export async function generateNewDeck(
                 break;
             case 'unread':
             default:
-                // 1. Unread AND Unshuffled
+                // 1. Unread AND Unshuffled AND Not Blacklisted
                 filteredItems = allFeedItems.filter(item =>
                     !readGuidsSet.has(item.guid) &&
-                    !shuffledOutGuidsSet.has(item.guid)
+                    !shuffledOutGuidsSet.has(item.guid) &&
+                    !isBlacklisted(item)
                 );
                 
-                // 2. Fallback: Any Unread (even if shuffled out previously)
+                // 2. Fallback: Any Unread AND Not Blacklisted
                 if (filteredItems.length === 0) {
                     console.log('generateNewDeck: No unread/unshuffled items found, trying any unread items.');
-                    filteredItems = allFeedItems.filter(item => !readGuidsSet.has(item.guid));
+                    filteredItems = allFeedItems.filter(item => !readGuidsSet.has(item.guid) && !isBlacklisted(item));
                 }
 
-                // 3. Fallback: Any Unshuffled (even if read)
+                // 3. Fallback: Any Unshuffled AND Not Blacklisted
                 if (filteredItems.length === 0) {
                     console.log('generateNewDeck: No unread items found, trying all unshuffled items.');
-                    filteredItems = allFeedItems.filter(item => !shuffledOutGuidsSet.has(item.guid));
+                    filteredItems = allFeedItems.filter(item => !shuffledOutGuidsSet.has(item.guid) && !isBlacklisted(item));
                 }
 
-                // 4. Ultimate Fallback: Absolutely everything
+                // 4. Ultimate Fallback: Absolutely everything (Still not blacklisted)
                 if (filteredItems.length === 0) {
-                    console.log('generateNewDeck: Absolutely no filter matches, using all items.');
-                    filteredItems = [...allFeedItems];
+                    console.log('generateNewDeck: Absolutely no filter matches, using all non-blacklisted items.');
+                    filteredItems = allFeedItems.filter(item => !isBlacklisted(item));
                 }
                 break;
         }

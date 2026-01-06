@@ -297,6 +297,27 @@ button.star.starred:active {
   justify-content: center;
   position: relative; /* For badge positioning */
   padding: 0; /* Clear any inherited padding */
+  flex-shrink: 0; /* Prevent squishing in flex containers */
+}
+
+.shuffle-btn .shuffle-icon,
+.settings-btn .gear-icon,
+.search-btn .search-icon,
+.help-btn .help-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8em;
+  height: 1.8em;
+}
+
+.shuffle-btn svg,
+.settings-btn svg,
+.search-btn svg,
+.help-btn svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .shuffle-btn:hover,

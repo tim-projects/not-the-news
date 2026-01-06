@@ -165,6 +165,10 @@ export function rssApp(): AppState {
         themeStyle: localStorage.getItem('theme') === 'light' ? (localStorage.getItem('themeStyleLight') || 'originalLight') : (localStorage.getItem('themeStyleDark') || 'originalDark'),
         themeStyleLight: localStorage.getItem('themeStyleLight') || 'originalLight',
         themeStyleDark: localStorage.getItem('themeStyleDark') || 'originalDark',
+        fontTitle: "'Playfair Display', serif",
+        fontBody: "inherit",
+        _initialRssFeedsInput: '',
+        _initialKeywordBlacklistInput: '',
         customCss: '',
         fontSize: 100,
         feedWidth: 50,
@@ -210,24 +214,31 @@ export function rssApp(): AppState {
         // --- Core Methods ---
         initApp: async function(this: AppState): Promise<void> {
             try {
-                // Wait for Firebase Auth to initialize before proceeding
-                this.progressMessage = 'Verifying authentication...';
-                let waitCount = 0;
-                while (!authInitialized && waitCount < 50) { 
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    waitCount++;
-                }
-
-                if (!auth.currentUser) {
-                    if (!window.location.pathname.endsWith('login.html')) {
-                        console.log("[Auth] Not logged in after wait, redirecting...");
-                        window.location.replace('/login.html');
-                        return;
+                // OPTIMISTIC AUTH: If we have a hint that we're logged in, proceed immediately
+                const authHint = localStorage.getItem('isAuthenticated') === 'true';
+                
+                if (!authHint) {
+                    console.log("[Auth] No hint found, waiting for verification...");
+                    this.progressMessage = 'Verifying authentication...';
+                    let waitCount = 0;
+                    while (!authInitialized && waitCount < 50) { 
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        waitCount++;
                     }
                 } else {
-                    initialAuthChecked = true; // Mark that we found a user during init
+                    console.log("[Auth] Hint found, proceeding with optimistic load.");
+                }
+
+                // Redirect if we definitely aren't logged in (after hint check or verification)
+                if (!authHint && !auth.currentUser && !window.location.pathname.endsWith('login.html')) {
+                    console.log("[Auth] Not logged in, redirecting to login.html");
+                    window.location.replace('/login.html');
+                    return;
+                }
+
+                if (auth.currentUser) {
+                    initialAuthChecked = true;
                     this.userEmail = auth.currentUser.email || (auth.currentUser.isAnonymous ? 'Guest' : 'Authenticated User');
-                    console.log("[Auth] User verified, proceeding with data initialization.");
                 }
 
                 this.progressMessage = 'Connecting to database...';
@@ -243,9 +254,15 @@ export function rssApp(): AppState {
                     await this._loadInitialState();
                 } catch (stateError: any) {
                     console.error("Initial state load failed:", stateError);
-                    // Continue with defaults if state fails
                 }
                 
+                // DETECT NEW DEVICE / EMPTY STATE
+                // If we have no sync history, we should perform a full blocking sync instead of optimistic loading
+                const isNewDevice = this.lastFeedSync === 0;
+                if (isNewDevice && authHint) {
+                    console.log("[Init] New device detected (no local sync history). Performing full blocking sync.");
+                }
+
                 this._initImageObserver();
 
                 // Warm up TTS voices
@@ -257,54 +274,80 @@ export function rssApp(): AppState {
                     };
                 }
 
-                // Refresh online status immediately before potentially starting sync
+                // Refresh online status
                 this.isOnline = isOnline();
 
-                if (this.isOnline && initialAuthChecked) {
-                    // Metadata sync is cheap, always do it
-                    this.progressMessage = 'Syncing user profile...';
-                    try {
-                        if (isOnline()) await processPendingOperations();
-                        if (isOnline()) await pullUserState(false, [], this);
-                    } catch (e) {
-                        console.error("Profile sync failed:", e);
-                    }
-
-                    // Feed content sync is expensive, use threshold
-                    const SYNC_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
-                    const isStale = (Date.now() - (this.lastFeedSync || 0)) > SYNC_THRESHOLD_MS;
-
-                    if (isStale) {
-                        this.progressMessage = 'Syncing latest content...'; 
+                // Background Sync Phase
+                if (this.isOnline) {
+                    // Wait for actual auth before triggering network sync if we only had a hint
+                    if (!authInitialized) {
+                        console.log("[Init] Waiting for background auth verification before network sync...");
                         
-                        try {
-                            const syncPromise = (async () => {
-                                if (isOnline()) await performFeedSync(this);
-                            })();
+                        const syncLogic = async () => {
+                            let syncWait = 0;
+                            while (!authInitialized && syncWait < 100) { // Max 10s wait
+                                await new Promise(t => setTimeout(t, 100));
+                                syncWait++;
+                            }
+                            if (auth.currentUser) {
+                                console.log("[Init] Auth verified in background, triggering sync.");
+                                if (isNewDevice) this.progressMessage = 'Restoring account data...';
+                                
+                                await processPendingOperations();
+                                
+                                // PHASE 1: Pull essential metadata only (deck, theme check)
+                                // If new device, pull everything immediately
+                                const skipKeys = isNewDevice ? [] : ['rssFeeds', 'keywordBlacklist', 'customCss', 'shuffleCount', 'lastShuffleResetDate', 'animationSpeed', 'openUrlsInNewTabEnabled', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'read', 'starred'];
+                                await pullUserState(false, skipKeys, this);
+                                
+                                // PHASE 2: Trigger expensive content refresh
+                                const SYNC_THRESHOLD_MS = 10 * 60 * 1000;
+                                if ((Date.now() - (this.lastFeedSync || 0)) > SYNC_THRESHOLD_MS) {
+                                    if (isNewDevice) this.progressMessage = 'Downloading latest news...';
+                                    await performFeedSync(this);
+                                }
+                            }
+                        };
 
-                            // Cap initial sync wait at 15 seconds to prevent permanent hang
-                            const timeoutPromise = new Promise((_, reject) => 
-                                setTimeout(() => reject(new Error("Sync timeout")), 15000)
-                            );
-
-                            await Promise.race([syncPromise, timeoutPromise]).catch(e => {
-                                console.warn("Initial sync slow or failed, proceeding to load data:", e.message);
-                            });
-                        } catch (e) {
-                            console.error("Critical sync logic failure:", e);
+                        if (isNewDevice) {
+                            await syncLogic(); // Block if new device
+                        } else {
+                            syncLogic(); // Background if existing
                         }
-                    } else {
-                        console.log(`[Init] Skipping feed sync, last sync was recent: ${new Date(this.lastFeedSync).toLocaleTimeString()}`);
+                    } else if (auth.currentUser) {
+                        // Already verified
+                        this.progressMessage = isNewDevice ? 'Restoring profile...' : 'Syncing user profile...';
+                        try {
+                            if (isOnline()) await processPendingOperations();
+                            // Phase 1 sync (or full if new)
+                            const skipKeys = isNewDevice ? [] : ['rssFeeds', 'keywordBlacklist', 'customCss', 'shuffleCount', 'lastShuffleResetDate', 'animationSpeed', 'openUrlsInNewTabEnabled', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'read', 'starred'];
+                            await pullUserState(false, skipKeys, this);
+                        } catch (e) {
+                            console.error("Profile sync failed:", e);
+                        }
+
+                        const SYNC_THRESHOLD_MS = 10 * 60 * 1000;
+                        if ((Date.now() - (this.lastFeedSync || 0)) > SYNC_THRESHOLD_MS) {
+                            const hasItems = Object.keys(this.feedItems).length > 0;
+                            if (hasItems && !isNewDevice) {
+                                performFeedSync(this); // Fire and forget
+                            } else {
+                                this.progressMessage = isNewDevice ? 'Building your feed...' : 'Syncing latest content...';
+                                try {
+                                    await performFeedSync(this);
+                                } catch (e) {
+                                    console.warn("Initial feed sync failed.");
+                                }
+                            }
+                        }
                     }
-                    
-                    await this._loadAndManageAllData();
-                } else {
-                    this.progressMessage = 'Offline mode. Loading local data...';
-                    await this._loadAndManageAllData();
                 }
 
+                // Always load local data immediately
+                this.progressMessage = 'Loading local data...';
+                await this._loadAndManageAllData();
+
                 this.progressMessage = 'Applying user preferences...';
-                // initTheme is no longer needed as we handle it via _loadInitialState and toggleTheme
                 initSyncToggle(this);
                 initImagesToggle(this);
                 initItemButtonMode(this);
@@ -313,31 +356,21 @@ export function rssApp(): AppState {
                 initFlickToSelectToggle(this);
                 initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
-                this.$nextTick(() => {
-                    initScrollPosition(this);
-                });
+                this.$nextTick(() => { initScrollPosition(this); });
                 
-                // Ensure initial sync messages are shown and loading screen is managed
                 if (this.deck.length === 0) {
-                    // If deck is still empty after sync/load, keep loading screen up with a message
                     if (this.entries.length > 0) {
                         this.progressMessage = 'Fetching and building your feed...';
                     } else {
                         this.progressMessage = 'No feed items found. Please configure your RSS feeds.';
                     }
-                    // Keep loading screen visible for a moment longer if deck is empty
-                    // This prevents a flash of blank screen before the message appears (if any)
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Show message for 1 second
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 } else {
-                    // Stabilization delay to ensure data is propagated to Alpine components
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    
                     if (!this.selectedGuid) {
                         const { value: lastId } = await loadSimpleState('lastViewedItemId');
                         const isRestoring = lastId && this.deck.some(item => item.guid === lastId);
-                        
                         if (!isRestoring && this.deck.length > 0) {
-                            // Auto-select first item only if we aren't restoring a previous position
                             this.selectItem(this.deck[0].guid);
                         }
                     }
@@ -346,7 +379,6 @@ export function rssApp(): AppState {
                 this.loading = false; // Hide main loading screen as soon as feed is ready
                 this._initComplete = true;
 
-                // Kick off non-critical background initialization
                 (async () => {
                     console.log("[Init] Starting background initialization tasks...");
                     this._setupWatchers();
@@ -358,6 +390,11 @@ export function rssApp(): AppState {
                     this._initObservers();
                     this.pregenerateDecks();
                     await this.updateSyncStatusMessage();
+                    
+                    if (authInitialized && auth.currentUser) {
+                        console.log("[Init] Pulling remaining user state in background...");
+                        await pullUserState(false, [], this);
+                    }
                     console.log("[Init] Background initialization complete.");
                 })();
 
@@ -503,16 +540,19 @@ export function rssApp(): AppState {
                 if (typeof guid !== 'string' || !guid) continue;
                 
                 const item = this.feedItems[guid.toLowerCase()];
-                // Check for item existence AND presence of content (description)
-                if (item && item.guid && item.description && !seenGuidsForDeck.has(item.guid.toLowerCase())) {
+                // Check for item existence AND presence of content (description) AND title
+                if (item && item.guid && item.description && item.title && !seenGuidsForDeck.has(item.guid.toLowerCase())) {
                     const mappedItem = mapRawItem(item, formatDate);
-                    if (mappedItem) { 
+                    if (mappedItem && mappedItem.title) { 
                         const g = mappedItem.guid.toLowerCase();
                         mappedItem.isRead = readSet.has(g);
                         mappedItem.isStarred = starredSet.has(g);
                         items.push(mappedItem);
                         seenGuidsForDeck.add(g);
                         foundCount++;
+                    } else {
+                         // If mapRawItem returns null OR title is missing after mapping, treat as missing
+                        missingGuids.push(guid);
                     }
                 } else {
                     missingGuids.push(guid);
@@ -632,7 +672,7 @@ export function rssApp(): AppState {
             
             if (keywordBlacklist.length > 0) {
                 filtered = filtered.filter(item => {
-                    const searchable = `${item.title} ${item.description}`.toLowerCase();
+                    const searchable = `${item.title} ${item.description} ${item.guid}`.toLowerCase();
                     return !keywordBlacklist.some(keyword => searchable.includes(keyword));
                 });
             }
@@ -660,11 +700,34 @@ export function rssApp(): AppState {
         get unreadCount(): number {
             if (!this.entries.length || !this.currentDeckGuids.length) return 0;
             const readGuids = new Set(this.read.map(r => (typeof r === 'string' ? r : r.guid).toLowerCase()));
+            const shuffledOutGuids = new Set(this.shuffledOutGuids.map(s => (typeof s === 'string' ? s : s.guid).toLowerCase()));
             const deckGuids = new Set(this.currentDeckGuids.map(item => (typeof item === 'string' ? item : item.guid).toLowerCase()));
+            
+            const keywordBlacklist = (this.keywordBlacklistInput ?? '')
+                .split(/\r?\n/)
+                .map(kw => kw.trim().toLowerCase())
+                .filter(kw => kw.length > 0);
+
             return this.entries.filter(e => {
                 const g = e.guid.toLowerCase();
-                return deckGuids.has(g) && !readGuids.has(g);
+                // Basic unread check
+                const isUnread = deckGuids.has(g) && !readGuids.has(g) && !shuffledOutGuids.has(g);
+                if (!isUnread) return false;
+
+                // Blacklist check
+                if (keywordBlacklist.length > 0) {
+                    const searchable = `${e.title} ${e.description} ${e.guid}`.toLowerCase();
+                    if (keywordBlacklist.some(keyword => searchable.includes(keyword))) {
+                        return false;
+                    }
+                }
+
+                return true;
             }).length;
+        },
+        get isSettingsDirty(): boolean {
+            return this.rssFeedsInput !== this._initialRssFeedsInput || 
+                   this.keywordBlacklistInput !== this._initialKeywordBlacklistInput;
         },
         // --- Action Methods ---
         isStarred: function (this: AppState, guid: string): boolean {
@@ -983,6 +1046,7 @@ export function rssApp(): AppState {
             try {
                 await saveSimpleState('rssFeeds', rssFeedsArray);
                 this.rssFeedsInput = normalizedLines.join('\n');
+                this._initialRssFeedsInput = this.rssFeedsInput;
                 createStatusBarMessage(this, 'RSS Feeds saved!');
                 this.loading = true;
                 this.progressMessage = 'Saving feeds and performing full sync...';
@@ -1045,6 +1109,7 @@ export function rssApp(): AppState {
             try {
                 await saveSimpleState('keywordBlacklist', keywordsArray);
                 this.keywordBlacklistInput = keywordsArray.join('\n');
+                this._initialKeywordBlacklistInput = this.keywordBlacklistInput;
                 createStatusBarMessage(this, 'Keyword Blacklist saved!');
                 this.updateCounts();
             } catch (error: any) {
@@ -1187,14 +1252,24 @@ export function rssApp(): AppState {
                     this.applyFeedWidth();
                 },
                 saveFeedWidth: async function(this: AppState): Promise<void> {
-                    await saveSimpleState('feedWidth', this.feedWidth);
-                    this.applyFeedWidth();
-                },
+                                    await saveSimpleState('feedWidth', this.feedWidth);
+                                    this.applyFeedWidth();
+                                },
                                 applyFeedWidth: function (this: AppState): void {
                                     document.documentElement.style.setProperty('--feed-width', `${this.feedWidth}%`);
                                 },
-                                loadAnimationSpeed: async function (this: AppState): Promise<void> {
-                                    const { value } = await loadSimpleState('animationSpeed');
+                                saveFonts: async function (this: AppState): Promise<void> {
+                                    await Promise.all([
+                                        saveSimpleState('fontTitle', this.fontTitle),
+                                        saveSimpleState('fontBody', this.fontBody)
+                                    ]);
+                                    this.applyFonts();
+                                },
+                                applyFonts: function (this: AppState): void {
+                                    document.documentElement.style.setProperty('--font-title', this.fontTitle);
+                                    document.documentElement.style.setProperty('--font-body', this.fontBody);
+                                },
+                                loadAnimationSpeed: async function (this: AppState): Promise<void> {                                    const { value } = await loadSimpleState('animationSpeed');
                                     this.animationSpeed = (typeof value === 'number') ? value : 100;
                                     this.applyAnimationSpeed();
                                 },
@@ -1245,6 +1320,7 @@ export function rssApp(): AppState {
                 return;
             }
 
+            this.openSettings = false; // Close settings immediately
             this.loading = true;
             this.progressMessage = 'Resetting application data...';
 
@@ -1527,6 +1603,10 @@ export function rssApp(): AppState {
                 }
 
                 createStatusBarMessage(this, 'Restoration complete! Reloading...');
+                
+                // Force a full pull to ensure local DB matches the restored server state
+                await pullUserState(true);
+
                 setTimeout(() => window.location.reload(), 1000);
 
             } catch (error: any) {
@@ -1536,31 +1616,34 @@ export function rssApp(): AppState {
             }
         },
         // --- Private Helper Methods ---
-                        _loadInitialState: async function (this: AppState): Promise<void> {
-                            try {
-                                                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState, animSpeedRes, lastFeedSyncRes] = await Promise.all([
-                                                    loadSimpleState('syncEnabled'),
-                                                    loadSimpleState('imagesEnabled'),
-                                                    loadSimpleState('itemButtonMode'),
-                                                    loadSimpleState('openUrlsInNewTabEnabled'),
-                                                    loadFilterMode(), // loadFilterMode directly returns string, not object with value
-                                                    loadSimpleState('theme'),
-                                                    loadSimpleState('curvesEnabled'),
-                                                    loadSimpleState('flickToSelectEnabled'),
-                                                    loadSimpleState('animationSpeed'),
-                                                    loadSimpleState('lastFeedSync')
-                                                ]);
-                                
-                this.syncEnabled = syncEnabled.value ?? true;
-                this.imagesEnabled = imagesEnabled.value ?? true;
-                this.itemButtonMode = itemButtonMode.value ?? 'play';
-                this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
-                this.curvesEnabled = curvesState.value ?? true;
-                this.flickToSelectEnabled = flickState.value ?? false;
-                this.animationSpeed = animSpeedRes.value ?? 100;
-                this.lastFeedSync = lastFeedSyncRes.value ?? 0;
-                this.filterMode = filterModeResult;
-                
+                                _loadInitialState: async function (this: AppState): Promise<void> {
+                                    try {
+                                        const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState, animSpeedRes, lastFeedSyncRes, fontTitleRes, fontBodyRes] = await Promise.all([
+                                            loadSimpleState('syncEnabled'),
+                                            loadSimpleState('imagesEnabled'),
+                                            loadSimpleState('itemButtonMode'),
+                                            loadSimpleState('openUrlsInNewTabEnabled'),
+                                            loadFilterMode(), // loadFilterMode directly returns string, not object with value
+                                            loadSimpleState('theme'),
+                                            loadSimpleState('curvesEnabled'),
+                                            loadSimpleState('flickToSelectEnabled'),
+                                            loadSimpleState('animationSpeed'),
+                                            loadSimpleState('lastFeedSync'),
+                                            loadSimpleState('fontTitle'),
+                                            loadSimpleState('fontBody')
+                                        ]);
+                                                        
+                                        this.syncEnabled = syncEnabled.value ?? true;
+                                        this.imagesEnabled = imagesEnabled.value ?? true;
+                                        this.itemButtonMode = itemButtonMode.value ?? 'play';
+                                        this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
+                                        this.curvesEnabled = curvesState.value ?? true;
+                                        this.flickToSelectEnabled = flickState.value ?? false;
+                                        this.animationSpeed = animSpeedRes.value ?? 100;
+                                        this.lastFeedSync = lastFeedSyncRes.value ?? 0;
+                                        this.fontTitle = fontTitleRes.value ?? "'Playfair Display', serif";
+                                        this.fontBody = fontBodyRes.value ?? "inherit";
+                                        this.filterMode = filterModeResult;                
                 const newTheme = (themeState.value === 'light' || themeState.value === 'dark') ? themeState.value : 'dark';
                                                 if (this.theme !== newTheme) {
                                                     this.theme = newTheme;
@@ -1601,6 +1684,10 @@ export function rssApp(): AppState {
                 await this.loadFeedWidth();
                 this.applyAnimationSpeed();
                 this.applyThemeStyle();
+                this.applyFonts();
+
+                this._initialRssFeedsInput = this.rssFeedsInput;
+                this._initialKeywordBlacklistInput = this.keywordBlacklistInput;
 
                 // Load pre-generated decks (local only)
                 const [onlineDeckRes, offlineDeckRes] = await Promise.all([
@@ -1652,6 +1739,8 @@ export function rssApp(): AppState {
             const { parseRssFeedsConfig } = await import('./js/helpers/dataUtils.ts');
             this.rssFeedsInput = parseRssFeedsConfig(rssFeedsRes.value).join('\n');
             this.keywordBlacklistInput = Array.isArray(blacklistRes.value) ? blacklistRes.value.join('\n') : '';
+            this._initialRssFeedsInput = this.rssFeedsInput;
+            this._initialKeywordBlacklistInput = this.keywordBlacklistInput;
 
             this.progressMessage = 'Optimizing local storage...';
             // Prune old read items before we use them
@@ -1913,6 +2002,8 @@ export function rssApp(): AppState {
             this.$watch('isOnline', (online: boolean) => {
                 document.documentElement.style.setProperty('--offline-padding', online ? '0' : '30px');
             });
+            this.$watch('fontTitle', () => this.applyFonts());
+            this.$watch('fontBody', () => this.applyFonts());
             // Apply initial state
             document.documentElement.style.setProperty('--offline-padding', this.isOnline ? '0' : '30px');
         },
@@ -2208,9 +2299,9 @@ export function rssApp(): AppState {
                     // If it's a direct SVG injection, ensure classes are preserved if needed
                     const svg = element.querySelector('svg');
                     if (svg) {
-                        // Inherit dimensions if not specified in file
-                        if (!svg.getAttribute('width')) svg.setAttribute('width', '100%');
-                        if (!svg.getAttribute('height')) svg.setAttribute('height', '100%');
+                        // Inherit dimensions 
+                        svg.setAttribute('width', '100%');
+                        svg.setAttribute('height', '100%');
                     }
                 }
             } catch (e) {

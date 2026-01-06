@@ -74,6 +74,19 @@ export const manageDailyDeck = async (
     
     const { loadCurrentDeck } = await import('./userStateUtils.ts');
     const currentDeckItems = await loadCurrentDeck();
+
+    // Fetch blacklist to ensure effectivelyEmpty check is accurate
+    const { loadSimpleState } = await import('../data/dbStateDefs.ts');
+    const blacklistRes = await loadSimpleState('keywordBlacklist');
+    const keywordBlacklist = (Array.isArray(blacklistRes.value) ? blacklistRes.value : [])
+        .map((kw: string) => kw.trim().toLowerCase())
+        .filter((kw: string) => kw.length > 0);
+
+    const isBlacklisted = (item: MappedFeedItem): boolean => {
+        if (keywordBlacklist.length === 0) return false;
+        const searchable = `${item.title} ${item.description} ${item.guid}`.toLowerCase();
+        return keywordBlacklist.some((kw: string) => searchable.includes(kw));
+    };
     
     const readGuidsSet = new Set(readItemsArray.map(item => getGuid(item).toLowerCase()));
     const starredGuidsSet = new Set(starredItemsArray.map(item => getGuid(item).toLowerCase()));
@@ -91,7 +104,7 @@ export const manageDailyDeck = async (
     const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
     const isDeckEffectivelyEmpty = isDeckEmpty || existingDeck.every(item => {
         const g = item.guid.toLowerCase();
-        return readGuidsSet.has(g) || shuffledOutGuidsSet.has(g);
+        return readGuidsSet.has(g) || shuffledOutGuidsSet.has(g) || isBlacklisted(item);
     });
     const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid.toLowerCase()));
 

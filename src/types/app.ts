@@ -82,6 +82,8 @@ export interface AppState {
     shadowsEnabled: boolean;
     curvesEnabled: boolean;
     flickToSelectEnabled: boolean;
+    fontTitle: string;
+    fontBody: string;
     entries: MappedFeedItem[];
     read: ReadItem[];
     starred: StarredItem[];
@@ -185,6 +187,8 @@ export interface AppState {
     applyFontSize(): void;
     applyFeedWidth(): void;
     applyAnimationSpeed(): void;
+    saveFonts(): Promise<void>;
+    applyFonts(): void;
     updateThemeAndStyle(newStyle: string, newTheme: 'light' | 'dark'): Promise<void>;
     scrollToTop(): void;
     observeImage(el: HTMLImageElement): void;

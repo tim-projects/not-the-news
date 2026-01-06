@@ -23,6 +23,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Not The News</title>
     <link rel="icon" href="/images/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Lato:wght@400;700&family=Lora:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Slab:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         .loading-screen {
             display: flex;
@@ -62,7 +65,7 @@
                                                     <span class="search-icon" x-init="loadSvg($el, 'search.svg')"></span>
                                                 </button>
                                                 <button id="help-button" @click="openShortcuts = !openShortcuts; if (openShortcuts) { openSettings = false; showSearchBar = false; }" class="help-btn" :class="{ 'active': openShortcuts }" title="Keyboard Shortcuts">
-                                                    <span style="font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem;">?</span>
+                                                    <span class="help-icon" style="font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem;">?</span>
                                                 </button>
                                                 <button id="shuffle-button" @click="processShuffle()" class="shuffle-btn" title="Shuffle">
                                                     <span class="shuffle-icon" x-init="loadSvg($el, 'shuffle.svg')"></span>
@@ -122,7 +125,7 @@
                                                                                                                      }" 
                                                                                                                      :data-guid="entry.guid" @click="if (selectedGuid !== entry.guid) selectItem(entry.guid)">
                                                                                                                     
-                                                                                                                        <div class="menu-container" x-show="itemButtonMode !== 'hide'">
+                                                                                                                        <div class="menu-container" x-show="itemButtonMode !== 'hide'" @click.away="activeMenuGuid = null">
                                                                                                                             <!-- Original Play Button (shown if mode is 'play') -->
                                                                                                                             <button class="play-button menu-trigger" x-show="itemButtonMode === 'play'"
                                                                                                                                     :class="{
@@ -248,7 +251,7 @@
             </div>
         </div>
 
-        <div x-show="openSettings" class="modal" @click.self="openSettings = false" x-cloak
+        <div x-show="openSettings" class="modal" @click.self="if (!isSettingsDirty) openSettings = false" x-cloak
              x-transition:enter="transition ease-out duration-150"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -257,12 +260,41 @@
              x-transition:leave-end="opacity-0">
             <div class="modal-content">
                 <div class="modal-header">
-                    <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore' || modalView === 'change-password') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
-                    <button class="close" @click="openSettings = false">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div id="main-settings" x-show="modalView === 'main'">
-                        <h2>APP</h2>
+                                            <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore' || modalView === 'change-password') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
+                                        <button class="close" @click="if (!isSettingsDirty) openSettings = false">✕</button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div id="behavior-settings-block" x-show="modalView === 'behavior'">
+                                            <h2>BEHAVIOR</h2>
+                                            <hr>
+                                            <div class="settings-group">
+                                                <div class="setting-label-group">
+                                                    <label for="item-button-mode-selector">Item Button</label>
+                                                    <p class="setting-description">Choose the function of the button on each item.</p>
+                                                </div>
+                                                <select id="item-button-mode-selector" x-model="itemButtonMode" class="filter-select">
+                                                    <option value="menu">Menu (Hamburger)</option>
+                                                    <option value="play">Play (TTS)</option>
+                                                    <option value="hide">Hide</option>
+                                                </select>
+                                            </div>
+                                            <div class="settings-group">
+                                                <div class="setting-label-group">
+                                                    <label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label>
+                                                    <p class="setting-description">Always open article links in a new browser tab.</p>
+                                                </div>
+                                                <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
+                                            </div>
+                                            <div class="settings-group">
+                                                <div class="setting-label-group">
+                                                    <label for="flick-to-select-toggle">Flick to Select</label>
+                                                    <p class="setting-description">Fast scroll/swipe moves between items.</p>
+                                                </div>
+                                                <div class="d-flex align-items-center"><span id="flick-to-select-text" x-text="flickToSelectEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="flick-to-select-toggle" x-model="flickToSelectEnabled"><span class="slider"></span></label></div>
+                                            </div>
+                                        </div>
+                    
+                                        <div id="main-settings" x-show="modalView === 'main'">                        <h2>APP</h2>
                         <hr>
                         <div class="settings-group">
                             <div class="setting-label-group">
@@ -283,30 +315,19 @@
                             </div>
                             <div class="d-flex align-items-center"><span id="sync-text" x-text="syncEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="sync-toggle" x-model="syncEnabled"><span class="slider"></span></label></div>
                         </div>
-                        <div class="settings-group">
-                            <div class="setting-label-group">
-                                <label for="item-button-mode-selector">Item Button</label>
-                                <p class="setting-description">Choose the function of the button on each item.</p>
-                            </div>
-                            <select id="item-button-mode-selector" x-model="itemButtonMode" class="filter-select">
-                                <option value="menu">Menu (Hamburger)</option>
-                                <option value="play">Play (TTS)</option>
-                                <option value="hide">Hide</option>
-                            </select>
-                        </div>
-                        <div class="settings-group">
-                            <div class="setting-label-group">
-                                <label for="open-urls-in-new-tab-toggle">Open Links in New Tab</label>
-                                <p class="setting-description">Always open article links in a new browser tab.</p>
-                            </div>
-                            <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
-                        </div>
                         <div class="settings-option">
                             <div class="setting-label-group">
                                 <span>Appearance</span>
                                 <p class="setting-description">Customize themes, fonts, and layout.</p>
                             </div>
                             <button id="configure-appearance-btn" class="configure-button" @click="modalView = 'appearance'; preloadThemes();">Configure</button>
+                        </div>
+                        <div class="settings-option">
+                            <div class="setting-label-group">
+                                <span>Behavior</span>
+                                <p class="setting-description">Customize how the application interacts.</p>
+                            </div>
+                            <button id="configure-behavior-btn" class="configure-button" @click="modalView = 'behavior'">Configure</button>
                         </div>
                         
                         <h2>RSS FEEDS</h2>
@@ -379,6 +400,39 @@
                         </div>
                         <div class="settings-group">
                             <div class="setting-label-group">
+                                <label for="font-title-selector">Title Font:</label>
+                                <p class="setting-description">Choose a font for article titles.</p>
+                            </div>
+                            <select id="font-title-selector" x-model="fontTitle" @change="saveFonts()" class="filter-select">
+                                <option value="'Playfair Display', serif">Default (Playfair Display)</option>
+                                <option value="'Lora', serif">Lora</option>
+                                <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
+                                <option value="'Roboto Slab', serif">Roboto Slab</option>
+                                <option value="'Montserrat', sans-serif">Montserrat</option>
+                                <option value="'Raleway', sans-serif">Raleway</option>
+                                <option value="'Open Sans', sans-serif">Open Sans</option>
+                                <option value="'Roboto', sans-serif">Roboto</option>
+                                <option value="'Lato', sans-serif">Lato</option>
+                            </select>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
+                                <label for="font-body-selector">Body Font:</label>
+                                <p class="setting-description">Choose a font for article content.</p>
+                            </div>
+                            <select id="font-body-selector" x-model="fontBody" @change="saveFonts()" class="filter-select">
+                                <option value="inherit">Default (System Sans)</option>
+                                <option value="'Lora', serif">Lora</option>
+                                <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
+                                <option value="'Open Sans', sans-serif">Open Sans</option>
+                                <option value="'Roboto', sans-serif">Roboto</option>
+                                <option value="'Lato', sans-serif">Lato</option>
+                                <option value="'Montserrat', sans-serif">Montserrat</option>
+                                <option value="'Raleway', sans-serif">Raleway</option>
+                            </select>
+                        </div>
+                        <div class="settings-group">
+                            <div class="setting-label-group">
                                 <label for="font-size-slider">Font Size</label>
                                 <p class="setting-description">Adjust the text size for readability.</p>
                             </div>
@@ -441,13 +495,6 @@
                             </div>
                             <div class="d-flex align-items-center"><span id="curves-text" x-text="curvesEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="curves-toggle" x-model="curvesEnabled"><span class="slider"></span></label></div>
                         </div>
-                        <div class="settings-group">
-                            <div class="setting-label-group">
-                                <label for="flick-to-select-toggle">Flick to Select</label>
-                                <p class="setting-description">Fast scroll/swipe moves between items.</p>
-                            </div>
-                            <div class="d-flex align-items-center"><span id="flick-to-select-text" x-text="flickToSelectEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="flick-to-select-toggle" x-model="flickToSelectEnabled"><span class="slider"></span></label></div>
-                        </div>
                     </div>
 
                     <div id="rss-settings-block" x-show="modalView === 'rss'">
@@ -480,6 +527,7 @@
                             <div x-show="discoveryError" x-text="discoveryError" style="color: #ff4444; font-size: 0.8rem; margin-top: 0.5rem;"></div>
                         </div>
                         <div class="settings-group grow">
+                            <div x-show="rssFeedsInput !== _initialRssFeedsInput" class="save-message" style="margin-bottom: 0.5rem; color: #ffaa00;">Unsaved changes - Settings locked.</div>
                             <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
                                 <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
@@ -491,6 +539,7 @@
                     <div id="keywords-settings-block" x-show="modalView === 'keywords'">
                         <h2>Configure Keyword Blacklist</h2>
                         <div class="settings-group grow">
+                            <div x-show="keywordBlacklistInput !== _initialKeywordBlacklistInput" class="save-message" style="margin-bottom: 0.5rem; color: #ffaa00;">Unsaved changes - Settings locked.</div>
                             <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
                                 <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>

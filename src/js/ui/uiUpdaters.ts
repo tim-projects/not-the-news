@@ -154,6 +154,7 @@ export function showUndoNotification(app: AppState, guid: string, index: number 
 export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     const mainSettings = document.getElementById('main-settings');
     const appearanceSettings = document.getElementById('appearance-settings-block');
+    const behaviorSettings = document.getElementById('behavior-settings-block');
     const rssSettings = document.getElementById('rss-settings-block');
     const keywordsSettings = document.getElementById('keywords-settings-block');
     const cssSettings = document.getElementById('css-settings-block');
@@ -161,7 +162,7 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     const backupSettings = document.getElementById('backup-settings-block');
     const restoreSettings = document.getElementById('restore-settings-block');
 
-    if (!mainSettings || !appearanceSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings || !backupSettings || !restoreSettings) {
+    if (!mainSettings || !appearanceSettings || !behaviorSettings || !rssSettings || !keywordsSettings || !cssSettings || !advancedSettings || !backupSettings || !restoreSettings) {
         console.warn('One or more settings panels not found.');
         return Promise.resolve();
     }
@@ -169,6 +170,7 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
     // Hide all panels initially
     mainSettings.style.display = 'none';
     appearanceSettings.style.display = 'none';
+    behaviorSettings.style.display = 'none';
     rssSettings.style.display = 'none';
     keywordsSettings.style.display = 'none';
     cssSettings.style.display = 'none';
@@ -183,6 +185,9 @@ export function manageSettingsPanelVisibility(app: AppState): Promise<void> {
             break;
         case 'appearance':
             appearanceSettings.style.display = 'block';
+            break;
+        case 'behavior':
+            behaviorSettings.style.display = 'block';
             break;
         case 'rss':
             rssSettings.style.display = 'block';

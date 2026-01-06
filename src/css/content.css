@@ -147,7 +147,7 @@ h1 {
 
 h2,
 h3 {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-title);
   font-weight: 100;
   color: var(--fg);
   line-height: 1.4;
@@ -351,7 +351,7 @@ p {
     }
 }
 
-svg.shuffle-icon, .gear-icon {
+.shuffle-icon, .gear-icon {
   width: 1.8em;
   height: 1.8em;
 }

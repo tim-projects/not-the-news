@@ -43,6 +43,8 @@ html {
   --animation-duration-factor: 1;
   --feed-gap: 1em;
   --offline-padding: 0;
+  --font-title: 'Playfair Display', serif;
+  --font-body: inherit;
 
   /* Define the specific LIGHT theme variables for use by html.light */
   --light-bg: #f5f5f5;
@@ -168,6 +170,7 @@ html {
   padding-bottom: var(--offline-padding);
   color: var(--fg);
   word-break: break-word;
+  font-family: var(--font-body);
   font-size: calc(14px * var(--font-scale));
   background-color: var(--bg);
   background-repeat: repeat;
