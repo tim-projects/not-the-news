@@ -1,8 +1,6 @@
-import { Buffer } from 'node:buffer';
-
 /**
  * Compression Utility for Large JSON Payloads
- * Uses native CompressionStream (Gzip) and Base64 encoding (via Buffer).
+ * Uses native CompressionStream (Gzip) and standard Base64 encoding.
  */
 
 /**
@@ -17,7 +15,7 @@ export async function compressJson(data: any): Promise<string> {
     const response = new Response(compressedStream);
     const blob = await response.blob();
     const arrayBuffer = await blob.arrayBuffer();
-    return Buffer.from(arrayBuffer).toString('base64');
+    return arrayBufferToBase64(arrayBuffer);
 }
 
 /**
@@ -39,8 +37,8 @@ export async function decompressJson(base64String: string): Promise<any> {
     }
 
     try {
-        const buffer = Buffer.from(base64String, 'base64');
-        const stream = new Blob([buffer]).stream();
+        const arrayBuffer = base64ToArrayBuffer(base64String);
+        const stream = new Blob([arrayBuffer]).stream();
         const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'));
         const response = new Response(decompressedStream);
         const text = await response.text();
@@ -54,4 +52,30 @@ export async function decompressJson(base64String: string): Promise<any> {
             return base64String;
         }
     }
+}
+
+/**
+ * Helper: Convert ArrayBuffer to Base64 string.
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+/**
+ * Helper: Convert Base64 string to ArrayBuffer.
+ */
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
 }

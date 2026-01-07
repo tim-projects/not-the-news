@@ -346,7 +346,8 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
                 return { key, status: 304, timestamp: localTimestamp };
             }
             if (!response.ok) {
-                console.error(`[DB] HTTP error for ${key}: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`[DB] HTTP error for ${key}: ${response.status} - ${errorText}`);
                 return { key, status: response.status };
             }
             const data: { value: any, lastModified: string, partial?: boolean } = await response.json();
