@@ -1,6 +1,7 @@
 import { MappedFeedItem, ReadItem, StarredItem, DeckItem, ShuffledOutItem, PendingOperation } from '../../src/types/app';
 import { processFeeds, FeedItem } from './rss';
 import * as jose from 'jose';
+import { compressJson, decompressJson } from './compression';
 
 // Minimal types for the worker
 interface Env {
@@ -86,6 +87,8 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
     return tokenRefreshPromise;
 }
 
+const COMPRESSIBLE_KEYS = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids'];
+
 class Storage {
     /**
      * Firestore Helper: Convert any value to Firestore JSON format
@@ -154,7 +157,17 @@ class Storage {
             }
 
             const data: any = await response.json();
-            const value = this.fromFirestoreValue(data.fields.value);
+            let value = this.fromFirestoreValue(data.fields.value);
+            
+            // Decompress if needed
+            if (COMPRESSIBLE_KEYS.includes(key) && typeof value === 'string') {
+                try {
+                    value = await decompressJson(value);
+                } catch (e) {
+                    console.warn(`[Storage] Failed to decompress ${key}, returning raw value.`, e);
+                }
+            }
+
             const lastModified = data.updateTime;
 
             return { value, lastModified };
@@ -168,13 +181,25 @@ class Storage {
         const projectId = env.FIREBASE_PROJECT_ID;
         if (!projectId) throw new Error("FIREBASE_PROJECT_ID is not configured in worker environment.");
 
+        // Compress if needed
+        let valueToStore = value;
+        if (COMPRESSIBLE_KEYS.includes(key) && typeof value !== 'string') {
+            // Only compress if it's not already a string (i.e., it's a raw Array/Object)
+            // If it is a string, we assume the client has already compressed it.
+            try {
+                valueToStore = await compressJson(value);
+            } catch (e) {
+                console.error(`[Storage] Compression failed for ${key}, attempting to save raw.`, e);
+            }
+        }
+
         const token = await getGoogleAccessToken(env);
         const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/state/${key}`;
 
         console.log(`[Firestore] PATCH ${url}`);
         const firestoreData = {
             fields: {
-                value: this.toFirestoreValue(value)
+                value: this.toFirestoreValue(valueToStore)
             }
         };
 

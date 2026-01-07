@@ -10,8 +10,10 @@ import {
     SimpleStateValue
 } from './dbStateDefs.ts';
 import { getAuthToken } from './dbAuth.ts';
+import { compressJson } from '../utils/compression.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const COMPRESSIBLE_KEYS = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids'];
 
 interface Operation {
     id?: number;
@@ -99,6 +101,15 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
     if (!operation || typeof operation.type !== 'string' || (operation.type === 'simpleUpdate' && (operation.value === null || operation.value === undefined))) {
         console.warn(`[DB] Skipping invalid or empty operation:`, operation);
         return;
+    }
+
+    // Client-side Compression
+    if (operation.type === 'simpleUpdate' && operation.key && COMPRESSIBLE_KEYS.includes(operation.key) && typeof operation.value !== 'string') {
+        try {
+            operation.value = await compressJson(operation.value);
+        } catch (e) {
+            console.error(`[DB] Compression failed for ${operation.key}, sending raw.`, e);
+        }
     }
 
     try {

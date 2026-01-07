@@ -154,7 +154,7 @@ export const manageDailyDeck = async (
             console.log(`[deckManager] Topping up unread deck from ${validUnreadInDeck.length} to 10.`);
             newDeckItems = validUnreadInDeck.map(item => ({ guid: item.guid, addedAt: new Date().toISOString() }));
             
-            const existingGuidsInNewDeck = new Set(newDeckItems.map(Y).map(g => g.toLowerCase()));
+            const existingGuidsInNewDeck = new Set(newDeckItems.map(getGuid).map(g => g.toLowerCase()));
 
             // 1. Try to use pre-generated items first
             if (pregeneratedDeck && pregeneratedDeck.length > 0) {
@@ -170,7 +170,7 @@ export const manageDailyDeck = async (
 
             // 2. If still < 10, generate more
             if (newDeckItems.length < 10) {
-                const combinedShuffledOut = [...shuffledOutItemsArray, ...newDeckItems.map(Y)];
+                const combinedShuffledOut = [...shuffledOutItemsArray, ...newDeckItems.map(getGuid)];
                 const topUpItems = await generateNewDeck(
                     entries,
                     readItemsArray,
@@ -204,7 +204,7 @@ export const manageDailyDeck = async (
                         entries,
                         readItemsArray,
                         starredItemsArray,
-                        [...shuffledOutItemsArray, ...newDeckItems.map(Y)],
+                        [...shuffledOutItemsArray, ...newDeckItems.map(getGuid)],
                         filterMode
                     );
                     newDeckItems = [...newDeckItems, ...topUpItems.map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }))].slice(0, 10);
