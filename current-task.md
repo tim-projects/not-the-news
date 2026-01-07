@@ -18,15 +18,19 @@
 - [x] **Goal:** Implement transparent upgrade of existing keys to the compressed format.
 - [x] **Importance:** Ensures that existing users don't lose their history. The app will automatically "upgrade" their cloud data to the new optimized format the next time they sync.
 
-### 5. Delta-Only Synchronization
+### 5. Deck Transition Optimization (Completed)
+- [x] **Goal:** Eliminate the delay when the last item in a deck is marked read.
+- [x] **Importance:** Triggers deck generation/refresh in the background during the 5-second undo countdown, ensuring the next deck is ready to display instantly after the undo notification expires.
+
+### 6. Delta-Only Synchronization
 - [ ] **Goal:** Implementation of hash-based diffing to avoid large downloads.
 - [ ] **Importance:** Prevents the app from downloading the entire 100,000 item list every time a sync occurs. The client will only request what has changed since its last known state, drastically reducing bandwidth and battery usage.
 
-### 6. GUID Optimization
+### 7. GUID Optimization
 - [ ] **Goal:** Map URL GUIDs to compact integers for massive state support.
 - [ ] **Importance:** Storing a 100-character URL GUID 100,000 times is inefficient. Mapping these to 4-byte integers provides an immediate 25x reduction in raw data size before compression is even applied.
 
-### 7. Hybrid Storage (Pointer Support) - *Requires Permission*
+### 8. Hybrid Storage (Pointer Support) - *Requires Permission*
 - [ ] **Goal:** Prepare architecture for Firestore + Cloudflare R2 hybrid storage.
 - [ ] **Importance:** Once a compressed document nears the 1MB Firestore limit, we move the blob to R2 and store only a pointer in Firestore. This provides an unlimited scaling path for "power users" while keeping costs effectively zero.
 
