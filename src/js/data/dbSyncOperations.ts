@@ -316,13 +316,26 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
     };
     if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
+    // Calculate 'since' for delta sync
+    let queryParams = '';
+    if (def.type === 'array' && (def.syncMode || 'merge') === 'merge' && !force && Array.isArray(localData)) {
+        const timeField = key === 'read' ? 'readAt' : (key === 'starred' ? 'starredAt' : 'timestamp');
+        const maxTime = localData.reduce((max, item) => {
+            const t = new Date(item[timeField] || item.timestamp || 0).getTime();
+            return t > max ? t : max;
+        }, 0);
+        if (maxTime > 0) {
+            queryParams = `?since=${new Date(maxTime).toISOString()}`;
+        }
+    }
+
     let retries = 2;
     while (retries >= 0) {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per key
 
-            const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}`, { 
+            const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}${queryParams}`, { 
                 method: 'GET', 
                 headers,
                 signal: controller.signal 
@@ -336,8 +349,10 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
                 console.error(`[DB] HTTP error for ${key}: ${response.status}`);
                 return { key, status: response.status };
             }
-            const data: { value: any, lastModified: string } = await response.json();
-            console.log(`[DB Sync] Received data for ${key}:`, data.value);
+            const data: { value: any, lastModified: string, partial?: boolean } = await response.json();
+            const isPartial = data.partial === true;
+            if (isPartial) console.log(`[DB Sync] Received partial delta for ${key}.`);
+            else console.log(`[DB Sync] Received full data for ${key}:`, data.value);
 
             if (def.type === 'array') {
                 const serverObjects: any[] = data.value || [];
@@ -362,7 +377,10 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
                     const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
 
                     const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
-                    const objectsToRemove = localDataRaw.filter((item: any) => !serverGuids.has(item.guid));
+                    
+                    // If partial (delta), we CANNOT determine deletions, so we skip removal logic.
+                    // Removals will only be processed during a full sync (force=true or no 'since' param).
+                    const objectsToRemove = isPartial ? [] : localDataRaw.filter((item: any) => !serverGuids.has(item.guid));
 
                     if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
                         console.log(`[DB Sync] Merging '${key}': ${objectsToAdd.length} added, ${objectsToRemove.length} removed.`);

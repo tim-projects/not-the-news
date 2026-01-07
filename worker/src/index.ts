@@ -602,6 +602,26 @@ export default {
                     }
 
                     if (state.value === null && !USER_STATE_SERVER_DEFAULTS[key]) return new Response('Not Found', { status: 404 });
+
+                    // Handle Delta Sync
+                    const urlObj = new URL(request.url);
+                    const since = urlObj.searchParams.get('since');
+                    if (since && Array.isArray(state.value)) {
+                        const sinceTime = new Date(since).getTime();
+                        if (!isNaN(sinceTime)) {
+                            const timeField = key === 'read' ? 'readAt' : (key === 'starred' ? 'starredAt' : 'timestamp');
+                            const filtered = state.value.filter((item: any) => {
+                                const itemTime = new Date(item[timeField] || item.timestamp || 0).getTime();
+                                return itemTime > sinceTime;
+                            });
+                            return jsonResponse({
+                                value: filtered,
+                                lastModified: state.lastModified,
+                                partial: true
+                            });
+                        }
+                    }
+
                     return jsonResponse(state);
                 }
             }

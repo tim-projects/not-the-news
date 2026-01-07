@@ -23,8 +23,8 @@
 - [x] **Importance:** Triggers deck generation/refresh in the background during the 5-second undo countdown, ensuring the next deck is ready to display instantly after the undo notification expires.
 
 ### 6. Delta-Only Synchronization
-- [ ] **Goal:** Implementation of hash-based diffing to avoid large downloads.
-- [ ] **Importance:** Prevents the app from downloading the entire 100,000 item list every time a sync occurs. The client will only request what has changed since its last known state, drastically reducing bandwidth and battery usage.
+- [x] **Goal:** Implementation of hash-based diffing to avoid large downloads.
+- [x] **Importance:** Prevents the app from downloading the entire 100,000 item list every time a sync occurs. The client will only request what has changed since its last known state, drastically reducing bandwidth and battery usage.
 
 ### 7. GUID Optimization
 - [ ] **Goal:** Map URL GUIDs to compact integers for massive state support.
