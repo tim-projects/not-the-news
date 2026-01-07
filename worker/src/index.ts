@@ -13,6 +13,7 @@ interface Env {
 
 // Global cache for Google Access Token
 let cachedGoogleToken: { token: string, expiresAt: number } | null = null;
+let tokenRefreshPromise: Promise<string> | null = null;
 
 /**
  * Helper to get a Google OAuth2 Access Token for Firestore
@@ -24,62 +25,68 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
         return cachedGoogleToken.token;
     }
 
-    const email = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
-    const privateKey = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY;
-
-    if (!email || !privateKey) {
-        throw new Error("Missing Firestore Service Account credentials in environment.");
+    // Return existing promise if a refresh is already in progress
+    if (tokenRefreshPromise) {
+        return tokenRefreshPromise;
     }
 
-    try {
-        let cleanedKey = privateKey.replace(/\\n/g, '\n');
-        if (cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) {
-            cleanedKey = cleanedKey.slice(1, -1);
+    tokenRefreshPromise = (async () => {
+        try {
+            const email = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
+            const privateKey = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY;
+
+            if (!email || !privateKey) {
+                throw new Error("Missing Firestore Service Account credentials in environment.");
+            }
+
+            let cleanedKey = privateKey.replace(/\\n/g, '\n');
+            if (cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) {
+                cleanedKey = cleanedKey.slice(1, -1);
+            }
+            const algorithm = 'RS256';
+            const pkcs8 = await jose.importPKCS8(cleanedKey, algorithm);
+
+            const jwt = await new jose.SignJWT({
+                scope: 'https://www.googleapis.com/auth/datastore',
+            })
+                .setProtectedHeader({ alg: algorithm })
+                .setIssuer(email)
+                .setSubject(email)
+                .setAudience('https://oauth2.googleapis.com/token')
+                .setExpirationTime('1h')
+                .setIssuedAt()
+                .sign(pkcs8);
+
+            const response = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                    assertion: jwt,
+                }),
+            });
+
+            const data: any = await response.json();
+            if (!data.access_token) {
+                throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
+            }
+            
+            // Cache the token
+            cachedGoogleToken = {
+                token: data.access_token,
+                expiresAt: Date.now() + (data.expires_in || 3600) * 1000
+            };
+
+            return data.access_token;
+        } finally {
+            tokenRefreshPromise = null;
         }
-        const algorithm = 'RS256';
-        const pkcs8 = await jose.importPKCS8(cleanedKey, algorithm);
+    })();
 
-        const jwt = await new jose.SignJWT({
-            scope: 'https://www.googleapis.com/auth/datastore',
-        })
-            .setProtectedHeader({ alg: algorithm })
-            .setIssuer(email)
-            .setSubject(email)
-            .setAudience('https://oauth2.googleapis.com/token')
-            .setExpirationTime('1h')
-            .setIssuedAt()
-            .sign(pkcs8);
-
-        const response = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-                assertion: jwt,
-            }),
-        });
-
-        const data: any = await response.json();
-        if (!data.access_token) {
-            throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
-        }
-        
-        // Cache the token
-        cachedGoogleToken = {
-            token: data.access_token,
-            expiresAt: Date.now() + (data.expires_in || 3600) * 1000
-        };
-
-        return data.access_token;
-    } catch (e: any) {
-        console.error('[Auth] getGoogleAccessToken Fatal Error:', e);
-        throw e;
-    }
+    return tokenRefreshPromise;
 }
 
 class Storage {
-    static memCache: Record<string, any> = {};
-
     /**
      * Firestore Helper: Convert any value to Firestore JSON format
      */
@@ -121,9 +128,6 @@ class Storage {
     }
 
     static async loadState(uid: string, key: string, env: Env): Promise<{ value: any, lastModified: string | null }> {
-        const cacheKey = `${uid}:${key}`;
-        if (this.memCache[cacheKey]) return this.memCache[cacheKey];
-
         const projectId = env.FIREBASE_PROJECT_ID;
         if (!projectId) throw new Error("FIREBASE_PROJECT_ID is not configured in worker environment.");
 
@@ -153,9 +157,7 @@ class Storage {
             const value = this.fromFirestoreValue(data.fields.value);
             const lastModified = data.updateTime;
 
-            const result = { value, lastModified };
-            this.memCache[cacheKey] = result;
-            return result;
+            return { value, lastModified };
         } catch (e: any) {
             console.error(`[Firestore] Fatal Load Error for ${key}:`, e);
             throw e;
@@ -193,11 +195,7 @@ class Storage {
 
         console.log(`[Firestore] Successfully saved ${key}`);
         const data: any = await response.json();
-        const lastModified = data.updateTime;
-
-        // Update cache
-        this.memCache[`${uid}:${key}`] = { value, lastModified };
-        return lastModified;
+        return data.updateTime;
     }
 
     static async resetUser(uid: string, env: Env): Promise<void> {
@@ -212,13 +210,6 @@ class Storage {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-        }
-        
-        // Clear memCache
-        for (const cacheKey in Storage.memCache) {
-            if (cacheKey.startsWith(`${uid}:`)) {
-                delete Storage.memCache[cacheKey];
-            }
         }
     }
 }
@@ -284,7 +275,8 @@ const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'customCss': { 'type': 'simple', 'default': '' },
     'shadowsEnabled': { 'type': 'simple', 'default': true },
     'curvesEnabled': { 'type': 'simple', 'default': true },
-    'flickToSelectEnabled': { 'type': 'simple', 'default': false },
+    'fontTitle': { 'type': 'simple', 'default': "'Playfair Display', serif" },
+    'fontBody': { 'type': 'simple', 'default': 'inherit' },
     'itemButtonMode': { 'type': 'simple', 'default': 'play' },
     'showSearchBar': { 'type': 'simple', 'default': false },
     'searchQuery': { 'type': 'simple', 'default': '' },
@@ -577,6 +569,13 @@ export default {
                 const key = pathName.split('/').pop();
                 if (key) {
                     const state = await Storage.loadState(uid, key, env);
+                    
+                    // Check for ETag match (If-None-Match) to return 304
+                    const ifNoneMatch = request.headers.get('If-None-Match');
+                    if (ifNoneMatch && state.lastModified && ifNoneMatch === state.lastModified) {
+                        return new Response(null, { status: 304 });
+                    }
+
                     if (state.value === null && !USER_STATE_SERVER_DEFAULTS[key]) return new Response('Not Found', { status: 404 });
                     return jsonResponse(state);
                 }

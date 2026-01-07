@@ -13,6 +13,12 @@
 - [x] **Prevent Accidental Exit:**
     - [x] Lock settings modal when RSS Feed or Blacklist text boxes have unsaved changes.
     - [x] Prevent closing via clicking away on the backdrop if dirty.
+- [x] **Backend Sync Support:**
+    - [x] Added `fontTitle` and `fontBody` to `USER_STATE_SERVER_DEFAULTS` in the worker to support synchronization and prevent 404 errors.
+- [ ] **Deck Transition Optimization:**
+    - [ ] Eliminate the delay when the last item in a deck is marked read.
+    - [ ] Trigger deck generation/refresh in the background during the 5-second undo countdown.
+    - [ ] Ensure the next deck is ready to display instantly after the undo notification expires.
 
 ## Context
 - The user wants more customization options for typography and better organization of settings.

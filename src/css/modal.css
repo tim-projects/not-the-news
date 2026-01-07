@@ -198,10 +198,11 @@ html.light .modal-content {
 }
 
 .save-message {
-  font-size: 0.9em;
-  color: var(--primary);
-  margin-left: 0.5em;
-  white-space: nowrap;
+  font-size: 0.85em;
+  color: #ffaa00;
+  text-align: right;
+  width: 100%;
+  font-weight: bold;
 }
 
 @media (min-width: 768px) {

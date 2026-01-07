@@ -344,7 +344,7 @@ export async function generateNewDeck(
             
             if (nextDeckItems.length < MAX_DECK_SIZE) {
                 const resurfaceCandidates = allFeedItems.filter(item =>
-                    shuffledOutGuidsSet.has(item.guid) && !readGuidsSet.has(item.guid) && !selectedIds.has(item.guid)
+                    shuffledOutGuidsSet.has(item.guid) && !readGuidsSet.has(item.guid) && !selectedIds.has(item.guid) && !isBlacklisted(item)
                 );
                 resurfaceCandidates.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -355,7 +355,11 @@ export async function generateNewDeck(
                 console.log(`[generateNewDeck] After resurfaceCandidates: ${nextDeckItems.length}`);
 
                 if (nextDeckItems.length < MAX_DECK_SIZE) {
-                    const remainingAllItems = allFeedItems.filter(item => !selectedIds.has(item.guid));
+                    const remainingAllItems = allFeedItems.filter(item => 
+                        !selectedIds.has(item.guid) && 
+                        (filterMode !== 'unread' || !readGuidsSet.has(item.guid)) &&
+                        !isBlacklisted(item)
+                    );
                     remainingAllItems.sort((a, b) => a.timestamp - b.timestamp);
 
                     for (const item of remainingAllItems) {

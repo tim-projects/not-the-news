@@ -317,6 +317,7 @@ html.light .itemtitle a {
 }
 
 /* Original Light Theme specific gradient */
+html.light.theme-originalLight .itemtitle,
 html.light:not([class*="theme-"]) .itemtitle {
   background: linear-gradient(360deg, var(--link-highlight) 0%, transparent);
 }

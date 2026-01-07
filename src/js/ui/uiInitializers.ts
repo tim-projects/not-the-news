@@ -17,8 +17,7 @@ import {
     getImagesToggle,
     getOpenUrlsInNewTabToggle,
     getShadowsToggle,
-    getCurvesToggle,
-    getFlickToSelectToggle
+    getCurvesToggle
 } from './uiElements.ts';
 
 import {
@@ -34,8 +33,7 @@ type GetToggleElementFunction = () => HTMLElement | null;
         itemButtonMode: 'Item Button',
         openUrlsInNewTabEnabled: 'Open in New Tab',
         shadowsEnabled: 'Shadows',
-        curvesEnabled: 'Curves',
-        flickToSelectEnabled: 'Flick to Select'
+        curvesEnabled: 'Curves'
     };
     
     /**
@@ -102,10 +100,6 @@ type GetToggleElementFunction = () => HTMLElement | null;
 
     export async function initCurvesToggle(app: AppState): Promise<void> {
         await setupBooleanToggle(app, getCurvesToggle, 'curvesEnabled');
-    }
-
-    export async function initFlickToSelectToggle(app: AppState): Promise<void> {
-        await setupBooleanToggle(app, getFlickToSelectToggle, 'flickToSelectEnabled');
     }
     
     export async function initUrlsNewTabToggle(app: AppState): Promise<void> {

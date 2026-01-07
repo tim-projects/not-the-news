@@ -43,7 +43,6 @@ export const USER_STATE_DEFS: UserStateDefs = {
     lastShuffleResetDate: { store: 'userSettings', type: 'simple', localOnly: false, default: null },
     shadowsEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
     curvesEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: true },
-    flickToSelectEnabled: { store: 'userSettings', type: 'simple', localOnly: false, default: false },
     fontTitle: { store: 'userSettings', type: 'simple', localOnly: false, default: "'Playfair Display', serif" },
     fontBody: { store: 'userSettings', type: 'simple', localOnly: false, default: "inherit" },
     pregeneratedOnlineDeck: { store: 'userSettings', type: 'simple', localOnly: true, default: null },

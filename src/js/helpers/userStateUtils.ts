@@ -75,14 +75,16 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
     
     if (typeof app.updateCounts === 'function') app.updateCounts();
 
-    // --- BACKGROUND DB & SYNC OPERATIONS ---
-    // We do NOT await these, allowing the function to return immediately.
+    // 1. Local DB write (AWAITED to prevent race conditions during deck management)
+    try {
+        await updateArrayState(stateKey, itemObject, action === 'add');
+    } catch (error) {
+        console.error(`[DB State Update] Failed for ${stateKey} on ${guid}:`, error);
+    }
+
+    // 2. Queue for server sync (BACKGROUNDED)
     (async () => {
         try {
-            // 1. Local DB write
-            await updateArrayState(stateKey, itemObject, action === 'add');
-
-            // 2. Queue for server sync
             const opType = `${stateKey}Delta`;
             const pendingOp: PendingOperation = {
                 type: opType,
@@ -92,7 +94,7 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
             };
             await queueAndAttemptSyncOperation(pendingOp);
         } catch (error) {
-            console.error(`[Background State Update] Failed for ${stateKey} on ${guid}:`, error);
+            console.error(`[Background Sync Queue] Failed for ${stateKey} on ${guid}:`, error);
         }
     })();
 }

@@ -81,7 +81,6 @@ export interface AppState {
     discoveryError: string;
     shadowsEnabled: boolean;
     curvesEnabled: boolean;
-    flickToSelectEnabled: boolean;
     fontTitle: string;
     fontBody: string;
     entries: MappedFeedItem[];
@@ -198,11 +197,10 @@ export interface AppState {
     restoreConfig(event: Event): Promise<void>;
     confirmRestore(): Promise<void>;
     _loadInitialState(): Promise<void>;
-    _loadAndManageAllData(initialEntries?: MappedFeedItem[]): Promise<void>;
+    _loadAndManageAllData(skipLoad?: boolean): Promise<void>;
     updateAllUI(): void;
     _setupWatchers(): void;
     _setupEventListeners(): void;
-    _setupFlickToSelectListeners(): void;
     _startPeriodicSync(): void;
     _startWorkerFeedSync(): void;
     _initScrollObserver(): void;

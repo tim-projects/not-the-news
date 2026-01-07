@@ -305,78 +305,90 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
     };
     if (localTimestamp && !force) headers['If-None-Match'] = localTimestamp;
 
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per key
+    let retries = 2;
+    while (retries >= 0) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per key
 
-        const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}`, { 
-            method: 'GET', 
-            headers,
-            signal: controller.signal 
-        });
-        clearTimeout(timeoutId);
+            const response: Response = await fetch(`${API_BASE_URL}/api/profile/${key}`, { 
+                method: 'GET', 
+                headers,
+                signal: controller.signal 
+            });
+            clearTimeout(timeoutId);
 
-        if (response.status === 304 && !force) {
-            return { key, status: 304, timestamp: localTimestamp };
-        }
-        if (!response.ok) {
-            console.error(`[DB] HTTP error for ${key}: ${response.status}`);
-            return { key, status: response.status };
-        }
-        const data: { value: any, lastModified: string } = await response.json();
-        console.log(`[DB Sync] Received data for ${key}:`, data.value);
+            if (response.status === 304 && !force) {
+                return { key, status: 304, timestamp: localTimestamp };
+            }
+            if (!response.ok) {
+                console.error(`[DB] HTTP error for ${key}: ${response.status}`);
+                return { key, status: response.status };
+            }
+            const data: { value: any, lastModified: string } = await response.json();
+            console.log(`[DB Sync] Received data for ${key}:`, data.value);
 
-        if (def.type === 'array') {
-            const serverObjects: any[] = data.value || [];
-            const localDataRaw: any[] = localData || [];
-            const syncMode = def.syncMode || 'merge';
+            if (def.type === 'array') {
+                const serverObjects: any[] = data.value || [];
+                const localDataRaw: any[] = localData || [];
+                const syncMode = def.syncMode || 'merge';
 
-            if (syncMode === 'replace' || force) {
-                console.log(`[DB Sync] Replacing local '${key}' with server snapshot.`);
-                await withDb(async (db: IDBPDatabase) => {
-                    const tx = db.transaction(def.store, 'readwrite');
-                    await tx.store.clear();
-                    for (const item of serverObjects) {
-                        const toStore = { ...item };
-                        delete toStore.id; // Let IndexedDB generate new local IDs
-                        await tx.store.put(toStore);
-                    }
-                    await tx.done;
-                });
-            } else {
-                // Merge mode (default for arrays)
-                const localGuids = new Set(localDataRaw.map((item: any) => item.guid));
-                const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
-
-                const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
-                const objectsToRemove = localDataRaw.filter((item: any) => !serverGuids.has(item.guid));
-
-                if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
-                    console.log(`[DB Sync] Merging '${key}': ${objectsToAdd.length} added, ${objectsToRemove.length} removed.`);
+                if (syncMode === 'replace' || force) {
+                    console.log(`[DB Sync] Replacing local '${key}' with server snapshot.`);
                     await withDb(async (db: IDBPDatabase) => {
                         const tx = db.transaction(def.store, 'readwrite');
-                        for (const item of objectsToAdd) {
+                        await tx.store.clear();
+                        for (const item of serverObjects) {
                             const toStore = { ...item };
-                            delete toStore.id;
+                            delete toStore.id; // Let IndexedDB generate new local IDs
                             await tx.store.put(toStore);
-                        }
-                        for (const item of objectsToRemove) {
-                            await tx.store.delete(item.id);
                         }
                         await tx.done;
                     });
+                } else {
+                    // Merge mode (default for arrays)
+                    const localGuids = new Set(localDataRaw.map((item: any) => item.guid));
+                    const serverGuids = new Set(serverObjects.map((item: any) => item.guid));
+
+                    const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
+                    const objectsToRemove = localDataRaw.filter((item: any) => !serverGuids.has(item.guid));
+
+                    if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
+                        console.log(`[DB Sync] Merging '${key}': ${objectsToAdd.length} added, ${objectsToRemove.length} removed.`);
+                        await withDb(async (db: IDBPDatabase) => {
+                            const tx = db.transaction(def.store, 'readwrite');
+                            for (const item of objectsToAdd) {
+                                const toStore = { ...item };
+                                delete toStore.id;
+                                await tx.store.put(toStore);
+                            }
+                            for (const item of objectsToRemove) {
+                                await tx.store.delete(item.id);
+                            }
+                            await tx.done;
+                        });
+                    }
                 }
+            } else {
+                // Use the internal save function to prevent re-queuing this change.
+                await _saveSyncMetaState(key, data.value, data.lastModified);
             }
-        } else {
-            // Use the internal save function to prevent re-queuing this change.
-            await _saveSyncMetaState(key, data.value, data.lastModified);
+            
+            return { key, status: 200, timestamp: data.lastModified };
+        } catch (error: any) {
+            const isAbort = error.name === 'AbortError';
+            if (retries > 0) {
+                console.warn(`[DB] Pull failed for ${key} (${isAbort ? 'Timeout' : error.message}), retrying... (${retries} left)`);
+                retries--;
+                // Exponential-ish backoff: 1s then 2s
+                await new Promise(resolve => setTimeout(resolve, (2 - retries) * 1000));
+                continue;
+            }
+            console.error(`[DB] Failed to pull ${key} after retries:`, error);
+            return { key, status: 'error' };
         }
-        
-        return { key, status: 200, timestamp: data.lastModified };
-    } catch (error: any) {
-        console.error(`[DB] Failed to pull ${key}:`, error);
-        return { key, status: 'error' };
     }
+    return { key, status: 'error' };
 }
 
 /**

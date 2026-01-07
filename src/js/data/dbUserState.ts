@@ -63,10 +63,19 @@ export async function updateArrayState(storeName: string, item: { guid: string, 
             return;
         }
         const store = tx.objectStore(storeName);
+        
+        // Check if item exists by GUID
+        const existingItem = await store.index('guid').get(item.guid);
+        
         if (add) {
-            await store.put(item);
+            if (existingItem) {
+                // Update existing item (preserve ID)
+                await store.put({ ...item, id: existingItem.id });
+            } else {
+                // Add new item (ID will be auto-generated)
+                await store.put(item);
+            }
         } else {
-            const existingItem = await store.index('guid').get(item.guid);
             if (existingItem?.id !== undefined) {
                 await store.delete(existingItem.id);
             }

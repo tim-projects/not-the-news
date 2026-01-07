@@ -18,6 +18,12 @@
         const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const themeToApply = storedTheme || (systemPrefersDark ? 'dark' : 'light');
         document.documentElement.classList.add(themeToApply);
+
+        // Apply style class immediately to prevent flash
+        const storedStyle = themeToApply === 'light' ? localStorage.getItem('themeStyleLight') : localStorage.getItem('themeStyleDark');
+        if (storedStyle) {
+            document.documentElement.classList.add(`theme-${storedStyle}`);
+        }
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -251,7 +257,7 @@
             </div>
         </div>
 
-        <div x-show="openSettings" class="modal" @click.self="if (!isSettingsDirty) openSettings = false" x-cloak
+        <div x-show="openSettings" class="modal" @click.self="if (!isSettingsDirty || confirm('Discard unsaved changes?')) openSettings = false" x-cloak
              x-transition:enter="transition ease-out duration-150"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -261,7 +267,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                                             <button id="back-button" @click="if (modalView === 'backup' || modalView === 'restore' || modalView === 'change-password') { modalView = 'advanced' } else { modalView = 'main' }" aria-label="Go Back" x-show="modalView !== 'main'">&#8592;</button>
-                                        <button class="close" @click="if (!isSettingsDirty) openSettings = false">✕</button>
+                                        <button class="close" @click="if (!isSettingsDirty || confirm('Discard unsaved changes?')) openSettings = false">✕</button>
                                     </div>
                                     <div class="modal-body">
                                         <div id="behavior-settings-block" x-show="modalView === 'behavior'">
@@ -285,13 +291,7 @@
                                                 </div>
                                                 <div class="d-flex align-items-center"><span id="open-urls-in-new-tab-text" x-text="openUrlsInNewTabEnabled ? 'Yes' : 'No'"></span><label class="switch"><input type="checkbox" id="open-urls-in-new-tab-toggle" x-model="openUrlsInNewTabEnabled"><span class="slider"></span></label></div>
                                             </div>
-                                            <div class="settings-group">
-                                                <div class="setting-label-group">
-                                                    <label for="flick-to-select-toggle">Flick to Select</label>
-                                                    <p class="setting-description">Fast scroll/swipe moves between items.</p>
-                                                </div>
-                                                <div class="d-flex align-items-center"><span id="flick-to-select-text" x-text="flickToSelectEnabled ? 'On' : 'Off'"></span><label class="switch"><input type="checkbox" id="flick-to-select-toggle" x-model="flickToSelectEnabled"><span class="slider"></span></label></div>
-                                            </div>
+
                                         </div>
                     
                                         <div id="main-settings" x-show="modalView === 'main'">                        <h2>APP</h2>
@@ -527,8 +527,8 @@
                             <div x-show="discoveryError" x-text="discoveryError" style="color: #ff4444; font-size: 0.8rem; margin-top: 0.5rem;"></div>
                         </div>
                         <div class="settings-group grow">
-                            <div x-show="rssFeedsInput !== _initialRssFeedsInput" class="save-message" style="margin-bottom: 0.5rem; color: #ffaa00;">Unsaved changes - Settings locked.</div>
                             <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
+                            <div x-show="rssFeedsInput !== _initialRssFeedsInput" class="save-message" style="margin-top: 0.5rem;">Unsaved changes.</div>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
                                 <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
                                 <button id="save-rss-btn" class="configure-button" style="margin: 0;" @click="saveRssFeeds()">Save Feeds</button>
@@ -539,8 +539,8 @@
                     <div id="keywords-settings-block" x-show="modalView === 'keywords'">
                         <h2>Configure Keyword Blacklist</h2>
                         <div class="settings-group grow">
-                            <div x-show="keywordBlacklistInput !== _initialKeywordBlacklistInput" class="save-message" style="margin-bottom: 0.5rem; color: #ffaa00;">Unsaved changes - Settings locked.</div>
                             <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
+                            <div x-show="keywordBlacklistInput !== _initialKeywordBlacklistInput" class="save-message" style="margin-top: 0.5rem;">Unsaved changes.</div>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
                                 <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
                                 <button id="save-keywords-btn" class="configure-button" style="margin: 0;" @click="saveKeywordBlacklist()">Save Keywords</button>

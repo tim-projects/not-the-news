@@ -147,7 +147,6 @@ export function rssApp(): AppState {
         discoveryError: '',
         shadowsEnabled: true,
         curvesEnabled: true,
-        flickToSelectEnabled: false,
         entries: [],
         read: [],
         starred: [],
@@ -353,7 +352,6 @@ export function rssApp(): AppState {
                 initItemButtonMode(this);
                 initShadowsToggle(this);
                 initCurvesToggle(this);
-                initFlickToSelectToggle(this);
                 initUrlsNewTabToggle(this);
                 attachScrollToTopHandler();
                 this.$nextTick(() => { initScrollPosition(this); });
@@ -383,7 +381,6 @@ export function rssApp(): AppState {
                     console.log("[Init] Starting background initialization tasks...");
                     this._setupWatchers();
                     this._setupEventListeners();
-                    this._setupFlickToSelectListeners();
                     this._startPeriodicSync();
                     this._startWorkerFeedSync();
                     this._initScrollObserver();
@@ -790,7 +787,7 @@ export function rssApp(): AppState {
             if (!isCurrentlyRead) {
                 this.readingGuid = guid;
                 const animFactor = 100 / (this.animationSpeed || 100);
-                // Phase 1: Fold animation (333ms baseline, was 500ms)
+                // Phase 1: Fold animation (333ms baseline)
                 if (this.filterMode === 'unread') {
                     this.closingGuid = guid;
                     await new Promise(resolve => setTimeout(resolve, 333 * animFactor));
@@ -800,7 +797,7 @@ export function rssApp(): AppState {
                         this.selectItem(nextGuidToSelect);
                     }
 
-                    // Phase 2: Swipe animation (300ms baseline, was 450ms)
+                    // Phase 2: Swipe animation (300ms baseline)
                     await new Promise(resolve => setTimeout(resolve, 300 * animFactor));
                 } else {
                     // Just the short delay for the button animation if not removing
@@ -821,9 +818,6 @@ export function rssApp(): AppState {
                 item.guid === guid ? { ...item, isRead: !isCurrentlyRead } : item
             );
 
-            // Trigger the sync and array updates (now backgrounded in the helper)
-            await toggleItemStateAndSync(this, guid, 'read');
-
             if (!isCurrentlyRead) {
                 this.nextSwipeDirection = this.nextSwipeDirection === 'left' ? 'right' : 'left';
             }
@@ -834,11 +828,7 @@ export function rssApp(): AppState {
                 if (removedIndex === -1) removedIndex = null;
 
                 this.deck = this.deck.filter(item => item.guid !== guid);
-                // Also remove it from currentDeckGuids so it's not re-added on refresh
                 this.currentDeckGuids = this.currentDeckGuids.filter(deckItem => deckItem.guid !== guid);
-                // Save the updated deck guids to the database
-                const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
-                await saveCurrentDeck(this.currentDeckGuids);
                 
                 // If we didn't select nextGuidToSelect during the animation, clear selection
                 if (!nextGuidToSelect && wasSelected) {
@@ -853,70 +843,74 @@ export function rssApp(): AppState {
                     } else {
                         this.currentDeckGuids.push(deckItem);
                     }
-                    // Save the updated deck guids to the database
-                    const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
-                    await saveCurrentDeck(this.currentDeckGuids);
                 }
             }
             
             this.updateCounts();
-            await this._reconcileAndRefreshUI(); // Reconcile to handle potential item removals/animations
             this.updateSyncStatusMessage();
 
             if (!isCurrentlyRead && this.filterMode !== 'all') {
                 showUndoNotification(this, guid, removedIndex);
             }
 
-            // Check if we need to refresh the deck (if unread items in current deck are low)
-            let remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
-            
-            if (this.filterMode === 'unread' && remainingUnreadInDeck === 0) {
-                console.log("[toggleRead] Last item read. Preloading next deck during undo period...");
-                
-                // Kick off background work while the user has a chance to undo
-                this.pregenerateDecks();
-                this.loadFeedItemsFromDB();
+            // --- BACKGROUND WORK: Move DB and Sync actions to background to keep UI snappy ---
+            (async () => {
+                // 1. Sync and array updates (Awaited but inside background scope)
+                await toggleItemStateAndSync(this, guid, 'read');
 
-                // Wait while undo is visible (max 5.5s)
-                while (this.showUndo) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-                
-                // If the user didn't undo, we clear the stack permanently before refresh
-                this.undoStack = [];
-                
-                // Re-calculate after potential undo
-                remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
-                if (remainingUnreadInDeck > 0) {
-                    console.log("[toggleRead] Undo detected, skipping refresh.");
-                    return;
-                }
-            }
+                // 2. Save current deck state
+                const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
+                await saveCurrentDeck(this.currentDeckGuids);
 
-            if (this.filterMode === 'unread' && remainingUnreadInDeck < 3) {
-                console.log(`[toggleRead] Deck running low (${remainingUnreadInDeck} unread), initiating refresh.`);
-                
-                // OPTIMIZATION: Check if we have a pre-generated deck ready to skip loading screen
-                const pregenKey = this.isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
-                const hasPregen = !!this[pregenKey as keyof AppState];
+                // 3. UI Reconcile (minor cleanup)
+                await this._reconcileAndRefreshUI();
 
-                // Show loading only if deck is totally empty AND we don't have a pre-generated backup
-                if (remainingUnreadInDeck === 0 && !hasPregen) {
-                    this.progressMessage = 'Generating new deck...';
-                    this.loading = true;
-                }
-                try {
-                    await this._loadAndManageAllData();
-                    if (remainingUnreadInDeck === 0 && this.deck.length > 0) {
+                // 4. Refresh logic if deck running low
+                let remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
+                
+                if (this.filterMode === 'unread' && remainingUnreadInDeck === 0) {
+                    console.log("[toggleRead] Last item read. Proactively generating next deck in background...");
+                    
+                    // Trigger background refresh IMMEDIATELY so it's ready by the end of the countdown
+                    // We call loadFeedItemsFromDB first to ensure we have the latest items for generation
+                    await this.loadFeedItemsFromDB();
+                    const refreshPromise = this._loadAndManageAllData(true); // skipLoad: true
+
+                    // Wait while undo is visible (max 5.5s) but DON'T block the main thread
+                    while (this.showUndo) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    // Wait for generation to finish if it hasn't already
+                    await refreshPromise;
+
+                    // Re-calculate after potential undo
+                    remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
+                    if (remainingUnreadInDeck > 0) {
+                        console.log("[toggleRead] Undo detected, refresh already applied but items restored.");
+                        return;
+                    }
+
+                    // Auto-select first item of the new deck
+                    if (this.deck.length > 0) {
                         this.selectItem(this.deck[0].guid);
                     }
-                } catch (error) {
-                    console.error('[toggleRead] Error during deck refresh:', error);
-                } finally {
-                    this.loading = false;
-                    this.progressMessage = '';
+                } else if (this.filterMode === 'unread' && remainingUnreadInDeck < 3) {
+                    console.log(`[toggleRead] Deck running low (${remainingUnreadInDeck} unread), initiating refresh.`);
+                    
+                    const pregenKey = this.isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
+                    const hasPregen = !!this[pregenKey as keyof AppState];
+
+                    // Use nextTick to ensure any pending UI state settled before maybe showing loading
+                    this.$nextTick(async () => {
+                        try {
+                            await this._loadAndManageAllData();
+                        } catch (error) {
+                            console.error('[toggleRead] Error during deck refresh:', error);
+                        }
+                    });
                 }
-            }
+            })();
         },
 
         toggleItemMenu: function(this: AppState, guid: string): void {
@@ -1092,7 +1086,7 @@ export function rssApp(): AppState {
                 this.loading = false;
             }
         },        saveKeywordBlacklist: async function(this: AppState): Promise<void> {
-            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim()).filter(Boolean).sort();
+            const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim().toLowerCase()).filter(Boolean).sort();
             
             // Check if anything changed
             const { value: currentBlacklist } = await loadSimpleState('keywordBlacklist');
@@ -1196,9 +1190,11 @@ export function rssApp(): AppState {
                     
                     if (newTheme === 'light') {
                         this.themeStyleLight = newStyle;
+                        localStorage.setItem('themeStyleLight', newStyle);
                         await saveSimpleState('themeStyleLight', newStyle);
                     } else {
                         this.themeStyleDark = newStyle;
+                        localStorage.setItem('themeStyleDark', newStyle);
                         await saveSimpleState('themeStyleDark', newStyle);
                     }
                     
@@ -1211,9 +1207,11 @@ export function rssApp(): AppState {
                     // But we keep it for backward compatibility or if called directly
                     if (this.theme === 'light') {
                         this.themeStyleLight = this.themeStyle;
+                        localStorage.setItem('themeStyleLight', this.themeStyleLight);
                         await saveSimpleState('themeStyleLight', this.themeStyleLight);
                     } else {
                         this.themeStyleDark = this.themeStyle;
+                        localStorage.setItem('themeStyleDark', this.themeStyleDark);
                         await saveSimpleState('themeStyleDark', this.themeStyleDark);
                     }
                     
@@ -1229,8 +1227,12 @@ export function rssApp(): AppState {
                     
                     // Manage theme style specific classes
                     const classesToRemove = Array.from(htmlEl.classList).filter(c => c.startsWith('theme-'));
-                    htmlEl.classList.remove(...classesToRemove);
-                    if (this.themeStyle !== 'originalLight' && this.themeStyle !== 'originalDark') {
+                    if (classesToRemove.length > 0) {
+                        htmlEl.classList.remove(...classesToRemove);
+                    }
+                    
+                    // Add the theme class (now including original themes)
+                    if (this.themeStyle) {
                         htmlEl.classList.add(`theme-${this.themeStyle}`);
                     }
                 },
@@ -1313,7 +1315,13 @@ export function rssApp(): AppState {
         // --- New Function: Reset Application Data ---
         resetApplicationData: async function(this: AppState): Promise<void> {
             console.log('resetApplicationData called.');
-            const isConfirmed = confirm('Are you sure you want to reset the application? This will clear all local data, cache, and unregister the service worker.');
+            
+            if (!this.isOnline) {
+                alert("Resetting the application requires an internet connection to re-download your data.");
+                return;
+            }
+
+            const isConfirmed = confirm('Are you sure you want to reset the application? This will clear all local data and re-download everything from the server. Use this if your local feed is out of sync.');
             console.log('User confirmed reset:', isConfirmed);
             if (!isConfirmed) {
                 console.log('Reset cancelled by user.');
@@ -1322,7 +1330,7 @@ export function rssApp(): AppState {
 
             this.openSettings = false; // Close settings immediately
             this.loading = true;
-            this.progressMessage = 'Resetting application data...';
+            this.progressMessage = 'Clearing local data...';
 
             try {
                 // 0. Close the current database connection
@@ -1368,35 +1376,17 @@ export function rssApp(): AppState {
                 // localStorage is no longer cleared to keep theme and other preferences
                 console.log('localStorage is preserved.');
 
-                // 4. Call backend to reset server-side data
-                console.log('DEBUG: About to make fetch call to /api/admin/wipe');
-                 
-                const token = await getAuthToken();
-                const response = await fetch(`${API_BASE_URL}/api/admin/wipe`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                    }
-                });
-
-                if (!response.ok) {
-                    let errorMsg = 'Failed to reset backend data.';
-                    try {
-                        const errorData = await response.json();
-                        errorMsg = errorData.message || errorData.error || errorMsg;
-                    } catch (e) {
-                        const text = await response.text();
-                        errorMsg = `Server error (${response.status}): ${text.substring(0, 100)}`;
-                    }
-                    throw new Error(errorMsg);
-                }
-                console.log('Backend application data reset successfully.');
-                createStatusBarMessage(this, 'Application reset complete! Reloading...');
+                // 3. Skip server wipe. We want to Restore, not Delete.
+                console.log('Skipping server wipe to allow restoration.');
+                
+                console.log("Local data cleared. Triggering re-sync...");
+                this.progressMessage = 'Restoring data from cloud...';
                 
                 // --- FIX: Before reloading, ensure we pull the preserved state from the backend ---
                 // Passing 'true' to force a fresh pull of all keys.
-                await pullUserState(true);
+                await pullUserState(true, [], this);
+                
+                createStatusBarMessage(this, 'Local reset complete! Reloading...');
                 
                 // Reload after a short delay to allow the message to be seen
                 setTimeout(() => {
@@ -1443,7 +1433,7 @@ export function rssApp(): AppState {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
                     history: ['read', 'starred', 'hidden'],
-                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
                 // Filter based on selections
@@ -1472,12 +1462,12 @@ export function rssApp(): AppState {
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-                URL.revokeObjectURL(o);
+                URL.revokeObjectURL(url);
                 createStatusBarMessage(this, 'Backup ready for download!');
                 console.log("Configuration backed up successfully!")
-            } catch (e) {
-                console.error("Error during config backup:", error);
-                createStatusBarMessage(this, `Failed to backup configuration: ${error.message}`);
+            } catch (e: any) {
+                console.error("Error during config backup:", e);
+                createStatusBarMessage(this, `Failed to backup configuration: ${e.message}`);
             } finally {
                 this.progressMessage = '';
             }
@@ -1498,15 +1488,16 @@ export function rssApp(): AppState {
                 
                 // Validate if it's a valid backup file by checking for common keys
                 const validKeys = ['rssFeeds', 'theme', 'read', 'starred', 'keywordBlacklist', 'fontSize'];
-                const hasValidData = Object.keys(this.restoreData).some(key => validKeys.includes(key));
+                const keysFound = Object.keys(this.restoreData).filter(key => validKeys.includes(key));
 
-                if (!hasValidData) {
+                if (keysFound.length === 0) {
                     createStatusBarMessage(this, "The selected file does not appear to be a valid Not The News backup.");
                     this.restoreData = null;
                     this.modalView = 'advanced';
                     return;
                 }
 
+                console.log(`[Restore] valid keys found: ${keysFound.join(', ')}`);
                 this.showRestorePreview = true;
                 this.modalView = 'restore';
                 
@@ -1515,7 +1506,7 @@ export function rssApp(): AppState {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
                     history: ['read', 'starred', 'hidden'],
-                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
                 for (const [cat, keys] of Object.entries(CATEGORIES)) {
@@ -1546,10 +1537,11 @@ export function rssApp(): AppState {
                     feeds: ['rssFeeds', 'keywordBlacklist'],
                     appearance: ['theme', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'fontSize', 'feedWidth', 'animationSpeed', 'customCss', 'shadowsEnabled', 'curvesEnabled', 'imagesEnabled'],
                     history: ['read', 'starred', 'hidden'],
-                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'flickToSelectEnabled', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
+                    settings: ['syncEnabled', 'openUrlsInNewTabEnabled', 'itemButtonMode', 'filterMode', 'lastViewedItemId', 'lastViewedItemOffset', 'searchQuery', 'showSearchBar']
                 };
 
                 const dataToRestore: Record<string, any> = {};
+                let keysCount = 0;
                 for (const [category, enabled] of Object.entries(this.backupSelections)) {
                     if (enabled) {
                         const keys = CATEGORIES[category as keyof typeof CATEGORIES];
@@ -1564,6 +1556,7 @@ export function rssApp(): AppState {
                                 if (key === 'themeStyleDark' && val === 'original') val = 'originalDark';
                                 
                                 dataToRestore[key] = val;
+                                keysCount++;
                             }
                         });
                     }
@@ -1572,13 +1565,13 @@ export function rssApp(): AppState {
                 // Always enable sync after restore
                 dataToRestore['syncEnabled'] = true;
 
-                if (Object.keys(dataToRestore).length === 0) {
+                if (keysCount === 0) {
                     createStatusBarMessage(this, 'No data selected for restoration.');
                     this.loading = false;
                     return;
                 }
 
-                 
+                console.log(`[Restore] Uploading ${keysCount} keys to cloud...`);
                 const token = await getAuthToken();
                 const response = await fetch(`${API_BASE_URL}/api/admin/archive-import`, {
                     method: 'POST',
@@ -1595,19 +1588,30 @@ export function rssApp(): AppState {
                         const errorData = await response.json();
                         errorMsg = errorData.error || errorData.message || errorMsg;
                     } catch (e) {
-                        // Fallback if not JSON
                         const text = await response.text();
                         errorMsg = `Server error (${response.status}): ${text.substring(0, 100)}`;
                     }
                     throw new Error(errorMsg);
                 }
 
-                createStatusBarMessage(this, 'Restoration complete! Reloading...');
+                const importResult = await response.json();
+                console.log('[Restore] Import result:', importResult);
+
+                if (importResult.failed > 0) {
+                    createStatusBarMessage(this, `Warning: ${importResult.failed} items failed to restore.`);
+                }
+
+                this.progressMessage = 'Cloud restore successful. Syncing local device...';
                 
                 // Force a full pull to ensure local DB matches the restored server state
-                await pullUserState(true);
+                // We await this to ensure IndexedDB is populated before reload
+                await pullUserState(true, [], this);
 
-                setTimeout(() => window.location.reload(), 1000);
+                createStatusBarMessage(this, 'Restoration complete! Reloading...');
+                
+                // Allow some time for state to settle and user to read message
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                window.location.reload();
 
             } catch (error: any) {
                 console.error("Error during restoration:", error);
@@ -1616,31 +1620,28 @@ export function rssApp(): AppState {
             }
         },
         // --- Private Helper Methods ---
-                                _loadInitialState: async function (this: AppState): Promise<void> {
-                                    try {
-                                        const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, flickState, animSpeedRes, lastFeedSyncRes, fontTitleRes, fontBodyRes] = await Promise.all([
-                                            loadSimpleState('syncEnabled'),
-                                            loadSimpleState('imagesEnabled'),
-                                            loadSimpleState('itemButtonMode'),
-                                            loadSimpleState('openUrlsInNewTabEnabled'),
-                                            loadFilterMode(), // loadFilterMode directly returns string, not object with value
-                                            loadSimpleState('theme'),
-                                            loadSimpleState('curvesEnabled'),
-                                            loadSimpleState('flickToSelectEnabled'),
-                                            loadSimpleState('animationSpeed'),
-                                            loadSimpleState('lastFeedSync'),
-                                            loadSimpleState('fontTitle'),
-                                            loadSimpleState('fontBody')
-                                        ]);
-                                                        
-                                        this.syncEnabled = syncEnabled.value ?? true;
-                                        this.imagesEnabled = imagesEnabled.value ?? true;
-                                        this.itemButtonMode = itemButtonMode.value ?? 'play';
-                                        this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
-                                        this.curvesEnabled = curvesState.value ?? true;
-                                        this.flickToSelectEnabled = flickState.value ?? false;
-                                        this.animationSpeed = animSpeedRes.value ?? 100;
-                                        this.lastFeedSync = lastFeedSyncRes.value ?? 0;
+                                        _loadInitialState: async function (this: AppState): Promise<void> {
+                                            try {
+                                                const [syncEnabled, imagesEnabled, itemButtonMode, urlsNewTab, filterModeResult, themeState, curvesState, animSpeedRes, lastFeedSyncRes, fontTitleRes, fontBodyRes] = await Promise.all([
+                                                    loadSimpleState('syncEnabled'),
+                                                    loadSimpleState('imagesEnabled'),
+                                                    loadSimpleState('itemButtonMode'),
+                                                    loadSimpleState('openUrlsInNewTabEnabled'),
+                                                    loadFilterMode(), // loadFilterMode directly returns string, not object with value
+                                                    loadSimpleState('theme'),
+                                                    loadSimpleState('curvesEnabled'),
+                                                    loadSimpleState('animationSpeed'),
+                                                    loadSimpleState('lastFeedSync'),
+                                                    loadSimpleState('fontTitle'),
+                                                    loadSimpleState('fontBody')
+                                                ]);
+                                                                
+                                                this.syncEnabled = syncEnabled.value ?? true;
+                                                this.imagesEnabled = imagesEnabled.value ?? true;
+                                                this.itemButtonMode = itemButtonMode.value ?? 'play';
+                                                this.openUrlsInNewTabEnabled = urlsNewTab.value ?? true;
+                                                this.curvesEnabled = curvesState.value ?? true;
+                                                this.animationSpeed = animSpeedRes.value ?? 100;                                        this.lastFeedSync = lastFeedSyncRes.value ?? 0;
                                         this.fontTitle = fontTitleRes.value ?? "'Playfair Display', serif";
                                         this.fontBody = fontBodyRes.value ?? "inherit";
                                         this.filterMode = filterModeResult;                
@@ -1709,10 +1710,12 @@ export function rssApp(): AppState {
             }
         },
         
-        _loadAndManageAllData: async function(this: AppState, initialEntries?: MappedFeedItem[]): Promise<void> {
+        _loadAndManageAllData: async function(this: AppState, skipLoad: boolean = false): Promise<void> {
             console.log('_loadAndManageAllData: START');
-            this.progressMessage = 'Loading saved feed items...';
-            await this.loadFeedItemsFromDB();
+            if (!skipLoad) {
+                this.progressMessage = 'Loading saved feed items...';
+                await this.loadFeedItemsFromDB();
+            }
             console.log(`_loadAndManageAllData: After loadFeedItemsFromDB. Entries: ${this.entries.length}`);
 
             this.progressMessage = 'Loading user state from storage...';
@@ -1887,6 +1890,11 @@ export function rssApp(): AppState {
                     } else {
                         this.keywordBlacklistInput = '';
                     }
+                    
+                    // Sync initial values so dirty check works correctly
+                    this._initialRssFeedsInput = this.rssFeedsInput;
+                    this._initialKeywordBlacklistInput = this.keywordBlacklistInput;
+
                     await saveCurrentScrollPosition();
                 } else {
                     // Remove hash if it exists when closing via UI
@@ -2080,80 +2088,6 @@ export function rssApp(): AppState {
                     this.updateSyncStatusMessage();
                 }
             }, 30000);
-        },
-        _setupFlickToSelectListeners: function(this: AppState): void {
-            let lastFlickTime = 0;
-            const FLICK_COOLDOWN = 800; // ms
-            const VELOCITY_THRESHOLD = 0.5; // pixels per ms
-            const DISTANCE_THRESHOLD = 50; // pixels
-            const WHEEL_DELTA_THRESHOLD = 100;
-
-            const getTargetGuid = (direction: number): string | null => {
-                const entries = this.filteredEntries;
-                if (entries.length === 0) return null;
-                
-                const currentIndex = this.selectedGuid ? entries.findIndex(e => e.guid === this.selectedGuid) : -1;
-                let nextIndex = currentIndex + direction;
-                
-                if (nextIndex < 0) nextIndex = 0;
-                if (nextIndex >= entries.length) nextIndex = entries.length - 1;
-                
-                return entries[nextIndex].guid;
-            };
-
-            const triggerFlickSelection = (direction: number) => {
-                const now = Date.now();
-                if (now - lastFlickTime < FLICK_COOLDOWN) return;
-                
-                const targetGuid = getTargetGuid(direction);
-                if (!targetGuid || targetGuid === this.selectedGuid) return;
-
-                console.log(`[Flick] Triggering selection move: direction=${direction}`);
-                lastFlickTime = now;
-                
-                // Kill current inertia/scrolling
-                window.scrollTo(window.scrollX, window.scrollY);
-                
-                // Trigger smooth scroll to target
-                this.selectItem(targetGuid);
-            };
-
-            // --- Mouse Wheel Flick ---
-            window.addEventListener('wheel', (e: WheelEvent) => {
-                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
-
-                if (Math.abs(e.deltaY) > WHEEL_DELTA_THRESHOLD) {
-                    // We don't preventDefault, but we do intercept and override if it's a "flick"
-                    triggerFlickSelection(e.deltaY > 0 ? 1 : -1);
-                }
-            }, { passive: true });
-
-            // --- Touch Flick ---
-            let touchStartY = 0;
-            let touchStartTime = 0;
-
-            window.addEventListener('touchstart', (e: TouchEvent) => {
-                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
-                touchStartY = e.touches[0].clientY;
-                touchStartTime = Date.now();
-            }, { passive: true });
-
-            window.addEventListener('touchend', (e: TouchEvent) => {
-                if (!this.flickToSelectEnabled || this.openSettings || this.showSearchBar) return;
-                
-                const touchEndY = e.changedTouches[0].clientY;
-                const touchEndTime = Date.now();
-                
-                const distanceY = touchEndY - touchStartY;
-                const duration = touchEndTime - touchStartTime;
-                
-                if (duration > 0) {
-                    const velocity = Math.abs(distanceY) / duration;
-                    if (velocity > VELOCITY_THRESHOLD && Math.abs(distanceY) > DISTANCE_THRESHOLD) {
-                        triggerFlickSelection(distanceY < 0 ? 1 : -1);
-                    }
-                }
-            }, { passive: true });
         },
         _startPeriodicSync: function(this: AppState): void {
             let lastActivityTimestamp = Date.now();
