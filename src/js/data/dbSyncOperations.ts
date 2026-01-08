@@ -387,13 +387,22 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
                         console.log(`[DB Sync] Merging '${key}': ${objectsToAdd.length} added, ${objectsToRemove.length} removed.`);
                         await withDb(async (db: IDBPDatabase) => {
                             const tx = db.transaction(def.store, 'readwrite');
+                            const store = tx.objectStore(def.store);
+                            const index = store.index('guid');
+
                             for (const item of objectsToAdd) {
-                                const toStore = { ...item };
-                                delete toStore.id;
-                                await tx.store.put(toStore);
+                                if (!item.guid) continue;
+                                const existingId = await index.getKey(item.guid);
+                                if (existingId) {
+                                    await store.put({ ...item, id: existingId });
+                                } else {
+                                    const toAdd = { ...item };
+                                    delete toAdd.id;
+                                    await store.put(toAdd);
+                                }
                             }
                             for (const item of objectsToRemove) {
-                                await tx.store.delete(item.id);
+                                await store.delete(item.id);
                             }
                             await tx.done;
                         });
@@ -634,8 +643,21 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
             if (fullItems && fullItems.length > 0) {
                 await withDb(async (db: IDBPDatabase) => {
                     const tx = db.transaction('feedItems', 'readwrite');
+                    const store = tx.objectStore('feedItems');
+                    const index = store.index('guid');
+
                     for (const item of fullItems) {
-                        if (item.guid) await tx.store.put(item);
+                        if (!item.guid) continue;
+                        
+                        // Check for existing item by GUID to get its local numeric ID
+                        const existingId = await index.getKey(item.guid);
+                        if (existingId) {
+                            await store.put({ ...item, id: existingId });
+                        } else {
+                            const toAdd = { ...item };
+                            delete toAdd.id;
+                            await store.put(toAdd);
+                        }
                     }
                     await tx.done;
                 });
