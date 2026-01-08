@@ -96,8 +96,9 @@ import { auth } from '../firebase';
  * --- MODIFIED: Queues any user operation and attempts an immediate sync if online. ---
  * The logic is now generalized and not limited to specific operation types.
  * @param {object} operation The operation object to queue and sync.
+ * @param {AppState} [app] The main application object.
  */
-export async function queueAndAttemptSyncOperation(operation: Operation): Promise<void> {
+export async function queueAndAttemptSyncOperation(operation: Operation, app: AppState | null = null): Promise<void> {
     if (!operation || typeof operation.type !== 'string' || (operation.type === 'simpleUpdate' && (operation.value === null || operation.value === undefined))) {
         console.warn(`[DB] Skipping invalid or empty operation:`, operation);
         return;
@@ -162,8 +163,7 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
                     skipKey = 'starred';
                 }
                 
-                // @ts-ignore - pullUserState takes app as 3rd param
-                pullUserState(false, skipKey ? [skipKey] : [], (this && this.loadFeedItemsFromDB) ? this : null);
+                pullUserState(false, skipKey ? [skipKey] : [], app);
                 // --- END SOLUTION ---
 
             } else {
@@ -179,8 +179,9 @@ export async function queueAndAttemptSyncOperation(operation: Operation): Promis
 
 /**
  * Processes all pending operations in the buffer and syncs them with the server.
+ * @param {AppState} [app] The main application object.
  */
-export async function processPendingOperations(): Promise<void> {
+export async function processPendingOperations(app: AppState | null = null): Promise<void> {
     const { value: syncEnabled } = await loadSimpleState('syncEnabled') as SimpleStateValue;
     if (!isOnline() || !syncEnabled) {
         console.log('[DB] Offline or sync is disabled. Skipping batch sync.');
@@ -266,7 +267,7 @@ export async function processPendingOperations(): Promise<void> {
     // skipping all keys we just pushed to the server.
     if (allSkipKeys.size > 0) {
         console.log(`[DB] Post-batch sync: Triggering single pull for ${allSkipKeys.size} unique keys.`);
-        pullUserState(false, Array.from(allSkipKeys));
+        pullUserState(false, Array.from(allSkipKeys), app);
     }
 }
 
@@ -379,19 +380,29 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
 
                     const objectsToAdd = serverObjects.filter((item: any) => !localGuids.has(item.guid));
                     
+                    // Deduplicate objectsToAdd by GUID to prevent ConstraintError on unique index
+                    const uniqueObjectsToAdd = Array.from(
+                        objectsToAdd.reduce((map, item) => {
+                            if (item.guid) {
+                                const g = item.guid.toLowerCase();
+                                map.set(g, { ...item, guid: g });
+                            }
+                            return map;
+                        }, new Map<string, any>()).values()
+                    );
+
                     // If partial (delta), we CANNOT determine deletions, so we skip removal logic.
                     // Removals will only be processed during a full sync (force=true or no 'since' param).
                     const objectsToRemove = isPartial ? [] : localDataRaw.filter((item: any) => !serverGuids.has(item.guid));
 
-                    if (objectsToAdd.length > 0 || objectsToRemove.length > 0) {
-                        console.log(`[DB Sync] Merging '${key}': ${objectsToAdd.length} added, ${objectsToRemove.length} removed.`);
+                    if (uniqueObjectsToAdd.length > 0 || objectsToRemove.length > 0) {
+                        console.log(`[DB Sync] Merging '${key}': ${uniqueObjectsToAdd.length} added, ${objectsToRemove.length} removed.`);
                         await withDb(async (db: IDBPDatabase) => {
                             const tx = db.transaction(def.store, 'readwrite');
                             const store = tx.objectStore(def.store);
                             const index = store.index('guid');
 
-                            for (const item of objectsToAdd) {
-                                if (!item.guid) continue;
+                            for (const item of uniqueObjectsToAdd) {
                                 const existingId = await index.getKey(item.guid);
                                 if (existingId) {
                                     await store.put({ ...item, id: existingId });
@@ -641,14 +652,24 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
             const fullItems = await _fetchItemsInBatches(guids, app, guids.length, 0);
 
             if (fullItems && fullItems.length > 0) {
+                // Deduplicate fullItems by GUID to prevent ConstraintError
+                // and normalize to lowercase for consistency
+                const uniqueFullItems = Array.from(
+                    fullItems.reduce((map, item) => {
+                        if (item.guid) {
+                            const g = item.guid.toLowerCase();
+                            map.set(g, { ...item, guid: g });
+                        }
+                        return map;
+                    }, new Map<string, any>()).values()
+                );
+
                 await withDb(async (db: IDBPDatabase) => {
                     const tx = db.transaction('feedItems', 'readwrite');
                     const store = tx.objectStore('feedItems');
                     const index = store.index('guid');
 
-                    for (const item of fullItems) {
-                        if (!item.guid) continue;
-                        
+                    for (const item of uniqueFullItems) {
                         // Check for existing item by GUID to get its local numeric ID
                         const existingId = await index.getKey(item.guid);
                         if (existingId) {
@@ -699,7 +720,7 @@ export async function performFullSync(app: AppState): Promise<boolean> {
     console.log('[DB] Full sync initiated.');
     try {
         // Run push first, then pulls.
-        await processPendingOperations(); // Process any items that were queued while offline.
+        await processPendingOperations(app); // Process any items that were queued while offline.
         await pullUserState(false, [], app);
         const syncSuccess = await performFeedSync(app);
         return syncSuccess;

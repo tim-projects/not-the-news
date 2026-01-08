@@ -39,7 +39,12 @@
     - Improved container detection to support both `window` and `#app-viewport`.
     - Moved `selectItem` call in `toggleRead` to occur after animations to ensure stable DOM positions.
 
-### 9. GUID Optimization
+### 9. Comprehensive Interaction Assessment
+- [ ] **Goal:** Document and verify every possible user interaction for UX consistency.
+- [ ] **Importance:** Ensures that recent changes (scroll fixes, compression, etc.) haven't introduced subtle regressions in edge cases (e.g., clicking items at the very edge of the screen).
+- [ ] **Deliverables:** `interaction-report.md` (List of all interactions) and `interaction-assessment/` folder (Verification per interaction).
+
+### 10. GUID Optimization
 - [ ] **Goal:** Map URL GUIDs to compact integers for massive state support.
 - [ ] **Importance:** Storing a 100-character URL GUID 100,000 times is inefficient. Mapping these to 4-byte integers provides an immediate 25x reduction in raw data size before compression is even applied.
 

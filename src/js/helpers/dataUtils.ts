@@ -138,7 +138,7 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     const ts = Date.parse(item.pubDate) || 0;
 
     return {
-        guid: item.guid,
+        guid: item.guid.toLowerCase(),
         image: imgSrc || (item as any).image || "",
         title: item.title,
         link: item.link,

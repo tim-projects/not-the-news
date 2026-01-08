@@ -454,6 +454,26 @@ async function discoverFeeds(targetUrl: string): Promise<Response> {
     }
 }
 
+async function getFeedItems(uid: string, env: Env, guids: string[]): Promise<Response> {
+    if (guids.length > 100) return jsonResponse({ error: 'Too many GUIDs requested' }, 400);
+    
+    let userCache = userCaches.get(uid);
+    
+    // If cache is missing or doesn't have all wanted items, try one sync
+    const hasAllItems = userCache && guids.every(g => userCache!.items.some(i => i.guid === g));
+    
+    if (!hasAllItems && guids.length > 0) {
+        console.log(`[List] Items missing from cache for ${uid}, triggering internal sync...`);
+        await syncFeeds(uid, env, 0);
+        userCache = userCaches.get(uid);
+    }
+
+    const currentItems = userCache ? userCache.items : [];
+    const results = guids.length > 0 ? currentItems.filter(i => guids.includes(i.guid)) : currentItems;
+    
+    return jsonResponse(results);
+}
+
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         try {
@@ -516,7 +536,37 @@ export default {
                 return jsonResponse({ time: now.toISOString(), timestamp: now.getTime() });
             }
 
-            if (pathName === '/api/refresh' && request.method === 'POST') {
+            // --- BACKWARD COMPATIBILITY ALIASES ---
+            if (pathName === '/api/user-state' || pathName === '/api/feed-sync' || pathName === '/api/feed-guids' || pathName === '/api/feed-items') {
+                let targetPath = '';
+                if (pathName === '/api/user-state') targetPath = '/api/profile';
+                else if (pathName === '/api/feed-sync') targetPath = '/api/refresh';
+                else if (pathName === '/api/feed-guids') targetPath = '/api/keys';
+                else if (pathName === '/api/feed-items') targetPath = '/api/list';
+
+                console.log(`[Worker] Legacy endpoint called: ${pathName}. Aliasing to ${targetPath}`);
+                
+                if (pathName === '/api/feed-sync') {
+                    return syncFeeds(uid, env, 0); 
+                }
+                
+                // Rewrite for keys and list
+                if (pathName === '/api/feed-guids') {
+                    const userCache = userCaches.get(uid);
+                    return jsonResponse({
+                        guids: userCache ? userCache.items.map(i => i.guid) : [],
+                        serverTime: userCache ? userCache.lastSync : new Date().toISOString()
+                    });
+                }
+
+                if (pathName === '/api/feed-items') {
+                    const guidsParam = url.searchParams.get('guids');
+                    const guids = guidsParam ? guidsParam.split(',') : [];
+                    return getFeedItems(uid, env, guids);
+                }
+            }
+
+            if ((pathName === '/api/refresh' || pathName === '/api/feed-sync') && request.method === 'POST') {
                 const now = Date.now();
                 const lastSync = syncCooldowns.get(uid) || 0;
                 const violations = violationCounts.get(uid) || 0;
@@ -569,28 +619,10 @@ export default {
                     const guidsParam = url.searchParams.get('guids');
                     wantedGuids = guidsParam ? guidsParam.split(',') : [];
                 }
-                
-                if (wantedGuids.length > 100) return jsonResponse({ error: 'Too many GUIDs requested' }, 400);
-                
-                let userCache = userCaches.get(uid);
-                
-                // If cache is missing or doesn't have all wanted items, try one sync
-                const hasAllItems = userCache && wantedGuids.every(g => userCache!.items.some(i => i.guid === g));
-                
-                if (!hasAllItems && wantedGuids.length > 0) {
-                    console.log(`[List] Items missing from cache for ${uid}, triggering internal sync...`);
-                    // We perform a sync but don't return its response directly
-                    await syncFeeds(uid, env, 0);
-                    userCache = userCaches.get(uid);
-                }
-
-                const currentItems = userCache ? userCache.items : [];
-                const results = wantedGuids.length > 0 ? currentItems.filter(i => wantedGuids.includes(i.guid)) : currentItems;
-                
-                return jsonResponse(results);
+                return getFeedItems(uid, env, wantedGuids);
             }
 
-            if (pathName.startsWith('/api/profile/')) {
+            if ((pathName.startsWith('/api/profile/') || pathName.startsWith('/api/user-state/'))) {
                 const key = pathName.split('/').pop();
                 if (key) {
                     const state = await Storage.loadState(uid, key, env);
@@ -626,7 +658,7 @@ export default {
                 }
             }
 
-            if (pathName === '/api/profile' && request.method === 'POST') {
+            if ((pathName === '/api/profile' || pathName === '/api/user-state') && request.method === 'POST') {
                 const operations: any[] = await request.json();
                 if (operations.length > 25) return jsonResponse({ error: 'Too many operations in batch' }, 400);
                 const results = [];

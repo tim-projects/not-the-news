@@ -292,7 +292,7 @@ export function rssApp(): AppState {
                                 console.log("[Init] Auth verified in background, triggering sync.");
                                 if (isNewDevice) this.progressMessage = 'Restoring account data...';
                                 
-                                await processPendingOperations();
+                                await processPendingOperations(this);
                                 
                                 // PHASE 1: Pull essential metadata only (deck, theme check)
                                 // If new device, pull everything immediately
@@ -317,7 +317,7 @@ export function rssApp(): AppState {
                         // Already verified
                         this.progressMessage = isNewDevice ? 'Restoring profile...' : 'Syncing user profile...';
                         try {
-                            if (isOnline()) await processPendingOperations();
+                            if (isOnline()) await processPendingOperations(this);
                             // Phase 1 sync (or full if new)
                             const skipKeys = isNewDevice ? [] : ['rssFeeds', 'keywordBlacklist', 'customCss', 'shuffleCount', 'lastShuffleResetDate', 'animationSpeed', 'openUrlsInNewTabEnabled', 'themeStyle', 'themeStyleLight', 'themeStyleDark', 'read', 'starred'];
                             await pullUserState(false, skipKeys, this);
@@ -410,7 +410,7 @@ export function rssApp(): AppState {
             this.progressMessage = 'Syncing...';
             this.loading = true;
             try {
-                await processPendingOperations();
+                await processPendingOperations(this);
                 const syncSuccess = await performFeedSync(this);
                 await pullUserState();
                 await this._loadAndManageAllData();
@@ -864,7 +864,7 @@ export function rssApp(): AppState {
 
                 // 2. Save current deck state
                 const { saveCurrentDeck } = await import('./js/helpers/userStateUtils.ts');
-                await saveCurrentDeck(this.currentDeckGuids);
+                await saveCurrentDeck(this.currentDeckGuids, this);
 
                 // 3. UI Reconcile (minor cleanup)
                 await this._reconcileAndRefreshUI();
@@ -1028,7 +1028,7 @@ export function rssApp(): AppState {
             }
 
             try {
-                await saveSimpleState('rssFeeds', rssFeedsArray);
+                await saveSimpleState('rssFeeds', rssFeedsArray, 'userSettings', this);
                 this.rssFeedsInput = normalizedLines.join('\n');
                 this._initialRssFeedsInput = this.rssFeedsInput;
                 createStatusBarMessage(this, 'RSS Feeds saved!');
@@ -1049,7 +1049,9 @@ export function rssApp(): AppState {
                 
                 const deckResult = await manageDailyDeck(
                     Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids,
-                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate
+                    this.shuffleCount, this.filterMode, this.lastShuffleResetDate,
+                    null, // No pregen deck for manual save
+                    this
                 );
                 
                 // --- FIX: Correctly update the component state with the deck result ---
@@ -1091,7 +1093,7 @@ export function rssApp(): AppState {
             }
 
             try {
-                await saveSimpleState('keywordBlacklist', keywordsArray);
+                await saveSimpleState('keywordBlacklist', keywordsArray, 'userSettings', this);
                 this.keywordBlacklistInput = keywordsArray.join('\n');
                 this._initialKeywordBlacklistInput = this.keywordBlacklistInput;
                 createStatusBarMessage(this, 'Keyword Blacklist saved!');
@@ -1102,7 +1104,7 @@ export function rssApp(): AppState {
             }
         },        saveCustomCss: async function(this: AppState): Promise<void> {
             try {
-                await saveSimpleState('customCss', this.customCss);
+                await saveSimpleState('customCss', this.customCss, 'userSettings', this);
                 this.applyCustomCss();
                 createStatusBarMessage(this, 'Custom CSS saved!');
             } catch (error: any) {
@@ -1176,19 +1178,19 @@ export function rssApp(): AppState {
                     
                     // Persist to DB
                      
-                    await saveSimpleState('theme', newTheme);
+                    await saveSimpleState('theme', newTheme, 'userSettings', this);
                     
                     if (newTheme === 'light') {
                         this.themeStyleLight = newStyle;
                         localStorage.setItem('themeStyleLight', newStyle);
-                        await saveSimpleState('themeStyleLight', newStyle);
+                        await saveSimpleState('themeStyleLight', newStyle, 'userSettings', this);
                     } else {
                         this.themeStyleDark = newStyle;
                         localStorage.setItem('themeStyleDark', newStyle);
-                        await saveSimpleState('themeStyleDark', newStyle);
+                        await saveSimpleState('themeStyleDark', newStyle, 'userSettings', this);
                     }
                     
-                    await saveSimpleState('themeStyle', newStyle);
+                    await saveSimpleState('themeStyle', newStyle, 'userSettings', this);
                     this.applyThemeStyle();
                     createStatusBarMessage(this, `Theme set to ${newTheme} (${newStyle}).`);
                 },
@@ -1198,14 +1200,14 @@ export function rssApp(): AppState {
                     if (this.theme === 'light') {
                         this.themeStyleLight = this.themeStyle;
                         localStorage.setItem('themeStyleLight', this.themeStyleLight);
-                        await saveSimpleState('themeStyleLight', this.themeStyleLight);
+                        await saveSimpleState('themeStyleLight', this.themeStyleLight, 'userSettings', this);
                     } else {
                         this.themeStyleDark = this.themeStyle;
                         localStorage.setItem('themeStyleDark', this.themeStyleDark);
-                        await saveSimpleState('themeStyleDark', this.themeStyleDark);
+                        await saveSimpleState('themeStyleDark', this.themeStyleDark, 'userSettings', this);
                     }
                     
-                    await saveSimpleState('themeStyle', this.themeStyle);
+                    await saveSimpleState('themeStyle', this.themeStyle, 'userSettings', this);
                     this.applyThemeStyle();
                 },
                 applyThemeStyle: function(this: AppState): void {
@@ -1232,7 +1234,7 @@ export function rssApp(): AppState {
                     this.applyFontSize();
                 },
                 saveFontSize: async function(this: AppState): Promise<void> {
-                    await saveSimpleState('fontSize', this.fontSize);
+                    await saveSimpleState('fontSize', this.fontSize, 'userSettings', this);
                     this.applyFontSize();
                 },
                 applyFontSize: function(this: AppState): void {
@@ -1243,17 +1245,18 @@ export function rssApp(): AppState {
                     this.feedWidth = (typeof value === 'number') ? value : 50;
                     this.applyFeedWidth();
                 },
-                saveFeedWidth: async function(this: AppState): Promise<void> {
-                                    await saveSimpleState('feedWidth', this.feedWidth);
-                                    this.applyFeedWidth();
-                                },
+                                                saveFeedWidth: async function (this: AppState): Promise<void> {
+                                                    await saveSimpleState('feedWidth', this.feedWidth, 'userSettings', this);
+                                                    this.applyFeedWidth();
+                                                },
+                
                                 applyFeedWidth: function (this: AppState): void {
                                     document.documentElement.style.setProperty('--feed-width', `${this.feedWidth}%`);
                                 },
                                 saveFonts: async function (this: AppState): Promise<void> {
                                     await Promise.all([
-                                        saveSimpleState('fontTitle', this.fontTitle),
-                                        saveSimpleState('fontBody', this.fontBody)
+                                        saveSimpleState('fontTitle', this.fontTitle, 'userSettings', this),
+                                        saveSimpleState('fontBody', this.fontBody, 'userSettings', this)
                                     ]);
                                     this.applyFonts();
                                 },
@@ -1266,7 +1269,7 @@ export function rssApp(): AppState {
                                     this.applyAnimationSpeed();
                                 },
                                 saveAnimationSpeed: async function (this: AppState): Promise<void> {
-                                    await saveSimpleState('animationSpeed', this.animationSpeed);
+                                    await saveSimpleState('animationSpeed', this.animationSpeed, 'userSettings', this);
                                     this.applyAnimationSpeed();
                                 },
                                 applyAnimationSpeed: function (this: AppState): void {
@@ -1765,7 +1768,8 @@ export function rssApp(): AppState {
                 this.shuffleCount,
                 this.filterMode,
                 this.lastShuffleResetDate,
-                pregenDeck // Pass the pre-generated deck
+                pregenDeck, // Pass the pre-generated deck
+                this // Pass app context
             );
 
             this.deck = result.deck;
@@ -1789,7 +1793,7 @@ export function rssApp(): AppState {
                     this.pregeneratedOfflineDeck = null;
                 }
                  
-                await saveSimpleState(pregenKey, null);
+                await saveSimpleState(pregenKey, null, 'userSettings', this);
                 
                 // Trigger background generation for the NEXT deck
                 this.pregenerateDecks(); 
@@ -1961,7 +1965,9 @@ export function rssApp(): AppState {
                 if (newMode === 'unread') {
                     const result = await manageDailyDeck(
                         Array.from(this.entries), this.read, this.starred, this.shuffledOutGuids,
-                        this.shuffleCount, this.filterMode, this.lastShuffleResetDate
+                        this.shuffleCount, this.filterMode, this.lastShuffleResetDate,
+                        null, // No pregen for manual mode switch
+                        this
                     );
                     this.deck = result.deck;
                     this.currentDeckGuids = result.currentDeckGuids;
@@ -2030,7 +2036,7 @@ export function rssApp(): AppState {
                 await this.updateSyncStatusMessage(); // <-- FIX: Update status on online event
                 if (this.syncEnabled) {
                     try {
-                        await processPendingOperations();
+                        await processPendingOperations(this);
                         await backgroundSync();
                     } catch (error: any) {
                         console.error('Error handling online event:', error);
@@ -2106,7 +2112,7 @@ export function rssApp(): AppState {
                 }
                 console.log('Starting scheduled background sync...');
                     try {
-                        await processPendingOperations();
+                        await processPendingOperations(this);
                         const syncSuccess = await performFeedSync(this);
                         await pullUserState();
                         await this._loadAndManageAllData();
@@ -2330,7 +2336,7 @@ export function rssApp(): AppState {
 
             const key = online ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
             this[key] = deckGuids;
-            await saveSimpleState(key, deckGuids);
+            await saveSimpleState(key, deckGuids, 'userSettings', this);
             console.log(`[Background] Pregenerated ${online ? 'ONLINE' : 'OFFLINE'} deck saved. Size: ${deckGuids.length}`);
         },
 

@@ -176,8 +176,9 @@ export async function processFeeds(feedUrls: string[], blacklist: string[]): Pro
                 
                 const feedItems: FeedItem[] = [];
                 for (const entry of feed.items) {
-                    const guid = entry.guid || entry.link || '';
+                    let guid = entry.guid || entry.link || '';
                     if (!guid) continue;
+                    guid = guid.toLowerCase();
 
                     // Keyword filtering
                     const title = entry.title || '';

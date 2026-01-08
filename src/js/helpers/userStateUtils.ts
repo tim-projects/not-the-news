@@ -77,7 +77,7 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
 
     // 1. Local DB write (AWAITED to prevent race conditions during deck management)
     try {
-        await updateArrayState(stateKey, itemObject, action === 'add');
+        await updateArrayState(stateKey, itemObject, action === 'add', app);
     } catch (error) {
         console.error(`[DB State Update] Failed for ${stateKey} on ${guid}:`, error);
     }
@@ -92,7 +92,7 @@ export async function toggleItemStateAndSync(app: AppState, guid: string, stateK
                 action: action,
                 timestamp: timestamp
             };
-            await queueAndAttemptSyncOperation(pendingOp);
+            await queueAndAttemptSyncOperation(pendingOp, app);
         } catch (error) {
             console.error(`[Background Sync Queue] Failed for ${stateKey} on ${guid}:`, error);
         }
@@ -202,7 +202,12 @@ export async function loadCurrentDeck(): Promise<DeckItem[]> {
     return deckObjects;
 }
 
-export async function saveCurrentDeck(deckObjects: DeckItem[]): Promise<void> {
+/**
+ * Saves the current deck of items to local storage and syncs the changes.
+ * @param {DeckItem[]} deckObjects Array of deck item objects.
+ * @param {AppState | null} app Optional application state for side effects (sync).
+ */
+export async function saveCurrentDeck(deckObjects: DeckItem[], app: AppState | null = null): Promise<void> {
     if (!Array.isArray(deckObjects)) {
          console.error("[saveCurrentDeck] Invalid input: expected an array of objects.");
          return;
@@ -222,7 +227,7 @@ export async function saveCurrentDeck(deckObjects: DeckItem[]): Promise<void> {
         const sanitizedDeckObjects = validDeckObjects.map(item => sanitizeForIndexedDB(item));
 
         // Overwrite the local database and queue the changes for synchronization.
-        await overwriteArrayAndSyncChanges('currentDeckGuids', sanitizedDeckObjects);
+        await overwriteArrayAndSyncChanges('currentDeckGuids', sanitizedDeckObjects, app);
     } catch (e) {
         console.error("[saveCurrentDeck] An error occurred while saving the deck:", e);
     }
@@ -240,17 +245,17 @@ export async function loadShuffleState(): Promise<{ shuffleCount: number; lastSh
     };
 }
 
-export async function saveShuffleState(count: number, resetDate: string): Promise<void> {
+export async function saveShuffleState(app: AppState, count: number, resetDate: string): Promise<void> {
     await saveSimpleState('shuffleCount', count);
     await saveSimpleState('lastShuffleResetDate', resetDate);
-    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'shuffleCount', value: count, timestamp: new Date().toISOString() } as PendingOperation);
-    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate, timestamp: new Date().toISOString() } as PendingOperation);
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'shuffleCount', value: count, timestamp: new Date().toISOString() } as PendingOperation, app);
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'lastShuffleResetDate', value: resetDate, timestamp: new Date().toISOString() } as PendingOperation, app);
 }
 
 export async function setFilterMode(app: AppState, mode: string): Promise<void> {
     app.filterMode = mode;
     await saveSimpleState('filterMode', mode);
-    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'filterMode', value: mode, timestamp: new Date().toISOString() } as PendingOperation);
+    await queueAndAttemptSyncOperation({ type: 'simpleUpdate', key: 'filterMode', value: mode, timestamp: new Date().toISOString() } as PendingOperation, app);
 }
 
 export async function loadFilterMode(): Promise<string> {

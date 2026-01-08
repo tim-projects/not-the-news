@@ -53,7 +53,7 @@ type GetToggleElementFunction = () => HTMLElement | null;
         toggleEl.addEventListener('change', async () => {
             // We read the new value from the app's state, which x-model has just updated.
             const newValue = (app as any)[dbKey];
-            await saveSimpleState(dbKey, newValue);
+            await saveSimpleState(dbKey, newValue, 'userSettings', app);
             
             const label = SETTING_LABELS[dbKey] || dbKey;
             createStatusBarMessage(app, `${label} ${newValue ? 'Enabled' : 'Disabled'}.`);
@@ -89,7 +89,7 @@ type GetToggleElementFunction = () => HTMLElement | null;
         if (!selectEl) return;
         selectEl.addEventListener('change', async () => {
             const newValue = app.itemButtonMode;
-            await saveSimpleState('itemButtonMode', newValue);
+            await saveSimpleState('itemButtonMode', newValue, 'userSettings', app);
             createStatusBarMessage(app, `Item Button set to ${newValue}.`);
         });
     }

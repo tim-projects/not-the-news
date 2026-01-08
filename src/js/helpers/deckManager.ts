@@ -41,6 +41,7 @@ const getGuid = (item: string | { guid: string }): string => {
  * @param {string} filterMode Current filter mode (optional, defaults to 'unread')
  * @param {string | null} lastShuffleResetDate Last shuffle reset date (optional)
  * @param {DeckItem[] | null} pregeneratedDeck Optional pre-generated deck to use if available
+ * @param {AppState | null} app Optional application state for side effects (sync)
  * @returns {Promise<{ deck: MappedFeedItem[]; currentDeckGuids: DeckItem[]; shuffledOutGuids: ShuffledOutItem[]; shuffleCount: number; lastShuffleResetDate: string; }>} Updated deck state
  */
 export const manageDailyDeck = async (
@@ -51,7 +52,8 @@ export const manageDailyDeck = async (
     shuffleCount: number,
     filterMode: string = 'unread',
     lastShuffleResetDate: string | null = null,
-    pregeneratedDeck: DeckItem[] | null = null
+    pregeneratedDeck: DeckItem[] | null = null,
+    app: AppState | null = null
 ): Promise<{ deck: MappedFeedItem[]; currentDeckGuids: DeckItem[]; shuffledOutGuids: ShuffledOutItem[]; shuffleCount: number; lastShuffleResetDate: string; }> => {
     console.log('manageDailyDeck: START');
     console.log('manageDailyDeck: Input params:', { entriesCount: entries.length, readItemsCount: readItems.length, starredItemsCount: starredItems.length, shuffledOutItemsCount: shuffledOutItems.length, shuffleCount, filterMode, lastShuffleResetDate, hasPregen: !!pregeneratedDeck });
@@ -132,7 +134,7 @@ export const manageDailyDeck = async (
             if (!allItemsInDeckShuffled) {
                 console.log('[deckManager] Automatically incrementing (refunding) shuffleCount due to deck cleared by reading.');
                 newShuffleCount = Math.min(DAILY_SHUFFLE_LIMIT, newShuffleCount + 1);
-                await saveShuffleState(newShuffleCount, newLastShuffleResetDate);
+                await saveShuffleState(app, newShuffleCount, newLastShuffleResetDate);
             }
         }
 
@@ -182,13 +184,13 @@ export const manageDailyDeck = async (
                 isStarred: starredGuidsSet.has(item.guid.toLowerCase())
             }));
         
-        await saveCurrentDeck(newCurrentDeckGuids);
+        await saveCurrentDeck(newCurrentDeckGuids, app);
 
         if (isNewDay) {
             newShuffledOutGuids = [];
             await saveArrayState('shuffledOutGuids', []);
             newShuffleCount = DAILY_SHUFFLE_LIMIT;
-            await saveShuffleState(newShuffleCount, today);
+            await saveShuffleState(app, newShuffleCount, today);
             newLastShuffleResetDate = today;
             await saveSimpleState('lastShuffleResetDate', today);
         }
@@ -240,7 +242,7 @@ export async function processShuffle(app: AppState): Promise<void> {
 
     const { overwriteArrayAndSyncChanges } = await import('../data/dbUserState.ts');
     await overwriteArrayAndSyncChanges('shuffledOutGuids', newShuffledOutGuids);
-    await saveShuffleState(app.shuffleCount, app.lastShuffleResetDate ?? new Date().toDateString());
+    await saveShuffleState(app, app.shuffleCount, app.lastShuffleResetDate ?? new Date().toDateString());
 
     // Use the optimized manageDailyDeck which supports pre-generated decks
     const isOnline = app.isOnline;
@@ -255,7 +257,8 @@ export async function processShuffle(app: AppState): Promise<void> {
         app.shuffleCount,
         app.filterMode,
         app.lastShuffleResetDate,
-        pregenDeck
+        pregenDeck,
+        app
     );
 
     // Update the app object with the results
