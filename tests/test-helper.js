@@ -23,37 +23,54 @@ export async function login(page, appUrl) {
 
 export async function ensureFeedsSeeded(page) {
     console.log('Checking if feeds are seeded...');
-    const feedsCount = await page.evaluate(async () => {
+    const state = await page.evaluate(async () => {
         const app = window.Alpine.$data(document.getElementById('app'));
-        if (!app) {
-            console.log('[ensureFeedsSeeded] Alpine app not found');
-            return 0;
-        }
+        if (!app) return { seeded: false, count: 0 };
+        
         let attempts = 0;
-        while (typeof app.rssFeedsInput !== 'string' && attempts < 20) {
-            console.log(`[ensureFeedsSeeded] Waiting for rssFeedsInput, attempt ${attempts}...`);
+        while ((!app.rssFeedsInput || app.rssFeedsInput.trim().length === 0) && attempts < 10) {
             if (app.loadRssFeeds) await app.loadRssFeeds();
-            if (typeof app.rssFeedsInput === 'string') break;
+            if (app.rssFeedsInput && app.rssFeedsInput.trim().length > 0) break;
             await new Promise(r => setTimeout(r, 500));
             attempts++;
         }
-        console.log(`[ensureFeedsSeeded] current rssFeedsInput: "${app.rssFeedsInput}"`);
-        return (app.rssFeedsInput || "").trim().length;
+        
+        return { 
+            seeded: (app.rssFeedsInput || "").trim().length > 0,
+            count: app.entries?.length || 0,
+            deckCount: app.deck?.length || 0
+        };
     });
 
-    if (feedsCount === 0) {
+    if (!state.seeded) {
         console.log('Seeding feeds via Alpine...');
         await page.evaluate(async () => {
             const app = window.Alpine.$data(document.getElementById('app'));
             app.rssFeedsInput = 'https://news.ycombinator.com/rss';
-            console.log('[ensureFeedsSeeded] Saving RSS feeds...');
             await app.saveRssFeeds();
-            console.log('[ensureFeedsSeeded] RSS feeds saved.');
         });
-        // Wait longer for sync and deck generation
-        console.log('Waiting 10s for initial sync and deck generation...');
-        await page.waitForTimeout(10000);
+        
+        // Wait for sync and content - up to 30s
+        console.log('Waiting for content to populate...');
+        await page.waitForFunction(() => {
+            const app = window.Alpine.$data(document.getElementById('app'));
+            return app.entries?.length > 0 && app.deck?.length > 0;
+        }, { timeout: 30000 }).catch(() => console.warn('Timed out waiting for content population.'));
     } else {
-        console.log(`Feeds already seeded (length: ${feedsCount}).`);
+        console.log(`Feeds already seeded. Entries: ${state.count}, Deck: ${state.deckCount}`);
+        if (state.count === 0 || state.deckCount === 0) {
+             console.log('Feeds seeded but empty. Forcing full sync...');
+             await page.evaluate(async () => {
+                 const app = window.Alpine.$data(document.getElementById('app'));
+                 await app.loadRssFeeds(); // This triggers sync in current implementation
+             });
+             await page.waitForTimeout(5000);
+        }
     }
+
+    // FINAL STATE LOG
+    await page.evaluate(() => {
+        const app = window.Alpine.$data(document.getElementById('app'));
+        console.log(`[ensureFeedsSeeded] FINAL STATE: entries=${app.entries?.length}, deck=${app.deck?.length}, loading=${app.loading}`);
+    });
 }

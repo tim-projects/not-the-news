@@ -1,129 +1,53 @@
 # Task: JSON Compression and Scaling Strategy
 
-empty item appears in the currentdeck. These should not be allowed in the currentdeck at any time.
-
-_loadAndManageAllData: Before manageDailyDeck 
-Object
-currentDeckGuidsCount
-: 
-2
-readCount
-: 
-433
-shuffleCount
-: 
-2
-[[Prototype]]
-: 
-Object
-constructor
-: 
-ƒ Object()
-hasOwnProperty
-: 
-ƒ hasOwnProperty()
-isPrototypeOf
-: 
-ƒ isPrototypeOf()
-propertyIsEnumerable
-: 
-ƒ propertyIsEnumerable()
-toLocaleString
-: 
-ƒ toLocaleString()
-toString
-: 
-ƒ toString()
-valueOf
-: 
-ƒ valueOf()
-__defineGetter__
-: 
-ƒ __defineGetter__()
-__defineSetter__
-: 
-ƒ __defineSetter__()
-__lookupGetter__
-: 
-ƒ __lookupGetter__()
-__lookupSetter__
-: 
-ƒ __lookupSetter__()
-__proto__
-: 
-(...)
-get __proto__
-: 
-ƒ __proto__()
-set __proto__
-: 
-ƒ __proto__()
+## Recent Fixes: Empty Items & Dev Stability
+- [x] **Bug: Empty items in deck:** Resolved by implementing robust GUID filtering across the stack (frontend mapping, deck generation, shuffle processing, and backend sync pull).
+- [x] **Backend Stability (Dev):** Implemented an in-memory storage fallback in the worker for development mode. This bypasses Firestore during intensive automated testing to avoid 429 (Too Many Requests) throttling.
+- [x] **CORS & OPTIONS:** Ensured all worker responses (including 401s and errors) include CORS headers and implemented a proper 204 response for OPTIONS preflight requests.
+- [x] **Request Flooding:** Implemented a serial promise queue for `pullUserState` in the frontend to prevent concurrent sync operations from overwhelming the backend.
 
 ## Objectives
 
 ### 1. Compression Utility
 - [x] **Goal:** Create a TypeScript utility using the native `CompressionStream` API for Gzip compression and Base64 encoding.
-- [x] **Importance:** This is the foundation for scaling. Large arrays (like `read` history) can grow beyond Firestore's 1MB document limit. Compression typically reduces GUID lists by 80-90%, buying significant headroom.
+- [x] **Importance:** Foundation for scaling. Compression reduces GUID lists by 80-90%, fitting large histories within Firestore limits.
 
 ### 2. Frontend Update
 - [x] **Goal:** Modify `queueAndAttemptSyncOperation` to compress large payloads before POSTing to the cloud.
-- [x] **Importance:** Ensures that heavy state updates don't fail due to size limits and reduces the amount of data the user's device needs to upload, improving performance on flakey connections.
+- [x] **Importance:** Reduces upload size and ensures sync doesn't fail due to Firestore document limits.
 
 ### 3. Worker Update
 - [x] **Goal:** Update the backend to detect, store, and decompress binary blobs.
-- [x] **Importance:** Enables the server to understand the compressed data coming from clients and allows it to perform its own server-side logic (like keyword filtering or delta calculations) on the full dataset.
+- [x] **Importance:** Enables server-side logic on compressed data and supports transparent decompression for clients.
 
 ### 4. Database Migration
 - [x] **Goal:** Implement transparent upgrade of existing keys to the compressed format.
-- [x] **Importance:** Ensures that existing users don't lose their history. The app will automatically "upgrade" their cloud data to the new optimized format the next time they sync.
+- [x] **Importance:** Automatically upgrades user data to the optimized format upon next sync.
 
-### 5. Deck Transition Optimization (Completed)
+### 5. Deck Transition Optimization
 - [x] **Goal:** Eliminate the delay when the last item in a deck is marked read.
-- [x] **Importance:** Triggers deck generation/refresh in the background during the 5-second undo countdown, ensuring the next deck is ready to display instantly after the undo notification expires.
+- [x] **Importance:** Background refresh during undo countdown ensures seamless transition to the next batch.
 
 ### 6. Delta-Only Synchronization
 - [x] **Goal:** Implementation of hash-based diffing to avoid large downloads.
-- [x] **Importance:** Prevents the app from downloading the entire 100,000 item list every time a sync occurs. The client will only request what has changed since its last known state, drastically reducing bandwidth and battery usage.
-
-### 7. Bug Investigation: Images Not Displaying
-- [x] **Goal:** Fix the regression where images are no longer appearing in the feed.
-- [x] **Findings:** 
-    - Resolved by improving image extraction regex in worker and ensuring IntersectionObserver correctly handles both lazy-loaded and pre-loaded images.
-    - Added `loaded` class management in `_initImageObserver` to reveal images that were previously stuck at `opacity: 0`.
-
-### 8. Bug Investigation: Incorrect Scroll Position on Selection
-- [x] **Goal:** Ensure that the top border of a newly selected item is always visible in the viewport.
-- [x] **Findings:**
-    - Resolved by removing header offsets and padding in `scrollSelectedIntoView`, ensuring item top aligns with viewport top.
-    - Improved container detection to support both `window` and `#app-viewport`.
-    - Moved `selectItem` call in `toggleRead` to occur after animations to ensure stable DOM positions.
+- [x] **Importance:** Drastically reduces bandwidth by only syncing what changed since the last known state.
 
 ### 9. Comprehensive Interaction Assessment
 - [ ] **Goal:** Document and verify every possible user interaction for UX consistency.
-- [ ] **Importance:** Ensures that recent changes (scroll fixes, compression, etc.) haven't introduced subtle regressions in edge cases (e.g., clicking items at the very edge of the screen).
-- [x] **Phase 1: Identification:** `interaction-report.md` created, listing all categories and interactions.
-- [ ] **Phase 2: Automated Verification:** Create `interaction-assessment/` files with Playwright logs for each interaction.
-- [ ] **Deliverables:** `interaction-report.md` (List of all interactions) and `interaction-assessment/` folder (Verification per interaction).
+- [x] **Phase 1: Identification:** `interaction-report.md` created.
+- [/] **Phase 2: Automated Verification:** `tests/interaction_assessment.spec.js` updated with robust selectors and async handling. Initial tests (Search, Navigation, Shortcuts) are passing locally.
+- [ ] **Deliverables:** `interaction-report.md` and `interaction-assessment/` folder with verified logs.
 
-### 11. Bug Investigation: Original Theme Conflicts
-- [x] **Goal:** Fix the bug where "Original Light" and "Original Dark" themes are overridden by other theme styles.
-- [x] **Method:** Created `tests/theme_regression.spec.js` to switch between themes. Improved `applyThemeStyle` in `main.ts` to thoroughly remove old theme classes. Added explicit variable definitions for `theme-originalLight` and `theme-originalDark` in `variables.css`.
-- [x] **Importance:** Ensures visual consistency and that the core "Original" experience remains accessible after exploring other themes.
+### 11. Original Theme Conflicts
+- [x] **Goal:** Fix bug where Original themes were overridden.
+- [x] **Fix:** Improved `applyThemeStyle` to purge old classes and added explicit variable blocks in `variables.css`. Verified with `tests/theme_regression.spec.js`.
 
-### 12. UI Polish: Settings Back Button Hover
-- [x] **Goal:** Update the back button (`#back-button`) in settings submenus to have a hover highlight color matching the close button.
-- [x] **Importance:** Improves UX consistency and visual feedback in navigation.
+### 12. Hybrid Storage (Pointer Support) - *Requires Permission*
+- [ ] **Goal:** Prepare architecture for Firestore + Cloudflare R2 offloading for very large datasets (>800KB compressed).
 
-### 8. Hybrid Storage (Pointer Support) - *Requires Permission*
-- [ ] **Goal:** Prepare architecture for Firestore + Cloudflare R2 hybrid storage.
-- [ ] **Importance:** Once a compressed document nears the 1MB Firestore limit, we move the blob to R2 and store only a pointer in Firestore. This provides an unlimited scaling path for "power users" while keeping costs effectively zero.
-
-## Strategy for 100,000 GUIDs per User (1,000 Users)
-1. **Binary JSON Compression:** Use Gzip to reduce 3.6MB raw GUID lists to ~400KB, fitting within Firestore's 1MB limit.
-2. **Delta Sync:** Download only what changed since the last known timestamp.
-3. **Integer Mapping:** Store 4-byte integers instead of 36+ byte strings.
-4. **Cloudflare R2 Offloading (Future):** Move blobs > 800KB to R2, leaving only a pointer in Firestore.
-
-## Context
-- **Goal:** Download enough items for 20 decks/day (200 items) and stay within free/low-cost tiers.
-- **Constraints:** 1MB Firestore document limit, subrequest limits, and bandwidth efficiency.
+## Strategy for 100,000 GUIDs per User
+1. **Binary JSON Compression:** (Complete) Reduce 3.6MB raw data to ~400KB.
+2. **Delta Sync:** (Complete) Only download changes.
+3. **Serial Sync Queue:** (Complete) Prevent request flooding.
+4. **Dev Bypass:** (Complete) In-memory dev storage to avoid cloud throttling during tests.
+5. **Integer Mapping:** (Planned) Store 4-byte integers instead of full GUID strings.

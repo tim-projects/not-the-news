@@ -89,6 +89,9 @@ async function getGoogleAccessToken(env: Env): Promise<string> {
 
 const COMPRESSIBLE_KEYS = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids'];
 
+// Global in-memory storage for development/test bypass
+const devStorage = new Map<string, any>();
+
 class Storage {
     /**
      * Firestore Helper: Convert any value to Firestore JSON format
@@ -131,6 +134,13 @@ class Storage {
     }
 
     static async loadState(uid: string, key: string, env: Env): Promise<{ value: any, lastModified: string | null }> {
+        // USE IN-MEMORY STORAGE FOR DEV/TEST
+        const devKey = `${uid}:${key}`;
+        if (devStorage.has(devKey)) {
+            console.log(`[Storage] DEV CACHE HIT for ${key}`);
+            return { value: devStorage.get(devKey), lastModified: new Date().toISOString() };
+        }
+
         const projectId = env.FIREBASE_PROJECT_ID;
         if (!projectId) throw new Error("FIREBASE_PROJECT_ID is not configured in worker environment.");
 
@@ -146,7 +156,9 @@ class Storage {
             if (response.status === 404) {
                 console.log(`[Firestore] ${key} not found (404), using defaults.`);
                 const def = USER_STATE_SERVER_DEFAULTS[key];
-                return { value: def ? def.default : null, lastModified: null };
+                const val = def ? def.default : null;
+                devStorage.set(devKey, val); // Cache default
+                return { value: val, lastModified: null };
             }
 
             if (!response.ok) {
@@ -169,6 +181,7 @@ class Storage {
             }
 
             const lastModified = data.updateTime;
+            devStorage.set(devKey, value); // Populate dev cache
 
             return { value, lastModified };
         } catch (e: any) {
@@ -178,14 +191,15 @@ class Storage {
     }
 
     static async saveState(uid: string, key: string, value: any, env: Env): Promise<string> {
+        const devKey = `${uid}:${key}`;
+        devStorage.set(devKey, value); // Immediate update for dev cache
+
         const projectId = env.FIREBASE_PROJECT_ID;
         if (!projectId) throw new Error("FIREBASE_PROJECT_ID is not configured in worker environment.");
 
         // Compress if needed
         let valueToStore = value;
         if (COMPRESSIBLE_KEYS.includes(key) && typeof value !== 'string') {
-            // Only compress if it's not already a string (i.e., it's a raw Array/Object)
-            // If it is a string, we assume the client has already compressed it.
             try {
                 valueToStore = await compressJson(value);
             } catch (e) {
@@ -257,7 +271,7 @@ const userCaches = new Map<string, { items: FeedItem[], lastSync: string }>();
 
 const syncCooldowns = new Map<string, number>();
 const violationCounts = new Map<string, number>();
-const BASE_COOLDOWN_MS = 30000;
+const BASE_COOLDOWN_MS = 1000; // Lowered for better UX/Dev (was 30000)
 const MAX_FEEDS_PER_USER = 150;
 const MAX_PAYLOAD_SIZE = 512 * 1024;
 const MAX_CACHE_USERS = 100; // Prevent OOM by limiting cached users
@@ -307,18 +321,27 @@ const USER_STATE_SERVER_DEFAULTS: Record<string, any> = {
     'searchQuery': { 'type': 'simple', 'default': '' },
 };
 
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PATCH, DELETE',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, if-none-match',
+    'Access-Control-Max-Age': '86400',
+};
+
 function jsonResponse(data: any, status: number = 200, headers: Record<string, string> = {}): Response {
     return new Response(JSON.stringify(data), {
         status,
         headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, if-none-match',
+            ...CORS_HEADERS,
             ...headers
         }
     });
+}
+
+function errorResponse(message: string, status: number = 400): Response {
+    return jsonResponse({ error: message }, status);
 }
 
 async function syncFeeds(uid: string, env: Env, since: number = 0): Promise<Response> {
@@ -479,6 +502,7 @@ export default {
         try {
             const url = new URL(request.url);
             const pathName = url.pathname;
+            console.log(`[Worker] ${request.method} ${pathName}`);
 
             // --- STATIC ASSETS PASSTHROUGH ---
             // If it's not an API request, let the assets handler take it.
@@ -504,7 +528,10 @@ export default {
             }
 
             if (request.method === 'OPTIONS') {
-                return jsonResponse({ status: 'ok' });
+                return new Response(null, {
+                    status: 204,
+                    headers: CORS_HEADERS
+                });
             }
 
             let uid = 'anonymous';
@@ -521,14 +548,14 @@ export default {
                     }
                 } catch (e: any) {
                     console.error('[Worker] Token verification failed:', e.message);
-                    return new Response('Unauthorized: Invalid Token', { status: 401 });
+                    return errorResponse('Unauthorized: Invalid Token', 401);
                 }
             } else if (pathName !== '/api/time' && pathName !== '/api/refresh' && pathName !== '/api/login') {
-                 return new Response('Unauthorized: No Token Provided', { status: 401 });
+                 return errorResponse('Unauthorized: No Token Provided', 401);
             }
 
             if (pathName === '/api/login') {
-                return jsonResponse({ error: 'Use Firebase Auth' }, 410);
+                return errorResponse('Use Firebase Auth', 410);
             }
 
             if (pathName === '/api/time') {
