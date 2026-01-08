@@ -388,8 +388,8 @@ button.star.starred:active {
 }
 
 #back-button:hover {
-  color: var(--primary);
-  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--primary-fg);
+  background: var(--primary);
 }
 
 #back-button:focus {

@@ -195,7 +195,12 @@ export async function loadCurrentDeck(): Promise<DeckItem[]> {
     }
 
     const deckObjects: DeckItem[] = Array.isArray(storedObjects)
-        ? storedObjects.filter((item: any) => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid)
+        ? storedObjects.filter((item: any) => 
+            typeof item === 'object' && 
+            item !== null && 
+            typeof item.guid === 'string' && 
+            item.guid.trim()
+          )
         : [];
         
     console.log(`[loadCurrentDeck] Loaded ${deckObjects.length} deck objects.`);
@@ -214,7 +219,12 @@ export async function saveCurrentDeck(deckObjects: DeckItem[], app: AppState | n
     }
     
     // Validate that we are working with objects that have a valid GUID.
-    const validDeckObjects = deckObjects.filter(item => typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid);
+    const validDeckObjects = deckObjects.filter(item => 
+        typeof item === 'object' && 
+        item !== null && 
+        typeof item.guid === 'string' && 
+        item.guid.trim()
+    );
 
     if (validDeckObjects.length !== deckObjects.length) {
         console.warn("[saveCurrentDeck] Filtered out invalid items from the generated deck.");

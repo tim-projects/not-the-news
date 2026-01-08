@@ -367,9 +367,13 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
                         const tx = db.transaction(def.store, 'readwrite');
                         await tx.store.clear();
                         for (const item of serverObjects) {
-                            const toStore = { ...item };
-                            delete toStore.id; // Let IndexedDB generate new local IDs
-                            await tx.store.put(toStore);
+                            if (typeof item === 'object' && item !== null && typeof item.guid === 'string' && item.guid.trim()) {
+                                const toStore = { ...item };
+                                delete toStore.id; // Let IndexedDB generate new local IDs
+                                await tx.store.put(toStore);
+                            } else {
+                                console.warn(`[DB Sync] Filtered out invalid item during ${key} replace:`, item);
+                            }
                         }
                         await tx.done;
                     });

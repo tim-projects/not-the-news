@@ -170,7 +170,9 @@ export const manageDailyDeck = async (
                 shuffledOutItemsArray,
                 filterMode
             );
-            newDeckItems = items.map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }));
+            newDeckItems = items
+                .filter(i => i && i.guid && i.guid.trim())
+                .map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }));
         }
         
         newCurrentDeckGuids = newDeckItems;
@@ -224,7 +226,7 @@ export async function processShuffle(app: AppState): Promise<void> {
         return;
     }
 
-    const visibleGuids = app.deck.map(item => item.guid);
+    const visibleGuids = app.deck.map(item => item.guid).filter(g => g && g.trim());
     console.log(`[deckManager] processShuffle: Visible GUIDs to shuffle out: ${visibleGuids.length}`, visibleGuids);
     const existingShuffledGuids: ShuffledOutItem[] = (app.shuffledOutGuids || []).map(item => ({ guid: getGuid(item), shuffledAt: new Date().toISOString() }));
     

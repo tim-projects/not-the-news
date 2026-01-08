@@ -22,16 +22,22 @@ export async function login(page, appUrl) {
 }
 
 export async function ensureFeedsSeeded(page) {
+    console.log('Checking if feeds are seeded...');
     const feedsCount = await page.evaluate(async () => {
         const app = window.Alpine.$data(document.getElementById('app'));
-        if (!app) return 0;
+        if (!app) {
+            console.log('[ensureFeedsSeeded] Alpine app not found');
+            return 0;
+        }
         let attempts = 0;
         while (typeof app.rssFeedsInput !== 'string' && attempts < 20) {
+            console.log(`[ensureFeedsSeeded] Waiting for rssFeedsInput, attempt ${attempts}...`);
             if (app.loadRssFeeds) await app.loadRssFeeds();
             if (typeof app.rssFeedsInput === 'string') break;
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise(r => setTimeout(r, 500));
             attempts++;
         }
+        console.log(`[ensureFeedsSeeded] current rssFeedsInput: "${app.rssFeedsInput}"`);
         return (app.rssFeedsInput || "").trim().length;
     });
 
@@ -40,9 +46,14 @@ export async function ensureFeedsSeeded(page) {
         await page.evaluate(async () => {
             const app = window.Alpine.$data(document.getElementById('app'));
             app.rssFeedsInput = 'https://news.ycombinator.com/rss';
+            console.log('[ensureFeedsSeeded] Saving RSS feeds...');
             await app.saveRssFeeds();
+            console.log('[ensureFeedsSeeded] RSS feeds saved.');
         });
-        // Wait for sync
-        await page.waitForTimeout(5000);
+        // Wait longer for sync and deck generation
+        console.log('Waiting 10s for initial sync and deck generation...');
+        await page.waitForTimeout(10000);
+    } else {
+        console.log(`Feeds already seeded (length: ${feedsCount}).`);
     }
 }

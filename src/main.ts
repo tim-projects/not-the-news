@@ -1217,11 +1217,13 @@ export function rssApp(): AppState {
                     htmlEl.classList.remove('light', 'dark');
                     htmlEl.classList.add(this.theme);
                     
-                    // Manage theme style specific classes
-                    const classesToRemove = Array.from(htmlEl.classList).filter(c => c.startsWith('theme-'));
-                    if (classesToRemove.length > 0) {
-                        htmlEl.classList.remove(...classesToRemove);
-                    }
+                    // Manage theme style specific classes - remove ALL theme- classes
+                    const classes = Array.from(htmlEl.classList);
+                    classes.forEach(c => {
+                        if (c.startsWith('theme-')) {
+                            htmlEl.classList.remove(c);
+                        }
+                    });
                     
                     // Add the theme class (now including original themes)
                     if (this.themeStyle) {

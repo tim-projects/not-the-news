@@ -1,5 +1,64 @@
 # Task: JSON Compression and Scaling Strategy
 
+empty item appears in the currentdeck. These should not be allowed in the currentdeck at any time.
+
+_loadAndManageAllData: Before manageDailyDeck 
+Object
+currentDeckGuidsCount
+: 
+2
+readCount
+: 
+433
+shuffleCount
+: 
+2
+[[Prototype]]
+: 
+Object
+constructor
+: 
+ƒ Object()
+hasOwnProperty
+: 
+ƒ hasOwnProperty()
+isPrototypeOf
+: 
+ƒ isPrototypeOf()
+propertyIsEnumerable
+: 
+ƒ propertyIsEnumerable()
+toLocaleString
+: 
+ƒ toLocaleString()
+toString
+: 
+ƒ toString()
+valueOf
+: 
+ƒ valueOf()
+__defineGetter__
+: 
+ƒ __defineGetter__()
+__defineSetter__
+: 
+ƒ __defineSetter__()
+__lookupGetter__
+: 
+ƒ __lookupGetter__()
+__lookupSetter__
+: 
+ƒ __lookupSetter__()
+__proto__
+: 
+(...)
+get __proto__
+: 
+ƒ __proto__()
+set __proto__
+: 
+ƒ __proto__()
+
 ## Objectives
 
 ### 1. Compression Utility
@@ -42,11 +101,18 @@
 ### 9. Comprehensive Interaction Assessment
 - [ ] **Goal:** Document and verify every possible user interaction for UX consistency.
 - [ ] **Importance:** Ensures that recent changes (scroll fixes, compression, etc.) haven't introduced subtle regressions in edge cases (e.g., clicking items at the very edge of the screen).
+- [x] **Phase 1: Identification:** `interaction-report.md` created, listing all categories and interactions.
+- [ ] **Phase 2: Automated Verification:** Create `interaction-assessment/` files with Playwright logs for each interaction.
 - [ ] **Deliverables:** `interaction-report.md` (List of all interactions) and `interaction-assessment/` folder (Verification per interaction).
 
-### 10. GUID Optimization
-- [ ] **Goal:** Map URL GUIDs to compact integers for massive state support.
-- [ ] **Importance:** Storing a 100-character URL GUID 100,000 times is inefficient. Mapping these to 4-byte integers provides an immediate 25x reduction in raw data size before compression is even applied.
+### 11. Bug Investigation: Original Theme Conflicts
+- [x] **Goal:** Fix the bug where "Original Light" and "Original Dark" themes are overridden by other theme styles.
+- [x] **Method:** Created `tests/theme_regression.spec.js` to switch between themes. Improved `applyThemeStyle` in `main.ts` to thoroughly remove old theme classes. Added explicit variable definitions for `theme-originalLight` and `theme-originalDark` in `variables.css`.
+- [x] **Importance:** Ensures visual consistency and that the core "Original" experience remains accessible after exploring other themes.
+
+### 12. UI Polish: Settings Back Button Hover
+- [x] **Goal:** Update the back button (`#back-button`) in settings submenus to have a hover highlight color matching the close button.
+- [x] **Importance:** Improves UX consistency and visual feedback in navigation.
 
 ### 8. Hybrid Storage (Pointer Support) - *Requires Permission*
 - [ ] **Goal:** Prepare architecture for Firestore + Cloudflare R2 hybrid storage.

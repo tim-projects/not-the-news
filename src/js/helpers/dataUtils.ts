@@ -137,8 +137,14 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     const descContent = html.trim();
     const ts = Date.parse(item.pubDate) || 0;
 
+    const guid = (item.guid || "").trim().toLowerCase();
+    if (!guid) {
+        console.warn("mapRawItem filtered out item with missing or empty GUID:", item.title);
+        return null;
+    }
+
     return {
-        guid: item.guid.toLowerCase(),
+        guid,
         image: imgSrc || (item as any).image || "",
         title: item.title,
         link: item.link,
@@ -275,7 +281,7 @@ export async function generateNewDeck(
         const selectedIds = new Set<string>(); // Set to store GUIDs
 
         const tryAddItemToDeck = (item: MappedFeedItem): boolean => {
-            if (nextDeckItems.length < MAX_DECK_SIZE && item && !selectedIds.has(item.guid)) {
+            if (nextDeckItems.length < MAX_DECK_SIZE && item && item.guid && item.guid.trim() && !selectedIds.has(item.guid)) {
                 nextDeckItems.push(item);
                 selectedIds.add(item.guid);
                 return true;
