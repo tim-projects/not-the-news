@@ -865,50 +865,36 @@ export function rssApp(): AppState {
                 // 3. UI Reconcile (minor cleanup)
                 await this._reconcileAndRefreshUI();
 
-                // 4. Refresh logic if deck running low
+                // 4. Refresh logic: ONLY when deck is completely finished (0 unread)
                 let remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
                 
                 if (this.filterMode === 'unread' && remainingUnreadInDeck === 0) {
-                    console.log("[toggleRead] Last item read. Proactively generating next deck in background...");
+                    console.log("[toggleRead] Current deck finished. Preparing next batch in background...");
                     
-                    // Trigger background refresh IMMEDIATELY so it's ready by the end of the countdown
-                    // We call loadFeedItemsFromDB first to ensure we have the latest items for generation
-                    await this.loadFeedItemsFromDB();
+                    // Trigger background tasks while user sees the undo button
+                    this.pregenerateDecks();
+                    this.loadFeedItemsFromDB();
                     const refreshPromise = this._loadAndManageAllData(true); // skipLoad: true
 
-                    // Wait while undo is visible (max 5.5s) but DON'T block the main thread
+                    // Wait while undo is visible (max 5.5s) without blocking the UI
                     while (this.showUndo) {
                         await new Promise(resolve => setTimeout(resolve, 100));
                     }
                     
-                    // Wait for generation to finish if it hasn't already
+                    // Once undo is gone, wait for the already-started refresh to finish
                     await refreshPromise;
 
-                    // Re-calculate after potential undo
+                    // Re-verify after potential undo
                     remainingUnreadInDeck = this.deck.filter(item => !this.isRead(item.guid)).length;
                     if (remainingUnreadInDeck > 0) {
-                        console.log("[toggleRead] Undo detected, refresh already applied but items restored.");
+                        console.log("[toggleRead] Undo detected, batch preserved.");
                         return;
                     }
 
-                    // Auto-select first item of the new deck
+                    // Auto-select first item of the new batch
                     if (this.deck.length > 0) {
                         this.selectItem(this.deck[0].guid);
                     }
-                } else if (this.filterMode === 'unread' && remainingUnreadInDeck < 3) {
-                    console.log(`[toggleRead] Deck running low (${remainingUnreadInDeck} unread), initiating refresh.`);
-                    
-                    const pregenKey = this.isOnline ? 'pregeneratedOnlineDeck' : 'pregeneratedOfflineDeck';
-                    const hasPregen = !!this[pregenKey as keyof AppState];
-
-                    // Use nextTick to ensure any pending UI state settled before maybe showing loading
-                    this.$nextTick(async () => {
-                        try {
-                            await this._loadAndManageAllData();
-                        } catch (error) {
-                            console.error('[toggleRead] Error during deck refresh:', error);
-                        }
-                    });
                 }
             })();
         },
@@ -1302,6 +1288,14 @@ export function rssApp(): AppState {
                         if (img.dataset.src) {
                             img.src = img.dataset.src;
                             // Optionally remove the observer after loading
+                            this.imageObserver?.unobserve(img);
+                        } else if (img.src) {
+                            // If it already has a src (e.g. description image), ensure it gets the loaded class
+                            if (img.complete) {
+                                img.classList.add('loaded');
+                            } else {
+                                img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
+                            }
                             this.imageObserver?.unobserve(img);
                         }
                     }
@@ -2216,6 +2210,14 @@ export function rssApp(): AppState {
                         this.selectItem(guid);
                     }
                 });
+            });
+        },
+
+        handleEntryImages: function(this: AppState, element: Element): void {
+            if (!element) return;
+            // Find all images in this element (e.g. in the description HTML)
+            element.querySelectorAll('img').forEach(img => {
+                this.observeImage(img as HTMLImageElement);
             });
         },
 

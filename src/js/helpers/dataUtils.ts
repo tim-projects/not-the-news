@@ -96,7 +96,7 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     
     if (images.length > 0) {
         const firstImg = images[0];
-        imgSrc = firstImg.src || "";
+        imgSrc = firstImg.getAttribute('src') || "";
         
         // Find if this image should be removed from the description (prevent duplicate)
         // Check if it's the first child, or the first child of the first child (if it's a link)
@@ -113,9 +113,9 @@ export function mapRawItem(item: RawFeedItem | null, fmtFn: (dateStr: string) =>
     }
 
     // Set lazy loading for any remaining images
+    // Remove onload as it doesn't execute in x-html
     doc.querySelectorAll("img").forEach(img => {
         img.setAttribute('loading', 'lazy');
-        img.setAttribute('onload', "this.classList.add('loaded')");
     });
 
     let sourceUrl = "";

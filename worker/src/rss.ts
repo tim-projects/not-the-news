@@ -68,7 +68,7 @@ export function prettifyItem(item: any): any {
             if (realLink.includes('i.redd.it') || realLink.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
                 // Prepend image if not already there (often Reddit RSS has it anyway, but let's be sure)
                 const escapedLink = realLink.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const hasImgTag = new RegExp(`<img[^>]+src=["']${escapedLink}["']`, 'i').test(item.description);
+                const hasImgTag = new RegExp(`<img[^>]+src=["']?${escapedLink}["']?`, 'i').test(item.description);
                 
                 if (!hasImgTag) {
                     item.description = `<img src="${realLink}" /><br/>` + item.description;
@@ -94,12 +94,15 @@ export function prettifyItem(item: any): any {
     item.title = wrapTitle(item.title || 'No Title', item.link || '#');
 
     // Image logic: find first image in description
-    const imgMatch = item.description?.match(/<img[^>]+src=["']([^"']+)["']/i);
+    // Handle optional quotes (single, double, or none)
+    const imgMatch = item.description?.match(/<img[^>]+src=(?:["']([^"']+)["']|([^ >]+))/i);
     if (imgMatch) {
-        item.image = imgMatch[1];
+        const imageUrl = imgMatch[1] || imgMatch[2];
+        item.image = imageUrl;
         // Remove this image from the description to prevent duplicate display in the client
-        // We look for the whole tag that contains the URL
-        const imgTagRegex = new RegExp(`<img[^>]+src=["']${imgMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'ig');
+        // We look for the whole tag that contains the URL, supporting optional quotes
+        const escapedUrl = imageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const imgTagRegex = new RegExp(`<img[^>]+src=["']?${escapedUrl}["']?[^>]*>`, 'ig');
         item.description = item.description.replace(imgTagRegex, '');
     }
 
