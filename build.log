@@ -4,22 +4,25 @@
 
 vite v7.3.0 building client environment for production...
 transforming...
-✓ 65 modules transformed.
+✓ 67 modules transformed.
 rendering chunks...
 [plugin vite:reporter] 
-(!) /home/ntn/git/not-the-news/src/js/data/dbSyncOperations.ts is dynamically imported by /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/data/database.ts, /home/ntn/git/not-the-news/src/js/data/dbUserState.ts, dynamic import will not move module into another chunk.
+(!) /home/ntn/git/not-the-news/src/js/data/dbCore.ts is dynamically imported by /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/data/dbStateDefs.ts, /home/ntn/git/not-the-news/src/js/data/dbSyncOperations.ts, /home/ntn/git/not-the-news/src/js/data/dbUserState.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
 
 [plugin vite:reporter] 
-(!) /home/ntn/git/not-the-news/src/js/data/dbUserState.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/data/database.ts, /home/ntn/git/not-the-news/src/js/data/dbSyncOperations.ts, /home/ntn/git/not-the-news/src/js/helpers/userStateUtils.ts, dynamic import will not move module into another chunk.
+(!) /home/ntn/git/not-the-news/src/js/data/dbStateDefs.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/dataUtils.ts, /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts but also statically imported by /home/ntn/git/not-the-news/src/js/data/dbSyncOperations.ts, /home/ntn/git/not-the-news/src/js/data/dbUserState.ts, /home/ntn/git/not-the-news/src/js/helpers/userStateUtils.ts, /home/ntn/git/not-the-news/src/js/ui/uiInitializers.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
 
 [plugin vite:reporter] 
-(!) /home/ntn/git/not-the-news/src/js/data/database.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/keyboardManager.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/js/ui/uiInitializers.ts, /home/ntn/git/not-the-news/src/js/ui/uiUpdaters.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
+(!) /home/ntn/git/not-the-news/src/js/data/dbSyncOperations.ts is dynamically imported by /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/data/dbUserState.ts, /home/ntn/git/not-the-news/src/js/helpers/userStateUtils.ts, /home/ntn/git/not-the-news/src/js/ui/uiInitializers.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
 
 [plugin vite:reporter] 
-(!) /home/ntn/git/not-the-news/src/js/helpers/dataUtils.ts is dynamically imported by /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
+(!) /home/ntn/git/not-the-news/src/js/data/dbUserState.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/js/helpers/keyboardManager.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/js/helpers/userStateUtils.ts, /home/ntn/git/not-the-news/src/js/ui/uiInitializers.ts, /home/ntn/git/not-the-news/src/js/ui/uiUpdaters.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
 
 [plugin vite:reporter] 
-(!) /home/ntn/git/not-the-news/src/js/helpers/userStateUtils.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
+(!) /home/ntn/git/not-the-news/src/js/helpers/dataUtils.ts is dynamically imported by /home/ntn/git/not-the-news/src/main.ts, /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /home/ntn/git/not-the-news/src/js/helpers/userStateUtils.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
 
 [plugin vite:reporter] 
 (!) /home/ntn/git/not-the-news/src/js/ui/uiUpdaters.ts is dynamically imported by /home/ntn/git/not-the-news/src/js/helpers/keyboardManager.ts but also statically imported by /home/ntn/git/not-the-news/src/js/helpers/deckManager.ts, /home/ntn/git/not-the-news/src/js/helpers/discoveryManager.ts, /home/ntn/git/not-the-news/src/js/helpers/keyboardManager.ts, /home/ntn/git/not-the-news/src/js/ui/uiInitializers.ts, /home/ntn/git/not-the-news/src/main.ts, dynamic import will not move module into another chunk.
@@ -30,15 +33,15 @@ rendering chunks...
 computing gzip size...
 ../www/registerSW.js                           0.13 kB
 ../www/manifest.json                           0.34 kB │ gzip:  0.23 kB
-../www/login.html                              4.46 kB │ gzip:  1.63 kB
-../www/index.html                             50.45 kB │ gzip:  8.98 kB
+../www/login.html                              4.72 kB │ gzip:  1.73 kB
+../www/index.html                             61.73 kB │ gzip:  9.61 kB
 ../www/assets/Playfair_Display-DaGQPUCb.ttf  123.24 kB
-../www/assets/main-DDPYElNu.css                6.31 kB │ gzip:  1.71 kB
-../www/assets/firebase-ByUD8l9H.css           29.36 kB │ gzip:  6.36 kB
-../www/assets/login-DOr9-383.js                2.16 kB │ gzip:  0.90 kB
-../www/assets/main-DFPROOUi.js               135.06 kB │ gzip: 40.96 kB
-../www/assets/firebase-D4b_x8Xg.js           195.17 kB │ gzip: 62.82 kB
-✓ built in 3.11s
+../www/assets/main-1B3yPWv_.css                7.23 kB │ gzip:  1.87 kB
+../www/assets/firebase-BnuZ3zbD.css           35.48 kB │ gzip:  7.14 kB
+../www/assets/login-BYjhgk8T.js                2.23 kB │ gzip:  0.93 kB
+../www/assets/main-CXnSFiSF.js               146.76 kB │ gzip: 44.73 kB
+../www/assets/firebase-pGhoXR0e.js           195.17 kB │ gzip: 62.82 kB
+✓ built in 4.66s
 
 PWA v1.0.3
 Building sw.js service worker ("es" format)...
@@ -47,12 +50,12 @@ transforming...
 ✓ 84 modules transformed.
 rendering chunks...
 computing gzip size...
-../www/sw.mjs  19.83 kB │ gzip: 6.54 kB
-✓ built in 1.99s
+../www/sw.mjs  20.15 kB │ gzip: 6.58 kB
+✓ built in 1.56s
 
 PWA v1.0.3
 mode      injectManifest
 format:   es
-precache  17 entries (844.81 KiB)
+precache  23 entries (877.14 KiB)
 files generated
   ../www/sw.js

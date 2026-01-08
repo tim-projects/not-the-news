@@ -610,13 +610,14 @@ export async function performFeedSync(app: AppState): Promise<boolean> {
         if (!response.ok) {
             if (response.status === 429) {
                 console.warn('[DB] Sync throttled by server. Backing off.');
-                // Update last sync time to avoid immediate retry loop on reload
                 const now = Date.now();
                 await _saveSyncMetaState('lastFeedSync', now);
                 if (app) app.lastFeedSync = now;
                 return false;
             }
-            throw new Error(`HTTP error ${response.status} for /api/refresh`);
+            const errText = await response.text();
+            console.error(`[DB] HTTP error ${response.status} for /api/refresh: ${errText}`);
+            throw new Error(`HTTP error ${response.status} for /api/refresh: ${errText}`);
         }
 
         const data: any = await response.json();

@@ -1,5 +1,8 @@
 # Future Features & Enhancements
 
+- the search box should have clickable up and down bittons on the right side to select items that have been found (similar to using the uo and down arrow keys)
+- when marking an item as read it correctly selects the next item, but the scroll isnt quite right the top of the item goes off the screen. instead, the top border of the newly selelected item ahoukd always be in the view area.
+
 ## Text-to-Speech Enhancements
 - Control speed/voice with utterance.rate and utterance.voice, pausing via speechSynthesis.pause(). Add event listeners for article load to auto-read or use a shortcut like 'v'.
 

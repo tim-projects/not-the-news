@@ -32,6 +32,8 @@
   },
   "dependencies": {
     "alpinejs": "^3.14.9",
-    "firebase": "^12.7.0"
+    "dotenv": "^17.2.3",
+    "firebase": "^12.7.0",
+    "jose": "^6.1.3"
   }
 }

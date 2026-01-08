@@ -112,20 +112,9 @@ export const manageDailyDeck = async (
     const isNewDay = lastShuffleResetDate !== today;
     
     const isDeckEmpty = !currentDeckItems || currentDeckItems.length === 0 || existingDeck.length === 0;
-    
-    // Condition for a refresh: New day, filter mode changed, deck is empty, OR unread deck is running low
-    const isUnreadMode = filterMode === 'unread';
-    const isDeckRunningLow = isUnreadMode && validUnreadInDeck.length < 10;
-    const isFilterModeChanged = !isUnreadMode && filterMode !== 'unread'; // Placeholder logic, refined below
+    const isDeckEffectivelyEmpty = isDeckEmpty || (filterMode === 'unread' && validUnreadInDeck.length === 0);
 
-    // We need a more precise "filter changed" check. 
-    // If we were in 'unread' and now in 'read', we MUST refresh.
-    // If we stay in 'unread', we only refresh if running low or new day.
-    
-    let needsRefresh = isNewDay || isDeckEmpty || (isUnreadMode && isDeckRunningLow);
-    
-    // If filter mode is not unread, we usually want to refresh to show the full list for that mode
-    if (!isUnreadMode) needsRefresh = true;
+    let needsRefresh = isNewDay || isDeckEmpty || isDeckEffectivelyEmpty || filterMode !== 'unread';
 
     const allItemsInDeckShuffled = !isDeckEmpty && existingDeck.every(item => shuffledOutGuidsSet.has(item.guid.toLowerCase()));
 
@@ -136,10 +125,10 @@ export const manageDailyDeck = async (
     let newLastShuffleResetDate: string = lastShuffleResetDate || today;
 
     if (needsRefresh) {
-        console.log(`[deckManager] Refreshing deck. Reason: New Day (${isNewDay}), Deck Low/Empty (${isDeckEmpty || isDeckRunningLow}), or Filter Mode (${filterMode}).`);
+        console.log(`[deckManager] Refreshing deck. Reason: New Day (${isNewDay}), Deck Empty (${isDeckEffectivelyEmpty}), or Filter Mode (${filterMode}).`);
 
         // Handle shuffle count refund logic (only if not a new day and deck cleared by reading)
-        if (!isNewDay && !isDeckEmpty && validUnreadInDeck.length === 0 && isUnreadMode) {
+        if (!isNewDay && !isDeckEmpty && validUnreadInDeck.length === 0 && filterMode === 'unread') {
             if (!allItemsInDeckShuffled) {
                 console.log('[deckManager] Automatically incrementing (refunding) shuffleCount due to deck cleared by reading.');
                 newShuffleCount = Math.min(DAILY_SHUFFLE_LIMIT, newShuffleCount + 1);
@@ -149,76 +138,37 @@ export const manageDailyDeck = async (
 
         let newDeckItems: any[] = [];
 
-        // TOP-UP STRATEGY for unread mode:
-        if (isUnreadMode && !isNewDay && !isDeckEmpty) {
-            console.log(`[deckManager] Topping up unread deck from ${validUnreadInDeck.length} to 10.`);
-            newDeckItems = validUnreadInDeck.map(item => ({ guid: item.guid, addedAt: new Date().toISOString() }));
-            
-            const existingGuidsInNewDeck = new Set(newDeckItems.map(getGuid).map(g => g.toLowerCase()));
+        // FULL REPLACEMENT (No more top-up)
+        console.log(`[deckManager] Performing full deck generation for mode: ${filterMode}`);
+        
+        let usablePregen = false;
+        if (filterMode === 'unread' && pregeneratedDeck && pregeneratedDeck.length > 0) {
+            const hasUnread = pregeneratedDeck.some(item => !readGuidsSet.has(getGuid(item).toLowerCase()));
+            if (hasUnread) usablePregen = true;
+        }
 
-            // 1. Try to use pre-generated items first
-            if (pregeneratedDeck && pregeneratedDeck.length > 0) {
-                for (const pregenItem of pregeneratedDeck) {
-                    if (newDeckItems.length >= 10) break;
-                    const guid = getGuid(pregenItem).toLowerCase();
-                    if (!existingGuidsInNewDeck.has(guid) && !readGuidsSet.has(guid) && !shuffledOutGuidsSet.has(guid)) {
-                        newDeckItems.push(pregenItem);
-                        existingGuidsInNewDeck.add(guid);
-                    }
-                }
-            }
-
-            // 2. If still < 10, generate more
+        if (usablePregen && pregeneratedDeck) {
+            console.log('[deckManager] Using pre-generated deck inside manageDailyDeck');
+            newDeckItems = [...pregeneratedDeck];
             if (newDeckItems.length < 10) {
-                const combinedShuffledOut = [...shuffledOutItemsArray, ...newDeckItems.map(getGuid)];
                 const topUpItems = await generateNewDeck(
                     entries,
                     readItemsArray,
                     starredItemsArray,
-                    combinedShuffledOut,
+                    [...shuffledOutItemsArray, ...newDeckItems.map(getGuid)],
                     filterMode
                 );
-                
-                for (const item of topUpItems) {
-                    if (newDeckItems.length >= 10) break;
-                    if (!existingGuidsInNewDeck.has(item.guid.toLowerCase())) {
-                        newDeckItems.push({ guid: item.guid, addedAt: new Date().toISOString() });
-                        existingGuidsInNewDeck.add(item.guid.toLowerCase());
-                    }
-                }
+                newDeckItems = [...newDeckItems, ...topUpItems.map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }))].slice(0, 10);
             }
         } else {
-            // FULL REPLACEMENT (New day, different filter mode, or initially empty)
-            console.log(`[deckManager] Performing full deck generation for mode: ${filterMode}`);
-            
-            let usablePregen = false;
-            if (isUnreadMode && pregeneratedDeck && pregeneratedDeck.length > 0) {
-                const hasUnread = pregeneratedDeck.some(item => !readGuidsSet.has(getGuid(item).toLowerCase()));
-                if (hasUnread) usablePregen = true;
-            }
-
-            if (usablePregen && pregeneratedDeck) {
-                newDeckItems = [...pregeneratedDeck];
-                if (newDeckItems.length < 10) {
-                    const topUpItems = await generateNewDeck(
-                        entries,
-                        readItemsArray,
-                        starredItemsArray,
-                        [...shuffledOutItemsArray, ...newDeckItems.map(getGuid)],
-                        filterMode
-                    );
-                    newDeckItems = [...newDeckItems, ...topUpItems.map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }))].slice(0, 10);
-                }
-            } else {
-                const items = await generateNewDeck(
-                    entries,
-                    readItemsArray,
-                    starredItemsArray,
-                    shuffledOutItemsArray,
-                    filterMode
-                );
-                newDeckItems = items.map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }));
-            }
+            const items = await generateNewDeck(
+                entries,
+                readItemsArray,
+                starredItemsArray,
+                shuffledOutItemsArray,
+                filterMode
+            );
+            newDeckItems = items.map(i => ({ guid: i.guid, addedAt: new Date().toISOString() }));
         }
         
         newCurrentDeckGuids = newDeckItems;

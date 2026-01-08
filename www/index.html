@@ -49,7 +49,7 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-DQ3RvZub.js"></script>
+  <script type="module" crossorigin src="/assets/main-DDWQbi5c.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/firebase-L7UioQ92.js">
   <link rel="stylesheet" crossorigin href="/assets/firebase-BnuZ3zbD.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
@@ -170,24 +170,19 @@
                                                                                                                     </div>
                                                                         
                                                                                                                     <div class="itemtitle" @click="
-                                                                                                                        if (selectedGuid !== entry.guid) {
-                                                                                                                            const rect = $el.closest('.item').getBoundingClientRect();
-                                                                                                                            const viewHeight = window.innerHeight;
-                                                                                                                            const visibleHeight = Math.min(rect.bottom, viewHeight) - Math.max(rect.top, 0);
-                                                                                                                            const coverage = visibleHeight / viewHeight;
-                                                                                                                            if (coverage <= 0.9) {
-                                                                                                                                selectItem(entry.guid); 
-                                                                                                                                $event.stopPropagation(); 
-                                                                                                                                $event.preventDefault(); 
-                                                                                                                            } else {
-                                                                                                                                selectedGuid = entry.guid;
-                                                                                                                            }
+                                                                                                                        const r = $el.getBoundingClientRect(); 
+                                                                                                                        if (r.bottom > window.innerHeight) { 
+                                                                                                                            selectItem(entry.guid); 
+                                                                                                                            $event.stopPropagation(); 
+                                                                                                                            $event.preventDefault(); 
+                                                                                                                        } else { 
+                                                                                                                            if (selectedGuid !== entry.guid) selectedGuid = entry.guid; 
                                                                                                                         }">
                                                                         
                                                                                     <svg class="star-animation-overlay" x-show="starredGuid === entry.guid">
                                                                                         <rect class="star-outline" pathLength="1" />
                                                                                     </svg>
-                                                                                    <button class="read-button" @click.stop="toggleRead(entry.guid)" 
+                                                                                    <button class="read-button" @click.stop="const r = $el.getBoundingClientRect(); if (r.bottom > window.innerHeight) { selectItem(entry.guid); } else { toggleRead(entry.guid); }" 
                                                                                             :class="{ 
                                                                                                                               'read': entry.isRead && readingGuid !== entry.guid,
                                                                                                                               'animating': readingGuid === entry.guid,
@@ -199,7 +194,7 @@
                                                                                         ✕
                                                                                     </button>
                                                                                                             <div x-html="entry.title"></div>
-                                                                                                            <button class="star" @click.stop="toggleStar(entry.guid)" 
+                                                                                                            <button class="star" @click.stop="const r = $el.getBoundingClientRect(); if (r.bottom > window.innerHeight) { selectItem(entry.guid); } else { toggleStar(entry.guid); }" 
                                                                                                                     :class="{
                                                                                                                         'starred': entry.isStarred,
                                                                                                                         'sub-focused': entry.guid === selectedGuid && selectedSubElement === 'star'
@@ -210,7 +205,7 @@
                                                                                                                 ★
                                                                                                             </button>
                                                                                                         </div>
-                                                                    <div class="itemdescription" x-init="handleEntryLinks($el)">
+                                                                    <div class="itemdescription" x-init="handleEntryLinks($el); handleEntryImages($el)">
                                     <div class="itemfrom">
                                         <p class="source" x-text="`Source: ${entry.source}`"></p>
                                         <p class="pubdate" x-text="entry.pubDate"></p>
