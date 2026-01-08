@@ -388,12 +388,6 @@ async function moveSelection(app: AppState, direction: number): Promise<void> {
 export function scrollSelectedIntoView(guid: string | null, app: AppState): void {
     if (!guid) return;
     
-    // Check if it's the first item
-    if (app.filteredEntries.length > 0 && app.filteredEntries[0].guid === guid) {
-        app.scrollToTop();
-        return;
-    }
-
     // We use a small timeout to ensure Alpine has updated the DOM
     setTimeout(() => {
         const element = document.querySelector(`.entry[data-guid="${guid}"]`) as HTMLElement;
@@ -410,9 +404,8 @@ export function scrollSelectedIntoView(guid: string | null, app: AppState): void
         const relativeTop = elementRect.top - containerRect.top;
         const currentScroll = container === document.documentElement ? window.pageYOffset : (container as HTMLElement).scrollTop;
         
-        // We want the element to be below the header if possible, or at least at the top with a margin
-        // If the header is NOT sticky, it will scroll away anyway, so this just ensures a nice margin.
-        const targetTop = currentScroll + relativeTop - headerHeight - 20;
+        // Match the top of the item with the top of the screen
+        const targetTop = currentScroll + relativeTop;
 
         container.scrollTo({
             top: Math.max(0, targetTop),

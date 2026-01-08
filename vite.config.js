@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
     publicDir: '../public',
 
     server: {
-      port: 8443,
+      port: 5173,
       allowedHosts: env.VITE_ALLOWED_HOSTS ? env.VITE_ALLOWED_HOSTS.split(',') : ['localhost'],
       proxy: {
         '/api': {

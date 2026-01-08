@@ -30,7 +30,7 @@ systemctl --user restart ntn-frontend
 echo "------------------------------------------------"
 echo "Services started!"
 echo "Backend: http://localhost:8787"
-echo "Frontend: http://localhost:8443"
+echo "Frontend: http://localhost:5173"
 echo ""
 echo "To view logs:"
 echo "  journalctl --user -u ntn-frontend -f"

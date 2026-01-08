@@ -5,7 +5,7 @@ After=network.target ntn-backend.service
 [Service]
 Type=simple
 WorkingDirectory={{REPO_DIR}}
-ExecStart=/usr/bin/npx vite --mode development
+ExecStart=/usr/bin/npx vite --mode development --host 127.0.0.1 --port 5173
 Restart=always
 Environment=PATH=/usr/bin:/usr/local/bin
 

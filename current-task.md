@@ -33,13 +33,11 @@
     - Added `loaded` class management in `_initImageObserver` to reveal images that were previously stuck at `opacity: 0`.
 
 ### 8. Bug Investigation: Incorrect Scroll Position on Selection
-- [ ] **Goal:** Ensure that the top border of a newly selected item is always visible in the viewport.
-- [ ] **Findings:**
-    - When marking an item as read, the next item is selected, but its top sometimes goes off-screen (under the header).
-    - Current logic in `scrollSelectedIntoView` uses `header.getBoundingClientRect().height` and a 20px padding, but it might not be accounting for all layout factors or the timing of Alpine.js DOM updates.
-- [ ] **Mitigation:**
-    - Adjust `scrollSelectedIntoView` to more accurately calculate the available viewport area.
-    - Verify header positioning (fixed vs sticky) and its impact on `getBoundingClientRect`.
+- [x] **Goal:** Ensure that the top border of a newly selected item is always visible in the viewport.
+- [x] **Findings:**
+    - Resolved by removing header offsets and padding in `scrollSelectedIntoView`, ensuring item top aligns with viewport top.
+    - Improved container detection to support both `window` and `#app-viewport`.
+    - Moved `selectItem` call in `toggleRead` to occur after animations to ensure stable DOM positions.
 
 ### 9. GUID Optimization
 - [ ] **Goal:** Map URL GUIDs to compact integers for massive state support.
