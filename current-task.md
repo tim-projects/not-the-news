@@ -27,21 +27,21 @@
 - [x] **Importance:** Prevents the app from downloading the entire 100,000 item list every time a sync occurs. The client will only request what has changed since its last known state, drastically reducing bandwidth and battery usage.
 
 ### 7. Bug Investigation: Images Not Displaying
-- [ ] **Goal:** Fix the regression where images are no longer appearing in the feed.
-- [ ] **Findings:** 
-    - Commit `f74539f` introduced logic to extract the first image from the description into a separate `image` property and remove it from the HTML to prevent duplicates.
-    - The worker's `prettifyItem` function now removes the image tag entirely using a global regex.
-    - On the client side, `mapRawItem` attempts to extract the image again, and if not found in the description, it falls back to the `item.image` property.
-    - Possible causes:
-        1. The client-side `IntersectionObserver` (`imageObserver`) is failing to trigger for dynamically loaded deck items.
-        2. The worker-provided `image` property is being lost during the transition from minimized `deltaItems` to full items from `/api/list`.
-        3. The client-side `mapRawItem` incorrectly resolves relative URLs when using `DOMParser`.
-- [ ] **Mitigation:**
-    - Verify `item.image` presence in the `/api/list` response.
-    - Debug `IntersectionObserver` initialization and firing.
-    - Check for CSS rules that might be inadvertently hiding the `title-image`.
+- [x] **Goal:** Fix the regression where images are no longer appearing in the feed.
+- [x] **Findings:** 
+    - Resolved by improving image extraction regex in worker and ensuring IntersectionObserver correctly handles both lazy-loaded and pre-loaded images.
+    - Added `loaded` class management in `_initImageObserver` to reveal images that were previously stuck at `opacity: 0`.
 
-### 8. GUID Optimization
+### 8. Bug Investigation: Incorrect Scroll Position on Selection
+- [ ] **Goal:** Ensure that the top border of a newly selected item is always visible in the viewport.
+- [ ] **Findings:**
+    - When marking an item as read, the next item is selected, but its top sometimes goes off-screen (under the header).
+    - Current logic in `scrollSelectedIntoView` uses `header.getBoundingClientRect().height` and a 20px padding, but it might not be accounting for all layout factors or the timing of Alpine.js DOM updates.
+- [ ] **Mitigation:**
+    - Adjust `scrollSelectedIntoView` to more accurately calculate the available viewport area.
+    - Verify header positioning (fixed vs sticky) and its impact on `getBoundingClientRect`.
+
+### 9. GUID Optimization
 - [ ] **Goal:** Map URL GUIDs to compact integers for massive state support.
 - [ ] **Importance:** Storing a 100-character URL GUID 100,000 times is inefficient. Mapping these to 4-byte integers provides an immediate 25x reduction in raw data size before compression is even applied.
 

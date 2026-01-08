@@ -792,11 +792,6 @@ export function rssApp(): AppState {
                     this.closingGuid = guid;
                     await new Promise(resolve => setTimeout(resolve, 333 * animFactor));
                     
-                    // Select next item AFTER fold but DURING swipe for smoother feel
-                    if (nextGuidToSelect) {
-                        this.selectItem(nextGuidToSelect);
-                    }
-
                     // Phase 2: Swipe animation (300ms baseline)
                     await new Promise(resolve => setTimeout(resolve, 300 * animFactor));
                 } else {
@@ -830,8 +825,10 @@ export function rssApp(): AppState {
                 this.deck = this.deck.filter(item => item.guid !== guid);
                 this.currentDeckGuids = this.currentDeckGuids.filter(deckItem => deckItem.guid !== guid);
                 
-                // If we didn't select nextGuidToSelect during the animation, clear selection
-                if (!nextGuidToSelect && wasSelected) {
+                // Select next item AFTER animations and state update to ensure stable DOM positions
+                if (nextGuidToSelect) {
+                    this.selectItem(nextGuidToSelect);
+                } else if (wasSelected) {
                     this.selectedGuid = null;
                 }
             } else if (this.filterMode === 'unread' && isCurrentlyRead) {

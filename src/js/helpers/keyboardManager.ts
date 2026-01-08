@@ -397,16 +397,26 @@ export function scrollSelectedIntoView(guid: string | null, app: AppState): void
     // We use a small timeout to ensure Alpine has updated the DOM
     setTimeout(() => {
         const element = document.querySelector(`.entry[data-guid="${guid}"]`) as HTMLElement;
-        if (element) {
-            const header = document.querySelector('#header');
-            const headerHeight = header ? header.getBoundingClientRect().height : 0;
-            const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
-            const offsetPosition = elementPosition - headerHeight - 20; // 20px extra padding
+        if (!element) return;
 
-            window.scrollTo({
-                top: offsetPosition,
-                behavior: 'smooth'
-            });
-        }
+        const container = document.getElementById('app-viewport') || document.documentElement;
+        const header = document.querySelector('#header');
+        const headerHeight = header ? header.getBoundingClientRect().height : 0;
+        
+        // Calculate position relative to container
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        
+        const relativeTop = elementRect.top - containerRect.top;
+        const currentScroll = container === document.documentElement ? window.pageYOffset : (container as HTMLElement).scrollTop;
+        
+        // We want the element to be below the header if possible, or at least at the top with a margin
+        // If the header is NOT sticky, it will scroll away anyway, so this just ensures a nice margin.
+        const targetTop = currentScroll + relativeTop - headerHeight - 20;
+
+        container.scrollTo({
+            top: Math.max(0, targetTop),
+            behavior: 'smooth'
+        });
     }, 10);
 }
