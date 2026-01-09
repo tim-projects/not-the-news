@@ -10,6 +10,8 @@ interface Env {
     FIREBASE_SERVICE_ACCOUNT_EMAIL?: string;
     FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
     ASSETS: { fetch: typeof fetch };
+    DEMO_BUCKET?: R2Bucket;
+    DEMO_JSON_PATH?: string;
 }
 
 // Global cache for Google Access Token
@@ -497,7 +499,90 @@ async function getFeedItems(uid: string, env: Env, guids: string[]): Promise<Res
     return jsonResponse(results);
 }
 
+async function generateDemoDeck(env: Env) {
+    console.log('[Cron] Generating Demo Deck...');
+    
+    // 1. Gather Feed URLs from Defaults
+    const defaults = USER_STATE_SERVER_DEFAULTS['rssFeeds'].default;
+    let feedUrls: string[] = [];
+    
+    const extract = (obj: any) => {
+        for (const k in obj) {
+            if (Array.isArray(obj[k])) {
+                obj[k].forEach((item: any) => {
+                    const url = (typeof item === 'string') ? item : (item && item.url) ? item.url : '';
+                    if (url) feedUrls.push(url);
+                });
+            } else if (typeof obj[k] === 'object') {
+                extract(obj[k]);
+            }
+        }
+    };
+    extract(defaults);
+
+    // 2. Fetch Feeds
+    const items = await processFeeds(feedUrls, []);
+    
+    // 3. Score Items (Simple recency + image boost for demo)
+    // In a real scenario with accessible aggregates, we would merge star counts here.
+    const scoredItems = items.map(item => {
+        let score = item.timestamp;
+        if (item.image) score += 1000 * 60 * 60 * 12; // Boost items with images by 12 hours
+        return { ...item, score };
+    });
+    
+    scoredItems.sort((a, b) => b.score - a.score);
+    const top10 = scoredItems.slice(0, 10);
+
+    const deckJson = {
+        updatedAt: new Date().toISOString(),
+        items: top10
+    };
+
+    // 4. Write to R2
+    if (env.DEMO_BUCKET) {
+        const key = env.DEMO_JSON_PATH || 'demo-deck.json';
+        await env.DEMO_BUCKET.put(key, JSON.stringify(deckJson), {
+            httpMetadata: {
+                contentType: 'application/json',
+            }
+        });
+        console.log('[Cron] Demo Deck written to R2');
+    } else {
+        console.warn('[Cron] DEMO_BUCKET not configured');
+    }
+}
+
+async function fetchDemoDeck(env: Env): Promise<Response> {
+    const key = env.DEMO_JSON_PATH || 'demo-deck.json';
+    
+    // 1. Try R2
+    if (env.DEMO_BUCKET) {
+        const object = await env.DEMO_BUCKET.get(key);
+        if (object) {
+            return new Response(object.body, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+                    ...CORS_HEADERS
+                }
+            });
+        }
+    }
+
+    // 2. Fallback: Generate on the fly (if R2 is empty/missing) or return static
+    // We'll do a quick generate if possible, but simpler to return a static fallback to avoid timeouts
+    return jsonResponse({
+        items: [],
+        warning: 'Demo deck not ready'
+    }, 404);
+}
+
 export default {
+    async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+        ctx.waitUntil(generateDemoDeck(env));
+    },
+
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         try {
             const url = new URL(request.url);
@@ -532,6 +617,10 @@ export default {
                     status: 204,
                     headers: CORS_HEADERS
                 });
+            }
+
+            if (pathName === '/api/demo-deck.json') {
+                return fetchDemoDeck(env);
             }
 
             let uid = 'anonymous';

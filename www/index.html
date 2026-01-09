@@ -8,11 +8,6 @@
             location.replace(location.href.replace('http:', 'https:'));
         }
 
-        // Immediate auth check for static hosting
-        if (!localStorage.getItem('isAuthenticated')) {
-            window.location.replace('/login.html');
-        }
-
         // Use localStorage for instant theme application.
         const storedTheme = localStorage.getItem('theme');
         const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -49,7 +44,7 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-DtTwe-7W.js"></script>
+  <script type="module" crossorigin src="/assets/main-ClW8CWym.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/firebase-wmPgdLmT.js">
   <link rel="stylesheet" crossorigin href="/assets/firebase-BqXno0jT.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
@@ -224,6 +219,15 @@
                                     </template>
                                     <span x-html="entry.description"></span>
                                 </div>
+                            </div>
+                        </template>
+                        <!-- Demo Footer -->
+                        <template x-if="isDemo && deck.length > 0">
+                            <div class="demo-footer" style="text-align: center; padding: 2rem; padding-bottom: 6rem; border-top: 1px solid var(--card-border); margin-top: 2rem;">
+                                <p style="margin-bottom: 1rem; opacity: 0.8; font-size: 1.1rem;">You are viewing a demo feed.</p>
+                                <button class="configure-button" style="font-size: 1.2rem; padding: 0.75rem 2rem;" @click="localStorage.clear(); window.location.href = '/login.html'">
+                                    Show More & Login
+                                </button>
                             </div>
                         </template>
                     </main>

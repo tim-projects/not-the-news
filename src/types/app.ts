@@ -94,6 +94,7 @@ export interface AppState {
     errorMessage: string;
     userEmail: string;
     isOnline: boolean;
+    isDemo: boolean;
     deckManaged: boolean;
     syncStatusMessage: string;
     showSyncStatus: boolean;

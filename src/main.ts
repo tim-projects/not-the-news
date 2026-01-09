@@ -157,6 +157,7 @@ export function rssApp(): AppState {
         errorMessage: '',
         userEmail: '',
         isOnline: isOnline(),
+        isDemo: false,
         deckManaged: false,
         syncStatusMessage: '',
         showSyncStatus: false,
@@ -230,8 +231,42 @@ export function rssApp(): AppState {
 
                 // Redirect if we definitely aren't logged in (after hint check or verification)
                 if (!authHint && !auth.currentUser && !window.location.pathname.endsWith('login.html')) {
-                    console.log("[Auth] Not logged in, redirecting to login.html");
-                    window.location.replace('/login.html');
+                    console.log("[Auth] Not logged in, entering Demo Mode.");
+                    this.isDemo = true;
+                    this.progressMessage = 'Loading demo...';
+                    
+                    // Initialize DB just for read-only/local (themes etc)
+                    try {
+                        this.db = await initDb();
+                        await this._loadInitialState();
+                    } catch (e) {
+                        console.warn("[Demo] DB/State init failed, using defaults", e);
+                    }
+
+                    await this.loadDemoDeck();
+                    
+                    // Apply UI settings
+                    this._initImageObserver();
+                    initSyncToggle(this); // Will show disabled state if handled correctly or hide it
+                    initImagesToggle(this);
+                    initItemButtonMode(this);
+                    initShadowsToggle(this);
+                    initCurvesToggle(this);
+                    initUrlsNewTabToggle(this);
+                    this.applyThemeStyle();
+                    this.applyFonts();
+                    
+                    this.loading = false;
+                    this._initComplete = true;
+                    
+                    // Start observers but SKIP sync tasks
+                    this.$nextTick(() => {
+                        this._setupWatchers();
+                        this._setupEventListeners();
+                        this._initScrollObserver();
+                        this._initObservers();
+                    });
+                    
                     return;
                 }
 
@@ -597,6 +632,51 @@ export function rssApp(): AppState {
 
             this.deck = Array.isArray(items) ? items : [];
             console.log(`[loadAndDisplayDeck] Final deck size: ${this.deck.length}`);
+        },
+        loadDemoDeck: async function(this: AppState): Promise<void> {
+            console.log('[Demo] Loading Demo Deck...');
+            
+            // 1. Check localStorage for user's own items first
+            const localItems = localStorage.getItem('userItems');
+            if (localItems) {
+                try {
+                    const parsed = JSON.parse(localItems);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        console.log('[Demo] Loaded from localStorage.');
+                        // Ensure items are mapped correctly if they were saved raw
+                        this.deck = parsed.map((item: any) => mapRawItem(item, formatDate) || item);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('[Demo] Failed to parse local items:', e);
+                }
+            }
+
+            // 2. Fetch demo deck
+            try {
+                const response = await fetch('/api/demo-deck.json');
+                if (!response.ok) throw new Error(`Status ${response.status}`);
+                const data = await response.json();
+                
+                // Map items to App format
+                // The worker returns 'FeedItem' objects which are compatible with 'raw' items expected by mapRawItem
+                const items = (data.items || []).map((item: any) => {
+                    const mapped = mapRawItem(item, formatDate);
+                    if (mapped) {
+                        mapped.isRead = false;
+                        mapped.isStarred = false;
+                        return mapped;
+                    }
+                    return null;
+                }).filter((i: any) => i !== null);
+                
+                this.deck = items;
+                console.log(`[Demo] Loaded ${items.length} items from server.`);
+            } catch (e) {
+                console.error('[Demo] Failed to load demo deck:', e);
+                this.errorMessage = "Could not load demo feed.";
+                this.deck = [];
+            }
         },
         loadFeedItemsFromDB: async function(this: AppState): Promise<void> {
             if (!this.db) {

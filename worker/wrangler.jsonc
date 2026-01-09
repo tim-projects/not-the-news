@@ -16,6 +16,17 @@
 		"directory": "../www",
 		"binding": "ASSETS"
 	},
+	"r2_buckets": [
+		{
+			"binding": "DEMO_BUCKET",
+			"bucket_name": "rss-demo-deck-bucket"
+		}
+	],
+	"triggers": {
+		"crons": [
+			"*/5 * * * *"
+		]
+	},
 	"routes": [
 		{
 			"pattern": "VITE_PRODUCTION_DOMAIN_PLACEHOLDER",
@@ -27,6 +38,7 @@
 	},
 	"vars": {
 		"API_BASE_URL": "https://VITE_PRODUCTION_DOMAIN_PLACEHOLDER",
-		"FIREBASE_PROJECT_ID": "not-the-news"
+		"FIREBASE_PROJECT_ID": "not-the-news",
+		"DEMO_JSON_PATH": "demo-deck.json"
 	}
 }
