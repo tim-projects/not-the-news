@@ -2179,48 +2179,53 @@ export function rssApp(): AppState {
         },
         handleEntryLinks: function(this: AppState, element: Element): void {
             if (!element) return;
-            element.querySelectorAll('a').forEach(link => {
-                if ((link as HTMLAnchorElement).hostname !== window.location.hostname) {
-                    if (this.openUrlsInNewTabEnabled) {
-                        link.setAttribute('target', '_blank');
-                        link.setAttribute('rel', 'noopener noreferrer');
-                    } else {
-                        link.removeAttribute('target');
+            
+            // Wait for x-html to render content
+            this.$nextTick(() => {
+                element.querySelectorAll('a').forEach(link => {
+                    // Force external links to new tab if enabled
+                    if ((link as HTMLAnchorElement).hostname !== window.location.hostname) {
+                        if (this.openUrlsInNewTabEnabled) {
+                            link.setAttribute('target', '_blank');
+                            link.setAttribute('rel', 'noopener noreferrer');
+                        } else {
+                            link.removeAttribute('target');
+                        }
                     }
-                }
-                
-                // Add click listener to the link itself to implement the >90% coverage check
-                link.addEventListener('click', (e: MouseEvent) => {
-                    // Find the parent item element
-                    const item = (e.target as HTMLElement).closest('.item') as HTMLElement;
-                    if (!item) return;
                     
-                    const guid = item.dataset.guid;
-                    if (!guid) return;
+                    // Add click listener to the link itself to implement the >90% coverage check
+                    link.addEventListener('click', (e: MouseEvent) => {
+                        // Find the parent item element
+                        const item = (e.target as HTMLElement).closest('.item') as HTMLElement;
+                        if (!item) return;
+                        
+                        const guid = item.dataset.guid;
+                        if (!guid) return;
 
-                    // If already selected, allow normal link behavior
-                    if (this.selectedGuid === guid) return;
+                        // If already selected, allow normal link behavior
+                        if (this.selectedGuid === guid) return;
 
-                    // Check screen coverage
-                    const rect = item.getBoundingClientRect();
-                    const viewHeight = window.innerHeight;
-                    const visibleHeight = Math.min(rect.bottom, viewHeight) - Math.max(rect.top, 0);
-                    const coverage = visibleHeight / viewHeight;
+                        // Check screen coverage
+                        const rect = item.getBoundingClientRect();
+                        const viewHeight = window.innerHeight;
+                        const visibleHeight = Math.min(rect.bottom, viewHeight) - Math.max(rect.top, 0);
+                        const coverage = visibleHeight / viewHeight;
 
-                    console.log(`[LinkClick] Item coverage: ${(coverage * 100).toFixed(1)}%`);
+                        console.log(`[LinkClick] Item coverage: ${(coverage * 100).toFixed(1)}%`);
 
-                    if (coverage > 0.9) {
-                        // Covered >90%, allow instant follow. 
-                        // We also select it silently for consistency but don't prevent the click.
-                        this.selectedGuid = guid;
-                        console.log(`[LinkClick] High coverage (${(coverage * 100).toFixed(1)}%), skipping double-click.`);
-                    } else {
-                        // Low coverage, require selection first
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log(`[LinkClick] Low coverage (${(coverage * 100).toFixed(1)}%), selecting item first.`);
-                        this.selectItem(guid);
-                    }
+                        if (coverage > 0.9) {
+                            // Covered >90%, allow instant follow. 
+                            // We also select it silently for consistency but don't prevent the click.
+                            this.selectedGuid = guid;
+                            console.log(`[LinkClick] High coverage (${(coverage * 100).toFixed(1)}%), skipping double-click.`);
+                        } else {
+                            // Low coverage, require selection first
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log(`[LinkClick] Low coverage (${(coverage * 100).toFixed(1)}%), selecting item first.`);
+                            this.selectItem(guid);
+                        }
+                    });
                 });
             });
         },

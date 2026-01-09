@@ -15,14 +15,16 @@
 ## Progress & Findings
 - **Progress:** Automated verification is 95% complete. Core UX flows, edge cases (partial visibility), and keyboard accessibility are fully verified.
 - **Findings:**
-    - **Selection Pattern:** Confirmed "Selection First" logic for links and buttons on items not fully in view. This prevents accidental misclicks during scrolling.
+    - **Link Click Race Condition:** Identified and fixed a bug where links in `entry.description` were sometimes missing click listeners because `x-html` rendering hadn't completed before `x-init` fired.
+        - *Fix:* Wrapped `handleEntryLinks` logic in `this.$nextTick` in `src/main.ts`.
+        - *Verified:* `Feed Item: Link Clicks coverage logic` test now reliably detects "Low coverage" selection behavior and "High coverage" navigation (popup).
+    - **Selection Pattern:** Confirmed "Selection First" logic for links and buttons on items not fully in view.
     - **Keyboard Accessibility:** Sub-element focus (h/l keys) allows precise control over Star/Read/Play actions without a mouse.
     - **Navigation Memory:** `lastSelectedGuid` correctly maintains focus context during view switches.
     - **Undo Reliability:** Verified that `u` and `Ctrl+Z` reliably restore items with correct position memory.
     - **Settings Integrity:** Verified that sub-menu navigation (Appearance -> Main) and form persistence work as expected.
 
 ## Next Steps
-- [ ] Run full interaction suite one last time to generate trace/video artifacts for the `interaction-assessment/` folder.
 - [ ] Finalize the report with any minor visual regressions found (none so far).
 - [ ] Move on to "Hybrid Storage" architecture planning.
 
