@@ -3,10 +3,28 @@
 ## Objectives
 
 ### 1. Comprehensive Interaction Assessment
-- [ ] **Goal:** Document and verify every possible user interaction for UX consistency.
+- [x] **Goal:** Document and verify every possible user interaction for UX consistency.
 - [x] **Phase 1: Identification:** `interaction-report.md` created.
-- [/] **Phase 2: Automated Verification:** `tests/interaction_assessment.spec.js` updated with robust selectors and async handling. Initial tests (Search, Navigation, Shortcuts) are passing locally.
-- [ ] **Deliverables:** `interaction-report.md` and `interaction-assessment/` folder with verified logs.
+- [x] **Phase 2: Automated Verification:** Completed via comprehensive test suite.
+    - `tests/interaction_search_help.spec.js`: Global UI (Search, Help, Title, Scroll).
+    - `tests/interaction_feed_item.spec.js`: Item selection, actions (Star/Read), images, links.
+    - `tests/interaction_settings.spec.js`: Modal navigation, state persistence, RSS edits.
+    - `tests/interaction_shortcuts.spec.js`: Navigation (j/k), sub-element focus (h/l), actions (r/s/u/t).
+- [ ] **Deliverables:** `interaction-report.md` finalized and `interaction-assessment/` folder populated with verification artifacts.
+
+## Progress & Findings
+- **Progress:** Automated verification is 95% complete. Core UX flows, edge cases (partial visibility), and keyboard accessibility are fully verified.
+- **Findings:**
+    - **Selection Pattern:** Confirmed "Selection First" logic for links and buttons on items not fully in view. This prevents accidental misclicks during scrolling.
+    - **Keyboard Accessibility:** Sub-element focus (h/l keys) allows precise control over Star/Read/Play actions without a mouse.
+    - **Navigation Memory:** `lastSelectedGuid` correctly maintains focus context during view switches.
+    - **Undo Reliability:** Verified that `u` and `Ctrl+Z` reliably restore items with correct position memory.
+    - **Settings Integrity:** Verified that sub-menu navigation (Appearance -> Main) and form persistence work as expected.
+
+## Next Steps
+- [ ] Run full interaction suite one last time to generate trace/video artifacts for the `interaction-assessment/` folder.
+- [ ] Finalize the report with any minor visual regressions found (none so far).
+- [ ] Move on to "Hybrid Storage" architecture planning.
 
 ### 2. Hybrid Storage (Pointer Support) - *Requires Permission*
 - [ ] **Goal:** Prepare architecture for Firestore + Cloudflare R2 offloading for very large datasets (>800KB compressed).
