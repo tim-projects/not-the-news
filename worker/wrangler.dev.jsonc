@@ -1,0 +1,32 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "ntn-backend-dev",
+	"account_id": "6e27abd41b72146090b06b58a6d19fd3",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-01-01",
+	"compatibility_flags": [
+		"global_fetch_strictly_public",
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": "../www",
+		"binding": "ASSETS"
+	},
+	"routes": [
+		{
+			"pattern": "dev-news.loveopenly.net",
+			"custom_domain": true
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"API_BASE_URL": "https://dev-news.loveopenly.net",
+		"FIREBASE_PROJECT_ID": "not-the-news-dev"
+	}
+}

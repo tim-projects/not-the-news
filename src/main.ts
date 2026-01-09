@@ -848,11 +848,6 @@ export function rssApp(): AppState {
         },
 
         toggleRead: async function(this: AppState, guid: string): Promise<void> {
-            if (this.isDemo) {
-                // Allow interaction without interruption.
-                this.deck = this.deck.filter(item => item.guid !== guid);
-                return;
-            }
             // Stop TTS if it's playing for the item being marked read (UX improvement)
             if (this.speakingGuid === guid) {
                 stopSpeech(this);
@@ -900,6 +895,11 @@ export function rssApp(): AppState {
                 
                 this.readingGuid = null;
                 this.closingGuid = null;
+            }
+
+            if (this.isDemo) {
+                this.deck = this.deck.filter(item => item.guid !== guid);
+                return;
             }
 
             let removedIndex: number | null = null;
