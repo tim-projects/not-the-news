@@ -44,8 +44,8 @@
         }
         [x-cloak] { display: none !important; }
     </style>
-  <script type="module" crossorigin src="/assets/main-ClW8CWym.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/firebase-wmPgdLmT.js">
+  <script type="module" crossorigin src="/assets/main-Dl_5Qo12.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/firebase-CKa5vJBo.js">
   <link rel="stylesheet" crossorigin href="/assets/firebase-BqXno0jT.css">
   <link rel="stylesheet" crossorigin href="/assets/main-1B3yPWv_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
@@ -299,7 +299,7 @@
                     
                                         <div id="main-settings" x-show="modalView === 'main'">                        <h2>APP</h2>
                         <hr>
-                        <div class="settings-group">
+                        <div class="settings-group" x-show="!isDemo">
                             <div class="setting-label-group">
                                 <label for="filter-selector">Filter View:</label>
                                 <p class="setting-description">Choose which items to display in the feed.</p>
@@ -311,7 +311,7 @@
                                 <option value="all" x-text="`All (${allCount})`"></option>
                             </select>
                         </div>
-                        <div class="settings-group">
+                        <div class="settings-group" x-show="!isDemo">
                             <div class="setting-label-group">
                                 <label for="sync-toggle">Auto-Sync Feed</label>
                                 <p class="setting-description">Automatically fetch new items in the background.</p>
@@ -357,7 +357,7 @@
                             </div>
                             <button id="install-button" class="configure-button">Install</button>
                         </div>
-                        <div class="settings-option">
+                        <div class="settings-option" x-show="!isDemo">
                             <div class="setting-label-group">
                                 <span>Advanced Settings</span>
                                 <p class="setting-description">Reset data or backup your configuration.</p>
@@ -533,8 +533,8 @@
                             <textarea class="settings-textarea" x-model="rssFeedsInput" placeholder="Enter RSS feed URLs, one per line"></textarea>
                             <div x-show="rssFeedsInput !== _initialRssFeedsInput" class="save-message" style="margin-top: 0.5rem;">Unsaved changes.</div>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
-                                <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
-                                <button id="save-rss-btn" class="configure-button" style="margin: 0;" @click="saveRssFeeds()">Save Feeds</button>
+                                <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'" x-show="!isDemo">Backup/Restore</button>
+                                <button id="save-rss-btn" class="configure-button" style="margin: 0;" :class="{ 'grow': isDemo }" @click="saveRssFeeds()">Save Feeds</button>
                             </div>
                         </div>
                     </div>
@@ -545,8 +545,8 @@
                             <textarea class="settings-textarea" x-model="keywordBlacklistInput" placeholder="Enter keywords to filter out, one per line"></textarea>
                             <div x-show="keywordBlacklistInput !== _initialKeywordBlacklistInput" class="save-message" style="margin-top: 0.5rem;">Unsaved changes.</div>
                             <div class="d-flex justify-between w-100" style="margin-top: 1rem;">
-                                <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'">Backup/Restore</button>
-                                <button id="save-keywords-btn" class="configure-button" style="margin: 0;" @click="saveKeywordBlacklist()">Save Keywords</button>
+                                <button class="configure-button" style="margin: 0;" @click="modalView = 'advanced'" x-show="!isDemo">Backup/Restore</button>
+                                <button id="save-keywords-btn" class="configure-button" style="margin: 0;" :class="{ 'grow': isDemo }" @click="saveKeywordBlacklist()">Save Keywords</button>
                             </div>
                         </div>
                     </div>
@@ -703,6 +703,29 @@
              :class="{ 'visible': fullscreenImage }">
             <button class="lightbox-close" @click="fullscreenImage = null" aria-label="Close full view">✕</button>
             <img :src="fullscreenImage" x-show="fullscreenImage" @click.stop>
+        </div>
+
+        <!-- CTA Modal for Demo Mode -->
+        <div id="cta-modal" x-show="showCta" class="modal" @click.self="showCta = false" x-cloak
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0">
+            <div class="modal-content" style="max-width: 400px; text-align: center; padding: 2rem; position: relative;">
+                <button class="close" style="position: absolute; top: 1rem; right: 1rem; border: none; background: transparent; font-size: 1.5rem; cursor: pointer; color: var(--fg); opacity: 0.6;" @click="showCta = false">✕</button>
+                <h2 style="font-family: 'Playfair Display', serif; font-size: 2rem; margin-bottom: 1rem; margin-top: 1rem;">Unlock Full Features</h2>
+                <p style="margin-bottom: 2rem; opacity: 0.8; line-height: 1.5;">Create an account to save your stars, track read articles, and customize your own RSS feeds across all your devices.</p>
+                <div class="d-flex flex-column gap-2">
+                    <button class="configure-button" style="font-size: 1.2rem; padding: 0.75rem; margin: 0;" @click="localStorage.clear(); window.location.href = '/login.html'">
+                        Sign Up Now
+                    </button>
+                    <button class="configure-button" style="background: transparent; border: 1px solid var(--card-border); color: var(--fg); margin: 0;" @click="showCta = false">
+                        Keep Exploring
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

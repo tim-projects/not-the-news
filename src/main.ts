@@ -158,6 +158,7 @@ export function rssApp(): AppState {
         userEmail: '',
         isOnline: isOnline(),
         isDemo: false,
+        showCta: false,
         deckManaged: false,
         syncStatusMessage: '',
         showSyncStatus: false,
@@ -817,6 +818,11 @@ export function rssApp(): AppState {
             return this.read.some(e => (typeof e === 'string' ? e : e.guid).toLowerCase() === g);
         },
         toggleStar: async function (this: AppState, guid: string): Promise<void> {
+            if (this.isDemo) {
+                this.deck = this.deck.map(item => item.guid === guid ? { ...item, isStarred: !item.isStarred } : item);
+                this.showCta = true;
+                return;
+            }
             const isStarring = !this.starred.some(item => item.guid === guid);
             if (isStarring) {
                 this.starredGuid = guid;
@@ -842,6 +848,11 @@ export function rssApp(): AppState {
         },
 
         toggleRead: async function(this: AppState, guid: string): Promise<void> {
+            if (this.isDemo) {
+                // Allow interaction without interruption.
+                this.deck = this.deck.filter(item => item.guid !== guid);
+                return;
+            }
             // Stop TTS if it's playing for the item being marked read (UX improvement)
             if (this.speakingGuid === guid) {
                 stopSpeech(this);
@@ -1039,6 +1050,10 @@ export function rssApp(): AppState {
                 m.scrollSelectedIntoView(guid, this);
             });
         },        processShuffle: async function(this: AppState): Promise<void> {
+            if (this.isDemo) {
+                this.showCta = true;
+                return;
+            }
             await processShuffle(this);
             this.updateCounts();
         },        loadRssFeeds: async function(this: AppState): Promise<void> {
@@ -1060,6 +1075,10 @@ export function rssApp(): AppState {
             this.applyCustomCss();
         },
         saveRssFeeds: async function(this: AppState): Promise<void> {
+            if (this.isDemo) {
+                this.showCta = true;
+                return;
+            }
             const lines = this.rssFeedsInput.split(/\r?\n/);
             const normalizedLines = lines.map(line => {
                 const trimmed = line.trim();
@@ -1158,6 +1177,10 @@ export function rssApp(): AppState {
                 this.loading = false;
             }
         },        saveKeywordBlacklist: async function(this: AppState): Promise<void> {
+            if (this.isDemo) {
+                this.showCta = true;
+                return;
+            }
             const keywordsArray = this.keywordBlacklistInput.split(/\r?\n/).map(kw => kw.trim().toLowerCase()).filter(Boolean).sort();
             
             // Check if anything changed
@@ -1250,29 +1273,31 @@ export function rssApp(): AppState {
                     this.theme = newTheme;
                     this.themeStyle = newStyle;
                     
-                    // Apply theme class to HTML element
-                    const htmlEl = document.documentElement;
-                    htmlEl.classList.remove('light', 'dark');
-                    htmlEl.classList.add(newTheme);
-                    localStorage.setItem('theme', newTheme);
-                    
-                    // Persist to DB
-                     
-                    await saveSimpleState('theme', newTheme, 'userSettings', this);
-                    
-                    if (newTheme === 'light') {
-                        this.themeStyleLight = newStyle;
-                        localStorage.setItem('themeStyleLight', newStyle);
-                        await saveSimpleState('themeStyleLight', newStyle, 'userSettings', this);
-                    } else {
-                        this.themeStyleDark = newStyle;
-                        localStorage.setItem('themeStyleDark', newStyle);
-                        await saveSimpleState('themeStyleDark', newStyle, 'userSettings', this);
-                    }
-                    
-                    await saveSimpleState('themeStyle', newStyle, 'userSettings', this);
+                    // Apply UI change immediately
                     this.applyThemeStyle();
-                    createStatusBarMessage(this, `Theme set to ${newTheme} (${newStyle}).`);
+                    
+                    // Persist to DB and sync in background
+                    (async () => {
+                        const htmlEl = document.documentElement;
+                        htmlEl.classList.remove('light', 'dark');
+                        htmlEl.classList.add(newTheme);
+                        localStorage.setItem('theme', newTheme);
+                        
+                        await saveSimpleState('theme', newTheme, 'userSettings', this);
+                        
+                        if (newTheme === 'light') {
+                            this.themeStyleLight = newStyle;
+                            localStorage.setItem('themeStyleLight', newStyle);
+                            await saveSimpleState('themeStyleLight', newStyle, 'userSettings', this);
+                        } else {
+                            this.themeStyleDark = newStyle;
+                            localStorage.setItem('themeStyleDark', newStyle);
+                            await saveSimpleState('themeStyleDark', newStyle, 'userSettings', this);
+                        }
+                        
+                        await saveSimpleState('themeStyle', newStyle, 'userSettings', this);
+                        createStatusBarMessage(this, `Theme set to ${newTheme} (${newStyle}).`);
+                    })();
                 },
                 saveThemeStyle: async function(this: AppState): Promise<void> {
                     // This method is now mostly handled by updateThemeAndStyle
@@ -1900,6 +1925,7 @@ export function rssApp(): AppState {
             this.updateCounts();
         },
         _reconcileAndRefreshUI: async function(this: AppState): Promise<void> {
+            if (this.isDemo) return;
             console.log('[UI] _reconcileAndRefreshUI: Initiating UI reconciliation and refresh.');
             // This function is intended to be called when the underlying data (read, starred, etc.) changes
             // and the UI needs to be updated to reflect those changes without a full deck reload.
