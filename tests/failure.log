@@ -1,4 +1,1 @@
-Running single Playwright test: .* in tests/interaction_feed_item.spec.js
-Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
-Error: element(s) not found
-Error: [2mexpect([22m[31mlocator[39m[2m).not.[22mtoHaveClass[2m([22m[32mexpected[39m[2m)[22m failed
+Running single Playwright test: . in tests/scroll.spec.js

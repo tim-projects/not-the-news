@@ -5,6 +5,7 @@ This document guides the agent's interaction with the project.
 ### Core Principles
 - Prioritize simplicity, performance, and security.
 - Avoid over-engineering.
+- Files should aim for 300-500 lines. If a file becomes larger than this, it must be refactored into smaller, logically separated modules.
 - Ask for clarification instead of guessing.
 - Use the `@refactor-directive` to refactor JavaScript code to be concise, modern, and functional while maintaining the same output.
 - everything can run without root. Use standard web development tools like Vite and Cloudflare Wrangler.

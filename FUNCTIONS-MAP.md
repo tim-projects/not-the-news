@@ -1,22 +1,28 @@
 # FUNCTIONS-MAP.md
 
-This document maps the project's codebase to help identify large files and plan refactoring. The goal is to keep files under 300 lines of code.
+This document maps the project's codebase to help identify large files and plan refactoring. The goal is to keep files under 300-500 lines of code.
 
-## Summary of Large Files (> 300 lines)
-- **`src/main.ts`** (2083 lines) - **CRITICAL**
-- **`worker/src/index.ts`** (~460 lines) - **CRITICAL**
-- **`src/js/data/dbSyncOperations.ts`** (~450 lines) - **CRITICAL**
-- **`src/js/helpers/dataUtils.ts`** (~350 lines)
-- **`src/js/helpers/keyboardManager.ts`** (~320 lines)
+## Summary of Large Files (> 500 lines)
+- **`src/main.ts`** (2468 lines) - **CRITICAL**
+- **`worker/src/index.ts`** (876 lines) - **CRITICAL**
+- **`src/js/data/dbSyncOperations.ts`** (734 lines) - **CRITICAL**
 
 ---
 
 ## Directory: `src/`
 
-### `src/main.ts` (!!! EXCEEDS 300 LINES !!!)
-- **Total Lines:** 2083
+### `src/main.ts` (!!! EXCEEDS 500 LINES !!!)
+- **Total Lines:** 2468
 - **Functions (Methods in `rssApp`):**
-  - `initApp`: ~120 lines
+  - `initApp`: ~150 lines (Updated with Demo Mode logic)
+  - `loadDemoDeck`: ~40 lines (New)
+  - `preloadThemes`: ~20 lines (Updated)
+  - `toggleRead`: ~170 lines (Updated with Demo Mode logic)
+  - `toggleStar`: ~20 lines (Updated with Demo Mode logic)
+  - `processShuffle`: ~15 lines (Updated with Demo Mode logic)
+  - `saveRssFeeds`: ~90 lines (Updated with Demo Mode logic)
+  - `saveKeywordBlacklist`: ~20 lines (Updated with Demo Mode logic)
+  - `_reconcileAndRefreshUI`: ~5 lines (Updated with Demo Mode logic)
   - `performBackgroundSync`: ~25 lines
   - `updateSyncStatusMessage`: ~15 lines
   - `logout`: ~10 lines
@@ -101,8 +107,8 @@ This document maps the project's codebase to help identify large files and plan 
 
 ## Directory: `src/js/data/`
 
-### `src/js/data/dbSyncOperations.ts` (!!! EXCEEDS 300 LINES !!!)
-- **Total Lines:** ~450
+### `src/js/data/dbSyncOperations.ts` (!!! EXCEEDS 500 LINES !!!)
+- **Total Lines:** 734
 - **Functions:**
   - `_saveSyncMetaState`: ~12 lines
   - `_addPendingOperationToBuffer`: ~18 lines
@@ -148,8 +154,8 @@ This document maps the project's codebase to help identify large files and plan 
 
 ## Directory: `src/js/helpers/`
 
-### `src/js/helpers/dataUtils.ts` (!!! EXCEEDS 300 LINES !!!)
-- **Total Lines:** ~350
+### `src/js/helpers/dataUtils.ts`
+- **Total Lines:** 440
 - **Functions:**
   - `formatDate`: ~20 lines
   - `shuffleArray`: ~5 lines
@@ -158,8 +164,8 @@ This document maps the project's codebase to help identify large files and plan 
   - `mapRawItems`: ~15 lines
   - `generateNewDeck`: ~180 lines (Candidate for splitting)
 
-### `src/js/helpers/keyboardManager.ts` (!!! EXCEEDS 300 LINES !!!)
-- **Total Lines:** ~320
+### `src/js/helpers/keyboardManager.ts`
+- **Total Lines:** 420
 - **Functions:**
   - `handleVerticalNavigation`: ~20 lines
   - `handleKeyboardShortcuts`: ~230 lines (Complex switch statement)
@@ -244,15 +250,18 @@ This document maps the project's codebase to help identify large files and plan 
 
 ## Directory: `worker/src/`
 
-### `worker/src/index.ts` (!!! EXCEEDS 300 LINES !!!)
-- **Total Lines:** ~460
+### `worker/src/index.ts` (!!! EXCEEDS 500 LINES !!!)
+- **Total Lines:** 876
 - **Functions:**
+  - `generateDemoDeck`: ~50 lines (New)
+  - `fetchDemoDeck`: ~20 lines (New)
+  - `scheduled` (handler): ~5 lines (New)
   - `getGoogleAccessToken`: ~40 lines
   - `Storage` (class): ~100 lines
   - `verifyFirebaseToken`: ~10 lines
   - `syncFeeds`: ~50 lines
   - `discoverFeeds`: ~40 lines
-  - `default.fetch` (Request Handler): ~150 lines (Complex switch/routing)
+  - `default.fetch` (Request Handler): ~160 lines (Updated with Demo routes)
 
 ### `worker/src/rss.ts`
 - **Total Lines:** ~130
