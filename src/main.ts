@@ -248,6 +248,15 @@ export function rssApp(): AppState {
                     
                     // Apply UI settings
                     this._initImageObserver();
+                    
+                    // Global listener to ensure all images (including those in x-html) get the fade-in class
+                    document.addEventListener('load', (e: Event) => {
+                        const target = e.target as HTMLElement;
+                        if (target.tagName === 'IMG') {
+                            target.classList.add('loaded');
+                        }
+                    }, true);
+
                     initSyncToggle(this); // Will show disabled state if handled correctly or hide it
                     initImagesToggle(this);
                     initItemButtonMode(this);
@@ -299,6 +308,14 @@ export function rssApp(): AppState {
                 }
 
                 this._initImageObserver();
+
+                // Global listener to ensure all images (including those in x-html) get the fade-in class
+                document.addEventListener('load', (e: Event) => {
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'IMG') {
+                        target.classList.add('loaded');
+                    }
+                }, true);
 
                 // Warm up TTS voices
                 if ('speechSynthesis' in window) {
@@ -1390,35 +1407,18 @@ export function rssApp(): AppState {
             scrollToTop();
         },
         observeImage: function(this: AppState, el: HTMLImageElement): void {
-            if (this.imageObserver) {
-                this.imageObserver.observe(el);
+            // Native loading="lazy" handles the timing. 
+            // We just ensure the fade-in class is applied when the browser finishes loading.
+            if (el.complete) {
+                el.classList.add('loaded');
+            } else {
+                el.addEventListener('load', () => el.classList.add('loaded'), { once: true });
             }
         },
         _initImageObserver: function(this: AppState): void {
-            this.imageObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target as HTMLImageElement;
-                        if (img.dataset.src) {
-                            img.src = img.dataset.src;
-                            // Optionally remove the observer after loading
-                            this.imageObserver?.unobserve(img);
-                        } else if (img.src) {
-                            // If it already has a src (e.g. description image), ensure it gets the loaded class
-                            if (img.complete) {
-                                img.classList.add('loaded');
-                            } else {
-                                img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
-                            }
-                            this.imageObserver?.unobserve(img);
-                        }
-                    }
-                });
-            }, {
-                root: null, // use viewport
-                rootMargin: '50% 0px', // preload slightly ahead
-                threshold: 0.01
-            });
+            // Manual observer no longer needed for swapping src, 
+            // but we keep the method signature for compatibility.
+            this.imageObserver = null;
         },
         // --- New Function: Reset Application Data ---
         resetApplicationData: async function(this: AppState): Promise<void> {
