@@ -31,6 +31,12 @@ test.describe('Interaction Assessment: Feed Items', () => {
         const starButton = firstItem.locator('.star');
         const readButton = firstItem.locator('.read-button');
 
+        // Ensure NOT starred initially for this test
+        if (await starButton.evaluate(el => el.classList.contains('starred'))) {
+            await starButton.click();
+            await expect(starButton).not.toHaveClass(/starred/, { timeout: 10000 });
+        }
+
         // Star toggle
         await expect(starButton).not.toHaveClass(/starred/);
         await starButton.click();

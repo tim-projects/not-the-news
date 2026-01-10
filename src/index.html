@@ -256,7 +256,7 @@
             </div>
         </div>
 
-        <div x-show="openSettings" class="modal" @click.self="if (!isSettingsDirty || confirm('Discard unsaved changes?')) openSettings = false" x-cloak
+        <div id="settings-modal" x-show="openSettings" class="modal" @click.self="if (!isSettingsDirty || confirm('Discard unsaved changes?')) openSettings = false" x-cloak
              x-transition:enter="transition ease-out duration-150"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"

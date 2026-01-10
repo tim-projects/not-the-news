@@ -10,7 +10,7 @@ import {
     SimpleStateValue
 } from './dbStateDefs.ts';
 import { getAuthToken } from './dbAuth.ts';
-import { compressJson } from '../utils/compression.ts';
+import { compressJson, decompressJson } from '../utils/compression.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const COMPRESSIBLE_KEYS = ['read', 'starred', 'currentDeckGuids', 'shuffledOutGuids'];
@@ -352,6 +352,16 @@ async function _pullSingleStateKey(key: string, def: UserStateDef, force: boolea
                 return { key, status: response.status };
             }
             const data: { value: any, lastModified: string, partial?: boolean } = await response.json();
+            
+            // --- FIX: Decompress value if it's a compressed string ---
+            if (typeof data.value === 'string' && COMPRESSIBLE_KEYS.includes(key)) {
+                try {
+                    data.value = await decompressJson(data.value);
+                } catch (e) {
+                    console.warn(`[DB Sync] Decompression failed for ${key}, using raw value.`, e);
+                }
+            }
+
             const isPartial = data.partial === true;
             if (isPartial) console.log(`[DB Sync] Received partial delta for ${key}.`);
             else console.log(`[DB Sync] Received full data for ${key}:`, data.value);

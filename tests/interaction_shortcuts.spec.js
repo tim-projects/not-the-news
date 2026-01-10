@@ -87,6 +87,12 @@ test.describe('Interaction Assessment: Keyboard Shortcuts', () => {
         await firstItem.click();
         await expect(firstItem).toHaveClass(/selected-item/, { timeout: 15000 });
         
+        // Ensure NOT starred initially for this test
+        if (await starButton.evaluate(el => el.classList.contains('starred'))) {
+            await page.keyboard.press('s');
+            await expect(starButton).not.toHaveClass(/starred/, { timeout: 10000 });
+        }
+
         // s to toggle star
         await expect(starButton).not.toHaveClass(/starred/);
         await page.keyboard.press('s');

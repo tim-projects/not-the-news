@@ -1,8 +1,8 @@
 
-> not-the-news@1.0.0 build
-> vite build
+> not-the-news@1.0.0 build:dev
+> vite build --mode development
 
-vite v7.3.0 building client environment for production...
+vite v7.3.0 building client environment for development...
 transforming...
 ✓ 67 modules transformed.
 rendering chunks...
@@ -34,44 +34,28 @@ computing gzip size...
 ../www/registerSW.js                           0.13 kB
 ../www/manifest.json                           0.34 kB │ gzip:  0.23 kB
 ../www/login.html                              4.72 kB │ gzip:  1.73 kB
-../www/index.html                             64.26 kB │ gzip: 10.19 kB
+../www/index.html                             64.28 kB │ gzip: 10.20 kB
 ../www/assets/Playfair_Display-DaGQPUCb.ttf  123.24 kB
 ../www/assets/main-1B3yPWv_.css                7.23 kB │ gzip:  1.87 kB
 ../www/assets/firebase-BqXno0jT.css           36.33 kB │ gzip:  7.16 kB
-../www/assets/login-CrvhRFSd.js                2.23 kB │ gzip:  0.93 kB
-../www/assets/main-Eu0QeVEF.js               149.67 kB │ gzip: 45.51 kB
-../www/assets/firebase-wmPgdLmT.js           195.17 kB │ gzip: 62.82 kB
-✓ built in 2.23s
+../www/assets/login-Buwd6oW6.js                2.23 kB │ gzip:  0.93 kB
+../www/assets/main-DKk77xq1.js               149.57 kB │ gzip: 45.49 kB
+../www/assets/firebase-CKa5vJBo.js           195.18 kB │ gzip: 62.82 kB
+✓ built in 2.22s
 
 PWA v1.0.3
 Building sw.js service worker ("es" format)...
-vite v7.3.0 building client environment for production...
+vite v7.3.0 building client environment for development...
 transforming...
 ✓ 84 modules transformed.
 rendering chunks...
 computing gzip size...
 ../www/sw.mjs  20.15 kB │ gzip: 6.58 kB
-✓ built in 946ms
+✓ built in 1.27s
 
 PWA v1.0.3
 mode      injectManifest
 format:   es
-precache  23 entries (883.28 KiB)
+precache  23 entries (883.22 KiB)
 files generated
   ../www/sw.js
-
-=== Deploying to 'not-the-news'...
-
-i  deploying hosting
-i  hosting[not-the-news]: beginning deploy...
-i  hosting[not-the-news]: found 21 files in www
-✔  hosting[not-the-news]: file upload complete
-i  hosting[not-the-news]: finalizing version...
-✔  hosting[not-the-news]: version finalized
-i  hosting[not-the-news]: releasing new version...
-✔  hosting[not-the-news]: release complete
-
-✔  Deploy complete!
-
-Project Console: https://console.firebase.google.com/project/not-the-news/overview
-Hosting URL: https://not-the-news.web.app
