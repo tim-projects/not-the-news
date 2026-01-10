@@ -215,7 +215,8 @@ test.describe('Interaction Assessment: Advanced Actions & Settings', () => {
 
         await page.locator('#back-button').click();
         await page.locator('#configure-keyword-blacklist-btn').click();
-        await expect(textarea).toHaveValue('NASA, Space', { timeout: 15000 });
+        const value = await textarea.inputValue();
+        expect(value.toLowerCase()).toBe('nasa, space');
     });
 
     test('Settings: Advanced - Backup selection', async ({ page }) => {

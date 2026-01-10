@@ -11,10 +11,10 @@
     - `tests/interaction_settings.spec.js`: Modal navigation, state persistence, RSS edits.
     - `tests/interaction_shortcuts.spec.js`: Navigation (j/k), sub-element focus (h/l), actions (r/s/u/t).
     - `tests/interaction_more.spec.js`: Advanced actions (Enter/o), TTS (p), Undo (Ctrl+Z), and deeper Settings (Blacklist, Backup).
-- [x] **Deliverables:** `interaction-report.md` finalized and `interaction-assessment/` folder populated with verification artifacts.
+- [x] **Deliverables:** `interaction-report.md` finalized and `interaction-assessment/` folder populated with verification artifacts (markdown reports and pass evidence).
 
 ## Progress & Findings
-- **Progress:** Automated verification is 100% complete. Every interaction listed in `interaction-report.md` has been verified via Playwright tests.
+- **Progress:** Automated verification and documentation are 100% complete. Every interaction listed in `interaction-report.md` has been verified via Playwright tests and documented in `interaction-assessment/`.
 - **Findings:**
     - **Compression Bug Fixed:** Identified and resolved a critical issue where compressed user state (e.g., `currentDeckGuids`) was not being decompressed when pulled from the server, causing corrupted local state and broken "Undo" functionality.
     - **Missing ID Added:** Restored the `settings-modal` ID to `src/index.html` to ensure reliable test targeting and UI consistency.
